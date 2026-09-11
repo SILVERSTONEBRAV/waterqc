@@ -1,0 +1,141 @@
+{% extends "ca/dashboard/layout/app.html" %}
+
+{% block title %}Pending CoA Approval{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h1>Pending CoA Approval</h1>
+        <p>Certificates of Analysis awaiting verification or approval.</p>
+    </div>
+
+<div class="page-actions">
+    <a href="{% url 'ca:dashboard' %}" class="btn btn-secondary">
+        Back to Dashboard
+    </a>
+</div>
+
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h2>CoA Approval Queue</h2>
+            <span>
+                {{ processes|length }}
+                pending CoA approval{{ processes|length|pluralize }}
+            </span>
+        </div>
+    </div>
+
+{% if processes %}
+<div class="table-responsive">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Sample ID</th>
+                <th>Batch</th>
+                <th>Request ID</th>
+                <th>Chemical</th>
+                <th>QA Officer</th>
+                <th>Approver</th>
+                <th>QA Reviewed</th>
+                <th>CoA Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for process in processes %}
+            <tr>
+                <td>
+                    {% if process.sample_id %}
+                        <strong>{{ process.sample_id }}</strong>
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if process.batch %}
+                        {{ process.batch }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if process.analysis_request %}
+                        {{ process.analysis_request.request_id|default:"—" }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if process.chemical %}
+                        {{ process.chemical }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if process.qa_officer %}
+                        {{ process.qa_officer }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if process.approver %}
+                        {{ process.approver }}
+                    {% else %}
+                        <span class="badge badge-warning">
+                            Unassigned
+                        </span>
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if process.qa_reviewed_at %}
+                        {{ process.qa_reviewed_at|date:"d M Y H:i" }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+
+                <td>
+                    <span class="badge badge-warning">
+                        Pending Approval
+                    </span>
+                </td>
+
+                <td>
+                    <a
+                        href="{% url 'ca:process-detail' process.pk %}"
+                        class="btn btn-primary"
+                    >
+                        Review CoA
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% else %}
+<div class="empty-state">
+    <h3>No pending CoA approvals</h3>
+    <p>
+        There are currently no Certificates of Analysis
+        awaiting approval.
+    </p>
+</div>
+{% endif %}
+
+</div>
+{% endblock %}

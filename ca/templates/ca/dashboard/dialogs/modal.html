@@ -1,0 +1,36 @@
+<div
+    class="ca-modal-root"
+    id="ca-modal-root"
+    hidden
+    aria-hidden="true"
+>
+    <div class="ca-modal-backdrop" data-action="close-modal"></div>
+
+    <div
+        class="ca-modal"
+        id="ca-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ca-modal-title"
+    >
+        <div class="ca-modal-header">
+            <div>
+                <h2 id="ca-modal-title"></h2>
+                <p id="ca-modal-subtitle"></p>
+            </div>
+
+            <button
+                type="button"
+                class="ca-icon-button"
+                data-action="close-modal"
+                aria-label="Close"
+            >
+                <span class="ca-icon ca-icon-close"></span>
+            </button>
+        </div>
+
+        <div class="ca-modal-body" id="ca-modal-body"></div>
+
+        <div class="ca-modal-footer" id="ca-modal-footer"></div>
+    </div>
+</div>

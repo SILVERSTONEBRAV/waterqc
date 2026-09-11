@@ -1,0 +1,11 @@
+# =========================================================
+# DEFAULT ROUTERS (OPTIONAL SAFE ENTRY)
+# =========================================================
+
+http:
+  routers:
+    dashboard:
+      rule: "PathPrefix(`/dashboard`) || PathPrefix(`/api`)"
+      service: api@internal
+      middlewares:
+        - secure-headers

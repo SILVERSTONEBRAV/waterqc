@@ -1,0 +1,44 @@
+<div class="wf-debugger">
+
+    <h3>Workflow Debugger</h3>
+
+    <!-- BREAKPOINTS -->
+    <div class="panel">
+
+        <h4>Breakpoints</h4>
+
+        {% for b in breakpoints %}
+            <div class="bp">
+                {{ b.0 }} → {{ b.1 }}
+            </div>
+        {% empty %}
+            <div class="muted">No breakpoints defined</div>
+        {% endfor %}
+
+    </div>
+
+    <!-- STATE GRAPH -->
+    <div class="panel">
+
+        <h4>State Map</h4>
+
+        {% for state, items in states.items %}
+            <div class="state-block">
+
+                <div class="state-header">
+                    <b>{{ state }}</b>
+                    <span>{{ items|length }}</span>
+                </div>
+
+                <div class="state-items">
+                    {% for i in items %}
+                        <div class="item">{{ i }}</div>
+                    {% endfor %}
+                </div>
+
+            </div>
+        {% endfor %}
+
+    </div>
+
+</div>

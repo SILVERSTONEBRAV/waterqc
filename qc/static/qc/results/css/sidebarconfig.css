@@ -1,0 +1,71 @@
+/* ================================
+   Sidebar Configuration Overrides
+   ================================ */
+
+/* Main dashboard grid: minimal left, thin right */
+.main-dashboard {
+  grid-template-columns: 60px minmax(0, 1fr) 200px; /* collapsed left, thin right */
+}
+
+/* Left sidebar: collapsed */
+.dashboard-sidebar-left {
+  width: 60px;
+  min-width: 60px;
+  max-width: 60px;
+  overflow: hidden; /* hide extra content */
+  padding: 0.5rem 0; /* minimal padding */
+  background: var(--surface-alt);
+  border-right: 1px solid var(--border);
+}
+
+/* Right sidebar: thin */
+.dashboard-sidebar-right {
+  width: 200px;
+  min-width: 200px;
+  max-width: 200px;
+  overflow-y: auto;
+  background: var(--surface-alt);
+  border-left: 1px solid var(--border);
+  padding: 0.75rem;
+}
+
+/* Sidebar content: icons only for left bar */
+.dashboard-sidebar-left .sidebar-card,
+.dashboard-sidebar-left .sidebar-card-body {
+  padding: 0.25rem;
+  text-align: center;
+}
+
+.dashboard-sidebar-left .sidebar-card-header {
+  display: none; /* hide headers in collapsed mode */
+}
+
+.dashboard-sidebar-left .list-item span {
+  display: none; /* hide text labels, keep icons */
+}
+
+/* Responsive: stack sidebars below workspace on small screens */
+@media (max-width: 900px) {
+  .main-dashboard {
+    display: flex;
+    flex-direction: column;
+  }
+  .dashboard-sidebar-left,
+  .dashboard-sidebar-right {
+    width: 100%;
+    max-width: none;
+    border: none;
+    padding: 0.5rem 1rem;
+  }
+}
+.param-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--slate-800);
+}
+
+.param-extra {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-top: 0.25rem;
+}

@@ -1,0 +1,43 @@
+
+<article class="ca-progress-card">
+    <div class="ca-progress-header">
+        <div class="ca-progress-title">
+            <strong>
+                {{ item.sample_id|default:item.batch.sample_id|default:"Chemical Batch" }}
+            </strong>
+
+            <span>
+                {{ item.parameter|default:item.current_test|default:"Analysis in progress" }}
+            </span>
+        </div>
+
+        <span class="ca-progress-percent">
+            {{ item.progress|default:0 }}%
+        </span>
+    </div>
+
+    <div class="ca-progress-track">
+        <div
+            class="ca-progress-bar"
+            style="width: {{ item.progress|default:0 }}%;"
+        ></div>
+    </div>
+
+    <div class="ca-progress-footer">
+        <span>
+            {{ item.completed_tests|default:0 }}
+            /
+            {{ item.required_tests|default:0 }}
+            tests
+        </span>
+
+        {% if item.analyst %}
+            <span>{{ item.analyst }}</span>
+        {% endif %}
+
+        {% if item.deadline %}
+            <span>{{ item.deadline }}</span>
+        {% endif %}
+    </div>
+</article>
+

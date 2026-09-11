@@ -1,0 +1,70 @@
+<div
+    class="ca-overlay ca-command-palette-overlay"
+    id="command-palette"
+    hidden
+    aria-hidden="true"
+>
+    <div class="ca-command-palette" role="dialog" aria-modal="true">
+        <div class="ca-command-search">
+            <span class="ca-icon ca-icon-search"></span>
+
+            <input
+                type="search"
+                id="command-search"
+                placeholder="Type a command..."
+                autocomplete="off"
+            />
+
+            <kbd>ESC</kbd>
+        </div>
+
+        <div class="ca-command-groups">
+            <section class="ca-command-group">
+                <span class="ca-command-group-title">Navigation</span>
+
+                <button type="button" class="ca-command-item" data-command="dashboard">
+                    <span class="ca-icon ca-icon-dashboard"></span>
+                    <span>Dashboard</span>
+                    <kbd>G D</kbd>
+                </button>
+
+                <button type="button" class="ca-command-item" data-command="batches">
+                    <span class="ca-icon ca-icon-package"></span>
+                    <span>Chemical Batches</span>
+                    <kbd>G B</kbd>
+                </button>
+
+                <button type="button" class="ca-command-item" data-command="requests">
+                    <span class="ca-icon ca-icon-file"></span>
+                    <span>Analysis Requests</span>
+                    <kbd>G R</kbd>
+                </button>
+
+                <button type="button" class="ca-command-item" data-command="reports">
+                    <span class="ca-icon ca-icon-report"></span>
+                    <span>Reports</span>
+                    <kbd>G P</kbd>
+                </button>
+            </section>
+
+            <section class="ca-command-group">
+                <span class="ca-command-group-title">Actions</span>
+
+                <button type="button" class="ca-command-item" data-command="create-batch">
+                    <span class="ca-icon ca-icon-plus"></span>
+                    <span>Create Chemical Batch</span>
+                </button>
+
+                <button type="button" class="ca-command-item" data-command="new-request">
+                    <span class="ca-icon ca-icon-file-plus"></span>
+                    <span>New Analysis Request</span>
+                </button>
+
+                <button type="button" class="ca-command-item" data-command="generate-report">
+                    <span class="ca-icon ca-icon-report"></span>
+                    <span>Generate Report</span>
+                </button>
+            </section>
+        </div>
+    </div>
+</div>

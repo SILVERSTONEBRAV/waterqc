@@ -1,0 +1,94 @@
+<div class="ca-header-inner">
+    <div class="ca-header-left">
+        <button
+            type="button"
+            class="ca-icon-button"
+            id="sidebar-toggle"
+            aria-label="Toggle sidebar"
+            aria-expanded="true"
+            data-action="toggle-sidebar"
+        >
+            <span class="ca-icon ca-icon-menu" aria-hidden="true"></span>
+        </button>
+
+        <a href="{% url 'ca:dashboard' %}" class="ca-brand">
+            <span class="ca-brand-mark">
+                CA
+            </span>
+            <span class="ca-brand-text">
+                <span class="ca-brand-title">Chemical Analysis</span>
+                <span class="ca-brand-subtitle">Management System</span>
+            </span>
+        </a>
+    </div>
+
+    <div class="ca-header-center">
+        <div class="ca-global-search">
+            <button
+                type="button"
+                class="ca-search-trigger"
+                data-action="open-search"
+                aria-label="Search"
+            >
+                <span class="ca-icon ca-icon-search" aria-hidden="true"></span>
+                <span class="ca-search-placeholder">Search batches, requests, results...</span>
+                <kbd>Ctrl K</kbd>
+            </button>
+        </div>
+    </div>
+
+    <div class="ca-header-right">
+        {% include "ca/dashboard/layout/notifications.html" %}
+
+        <button
+            type="button"
+            class="ca-icon-button"
+            data-action="open-command-palette"
+            aria-label="Command palette"
+        >
+            <span class="ca-icon ca-icon-command" aria-hidden="true"></span>
+        </button>
+
+        <div class="ca-user-menu" data-component="user-menu">
+            <button
+                type="button"
+                class="ca-user-trigger"
+                data-action="toggle-user-menu"
+                aria-expanded="false"
+            >
+                <span class="ca-user-avatar">
+                    {{ request.user.get_username|default:"U"|slice:":1"|upper }}
+                </span>
+
+                <span class="ca-user-info">
+                    <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
+                    <small>{{ request.user.email|default:"Laboratory User" }}</small>
+                </span>
+
+                <span class="ca-icon ca-icon-chevron-down" aria-hidden="true"></span>
+            </button>
+
+            <div class="ca-user-dropdown" hidden>
+                <a href="#" class="ca-menu-item">
+                    <span class="ca-icon ca-icon-user"></span>
+                    Profile
+                </a>
+
+                <a href="#" class="ca-menu-item">
+                    <span class="ca-icon ca-icon-settings"></span>
+                    Settings
+                </a>
+
+                <div class="ca-menu-divider"></div>
+
+                <form method="post" action="{% url 'accounts:logout' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="ca-menu-item ca-menu-danger">
+                        <span class="ca-icon ca-icon-logout"></span>
+                        Sign out
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

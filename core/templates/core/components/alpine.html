@@ -1,0 +1,15 @@
+<script>
+document.addEventListener("alpine:init",()=>{
+
+    Alpine.store("app",{
+
+        online:navigator.onLine,
+
+        loading:false,
+
+        websocket:false
+
+    });
+
+});
+</script>

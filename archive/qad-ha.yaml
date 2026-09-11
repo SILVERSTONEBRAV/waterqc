@@ -1,0 +1,732 @@
+# =========================================================
+# 🛡️ QAD Stack — Fully .env-Driven Kubernetes HA Manifest
+# =========================================================
+
+# -------------------------
+# Namespace
+# -------------------------
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ${NAMESPACE:-qad}
+
+# =========================================================
+# Secrets — Sensitive Values
+# =========================================================
+apiVersion: v1
+kind: Secret
+metadata:
+  name: django-secret
+  namespace: ${NAMESPACE:-qad}
+type: Opaque
+stringData:
+  DJANGO_SECRET_KEY: ${SECRET_KEY}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  REDIS_PASSWORD: ${REDIS_PASSWORD}
+  EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD}
+  JWT_SIGNING_KEY: ${JWT_SIGNING_KEY}
+
+# =========================================================
+# ConfigMaps — Non-sensitive Configs
+# =========================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pg-bouncer-config
+  namespace: ${NAMESPACE:-qad}
+data:
+  pgbouncer.ini: |
+    [databases]
+    ${POSTGRES_DB} = host=${POSTGRES_HOST} port=${POSTGRES_PORT} dbname=${POSTGRES_DB} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD}
+    [pgbouncer]
+    listen_addr = 0.0.0.0
+    listen_port = ${POSTGRES_PORT}
+    auth_type = md5
+    auth_file = /etc/pgbouncer/userlist.txt
+    pool_mode = transaction
+    max_client_conn = ${PGBOUNCER_MAX_CLIENT_CONN}
+    default_pool_size = ${PGBOUNCER_POOL_SIZE}
+  userlist.txt: |
+    "${POSTGRES_USER}" "md5<your-md5-password>"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: ${NAMESPACE:-qad}
+data:
+  default.conf: |
+    server {
+        listen ${NGINX_PORT_HTTP:-80};
+        server_name ${DOMAIN_NAME};
+        client_max_body_size ${NGINX_MAX_BODY:-20M};
+        location / {
+            proxy_pass http://${WEB_SERVICE_HOST}:${WEB_SERVICE_PORT};
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        location /static/ { alias /static/; }
+        location /media/ { alias /media/; }
+    }
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-config
+  namespace: ${NAMESPACE:-qad}
+data:
+  HEALTHCHECK_PATH: ${HEALTHCHECK_PATH:-/health/}
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: celery-config
+  namespace: ${NAMESPACE:-qad}
+data:
+  CELERY_CONCURRENCY: "${CELERY_CONCURRENCY:-4}"
+  REDIS_HOST: ${REDIS_HOST:-redis}
+  REDIS_PORT: "${REDIS_PORT:-6379}"
+  REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+# =========================================================
+# PersistentVolumeClaims
+# =========================================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: ${NAMESPACE:-qad}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: ${POSTGRES_STORAGE:-10Gi}
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+  namespace: ${NAMESPACE:-qad}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: ${REDIS_STORAGE:-5Gi}
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: staticfiles-pvc
+  namespace: ${NAMESPACE:-qad}
+spec:
+  accessModes: [ReadWriteMany]
+  resources:
+    requests:
+      storage: ${STATICFILES_STORAGE:-5Gi}
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: media-pvc
+  namespace: ${NAMESPACE:-qad}
+spec:
+  accessModes: [ReadWriteMany]
+  resources:
+    requests:
+      storage: ${MEDIA_STORAGE:-10Gi}
+
+# =========================================================
+# PostgreSQL HA (Patroni) StatefulSet
+# =========================================================
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: ${NAMESPACE:-qad}
+spec:
+  serviceName: postgres
+  replicas: ${POSTGRES_REPLICAS:-3}
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: patroni
+          image: ${PATRONI_IMAGE:-patroni:2.1}
+          ports:
+            - containerPort: ${POSTGRES_PORT:-5432}
+          env:
+            - name: PATRONI_SCOPE
+              value: "qad"
+            - name: PATRONI_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: PATRONI_RESTAPI_LISTEN
+              value: "0.0.0.0:8008"
+            - name: PATRONI_RESTAPI_CONNECT_ADDRESS
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: PATRONI_ETCD_HOSTS
+              value: ${ETCD_HOSTS:-etcd:2379}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: django-secret
+                  key: POSTGRES_PASSWORD
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+
+---
+# HAProxy Service for PostgreSQL
+apiVersion: v1
+kind: Service
+metadata:
+  name: haproxy-postgres
+  namespace: ${NAMESPACE:-qad}
+spec:
+  ports:
+    - port: ${POSTGRES_PORT:-6432}
+      targetPort: ${POSTGRES_PORT:-6432}
+  selector:
+    app: postgres
+
+# =========================================================
+# Redis HA + Sentinel
+# =========================================================
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+  namespace: ${NAMESPACE:-qad}
+spec:
+  serviceName: redis
+  replicas: ${REDIS_REPLICAS:-3}
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: ${REDIS_IMAGE:-redis:7}
+          command: ["redis-server", "/etc/redis/redis.conf"]
+          ports:
+            - containerPort: ${REDIS_PORT:-6379}
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: django-secret
+                  key: REDIS_PASSWORD
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+      volumes:
+        - name: redis-data
+          persistentVolumeClaim:
+            claimName: redis-pvc
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-sentinel
+  namespace: ${NAMESPACE:-qad}
+spec:
+  serviceName: redis-sentinel
+  replicas: ${REDIS_SENTINEL_REPLICAS:-3}
+  selector:
+    matchLabels:
+      app: redis-sentinel
+  template:
+    metadata:
+      labels:
+        app: redis-sentinel
+    spec:
+      containers:
+        - name: sentinel
+          image: ${REDIS_IMAGE:-redis:7}
+          command: ["redis-sentinel", "/etc/redis/sentinel.conf"]
+          ports:
+            - containerPort: ${REDIS_SENTINEL_PORT:-26379}
+
+# =========================================================
+# PgBouncer Deployment
+# =========================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pgbouncer
+  namespace: ${NAMESPACE:-qad}
+spec:
+  replicas: ${PGBOUNCER_REPLICAS:-2}
+  selector:
+    matchLabels:
+      app: pgbouncer
+  template:
+    metadata:
+      labels:
+        app: pgbouncer
+    spec:
+      containers:
+        - name: pgbouncer
+          image: ${PGBOUNCER_IMAGE:-localhost/edoburu-pgbouncer:latest}
+          ports:
+            - containerPort: ${POSTGRES_PORT:-6432}
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: django-secret
+                  key: POSTGRES_PASSWORD
+          volumeMounts:
+            - name: config
+              mountPath: /etc/pgbouncer
+      volumes:
+        - name: config
+          configMap:
+            name: pg-bouncer-config
+
+# =========================================================
+# Django Migrations Job
+# =========================================================
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: django-migrate
+  namespace: ${NAMESPACE:-qad}
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      containers:
+        - name: migrate
+          image: ${WEB_IMAGE:-localhost/qad-web:latest}
+          command: ["sh", "-c", "python manage.py migrate --noinput"]
+          envFrom:
+            - secretRef:
+                name: django-secret
+          volumeMounts:
+            - name: staticfiles
+              mountPath: /app/staticfiles
+            - name: media
+              mountPath: /app/media
+      restartPolicy: OnFailure
+      volumes:
+        - name: staticfiles
+          persistentVolumeClaim:
+            claimName: staticfiles-pvc
+        - name: media
+          persistentVolumeClaim:
+            claimName: media-pvc
+
+# =========================================================
+# Web Deployment (Gunicorn) + HPA + Canary
+# =========================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: ${NAMESPACE:-qad}
+spec:
+  replicas: ${WEB_REPLICAS:-3}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      initContainers:
+        - name: wait-for-backend
+          image: ${WEB_IMAGE:-localhost/qad-web:latest}
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z ${POSTGRES_HOST:-haproxy-postgres} ${POSTGRES_PORT:-6432}; do sleep 2; done
+              until nc -z ${REDIS_HOST:-redis} ${REDIS_PORT:-6379}; do sleep 2; done
+      containers:
+        - name: web
+          image: ${WEB_IMAGE:-localhost/qad-web:latest}
+          ports:
+            - containerPort: ${WEB_PORT:-8000}
+          envFrom:
+            - secretRef:
+                name: django-secret
+            - configMapRef:
+                name: web-config
+          readinessProbe:
+            httpGet:
+              path: ${HEALTHCHECK_PATH:-/health/}
+              port: ${WEB_PORT:-8000}
+          livenessProbe:
+            httpGet:
+              path: ${HEALTHCHECK_PATH:-/health/}
+              port: ${WEB_PORT:-8000}
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sh", "-c", "sleep ${PRESTOP_SLEEP:-15}"]
+          resources:
+            requests:
+              cpu: ${WEB_CPU_REQUEST:-500m}
+              memory: ${WEB_MEMORY_REQUEST:-512Mi}
+            limits:
+              cpu: ${WEB_CPU_LIMIT:-1}
+              memory: ${WEB_MEMORY_LIMIT:-1Gi}
+      volumes:
+        - name: staticfiles
+          persistentVolumeClaim:
+            claimName: staticfiles-pvc
+        - name: media
+          persistentVolumeClaim:
+            claimName: media-pvc
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: web
+              topologyKey: "kubernetes.io/hostname"
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: web-hpa
+  namespace: ${NAMESPACE:-qad}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: web
+  minReplicas: ${WEB_HPA_MIN:-2}
+  maxReplicas: ${WEB_HPA_MAX:-6}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: ${WEB_HPA_CPU_TARGET:-70}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-canary
+  namespace: ${NAMESPACE:-qad}
+spec:
+  replicas: ${WEB_CANARY_REPLICAS:-1}
+  selector:
+    matchLabels:
+      app: web
+      version: canary
+  template:
+    metadata:
+      labels:
+        app: web
+        version: canary
+    spec:
+      containers:
+        - name: web
+          image: ${WEB_CANARY_IMAGE:-localhost/qad-web:canary}
+          ports:
+            - containerPort: ${WEB_PORT:-8000}
+          envFrom:
+            - secretRef:
+                name: django-secret
+          readinessProbe:
+            httpGet:
+              path: ${HEALTHCHECK_PATH:-/health/}
+              port: ${WEB_PORT:-8000}
+          livenessProbe:
+            httpGet:
+              path: ${HEALTHCHECK_PATH:-/health/}
+              port: ${WEB_PORT:-8000}
+          resources:
+            requests:
+              cpu: ${WEB_CANARY_CPU_REQUEST:-250m}
+              memory: ${WEB_CANARY_MEMORY_REQUEST:-256Mi}
+            limits:
+              cpu: ${WEB_CANARY_CPU_LIMIT:-500m}
+              memory: ${WEB_CANARY_MEMORY_LIMIT:-512Mi}
+
+# =========================================================
+# Daphne Deployment + HPA
+# =========================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: daphne
+  namespace: ${NAMESPACE:-qad}
+spec:
+  replicas: ${DAPHNE_REPLICAS:-2}
+  selector:
+    matchLabels:
+      app: daphne
+  template:
+    metadata:
+      labels:
+        app: daphne
+    spec:
+      containers:
+        - name: daphne
+          image: ${DAPHNE_IMAGE:-localhost/qad-daphne:latest}
+          ports:
+            - containerPort: ${DAPHNE_PORT:-8001}
+          readinessProbe:
+            httpGet:
+              path: ${HEALTHCHECK_PATH:-/health/}
+              port: ${DAPHNE_PORT:-8001}
+          livenessProbe:
+            httpGet:
+              path: ${HEALTHCHECK_PATH:-/health/}
+              port: ${DAPHNE_PORT:-8001}
+          resources:
+            requests:
+              cpu: ${DAPHNE_CPU_REQUEST:-250m}
+              memory: ${DAPHNE_MEMORY_REQUEST:-256Mi}
+            limits:
+              cpu: ${DAPHNE_CPU_LIMIT:-500m}
+              memory: ${DAPHNE_MEMORY_LIMIT:-512Mi}
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: daphne-hpa
+  namespace: ${NAMESPACE:-qad}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: daphne
+  minReplicas: ${DAPHNE_HPA_MIN:-2}
+  maxReplicas: ${DAPHNE_HPA_MAX:-4}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: ${DAPHNE_HPA_CPU_TARGET:-70}
+
+# =========================================================
+# Celery Worker + HPA
+# =========================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery
+  namespace: ${NAMESPACE:-qad}
+spec:
+  replicas: ${CELERY_REPLICAS:-2}
+  selector:
+    matchLabels:
+      app: celery
+  template:
+    metadata:
+      labels:
+        app: celery
+    spec:
+      containers:
+        - name: celery
+          image: ${CELERY_IMAGE:-localhost/qad-celery:latest}
+          command: ["celery", "-A", "qad", "worker", "--loglevel=INFO", "--concurrency=${CELERY_CONCURRENCY:-4}"]
+          envFrom:
+            - secretRef:
+                name: django-secret
+            - configMapRef:
+                name: celery-config
+          readinessProbe:
+            exec:
+              command: ["celery", "-A", "qad", "status"]
+          livenessProbe:
+            exec:
+              command: ["celery", "-A", "qad", "status"]
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sh", "-c", "sleep ${PRESTOP_SLEEP:-10}"]
+          resources:
+            requests:
+              cpu: ${CELERY_CPU_REQUEST:-250m}
+              memory: ${CELERY_MEMORY_REQUEST:-256Mi}
+            limits:
+              cpu: ${CELERY_CPU_LIMIT:-500m}
+              memory: ${CELERY_MEMORY_LIMIT:-512Mi}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: celery
+              topologyKey: "kubernetes.io/hostname"
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: celery-hpa
+  namespace: ${NAMESPACE:-qad}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: celery
+  minReplicas: ${CELERY_HPA_MIN:-2}
+  maxReplicas: ${CELERY_HPA_MAX:-6}
+  metrics:
+    - type: External
+      external:
+        metric:
+          name: redis_queue_length
+        target:
+          type: AverageValue
+          averageValue: ${CELERY_QUEUE_TARGET:-50}
+
+# =========================================================
+# Celery Beat Deployment
+# =========================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-beat
+  namespace: ${NAMESPACE:-qad}
+spec:
+  replicas: ${CELERY_BEAT_REPLICAS:-2}
+  selector:
+    matchLabels:
+      app: celery-beat
+  template:
+    metadata:
+      labels:
+        app: celery-beat
+    spec:
+      containers:
+        - name: beat
+          image: ${CELERY_IMAGE:-localhost/qad-celery:latest}
+          command: ["celery", "-A", "qad", "beat", "--loglevel=INFO"]
+          envFrom:
+            - secretRef:
+                name: django-secret
+            - configMapRef:
+                name: celery-config
+          resources:
+            requests:
+              cpu: ${CELERY_BEAT_CPU_REQUEST:-250m}
+              memory: ${CELERY_BEAT_MEMORY_REQUEST:-256Mi}
+            limits:
+              cpu: ${CELERY_BEAT_CPU_LIMIT:-500m}
+              memory: ${CELERY_BEAT_MEMORY_LIMIT:-512Mi}
+
+# =========================================================
+# Nginx Deployment + LoadBalancer + Ingress
+# =========================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  namespace: ${NAMESPACE:-qad}
+spec:
+  replicas: ${NGINX_REPLICAS:-2}
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: ${NGINX_IMAGE:-nginx:1.25-alpine}
+          ports:
+            - containerPort: ${NGINX_PORT_HTTP:-80}
+            - containerPort: ${NGINX_PORT_HTTPS:-443}
+          envFrom:
+            - configMapRef:
+                name: nginx-config
+          volumeMounts:
+            - name: nginx-conf
+              mountPath: /etc/nginx/conf.d
+      volumes:
+        - name: nginx-conf
+          configMap:
+            name: nginx-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+  namespace: ${NAMESPACE:-qad}
+spec:
+  type: LoadBalancer
+  selector:
+    app: nginx
+  ports:
+    - name: http
+      port: ${NGINX_PORT_HTTP:-80}
+      targetPort: ${NGINX_PORT_HTTP:-80}
+    - name: https
+      port: ${NGINX_PORT_HTTPS:-443}
+      targetPort: ${NGINX_PORT_HTTPS:-443}
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nginx-ingress
+  namespace: ${NAMESPACE:-qad}
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: ${NGINX_MAX_BODY:-20M}
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: ${DOMAIN_NAME}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: nginx
+                port:
+                  number: ${NGINX_PORT_HTTP:-80}
+  tls:
+    - hosts:
+        - ${DOMAIN_NAME}
+      secretName: ${TLS_SECRET_NAME}

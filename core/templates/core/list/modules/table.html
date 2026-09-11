@@ -1,0 +1,23 @@
+<div class="table-responsive position-relative">
+
+<table class="table table-hover align-middle mb-0">
+
+<thead class="table-light">
+<tr>
+    <th style="width:40px;">
+        <input type="checkbox" id="select-all">
+    </th>
+
+    {% for field in fields %}
+        <th>{{ field.verbose }}</th>
+    {% endfor %}
+
+    <th class="text-end">Actions</th>
+</tr>
+</thead>
+
+<tbody id="table-body"></tbody>
+
+</table>
+
+</div>

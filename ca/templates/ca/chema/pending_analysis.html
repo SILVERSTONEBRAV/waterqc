@@ -1,0 +1,155 @@
+{% extends "ca/dashboard/layout/app.html" %}
+
+{% block title %}Pending Analyses{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h1>Pending Analyses</h1>
+        <p>Chemical analysis processes currently awaiting completion by an assigned analyst.</p>
+    </div>
+<div class="page-actions">
+    <a href="{% url 'ca:dashboard' %}" class="btn btn-secondary">
+        Back to Dashboard
+    </a>
+</div>
+
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h2>Analysis Queue</h2>
+            <span>
+                {{ processes|length }}
+                pending analysis{{ processes|length|pluralize }}
+            </span>
+        </div>
+    </div>
+
+```
+{% if processes %}
+<div class="table-responsive">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Sample ID</th>
+                <th>Batch</th>
+                <th>Request ID</th>
+                <th>Chemical</th>
+                <th>Analyst</th>
+                <th>Progress</th>
+                <th>Analysis Started</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for process in processes %}
+            <tr>
+                <td>
+                    {% if process.sample_id %}
+                        <strong>{{ process.sample_id }}</strong>
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if process.batch %}
+                        {{ process.batch }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if process.analysis_request %}
+                        {{ process.analysis_request.request_id|default:"—" }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if process.chemical %}
+                        {{ process.chemical }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if process.assigned_analyst %}
+                        {{ process.assigned_analyst }}
+                    {% else %}
+                        <span class="badge badge-warning">
+                            Unassigned
+                        </span>
+                    {% endif %}
+                </td>
+
+                <td>
+                    <div class="progress">
+                        <div
+                            class="progress-bar"
+                            role="progressbar"
+                            style="width: {{ process.analysis_progress }}%;"
+                            aria-valuenow="{{ process.analysis_progress }}"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                        >
+                            {{ process.analysis_progress }}%
+                        </div>
+                    </div>
+
+                    <small>
+                        {{ process.completed_test_count }}
+                        / {{ process.required_test_count }}
+                        tests
+                    </small>
+                </td>
+
+                <td>
+                    {% if process.analysis_started_at %}
+                        {{ process.analysis_started_at|date:"d M Y H:i" }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+
+                <td>
+                    <span class="badge badge-info">
+                        {{ process.get_status_display }}
+                    </span>
+                </td>
+
+                <td>
+                    <a
+                        href="{% url 'ca:process-detail' process.pk %}"
+                        class="btn btn-primary"
+                    >
+                        Continue
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% else %}
+<div class="empty-state">
+    <h3>No pending analyses</h3>
+    <p>
+        There are currently no chemical analysis processes
+        awaiting analytical work.
+    </p>
+</div>
+{% endif %}
+
+
+</div>
+{% endblock %}

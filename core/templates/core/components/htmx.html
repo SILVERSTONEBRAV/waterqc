@@ -1,0 +1,25 @@
+<script>
+document.body.addEventListener("htmx:beforeRequest",function(){
+
+    document.body.classList.add("cursor-progress");
+
+});
+
+document.body.addEventListener("htmx:afterRequest",function(){
+
+    document.body.classList.remove("cursor-progress");
+
+});
+
+document.body.addEventListener("htmx:responseError",function(e){
+
+    dispatchAppEvent(
+        APP.events.NOTIFY,
+        {
+            type:"error",
+            message:"Request failed."
+        }
+    );
+
+});
+</script>

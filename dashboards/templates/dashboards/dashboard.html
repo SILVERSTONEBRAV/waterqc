@@ -1,0 +1,475 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block title %}
+{{ dashboard.title|default:"Enterprise Intelligence Platform" }}
+{% endblock %}
+
+{% block content %}
+<div
+    x-data="dashboardManager()"
+    class="dashboard-shell enterprise-dashboard"
+>
+
+    <header class="dashboard-header glass-panel">
+
+        <div class="header-left">
+
+            <nav class="dashboard-breadcrumb">
+                <a href="/">Home</a>
+                <i class="fas fa-chevron-right"></i>
+                <span>Analytics</span>
+                <i class="fas fa-chevron-right"></i>
+                <span>{{ dashboard.title }}</span>
+            </nav>
+
+            <div class="dashboard-heading">
+                <h1>{{ dashboard.title }}</h1>
+
+                {% if dashboard.description %}
+                <p>
+                    {{ dashboard.description }}
+                </p>
+                {% endif %}
+
+                <div class="dashboard-meta">
+                    <span>
+                        <i class="fas fa-layer-group"></i>
+                        {{ widgets|length }} Widgets
+                    </span>
+
+                    <span>
+                        <i class="fas fa-bolt"></i>
+                        Real-time Analytics
+                    </span>
+
+                    <span>
+                        <i class="fas fa-database"></i>
+                        Connected Data Sources
+                    </span>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="header-right">
+
+            <button class="btn btn-outline">
+                <i class="fas fa-clock"></i>
+                <span x-text="lastUpdated"></span>
+            </button>
+
+            <button
+                class="btn btn-outline"
+                @click="refreshAll()"
+            >
+                <i class="fas fa-rotate"></i>
+                Refresh
+            </button>
+
+            <button class="btn btn-outline">
+                <i class="fas fa-camera"></i>
+                Snapshot
+            </button>
+
+            <button class="btn btn-outline">
+                <i class="fas fa-file-export"></i>
+                Export
+            </button>
+
+            <button class="btn btn-primary">
+                <i class="fas fa-plus"></i>
+                New Widget
+            </button>
+
+        </div>
+
+    </header>
+
+    <section class="dashboard-command-center glass-panel">
+
+        <div class="command-left">
+
+            <div class="dashboard-search">
+                <i class="fas fa-search"></i>
+
+                <input
+                    type="text"
+                    placeholder="Search dashboards, widgets, charts..."
+                    x-model="search"
+                >
+            </div>
+
+            {% if dashboard.filters %}
+            <div class="dashboard-filters">
+
+                {% for filter in dashboard.filters %}
+                <select class="dashboard-filter">
+                    <option>
+                        {{ filter.label }}
+                    </option>
+                </select>
+                {% endfor %}
+
+            </div>
+            {% endif %}
+
+        </div>
+
+        <div class="command-right">
+
+            <button class="icon-btn">
+                <i class="fas fa-calendar"></i>
+            </button>
+
+            <button class="icon-btn">
+                <i class="fas fa-sliders-h"></i>
+            </button>
+
+            <button class="icon-btn">
+                <i class="fas fa-filter"></i>
+            </button>
+
+            <button class="icon-btn">
+                <i class="fas fa-chart-pie"></i>
+            </button>
+
+            <button class="icon-btn">
+                <i class="fas fa-project-diagram"></i>
+            </button>
+
+            <button
+                class="icon-btn"
+                @click="toggleFullscreen()"
+            >
+                <i class="fas fa-expand"></i>
+            </button>
+
+        </div>
+
+    </section>
+
+    {% if kpis %}
+    <section class="dashboard-kpis">
+
+        {% for kpi in kpis %}
+        <article class="kpi-card glass-panel">
+
+            <div class="kpi-top">
+
+                <div class="kpi-icon">
+                    <i class="{{ kpi.icon|default:'fas fa-chart-line' }}"></i>
+                </div>
+
+                <button class="icon-btn">
+                    <i class="fas fa-ellipsis-h"></i>
+                </button>
+
+            </div>
+
+            <div class="kpi-value">
+                {{ kpi.value }}
+            </div>
+
+            <div class="kpi-label">
+                {{ kpi.label }}
+            </div>
+
+            {% if kpi.change %}
+            <div
+                class="
+                    kpi-change
+                    {% if kpi.change > 0 %}
+                        positive
+                    {% else %}
+                        negative
+                    {% endif %}
+                "
+            >
+                {{ kpi.change }}
+            </div>
+            {% endif %}
+
+            <div class="kpi-progress">
+                <div class="kpi-progress-bar"></div>
+            </div>
+
+        </article>
+        {% endfor %}
+
+    </section>
+    {% endif %}
+
+    <main
+        id="dashboard-grid"
+        class="dashboard-grid dashboard-grid-12"
+    >
+
+        {% for widget in widgets %}
+        <section
+            class="
+                dashboard-widget
+                glass-panel
+                widget-size-{{ widget.width|default:4 }}
+                widget-height-{{ widget.height|default:2 }}
+                widget-type-{{ widget.widget_type|default:'chart' }}
+            "
+            data-widget="{{ widget.key }}"
+            x-show="
+                '{{ widget.title|lower }}'
+                .includes(search.toLowerCase())
+            "
+        >
+
+            <header class="widget-header">
+
+                <div class="widget-title">
+
+                    <div class="widget-icon">
+                        <i class="{{ widget.icon|default:'fas fa-chart-area' }}"></i>
+                    </div>
+
+                    <div>
+
+                        <h3>
+                            {{ widget.title }}
+                        </h3>
+
+                        {% if widget.description %}
+                        <p>
+                            {{ widget.description }}
+                        </p>
+                        {% endif %}
+
+                    </div>
+
+                </div>
+
+                <div class="widget-actions">
+
+                    {% if widget.realtime %}
+                    <span class="live-indicator">
+                        <span class="live-dot"></span>
+                        LIVE
+                    </span>
+                    {% endif %}
+
+                    <button class="icon-btn">
+                        <i class="fas fa-thumbtack"></i>
+                    </button>
+
+                    <button class="icon-btn">
+                        <i class="fas fa-star"></i>
+                    </button>
+
+                    <button class="icon-btn">
+                        <i class="fas fa-download"></i>
+                    </button>
+
+                    <button
+                        class="icon-btn"
+                        hx-get="{{ widget.url }}"
+                        hx-target="#widget-{{ widget.key }}"
+                    >
+                        <i class="fas fa-rotate"></i>
+                    </button>
+
+                    <button class="icon-btn">
+                        <i class="fas fa-expand"></i>
+                    </button>
+
+                    <button class="icon-btn">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+
+                </div>
+
+            </header>
+
+            <div
+                id="widget-{{ widget.key }}"
+                class="widget-body"
+
+                {% if widget.refresh_interval %}
+                hx-get="{{ widget.url }}"
+                hx-trigger="every {{ widget.refresh_interval }}s"
+                hx-target="#widget-{{ widget.key }}"
+                hx-swap="innerHTML"
+                {% endif %}
+            >
+
+                {% include "dashboards/widget.html" with widget=widget %}
+
+            </div>
+
+            <footer class="widget-footer">
+
+                <div class="widget-meta">
+
+                    <span>
+                        <i class="fas fa-clock"></i>
+                        {{ widget.refresh_interval|default:300 }}s
+                    </span>
+
+                    <span>
+                        <i class="fas fa-chart-area"></i>
+                        {{ widget.widget_type|default:"Analytics" }}
+                    </span>
+
+                    {% if widget.owner %}
+                    <span>
+                        <i class="fas fa-user"></i>
+                        {{ widget.owner }}
+                    </span>
+                    {% endif %}
+
+                </div>
+
+                <div class="widget-health">
+
+                    <span class="status-dot"></span>
+
+                    <span>
+                        Operational
+                    </span>
+
+                </div>
+
+            </footer>
+
+        </section>
+        {% empty %}
+
+        <section class="dashboard-empty glass-panel">
+
+            <div class="empty-icon">
+                <i class="fas fa-chart-line"></i>
+            </div>
+
+            <h2>
+                Dashboard Empty
+            </h2>
+
+            <p>
+                No analytical widgets have been configured.
+            </p>
+
+            <button class="btn btn-primary">
+                <i class="fas fa-plus"></i>
+                Create Widget
+            </button>
+
+        </section>
+
+        {% endfor %}
+
+    </main>
+
+    <aside class="dashboard-sidebar">
+
+        <section class="glass-panel side-card">
+
+            <header>
+                <h3>System Insights</h3>
+            </header>
+
+            <div class="insight-list">
+
+                <div class="insight-item">
+                    <i class="fas fa-chart-bar"></i>
+                    <div>
+                        {{ widgets|length }}
+                        active visualizations
+                    </div>
+                </div>
+
+                <div class="insight-item">
+                    <i class="fas fa-bolt"></i>
+                    <div>
+                        Streaming analytics enabled
+                    </div>
+                </div>
+
+                <div class="insight-item">
+                    <i class="fas fa-database"></i>
+                    <div>
+                        Data synchronization healthy
+                    </div>
+                </div>
+
+                <div class="insight-item">
+                    <i class="fas fa-brain"></i>
+                    <div>
+                        Forecasting and ML available
+                    </div>
+                </div>
+
+            </div>
+
+        </section>
+
+        <section class="glass-panel side-card">
+
+            <header>
+                <h3>Visualization Types</h3>
+            </header>
+
+            <div class="viz-grid">
+
+                <span>Line</span>
+                <span>Bar</span>
+                <span>Area</span>
+                <span>Pie</span>
+                <span>Scatter</span>
+                <span>Heatmap</span>
+                <span>Treemap</span>
+                <span>Radar</span>
+                <span>Gauge</span>
+                <span>Sankey</span>
+                <span>Geo</span>
+                <span>Network</span>
+
+            </div>
+
+        </section>
+
+    </aside>
+
+    <button
+        class="dashboard-fab"
+        title="Create Widget"
+    >
+        <i class="fas fa-plus"></i>
+    </button>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function dashboardManager() {
+    return {
+        search: "",
+        lastUpdated: new Date().toLocaleTimeString(),
+
+        refreshAll() {
+            document
+                .querySelectorAll("[hx-get]")
+                .forEach(el => htmx.trigger(el, "refresh"));
+
+            this.lastUpdated =
+                new Date().toLocaleTimeString();
+        },
+
+        toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement
+                    .requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        }
+    };
+}
+</script>
+{% endblock %}

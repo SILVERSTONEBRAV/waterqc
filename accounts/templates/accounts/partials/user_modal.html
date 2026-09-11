@@ -1,0 +1,58 @@
+<div class="modal-header">
+    <h5 class="modal-title">{{ user.id|default:"Add New User" }}</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+</div>
+<form>
+  <div class="modal-body" data-tab="usersTable">
+    <div class="mb-3">
+      <label class="form-label">Username</label>
+      <input type="text" name="username" class="form-control" value="{{ user.username|default:'' }}" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">First Name</label>
+      <input type="text" name="first_name" class="form-control" value="{{ user.first_name|default:'' }}">
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Last Name</label>
+      <input type="text" name="last_name" class="form-control" value="{{ user.last_name|default:'' }}">
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Email</label>
+      <input type="email" name="email" class="form-control" value="{{ user.email|default:'' }}">
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Section</label>
+      <select name="section_id" class="form-select">
+        <option value="">— Select Section —</option>
+        {% for s in sections %}
+          <option value="{{ s.id }}" {% if user.section_id == s.id %}selected{% endif %}>{{ s.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Groups</label>
+      <select name="groups" class="form-select" multiple>
+        {% for g in groups %}
+          <option value="{{ g.id }}" {% if g.id in user.groups.all.values_list "id" %}selected{% endif %}>{{ g.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-check mb-3">
+      <input class="form-check-input" type="checkbox" name="is_active" id="activeCheck" {% if user.is_active %}checked{% endif %}>
+      <label class="form-check-label" for="activeCheck">Active</label>
+    </div>
+    <div class="form-check mb-3">
+      <input class="form-check-input" type="checkbox" name="is_locked" id="lockedCheck" {% if user.is_locked %}checked{% endif %}>
+      <label class="form-check-label" for="lockedCheck">Locked</label>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Password</label>
+      <input type="password" name="password" class="form-control">
+      {% if user.id %}<small class="text-muted">Leave blank to keep current password</small>{% endif %}
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button type="submit" class="btn btn-primary">Save</button>
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+  </div>
+</form>

@@ -1,0 +1,29 @@
+{% block content %}
+
+<div class="profile-card">
+
+    <img src="{{ user_obj.profile_picture_url }}" alt="Avatar" class="avatar">
+
+    <h2>{{ user_obj.full_name }}</h2>
+
+    <ul class="profile-fields">
+        {% for label, value in fields.items %}
+            <li><strong>{{ label }}:</strong> {{ value }}</li>
+        {% endfor %}
+    </ul>
+
+    <!-- Normal users: only change picture -->
+    <a href="{% url 'accounts:profile_picture_update' %}" class="btn">
+        Change Profile Picture
+    </a>
+
+    <!-- Superusers: full CRUD -->
+    {% if request.user.is_superuser %}
+        <a href="{% url 'accounts:user_list' %}" class="btn btn-admin">
+            Manage Users
+        </a>
+    {% endif %}
+
+</div>
+
+{% endblock %}

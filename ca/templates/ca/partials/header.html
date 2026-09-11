@@ -1,0 +1,29 @@
+<header class="topbar">
+    <div class="brand">
+        {% if company.logo %}
+            <img
+                src="{{ company.logo.url }}"
+                alt="{{ company.name }} Logo"
+                class="logo"
+            >
+        {% endif %}
+
+        <span class="company-name">
+            {{ company.name|default:"NCWSC" }}
+        </span>
+    </div>
+
+    <div class="user-menu">
+        {% if request.user.is_authenticated %}
+            {% include "accounts/partials/user_dropdown.html" %}
+        {% endif %}
+
+        <button
+            id="themeToggle"
+            class="theme-toggle"
+            aria-label="Toggle Dark/Light Mode"
+        >
+            <i class="fas fa-moon"></i>
+        </button>
+    </div>
+</header>

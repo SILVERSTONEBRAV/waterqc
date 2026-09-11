@@ -1,0 +1,1345 @@
+{% extends "ca/dashboard/layout/app.html" %}
+{% load static %}
+
+{% block title %}Chemical Analysis Command Center{% endblock %}
+
+{% block app_module %}dashboard{% endblock %}
+
+{% block page_css %}
+
+<link rel="stylesheet" href="{% static 'ca/css/pages/dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<div
+    class="ca-dashboard"
+    id="chemical-analysis-dashboard"
+    data-dashboard="command-center"
+    data-refresh-url="{% url 'ca:dashboard' %}"
+    data-action-url="{% url 'ca:dashboard-action' %}"
+    data-process-refresh-url="{% url 'ca:process-refresh' 0 %}"
+>
+
+```
+<section class="dashboard-commandbar">
+    <div class="dashboard-commandbar__identity">
+        <span class="dashboard-eyebrow">CHEMICAL ANALYSIS</span>
+        <h1>Chemical Analysis Command Center</h1>
+
+        <p>
+            End-to-end control of chemical receipt, sampling, analysis,
+            quality review, approval, certification and batch disposition.
+        </p>
+
+        {% if treatment_plant %}
+            <div class="dashboard-context">
+                <span>Plant</span>
+                <strong>{{ treatment_plant.name }}</strong>
+            </div>
+        {% elif plant_context.is_superuser %}
+            <div class="dashboard-context">
+                <span>Scope</span>
+                <strong>All Treatment Plants</strong>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="dashboard-commandbar__actions">
+        <a
+            href="{% url 'ca:my-tasks' %}"
+            class="ca-btn ca-btn--primary"
+        >
+            My Tasks
+        </a>
+
+        <a
+            href="{% url 'ca:batch-create' %}"
+            class="ca-btn ca-btn--secondary"
+        >
+            Receive Batch
+        </a>
+
+        <a
+            href="{% url 'ca:process-list' %}"
+            class="ca-btn ca-btn--secondary"
+        >
+            Processes
+        </a>
+
+        <a
+            href="{% url 'ca:result-list' %}"
+            class="ca-btn ca-btn--secondary"
+        >
+            Results
+        </a>
+
+        <a
+            href="{% url 'ca:coa-list' %}"
+            class="ca-btn ca-btn--secondary"
+        >
+            CoA
+        </a>
+
+        <button
+            type="button"
+            class="ca-btn ca-btn--ghost"
+            data-dashboard-refresh
+        >
+            Refresh
+        </button>
+    </div>
+</section>
+
+<section class="dashboard-status-strip">
+    <div class="status-strip__item">
+        <span>System Status</span>
+        <strong class="status-positive">Operational</strong>
+    </div>
+
+    <div class="status-strip__item">
+        <span>Last Updated</span>
+        <strong>
+            {{ dashboard.generated_at|default:"Now" }}
+        </strong>
+    </div>
+
+    <div class="status-strip__item">
+        <span>Active Processes</span>
+        <strong>
+            {{ kpis.active_analyses|default:0 }}
+        </strong>
+    </div>
+
+    <div class="status-strip__item">
+        <span>Overdue</span>
+        <strong class="{% if sla.overdue %}status-critical{% else %}status-positive{% endif %}">
+            {{ sla.overdue|default:0 }}
+        </strong>
+    </div>
+
+    <div class="status-strip__item">
+        <span>Retest Queue</span>
+        <strong>
+            {{ kpis.retest_queue|default:0 }}
+        </strong>
+    </div>
+</section>
+
+<section class="dashboard-kpi-grid">
+
+    <a href="{% url 'ca:batch-list' %}" class="dashboard-kpi">
+        <div class="dashboard-kpi__label">Chemical Batches</div>
+        <div class="dashboard-kpi__value">
+            {{ kpis.total_batches|default:0 }}
+        </div>
+        <div class="dashboard-kpi__meta">
+            All received chemical batches
+        </div>
+    </a>
+
+    <a href="{% url 'ca:pending-analysis' %}" class="dashboard-kpi">
+        <div class="dashboard-kpi__label">Pending Analysis</div>
+        <div class="dashboard-kpi__value">
+            {{ kpis.pending_requests|default:0 }}
+        </div>
+        <div class="dashboard-kpi__meta">
+            Awaiting analytical work
+        </div>
+    </a>
+
+    <a href="{% url 'ca:pending-qa' %}" class="dashboard-kpi">
+        <div class="dashboard-kpi__label">QA Queue</div>
+        <div class="dashboard-kpi__value">
+            {{ kpis.qa_queue|default:0 }}
+        </div>
+        <div class="dashboard-kpi__meta">
+            Awaiting quality review
+        </div>
+    </a>
+
+    <a href="{% url 'ca:pending-approval' %}" class="dashboard-kpi">
+        <div class="dashboard-kpi__label">Approval Queue</div>
+        <div class="dashboard-kpi__value">
+            {{ kpis.approval_queue|default:0 }}
+        </div>
+        <div class="dashboard-kpi__meta">
+            Awaiting chemical approval
+        </div>
+    </a>
+
+    <a href="{% url 'ca:pending-coa-approval' %}" class="dashboard-kpi">
+        <div class="dashboard-kpi__label">CoA Queue</div>
+        <div class="dashboard-kpi__value">
+            {{ kpis.coa_count|default:0 }}
+        </div>
+        <div class="dashboard-kpi__meta">
+            Certification activity
+        </div>
+    </a>
+
+    <a href="{% url 'ca:overdue-analysis' %}" class="dashboard-kpi dashboard-kpi--critical">
+        <div class="dashboard-kpi__label">Overdue Analysis</div>
+        <div class="dashboard-kpi__value">
+            {{ sla.overdue|default:0 }}
+        </div>
+        <div class="dashboard-kpi__meta">
+            Requires immediate attention
+        </div>
+    </a>
+
+    <div class="dashboard-kpi">
+        <div class="dashboard-kpi__label">QA Pass Rate</div>
+        <div class="dashboard-kpi__value">
+            {{ kpis.pass_rate|default:0 }}%
+        </div>
+        <div class="dashboard-kpi__meta">
+            {{ kpis.pass_count|default:0 }} passed
+        </div>
+    </div>
+
+    <div class="dashboard-kpi">
+        <div class="dashboard-kpi__label">SLA Compliance</div>
+        <div class="dashboard-kpi__value">
+            {{ sla.sla_rate|default:0 }}%
+        </div>
+        <div class="dashboard-kpi__meta">
+            {{ sla.within_sla|default:0 }} within SLA
+        </div>
+    </div>
+
+</section>
+
+<section class="dashboard-section dashboard-workflow-command">
+
+    <div class="dashboard-section__header">
+        <div>
+            <span class="dashboard-eyebrow">WORKFLOW CONTROL</span>
+            <h2>Analysis Workflow</h2>
+            <p>
+                Every active chemical analysis process is controlled through
+                the Viewflow workflow and its associated permissions.
+            </p>
+        </div>
+
+        <div class="dashboard-section__actions">
+            <a
+                href="{% url 'ca:workflow' %}"
+                class="ca-btn ca-btn--secondary"
+            >
+                Workflow
+            </a>
+
+            <a
+                href="{% url 'ca:process-list' %}"
+                class="ca-btn ca-btn--secondary"
+            >
+                All Processes
+            </a>
+        </div>
+    </div>
+
+    <div class="workflow-pipeline">
+
+        <a
+            href="{% url 'ca:batch-list' %}?status=RECEIVED"
+            class="workflow-stage"
+            data-stage="receive"
+        >
+            <span class="workflow-stage__number">01</span>
+            <span class="workflow-stage__title">Receive Batch</span>
+            <span class="workflow-stage__description">
+                Receive and register chemical delivery.
+            </span>
+            <strong class="workflow-stage__count">
+                {{ workflow.receive|default:0 }}
+            </strong>
+        </a>
+
+        <a
+            href="{% url 'ca:request-list' %}?status=PENDING"
+            class="workflow-stage"
+            data-stage="request"
+        >
+            <span class="workflow-stage__number">02</span>
+            <span class="workflow-stage__title">Analysis Request</span>
+            <span class="workflow-stage__description">
+                Create the analytical request.
+            </span>
+            <strong class="workflow-stage__count">
+                {{ workflow.request|default:0 }}
+            </strong>
+        </a>
+
+        <a
+            href="{% url 'ca:pending-analysis' %}"
+            class="workflow-stage"
+            data-stage="assign"
+        >
+            <span class="workflow-stage__number">03</span>
+            <span class="workflow-stage__title">Assign Analyst</span>
+            <span class="workflow-stage__description">
+                Assign active plant analysts.
+            </span>
+            <strong class="workflow-stage__count">
+                {{ workflow.assign|default:0 }}
+            </strong>
+        </a>
+
+        <a
+            href="{% url 'ca:checklist-list' %}"
+            class="workflow-stage"
+            data-stage="checklist"
+        >
+            <span class="workflow-stage__number">04</span>
+            <span class="workflow-stage__title">Receiving Checklist</span>
+            <span class="workflow-stage__description">
+                Verify receipt and complete checklist.
+            </span>
+            <strong class="workflow-stage__count">
+                {{ workflow.checklist|default:0 }}
+            </strong>
+        </a>
+
+        <a
+            href="{% url 'ca:my-tasks' %}"
+            class="workflow-stage"
+            data-stage="sampling"
+        >
+            <span class="workflow-stage__number">05</span>
+            <span class="workflow-stage__title">Sampling Plan</span>
+            <span class="workflow-stage__description">
+                Generate systematic random sampling plan.
+            </span>
+            <strong class="workflow-stage__count">
+                {{ workflow.sampling|default:0 }}
+            </strong>
+        </a>
+
+        <a
+            href="{% url 'ca:my-tasks' %}"
+            class="workflow-stage"
+            data-stage="measurement"
+        >
+            <span class="workflow-stage__number">06</span>
+            <span class="workflow-stage__title">Sample Measurements</span>
+            <span class="workflow-stage__description">
+                Record selected package measurements.
+            </span>
+            <strong class="workflow-stage__count">
+                {{ workflow.measurements|default:0 }}
+            </strong>
+        </a>
+
+        <a
+            href="{% url 'ca:my-tasks' %}"
+            class="workflow-stage"
+            data-stage="counter-check"
+        >
+            <span class="workflow-stage__number">07</span>
+            <span class="workflow-stage__title">Counter-Check</span>
+            <span class="workflow-stage__description">
+                Independently verify sampling measurements.
+            </span>
+            <strong class="workflow-stage__count">
+                {{ workflow.counter_check|default:0 }}
+            </strong>
+        </a>
+
+        <a
+            href="{% url 'ca:my-tasks' %}"
+            class="workflow-stage"
+            data-stage="sampling-qa"
+        >
+            <span class="workflow-stage__number">08</span>
+            <span class="workflow-stage__title">Sampling QA</span>
+            <span class="workflow-stage__description">
+                Review weight deviation when QA approval is required.
+            </span>
+            <strong class="workflow-stage__count">
+                {{ workflow.sampling_qa|default:0 }}
+            </strong>
+        </a>
+
+        <a
+            href="{% url 'ca:pending-analysis' %}"
+            class="workflow-stage"
+            data-stage="start-analysis"
+        >
+            <span class="workflow-stage__number">09</span>
+            <span class="workflow-stage__title">Start Analysis</span>
+            <span class="workflow-stage__description">
+                Clear the sampled batch for chemical analysis.
+            </span>
+            <strong class="workflow-stage__count">
+                {{ workflow.start_analysis|default:0 }}
+            </strong>
+        </a>
+
+        <a
+            href="{% url 'ca:result-list' %}"
+            class="workflow-stage"
+            data-stage="results"
+        >
+            <span class="workflow-stage__number">10</span>
+            <span class="workflow-stage__title">Record Results</span>
+            <span class="workflow-stage__description">
+                Record the next required analytical parameter.
+            </span>
+            <strong class="workflow-stage__count">
+                {{ workflow.results|default:0 }}
+            </strong>
+        </a>
+
+        <a
+            href="{% url 'ca:analysis-input-detail' 0 %}"
+            class="workflow-stage"
+            data-stage="method-inputs"
+        >
+            <span class="workflow-stage__number">11</span>
+            <span class="workflow-stage__title">Method Inputs</span>
+            <span class="workflow-stage__description">
+                Capture analytical method inputs where required.
+            </span>
+            <strong class="workflow-stage__count">
+                {{ workflow.method_inputs|default:0 }}
+            </strong>
+        </a>
+
+        <a
+            href="{% url 'ca:my-tasks' %}"
+            class="workflow-stage"
+            data-stage="complete-analysis"
+        >
+            <span class="workflow-stage__number">12</span>
+            <span class="workflow-stage__title">Complete Analysis</span>
+            <span class="workflow-stage__description">
+                Finalize all required analytical parameters.
+            </span>
+            <strong class="workflow-stage__count">
+                {{ workflow.complete_analysis|default:0 }}
+            </strong>
+        </a>
+
+        <a
+            href="{% url 'ca:pending-qa' %}"
+            class="workflow-stage workflow-stage--quality"
+            data-stage="qa"
+        >
+            <span class="workflow-stage__number">13</span>
+            <span class="workflow-stage__title">QA Review</span>
+            <span class="workflow-stage__description">
+                Pass, request retest or reject.
+            </span>
+            <strong class="workflow-stage__count">
+                {{ workflow.qa|default:kpis.qa_queue|default:0 }}
+            </strong>
+        </a>
+
+        <a
+            href="{% url 'ca:my-tasks' %}"
+            class="workflow-stage workflow-stage--retest"
+            data-stage="retest"
+        >
+            <span class="workflow-stage__number">14</span>
+            <span class="workflow-stage__title">Retest</span>
+            <span class="workflow-stage__description">
+                Repeat the selected failed or questioned parameter.
+            </span>
+            <strong class="workflow-stage__count">
+                {{ workflow.retest|default:kpis.retest_queue|default:0 }}
+            </strong>
+        </a>
+
+        <a
+            href="{% url 'ca:pending-approval' %}"
+            class="workflow-stage workflow-stage--approval"
+            data-stage="approval"
+        >
+            <span class="workflow-stage__number">15</span>
+            <span class="workflow-stage__title">Chemical Approval</span>
+            <span class="workflow-stage__description">
+                Approve or reject the completed analysis.
+            </span>
+            <strong class="workflow-stage__count">
+                {{ workflow.approval|default:kpis.approval_queue|default:0 }}
+            </strong>
+        </a>
+
+        <a
+            href="{% url 'ca:pending-coa-approval' %}"
+            class="workflow-stage workflow-stage--coa"
+            data-stage="coa"
+        >
+            <span class="workflow-stage__number">16</span>
+            <span class="workflow-stage__title">Generate & Approve CoA</span>
+            <span class="workflow-stage__description">
+                Generate and approve the Certificate of Analysis.
+            </span>
+            <strong class="workflow-stage__count">
+                {{ workflow.coa|default:kpis.coa_count|default:0 }}
+            </strong>
+        </a>
+
+        <a
+            href="{% url 'ca:my-tasks' %}"
+            class="workflow-stage workflow-stage--disposition"
+            data-stage="disposition"
+        >
+            <span class="workflow-stage__number">17</span>
+            <span class="workflow-stage__title">Batch Disposition</span>
+            <span class="workflow-stage__description">
+                Select utilization or return to supplier.
+            </span>
+            <strong class="workflow-stage__count">
+                {{ workflow.disposition|default:0 }}
+            </strong>
+        </a>
+
+        <a
+            href="{% url 'ca:batch-list' %}?status=UTILIZED"
+            class="workflow-stage workflow-stage--complete"
+            data-stage="completed"
+        >
+            <span class="workflow-stage__number">18</span>
+            <span class="workflow-stage__title">Completed</span>
+            <span class="workflow-stage__description">
+                Finalized chemical workflow.
+            </span>
+            <strong class="workflow-stage__count">
+                {{ workflow.completed|default:0 }}
+            </strong>
+        </a>
+
+    </div>
+
+    <div class="workflow-decision-map">
+
+        <div class="workflow-decision">
+            <span class="workflow-decision__label">Sampling QA</span>
+            <strong>Required?</strong>
+            <span>Yes → Sampling QA Review</span>
+            <span>No → Start Analysis</span>
+        </div>
+
+        <div class="workflow-decision">
+            <span class="workflow-decision__label">Analytical Result</span>
+            <strong>Method Input?</strong>
+            <span>Yes → Record Method Inputs</span>
+            <span>No → Continue Analysis</span>
+        </div>
+
+        <div class="workflow-decision">
+            <span class="workflow-decision__label">QA Decision</span>
+            <strong>PASS / RETEST / REJECT</strong>
+            <span>PASS → Approval</span>
+            <span>RETEST → Retest → QA</span>
+            <span>REJECT → Rejected</span>
+        </div>
+
+        <div class="workflow-decision">
+            <span class="workflow-decision__label">Approval Decision</span>
+            <strong>APPROVE / REJECT</strong>
+            <span>APPROVE → CoA</span>
+            <span>REJECT → Rejected</span>
+        </div>
+
+        <div class="workflow-decision">
+            <span class="workflow-decision__label">Disposition</span>
+            <strong>UTILIZE / RETURN</strong>
+            <span>UTILIZE → Completed</span>
+            <span>RETURN → Completed</span>
+        </div>
+
+    </div>
+</section>
+
+<section class="dashboard-grid dashboard-grid--three">
+
+    <article class="dashboard-panel">
+        <div class="dashboard-panel__header">
+            <div>
+                <span class="dashboard-eyebrow">EXECUTION</span>
+                <h2>Active Analysis Queue</h2>
+            </div>
+
+            <a href="{% url 'ca:process-list' %}">
+                View all
+            </a>
+        </div>
+
+        <div class="dashboard-table-wrap">
+            <table class="dashboard-table">
+                <thead>
+                    <tr>
+                        <th>Process</th>
+                        <th>Chemical</th>
+                        <th>Stage</th>
+                        <th>Age</th>
+                        <th>Risk</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for process in active_processes %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'ca:process-detail' process.id %}">
+                                    #{{ process.id }}
+                                </a>
+                            </td>
+
+                            <td>
+                                {{ process.chemical|default:"—" }}
+                            </td>
+
+                            <td>
+                                <span class="ca-badge">
+                                    {{ process.status }}
+                                </span>
+                            </td>
+
+                            <td>
+                                {{ process.age_hours|default:0 }}h
+                            </td>
+
+                            <td>
+                                <span class="risk-indicator risk-indicator--{{ process.risk|lower|default:'normal' }}">
+                                    {{ process.risk|default:"Normal" }}
+                                </span>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5">
+                                No active chemical analysis processes.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+
+    <article class="dashboard-panel">
+        <div class="dashboard-panel__header">
+            <div>
+                <span class="dashboard-eyebrow">QUALITY</span>
+                <h2>QA Control</h2>
+            </div>
+
+            <a href="{% url 'ca:pending-qa' %}">
+                Open queue
+            </a>
+        </div>
+
+        <div class="control-metrics">
+
+            <div class="control-metric">
+                <span>Pending QA</span>
+                <strong>{{ kpis.qa_queue|default:0 }}</strong>
+            </div>
+
+            <div class="control-metric">
+                <span>Pass Rate</span>
+                <strong>{{ kpis.pass_rate|default:0 }}%</strong>
+            </div>
+
+            <div class="control-metric">
+                <span>Retests</span>
+                <strong>{{ kpis.retest_queue|default:0 }}</strong>
+            </div>
+
+            <div class="control-metric">
+                <span>Rejected</span>
+                <strong>{{ kpis.rejected|default:0 }}</strong>
+            </div>
+
+        </div>
+
+        <div class="dashboard-list">
+            {% for item in qa_queue %}
+                <a
+                    href="{% url 'ca:process-detail' item.id %}"
+                    class="dashboard-list__item"
+                >
+                    <span>
+                        Process #{{ item.id }}
+                    </span>
+
+                    <strong>
+                        {{ item.status }}
+                    </strong>
+
+                    <small>
+                        {{ item.age_hours|default:0 }}h
+                    </small>
+                </a>
+            {% empty %}
+                <div class="dashboard-empty">
+                    No QA items currently awaiting review.
+                </div>
+            {% endfor %}
+        </div>
+    </article>
+
+    <article class="dashboard-panel">
+        <div class="dashboard-panel__header">
+            <div>
+                <span class="dashboard-eyebrow">CERTIFICATION</span>
+                <h2>Approval & CoA</h2>
+            </div>
+
+            <a href="{% url 'ca:coa-list' %}">
+                Open CoA
+            </a>
+        </div>
+
+        <div class="control-metrics">
+
+            <div class="control-metric">
+                <span>Approval Queue</span>
+                <strong>{{ kpis.approval_queue|default:0 }}</strong>
+            </div>
+
+            <div class="control-metric">
+                <span>CoA Queue</span>
+                <strong>{{ kpis.coa_count|default:0 }}</strong>
+            </div>
+
+            <div class="control-metric">
+                <span>Certificates</span>
+                <strong>{{ kpis.coa_count|default:0 }}</strong>
+            </div>
+
+        </div>
+
+        <div class="dashboard-action-stack">
+
+            <a
+                href="{% url 'ca:pending-approval' %}"
+                class="dashboard-action"
+            >
+                <span>Chemical Approval</span>
+                <strong>
+                    {{ kpis.approval_queue|default:0 }}
+                </strong>
+            </a>
+
+            <a
+                href="{% url 'ca:pending-coa-approval' %}"
+                class="dashboard-action"
+            >
+                <span>CoA Approval</span>
+                <strong>
+                    {{ kpis.coa_count|default:0 }}
+                </strong>
+            </a>
+
+            <a
+                href="{% url 'ca:coa-list' %}"
+                class="dashboard-action"
+            >
+                <span>Certificate Register</span>
+                <strong>→</strong>
+            </a>
+
+        </div>
+    </article>
+
+</section>
+
+<section class="dashboard-grid dashboard-grid--two">
+
+    <article class="dashboard-panel dashboard-panel--wide">
+        <div class="dashboard-panel__header">
+            <div>
+                <span class="dashboard-eyebrow">SLA INTELLIGENCE</span>
+                <h2>Turnaround Performance</h2>
+            </div>
+
+            <a href="{% url 'ca:overdue-analysis' %}">
+                Overdue analysis
+            </a>
+        </div>
+
+        <div class="performance-grid">
+
+            <div class="performance-card">
+                <span>Average</span>
+                <strong>
+                    {{ turnaround.average_hours|default:0 }}h
+                </strong>
+            </div>
+
+            <div class="performance-card">
+                <span>Median</span>
+                <strong>
+                    {{ turnaround.median_hours|default:0 }}h
+                </strong>
+            </div>
+
+            <div class="performance-card">
+                <span>P90</span>
+                <strong>
+                    {{ turnaround.p90_hours|default:0 }}h
+                </strong>
+            </div>
+
+            <div class="performance-card">
+                <span>Maximum</span>
+                <strong>
+                    {{ turnaround.max_hours|default:0 }}h
+                </strong>
+            </div>
+
+            <div class="performance-card performance-card--critical">
+                <span>Overdue</span>
+                <strong>
+                    {{ sla.overdue|default:0 }}
+                </strong>
+            </div>
+
+        </div>
+
+        <div class="sla-bar">
+            <div
+                class="sla-bar__fill"
+                style="--progress: {{ sla.sla_rate|default:0 }}%;"
+            ></div>
+        </div>
+
+        <div class="sla-summary">
+            <span>
+                {{ sla.within_sla|default:0 }} within SLA
+            </span>
+
+            <strong>
+                {{ sla.sla_rate|default:0 }}%
+            </strong>
+
+            <span>
+                {{ sla.overdue|default:0 }} overdue
+            </span>
+        </div>
+    </article>
+
+    <article class="dashboard-panel">
+        <div class="dashboard-panel__header">
+            <div>
+                <span class="dashboard-eyebrow">AGING</span>
+                <h2>Process Aging</h2>
+            </div>
+
+            <a href="{% url 'ca:overdue-analysis' %}">
+                View overdue
+            </a>
+        </div>
+
+        <div class="dashboard-list">
+            {% for item in aging %}
+                <a
+                    href="{% url 'ca:process-detail' item.id %}"
+                    class="dashboard-list__item"
+                >
+                    <span>
+                        #{{ item.id }}
+                    </span>
+
+                    <strong>
+                        {{ item.status }}
+                    </strong>
+
+                    <small>
+                        {{ item.age_days|default:0 }}d
+                    </small>
+                </a>
+            {% empty %}
+                <div class="dashboard-empty">
+                    No aging exceptions detected.
+                </div>
+            {% endfor %}
+        </div>
+    </article>
+
+</section>
+
+<section class="dashboard-section">
+
+    <div class="dashboard-section__header">
+        <div>
+            <span class="dashboard-eyebrow">OPERATIONAL INTELLIGENCE</span>
+            <h2>Plant Performance</h2>
+        </div>
+
+        <a
+            href="{% url 'ca:process-statistics' 0 %}"
+            class="ca-btn ca-btn--secondary"
+        >
+            Statistics
+        </a>
+    </div>
+
+    <div class="dashboard-table-wrap">
+        <table class="dashboard-table dashboard-table--performance">
+            <thead>
+                <tr>
+                    <th>Treatment Plant</th>
+                    <th>Total</th>
+                    <th>Active</th>
+                    <th>Completed</th>
+                    <th>Rejected</th>
+                    <th>Completion</th>
+                    <th>Rejection</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for row in plant_summary %}
+                    <tr>
+                        <td>
+                            <strong>{{ row.plant }}</strong>
+                        </td>
+
+                        <td>{{ row.total|default:0 }}</td>
+                        <td>{{ row.active|default:0 }}</td>
+                        <td>{{ row.completed|default:0 }}</td>
+                        <td>{{ row.rejected|default:0 }}</td>
+
+                        <td>
+                            <div class="table-progress">
+                                <span
+                                    style="--progress: {{ row.completion_rate|default:0 }}%;"
+                                ></span>
+                                <strong>
+                                    {{ row.completion_rate|default:0 }}%
+                                </strong>
+                            </div>
+                        </td>
+
+                        <td>
+                            {{ row.rejection_rate|default:0 }}%
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="7">
+                            No plant performance data available.
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</section>
+
+<section class="dashboard-grid dashboard-grid--three">
+
+    <article class="dashboard-panel">
+        <div class="dashboard-panel__header">
+            <div>
+                <span class="dashboard-eyebrow">SUPPLIERS</span>
+                <h2>Supplier Quality</h2>
+            </div>
+
+            <a href="{% url 'ca:batch-list' %}">
+                Batches
+            </a>
+        </div>
+
+        <div class="dashboard-list">
+            {% for supplier in supplier_performance %}
+                <div class="dashboard-list__item">
+                    <span>
+                        {{ supplier.supplier }}
+                    </span>
+
+                    <strong>
+                        {{ supplier.acceptance_rate|default:0 }}%
+                    </strong>
+
+                    <small>
+                        {{ supplier.total|default:0 }} batches
+                    </small>
+                </div>
+            {% empty %}
+                <div class="dashboard-empty">
+                    No supplier performance data available.
+                </div>
+            {% endfor %}
+        </div>
+    </article>
+
+    <article class="dashboard-panel">
+        <div class="dashboard-panel__header">
+            <div>
+                <span class="dashboard-eyebrow">ANALYSTS</span>
+                <h2>Analyst Performance</h2>
+            </div>
+
+            <a href="{% url 'ca:my-tasks' %}">
+                Tasks
+            </a>
+        </div>
+
+        <div class="dashboard-list">
+            {% for analyst in analyst_performance %}
+                <div class="dashboard-list__item">
+                    <span>
+                        {{ analyst.analyst }}
+                    </span>
+
+                    <strong>
+                        {{ analyst.completed|default:0 }}
+                    </strong>
+
+                    <small>
+                        {{ analyst.retest|default:0 }} retests
+                    </small>
+                </div>
+            {% empty %}
+                <div class="dashboard-empty">
+                    No analyst performance data available.
+                </div>
+            {% endfor %}
+        </div>
+    </article>
+
+    <article class="dashboard-panel">
+        <div class="dashboard-panel__header">
+            <div>
+                <span class="dashboard-eyebrow">CHEMICALS</span>
+                <h2>Chemical Quality</h2>
+            </div>
+
+            <a href="{% url 'ca:specification-list' %}">
+                Specifications
+            </a>
+        </div>
+
+        <div class="dashboard-list">
+            {% for chemical in chemical_performance %}
+                <div class="dashboard-list__item">
+                    <span>
+                        {{ chemical.chemical }}
+                    </span>
+
+                    <strong>
+                        {{ chemical.quality_rate|default:0 }}%
+                    </strong>
+
+                    <small>
+                        {{ chemical.total|default:0 }} batches
+                    </small>
+                </div>
+            {% empty %}
+                <div class="dashboard-empty">
+                    No chemical quality data available.
+                </div>
+            {% endfor %}
+        </div>
+    </article>
+
+</section>
+
+<section class="dashboard-grid dashboard-grid--two">
+
+    <article class="dashboard-panel">
+        <div class="dashboard-panel__header">
+            <div>
+                <span class="dashboard-eyebrow">EXCEPTIONS</span>
+                <h2>Risk Register</h2>
+            </div>
+
+            <a href="{% url 'ca:overdue-analysis' %}">
+                Investigate
+            </a>
+        </div>
+
+        <div class="dashboard-table-wrap">
+            <table class="dashboard-table">
+                <thead>
+                    <tr>
+                        <th>Process</th>
+                        <th>Status</th>
+                        <th>Age</th>
+                        <th>Retests</th>
+                        <th>Risk</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for item in risk_register %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'ca:process-detail' item.id %}">
+                                    #{{ item.id }}
+                                </a>
+                            </td>
+
+                            <td>{{ item.status }}</td>
+                            <td>{{ item.age_hours|default:0 }}h</td>
+                            <td>{{ item.rework_count|default:0 }}</td>
+
+                            <td>
+                                <span class="risk-indicator risk-indicator--{{ item.risk|lower|default:'normal' }}">
+                                    {{ item.risk|default:"Normal" }}
+                                </span>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5">
+                                No workflow exceptions detected.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+
+    <article class="dashboard-panel">
+        <div class="dashboard-panel__header">
+            <div>
+                <span class="dashboard-eyebrow">RECENT ACTIVITY</span>
+                <h2>Workflow Activity</h2>
+            </div>
+
+            <a href="{% url 'ca:process-list' %}">
+                Processes
+            </a>
+        </div>
+
+        <div class="dashboard-activity">
+
+            {% for event in recent_activity %}
+                <div class="dashboard-activity__item">
+
+                    <div class="dashboard-activity__time">
+                        {{ event.date|default:"—" }}
+                    </div>
+
+                    <div class="dashboard-activity__body">
+                        <strong>
+                            {{ event.type|default:"Workflow Event" }}
+                        </strong>
+
+                        <span>
+                            {{ event.description|default:event.status|default:"Process activity" }}
+                        </span>
+                    </div>
+
+                </div>
+            {% empty %}
+                <div class="dashboard-empty">
+                    No recent workflow activity.
+                </div>
+            {% endfor %}
+
+        </div>
+    </article>
+
+</section>
+
+<section class="dashboard-section">
+
+    <div class="dashboard-section__header">
+        <div>
+            <span class="dashboard-eyebrow">COMMAND ACCESS</span>
+            <h2>Workflow & Operations</h2>
+        </div>
+    </div>
+
+    <div class="dashboard-command-grid">
+
+        <a
+            href="{% url 'ca:batch-list' %}"
+            class="dashboard-command-card"
+        >
+            <span>Batch Register</span>
+            <strong>→</strong>
+            <small>Receive, inspect, edit and transition chemical batches.</small>
+        </a>
+
+        <a
+            href="{% url 'ca:request-list' %}"
+            class="dashboard-command-card"
+        >
+            <span>Analysis Requests</span>
+            <strong>→</strong>
+            <small>Monitor requests and request-state transitions.</small>
+        </a>
+
+        <a
+            href="{% url 'ca:process-list' %}"
+            class="dashboard-command-card"
+        >
+            <span>Process Control</span>
+            <strong>→</strong>
+            <small>Inspect active workflow processes and operational state.</small>
+        </a>
+
+        <a
+            href="{% url 'ca:my-tasks' %}"
+            class="dashboard-command-card"
+        >
+            <span>My Workflow Tasks</span>
+            <strong>→</strong>
+            <small>Execute the Viewflow tasks assigned to you.</small>
+        </a>
+
+        <a
+            href="{% url 'ca:result-list' %}"
+            class="dashboard-command-card"
+        >
+            <span>Analytical Results</span>
+            <strong>→</strong>
+            <small>Review chemical analytical results and filtering.</small>
+        </a>
+
+        <a
+            href="{% url 'ca:checklist-list' %}"
+            class="dashboard-command-card"
+        >
+            <span>Receiving Checklists</span>
+            <strong>→</strong>
+            <small>Monitor receiving verification and completion.</small>
+        </a>
+
+        <a
+            href="{% url 'ca:specification-list' %}"
+            class="dashboard-command-card"
+        >
+            <span>Chemical Specifications</span>
+            <strong>→</strong>
+            <small>Manage plant-specific analytical specifications.</small>
+        </a>
+
+        <a
+            href="{% url 'ca:coa-list' %}"
+            class="dashboard-command-card"
+        >
+            <span>Certificates of Analysis</span>
+            <strong>→</strong>
+            <small>Generate, verify, approve and download CoAs.</small>
+        </a>
+
+        <a
+            href="{% url 'ca:workflow' %}"
+            class="dashboard-command-card"
+        >
+            <span>Workflow Console</span>
+            <strong>→</strong>
+            <small>Open the Viewflow workflow task interface.</small>
+        </a>
+
+    </div>
+
+</section>
+
+<section class="dashboard-section dashboard-section--compact">
+
+    <div class="dashboard-section__header">
+        <div>
+            <span class="dashboard-eyebrow">QUALITY CONTROL</span>
+            <h2>Immediate Actions</h2>
+        </div>
+    </div>
+
+    <div class="dashboard-action-grid">
+
+        <a
+            href="{% url 'ca:pending-analysis' %}"
+            class="dashboard-action-card"
+        >
+            <span>Pending Analysis</span>
+            <strong>{{ kpis.pending_requests|default:0 }}</strong>
+        </a>
+
+        <a
+            href="{% url 'ca:pending-qa' %}"
+            class="dashboard-action-card"
+        >
+            <span>Pending QA</span>
+            <strong>{{ kpis.qa_queue|default:0 }}</strong>
+        </a>
+
+        <a
+            href="{% url 'ca:pending-approval' %}"
+            class="dashboard-action-card"
+        >
+            <span>Pending Approval</span>
+            <strong>{{ kpis.approval_queue|default:0 }}</strong>
+        </a>
+
+        <a
+            href="{% url 'ca:pending-coa-approval' %}"
+            class="dashboard-action-card"
+        >
+            <span>Pending CoA</span>
+            <strong>{{ kpis.coa_count|default:0 }}</strong>
+        </a>
+
+        <a
+            href="{% url 'ca:overdue-analysis' %}"
+            class="dashboard-action-card dashboard-action-card--critical"
+        >
+            <span>Overdue</span>
+            <strong>{{ sla.overdue|default:0 }}</strong>
+        </a>
+
+        <a
+            href="{% url 'ca:my-tasks' %}"
+            class="dashboard-action-card dashboard-action-card--primary"
+        >
+            <span>My Tasks</span>
+            <strong>→</strong>
+        </a>
+
+    </div>
+
+</section>
+
+<section class="dashboard-footer-summary">
+
+    <div>
+        <span>Workflow integrity</span>
+        <strong>Viewflow controlled</strong>
+    </div>
+
+    <div>
+        <span>Authorization</span>
+        <strong>Django permissions</strong>
+    </div>
+
+    <div>
+        <span>Plant scope</span>
+        <strong>
+            {% if plant_context.is_superuser %}
+                All plants
+            {% elif treatment_plant %}
+                {{ treatment_plant.name }}
+            {% else %}
+                Assigned plant
+            {% endif %}
+        </strong>
+    </div>
+
+    <div>
+        <span>Quality path</span>
+        <strong>PASS / RETEST / REJECT</strong>
+    </div>
+
+</section>
+
+</div>
+
+{% endblock %}
+
+{% block page_js %}
+
+<script src="{% static 'ca/js/pages/dashboard.js' %}" defer></script>
+
+{% endblock %}

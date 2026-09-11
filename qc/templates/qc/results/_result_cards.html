@@ -1,0 +1,114 @@
+{% load custom_filters %}
+
+{% for card in cards %}
+<div id="card-{{ card.sampling_time.pk }}"
+     class="card excel-card mb-6 elevation-2 result-card"
+     data-water-type="{{ card.water_type|default:'generic' }}">
+
+    {% for group in card.groups %}
+    <section class="card-section">
+
+        <!-- Group Header -->
+        <div class="card-header excel-header flex items-center justify-between">
+            <h3 class="card-title text-uppercase tracking-wide">
+                {{ group.title }}
+            </h3>
+            <span class="card-subtitle">
+                {{ group.parameters|length }} parameter{{ group.parameters|length|pluralize }}
+            </span>
+        </div>
+
+        <!-- Results Table -->
+        <div class="excel-wrapper">
+            <table class="excel-table w-full">
+                <thead>
+                    <tr>
+                        <th class="excel-th sticky left-0 z-sticky">Phase</th>
+                        {% for parameter in group.parameters %}
+                        <th class="excel-th text-center">
+                            {% with parts=parameter.name|split_brackets %}
+                                <div class="param-name">
+                                    {{ parts.0 }}{% if parameter.unit %} ({{ parameter.unit }}){% endif %}
+                                </div>
+                                {% if parts.1 %}
+                                <div class="param-extra fs-xs text-muted">
+                                    {{ parts.1 }}
+                                </div>
+                                {% endif %}
+                            {% endwith %}
+                        </th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in group.rows %}
+                    <tr class="excel-row">
+                        <!-- Phase -->
+                        <td class="excel-cell sticky left-0 z-sticky fw-medium text-muted">
+                            {{ row.name }}
+                        </td>
+                        {% for parameter in group.parameters %}
+                        <td class="excel-cell">
+                            {% with cell=row.results|get_item:parameter.name %}
+                                {% if cell %}
+                                <div class="form-group text-center">
+                                    <input
+                                        type="number"
+                                        step="0.001"
+                                        min="-999999"
+                                        max="999999"
+                                        inputmode="decimal"
+                                        autocomplete="off"
+                                        spellcheck="false"
+                                        name="result_{{ cell.result.pk }}"
+                                        value="{{ cell.value|default_if_none:'' }}"
+                                        class="form-control excel-input text-center fs-sm fw-medium
+                                        {% if cell.abnormal %}
+                                            form-control-danger
+                                        {% elif cell.entered %}
+                                            form-control-success
+                                        {% endif %}"
+                                        data-autosave="true"
+                                        data-navigation="true"
+                                        aria-label="Result for {{ parameter.name }}">
+                                    <div class="spec-text fs-xs text-muted">
+                                        Spec: {{ cell.display_limit }}
+                                    </div>
+                                    <!-- Inline status indicator -->
+                                    {% if cell.abnormal %}
+                                        <span class="status-indicator text-danger fs-xs">⚠️ Out of range</span>
+                                    {% elif cell.entered %}
+                                        <span class="status-indicator text-success fs-xs">✅ Saved</span>
+                                    {% endif %}
+                                </div>
+                                {% else %}
+                                <div class="text-muted text-center fs-sm">—</div>
+                                {% endif %}
+                            {% endwith %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="100%" class="text-center fs-sm text-muted p-6">
+                            No analytical results available.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+    </section>
+    {% endfor %}
+
+</div>
+
+{% empty %}
+<div class="card excel-card card-bordered bg-alt text-center p-8">
+    <h2 class="fs-md fw-bold text-muted">No Current Analysis</h2>
+    <p class="fs-sm text-muted mt-2">
+        Analytical worksheets will appear automatically when the next scheduled sampling event is generated.
+    </p>
+</div>
+{% endfor %}

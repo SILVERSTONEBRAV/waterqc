@@ -1,0 +1,531 @@
+{% extends "t/base.html" %}
+{% load custom_filters %}
+{% load static %}
+
+{% block content %}
+
+<meta name="csrf-token" content="{{ csrf_token }}">
+
+{% include "core/list/modules/styles.html" %}
+
+<div class="card border-0 shadow-sm">
+
+    {% include "core/list/modules/toolbar.html" %}
+
+    {% include "core/list/modules/table.html" %}
+
+</div>
+
+{% include "core/list/modules/modal.html" %}
+
+{% endblock %}
+
+
+{% block extra_scripts %}
+<script>
+/* =====================================================
+   REGISTRY-AWARE TABLE ENGINE vNEXT ULTRA++
+   (Reactive, safe mutation pipeline, backend-agnostic)
+===================================================== */
+
+const csrf = document.querySelector('meta[name="csrf-token"]').content;
+
+const segments = location.pathname.split("/").filter(Boolean);
+const app = segments[0];
+const model = segments[1];
+
+const baseURL = `/${app}/${model}`;
+
+/* =====================================================
+   STATE CORE
+===================================================== */
+const state = {
+    rows: new Map(),
+    selected: new Set(),
+    search: "",
+    loading: false,
+
+    inflight: new Map(),
+    aborters: new Map(),
+
+    version: 0 // render versioning (prevents stale renders)
+};
+
+/* =====================================================
+   EVENT BUS
+===================================================== */
+const bus = {
+    events: {},
+    on(evt, fn) {
+        (this.events[evt] ||= []).push(fn);
+    },
+    emit(evt, payload) {
+        (this.events[evt] || []).forEach(fn => fn(payload));
+    }
+};
+
+/* =====================================================
+   SAFE FETCH LAYER (FORM + JSON HYBRID READY)
+===================================================== */
+async function api(url, opts = {}) {
+    const key = `${opts.method || "GET"}:${url}`;
+
+    if (state.inflight.has(key)) return state.inflight.get(key);
+
+    const controller = new AbortController();
+    state.aborters.set(key, controller);
+
+    const isFormData = opts.body instanceof FormData;
+
+    const headers = {
+        "X-CSRFToken": csrf,
+        ...(isFormData ? {} : { "Content-Type": "application/json" }),
+        ...(opts.headers || {})
+    };
+
+    const promise = fetch(url, {
+        ...opts,
+        signal: controller.signal,
+        headers
+    })
+    .then(async res => {
+        const text = await res.text();
+
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch {
+            data = text;
+        }
+
+        if (!res.ok) {
+            throw { status: res.status, data };
+        }
+
+        return data;
+    })
+    .finally(() => {
+        state.inflight.delete(key);
+        state.aborters.delete(key);
+    });
+
+    state.inflight.set(key, promise);
+    return promise;
+}
+
+/* =====================================================
+   COMMAND PIPELINE (STRICT NORMALIZATION)
+===================================================== */
+async function command(action, payload = {}) {
+    const urlMap = {
+        create: `${baseURL}/create/`,
+        update: `${baseURL}/${payload.id}/update/`,
+        delete: `${baseURL}/${payload.id}/delete/`,
+        bulk_delete: `${baseURL}/bulk_delete/`,
+        inline_edit: `${baseURL}/${payload.id}/inline_edit/`,
+    };
+
+    const url = urlMap[action];
+    if (!url) throw new Error(`Unknown action: ${action}`);
+
+    const res = await api(url, {
+        method: "POST",
+        body: JSON.stringify(payload)
+    });
+
+    bus.emit(action, res);
+    return res;
+}
+
+/* =====================================================
+   TABLE LOAD
+===================================================== */
+async function loadTable() {
+    state.loading = true;
+
+    const params = new URLSearchParams({
+        format: "json",
+        ...(state.search && { search: state.search })
+    });
+
+    const data = await api(`${baseURL}/list/?${params}`);
+
+    state.rows.clear();
+
+    (data.rows || []).forEach(r => {
+        state.rows.set(String(r.id), r);
+    });
+
+    render();
+    state.loading = false;
+}
+
+/* =====================================================
+   UPSERT (CREATE/UPDATE SAFE MERGE)
+===================================================== */
+function upsertRow(row) {
+    if (!row?.id) return;
+
+    const existing = state.rows.get(String(row.id));
+
+    state.rows.set(String(row.id), {
+        ...(existing || {}),
+        ...row
+    });
+
+    scheduleRender();
+}
+
+/* =====================================================
+   REMOVE
+===================================================== */
+function removeRow(id) {
+    state.rows.delete(String(id));
+    scheduleRender();
+}
+
+/* =====================================================
+   RENDER ENGINE (BATCHED)
+===================================================== */
+let renderQueued = false;
+
+function scheduleRender() {
+    if (renderQueued) return;
+
+    renderQueued = true;
+
+    requestAnimationFrame(() => {
+        renderQueued = false;
+        render();
+    });
+}
+
+function render() {
+    const tbody = document.getElementById("table-body");
+
+    const frag = document.createDocumentFragment();
+
+    for (const row of state.rows.values()) {
+        const temp = document.createElement("tbody");
+        temp.innerHTML = renderRow(row);
+        frag.appendChild(temp.firstElementChild);
+    }
+
+    tbody.replaceChildren(...frag.childNodes);
+}
+
+/* =====================================================
+   ROW RENDER
+===================================================== */
+function renderRow(row) {
+
+    const cells = Object.entries(row.fields).map(([name, f]) => `
+        <td class="cell"
+            data-id="${row.id}"
+            data-field="${name}">
+            <div class="cell-view">${escapeHtml(f.value ?? "")}</div>
+            <div class="cell-edit d-none"></div>
+        </td>
+    `).join("");
+
+    return `
+    <tr data-id="${row.id}">
+        <td><input type="checkbox" class="row-check"></td>
+        ${cells}
+        <td class="text-end">
+            <button class="btn btn-sm btn-primary view">View</button>
+            <button class="btn btn-sm btn-warning edit">Edit</button>
+            <button class="btn btn-sm btn-danger delete">Delete</button>
+        </td>
+    </tr>`;
+}
+
+/* =====================================================
+   INLINE EDIT (SAFE + RACE-PROOF)
+===================================================== */
+document.body.addEventListener("click", e => {
+    const cell = e.target.closest(".cell");
+    if (cell) activate(cell);
+});
+
+function activate(cell) {
+    if (cell.classList.contains("editing")) return;
+
+    const row = state.rows.get(cell.dataset.id);
+    if (!row) return;
+
+    const field = row.fields[cell.dataset.field];
+
+    const view = cell.querySelector(".cell-view");
+    const edit = cell.querySelector(".cell-edit");
+
+    edit.innerHTML = `<input type="text" value="${field.value ?? ""}">`;
+
+    cell.classList.add("editing");
+    view.classList.add("d-none");
+    edit.classList.remove("d-none");
+
+    const input = edit.querySelector("input");
+    input.focus();
+
+    input.onkeydown = (e) => {
+        if (e.key === "Enter") saveCell(cell, input.value);
+        if (e.key === "Escape") cancel(cell);
+    };
+}
+
+/* =====================================================
+   SAVE CELL (OPTIMISTIC + SAFE ROLLBACK)
+===================================================== */
+async function saveCell(cell, value) {
+    const id = cell.dataset.id;
+    const field = cell.dataset.field;
+
+    const row = state.rows.get(id);
+    if (!row) return;
+
+    const old = row.fields[field].value;
+
+    row.fields[field].value = value;
+    cell.querySelector(".cell-view").innerText = value;
+
+    cancel(cell);
+
+    try {
+        const res = await command("inline_edit", { id, field, value });
+
+        const serverValue = res?.value ?? value;
+        row.fields[field].value = serverValue;
+
+    } catch (err) {
+        row.fields[field].value = old;
+        cell.querySelector(".cell-view").innerText = old;
+    }
+}
+
+function cancel(cell) {
+    cell.classList.remove("editing");
+    cell.querySelector(".cell-view").classList.remove("d-none");
+    cell.querySelector(".cell-edit").classList.add("d-none");
+}
+
+/* =====================================================
+   MODAL ENGINE (FULL SAFE FORM HANDLING)
+===================================================== */
+async function openModal(url) {
+    const modalEl = document.getElementById("genericModal");
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+
+    const res = await fetch(url, {
+        headers: { "X-Requested-With": "XMLHttpRequest" }
+    });
+
+    document.getElementById("modal-body").innerHTML = await res.text();
+
+    const form = document.querySelector("#modal-body form");
+    if (!form) return;
+
+    // prevent duplicate binding
+    const clean = form.cloneNode(true);
+    form.replaceWith(clean);
+
+    clean.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const formData = new FormData(clean);
+
+        const payload = {};
+        for (let [k, v] of formData.entries()) {
+            if (payload[k] !== undefined) {
+                payload[k] = Array.isArray(payload[k])
+                    ? [...payload[k], v]
+                    : [payload[k], v];
+            } else {
+                payload[k] = v;
+            }
+        }
+
+        try {
+            let actionURL = clean.getAttribute("action") || url;
+            if (!actionURL.endsWith("/")) actionURL += "/";
+
+            const res = await api(actionURL, {
+                method: "POST",
+                body: formData // CRITICAL FIX: FormData not JSON
+            });
+
+            const row = res?.row || res;
+
+            if (row?.id) {
+                upsertRow(row);
+            }
+
+            modal.hide();
+
+        } catch (err) {
+            console.error(err);
+            alert("Save failed");
+        }
+    });
+}
+
+/* =====================================================
+   ACTIONS
+===================================================== */
+document.body.addEventListener("click", e => {
+
+    const tr = e.target.closest("tr");
+    if (!tr) return;
+
+    const id = tr.dataset.id;
+
+    if (e.target.closest(".view")) openModal(`${baseURL}/${id}/detail/`);
+    if (e.target.closest(".edit")) openModal(`${baseURL}/${id}/update/`);
+
+    if (e.target.closest(".delete")) {
+        command("delete", { id })
+            .then(() => removeRow(id))
+            .catch(console.error);
+    }
+});
+
+
+
+/* =====================================================
+   ADD NEW
+===================================================== */
+document.getElementById("add-btn")?.addEventListener("click", () => {
+    openModal(`${baseURL}/create/`);
+});
+
+/* =====================================================
+   EXPORT ENGINE v2 (BACKEND-AWARE + MULTI-MODE + SAFE)
+===================================================== */
+
+const EXPORT_CONFIG = {
+    csv:  { method: "GET", mode: "download" },
+    xlsx: { method: "GET", mode: "download" },
+    pdf:  { method: "POST", mode: "blob" },
+    json: { method: "GET", mode: "download" },
+    docx: { method: "POST", mode: "blob" }
+};
+
+function buildExportURL(type) {
+    const url = new URL(`${baseURL}/export/`, location.origin);
+    url.searchParams.set("type", type);
+
+    if (state.search) {
+        url.searchParams.set("search", state.search);
+    }
+
+    return url;
+}
+
+async function exportData(type) {
+    const config = EXPORT_CONFIG[type];
+
+    if (!config) {
+        console.error("❌ Unsupported export type:", type);
+        return;
+    }
+
+    const url = buildExportURL(type);
+
+    try {
+
+        /* ===============================
+           MODE 1: DIRECT DOWNLOAD (CSV/XLSX/JSON)
+        =============================== */
+        if (config.mode === "download") {
+            window.open(url.toString(), "_blank", "noopener");
+            return;
+        }
+
+        /* ===============================
+           MODE 2: BLOB EXPORT (PDF/DOCX)
+        =============================== */
+        const res = await fetch(url.toString(), {
+            method: config.method,
+            headers: {
+                "X-CSRFToken": csrf,
+                "Accept": "application/octet-stream"
+            },
+            body: config.method === "POST"
+                ? JSON.stringify({ search: state.search })
+                : undefined
+        });
+
+        if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(errText);
+        }
+
+        const blob = await res.blob();
+
+        const downloadUrl = window.URL.createObjectURL(blob);
+
+        const a = document.createElement("a");
+        a.href = downloadUrl;
+        a.download = `${model}-export.${type}`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+
+        window.URL.revokeObjectURL(downloadUrl);
+
+    } catch (err) {
+        console.error("Export failed:", err);
+        alert("Export failed: check backend /export handler");
+    }
+}
+
+
+document.addEventListener("click", (e) => {
+    const item = e.target.closest(".export");
+    if (!item) return;
+
+    const type = item.dataset.type;
+    exportData(type);
+});
+
+
+/* =====================================================
+   SEARCH
+===================================================== */
+const search = debounce(val => {
+    state.search = val;
+    loadTable();
+}, 300);
+
+document.getElementById("table-search")?.addEventListener("input", e => {
+    search(e.target.value);
+});
+
+/* =====================================================
+   UTILITIES
+===================================================== */
+function debounce(fn, t) {
+    let x;
+    return (...a) => {
+        clearTimeout(x);
+        x = setTimeout(() => fn(...a), t);
+    };
+}
+
+function escapeHtml(s) {
+    return String(s)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+}
+
+/* =====================================================
+   BOOT
+===================================================== */
+loadTable();
+
+</script>
+{% endblock %}
+
+

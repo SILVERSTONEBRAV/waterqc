@@ -1,0 +1,584 @@
+{% load static %}
+
+<div class="card border-0 shadow-lg rounded-4 overflow-hidden">
+
+    <!-- ================================================= -->
+    <!-- HEADER -->
+    <!-- ================================================= -->
+
+    <div class="card-header bg-white border-bottom py-4">
+
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+
+            <div>
+                <h4 class="fw-bold mb-1">
+                    <i class="fa fa-users text-primary me-2"></i>
+                    User Management
+                </h4>
+
+                <div class="text-muted">
+                    Manage users, permissions, treatment plants, security and account lifecycle.
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 flex-wrap">
+
+                <button
+                    class="btn btn-outline-dark rounded-pill"
+                    onclick="window.print()"
+                >
+                    <i class="fa fa-print me-2"></i>
+                    Print
+                </button>
+
+                <div class="dropdown">
+
+                    <button
+                        class="btn btn-outline-primary rounded-pill dropdown-toggle"
+                        data-bs-toggle="dropdown"
+                    >
+                        <i class="fa fa-download me-2"></i>
+                        Export
+                    </button>
+
+                    <ul class="dropdown-menu dropdown-menu-end shadow">
+
+                        <li>
+                            <a
+                                class="dropdown-item"
+                                href="?{{ request.GET.urlencode }}&export=csv"
+                            >
+                                <i class="fa fa-file-csv text-success me-2"></i>
+                                CSV
+                            </a>
+                        </li>
+
+                        <li>
+                            <a
+                                class="dropdown-item"
+                                href="?{{ request.GET.urlencode }}&export=xlsx"
+                            >
+                                <i class="fa fa-file-excel text-success me-2"></i>
+                                Excel
+                            </a>
+                        </li>
+
+                        <li>
+                            <a
+                                class="dropdown-item"
+                                href="?{{ request.GET.urlencode }}&export=pdf"
+                            >
+                                <i class="fa fa-file-pdf text-danger me-2"></i>
+                                PDF
+                            </a>
+                        </li>
+
+                        <li>
+                            <a
+                                class="dropdown-item"
+                                href="?{{ request.GET.urlencode }}&export=docx"
+                            >
+                                <i class="fa fa-file-word text-primary me-2"></i>
+                                Word
+                            </a>
+                        </li>
+
+                        <li>
+                            <a
+                                class="dropdown-item"
+                                href="?{{ request.GET.urlencode }}&export=json"
+                            >
+                                <i class="fa fa-code text-warning me-2"></i>
+                                JSON
+                            </a>
+                        </li>
+
+                    </ul>
+
+                </div>
+
+                {% if request.user.is_superuser %}
+                <a
+                    href="{% url 'accounts:user_create' %}"
+                    class="btn btn-primary rounded-pill"
+                >
+                    <i class="fa fa-user-plus me-2"></i>
+                    Create User
+                </a>
+                {% endif %}
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- ================================================= -->
+    <!-- KPI CARDS -->
+    <!-- ================================================= -->
+
+    <div class="card-body bg-light border-bottom">
+
+        <div class="row g-3">
+
+            <div class="col-lg-3 col-md-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <small class="text-muted">Total Users</small>
+                        <h2 class="fw-bold mb-0">
+                            {{ users|length }}
+                        </h2>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-3 col-md-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <small class="text-muted">Active Users</small>
+                        <h2 class="fw-bold text-success mb-0">
+                            {{ active_users_count }}
+                        </h2>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-3 col-md-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <small class="text-muted">Locked Accounts</small>
+                        <h2 class="fw-bold text-danger mb-0">
+                            {{ locked_users_count }}
+                        </h2>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-3 col-md-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <small class="text-muted">MFA Enabled</small>
+                        <h2 class="fw-bold text-primary mb-0">
+                            {{ mfa_users_count }}
+                        </h2>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- ================================================= -->
+    <!-- FILTERS -->
+    <!-- ================================================= -->
+
+    <div class="card-body border-bottom">
+
+        <form method="get">
+
+            <div class="row g-3">
+
+                <div class="col-lg-3">
+
+                    <input
+                        type="text"
+                        name="search"
+                        value="{{ request.GET.search }}"
+                        class="form-control"
+                        placeholder="Search users..."
+                    >
+
+                </div>
+
+                <div class="col-lg-2">
+
+                    <select
+                        name="status"
+                        class="form-select"
+                    >
+                        <option value="">All Statuses</option>
+
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                        <option value="locked">Locked</option>
+                        <option value="staff">Staff</option>
+                        <option value="mfa">MFA Enabled</option>
+                    </select>
+
+                </div>
+
+                <div class="col-lg-3">
+
+                    <div class="input-group">
+
+                        <select
+                            name="section"
+                            class="form-select"
+                        >
+                            <option value="">
+                                All Sections
+                            </option>
+
+                            {% for section in sections %}
+                            <option
+                                value="{{ section.pk }}"
+                            >
+                                {{ section }}
+                            </option>
+                            {% endfor %}
+
+                        </select>
+
+                        {% if request.user.is_superuser %}
+                        <a
+                            href="{% url 'core:section_create' %}"
+                            class="btn btn-outline-success"
+                            title="Add Section"
+                        >
+                            <i class="fa fa-plus"></i>
+                        </a>
+                        {% endif %}
+
+                    </div>
+
+                </div>
+
+                <div class="col-lg-3">
+
+                    <div class="input-group">
+
+                        <select
+                            name="plant"
+                            class="form-select"
+                        >
+                            <option value="">
+                                All Treatment Plants
+                            </option>
+
+                            {% for plant in plants %}
+                            <option
+                                value="{{ plant.pk }}"
+                            >
+                                {{ plant }}
+                            </option>
+                            {% endfor %}
+
+                        </select>
+
+                        {% if request.user.is_superuser %}
+                        <a
+                            href="{% url 't:treatmentplant_create' %}"
+                            class="btn btn-outline-success"
+                            title="Add Treatment Plant"
+                        >
+                            <i class="fa fa-plus"></i>
+                        </a>
+                        {% endif %}
+
+                    </div>
+
+                </div>
+
+                <div class="col-lg-1 d-grid">
+
+                    <button class="btn btn-primary">
+                        <i class="fa fa-search"></i>
+                    </button>
+
+                </div>
+
+            </div>
+
+        </form>
+
+    </div>
+
+
+    <!-- ================================================= -->
+    <!-- BULK ACTION BAR -->
+    <!-- ================================================= -->
+
+    <div class="card-body border-bottom py-2">
+
+        <div class="d-flex justify-content-between align-items-center flex-wrap">
+
+            <small class="text-muted">
+                {{ users|length }} user{{ users|pluralize }} found
+            </small>
+
+            {% if request.user.is_superuser %}
+            <div class="btn-group btn-group-sm">
+
+                <button class="btn btn-outline-success">
+                    Activate
+                </button>
+
+                <button class="btn btn-outline-warning">
+                    Deactivate
+                </button>
+
+                <button class="btn btn-outline-danger">
+                    Delete
+                </button>
+
+            </div>
+            {% endif %}
+
+        </div>
+
+    </div>
+
+
+    <!-- ================================================= -->
+    <!-- USERS TABLE -->
+    <!-- ================================================= -->
+
+    <div class="table-responsive">
+
+        <table class="table table-hover align-middle mb-0">
+
+            <thead class="table-light sticky-top">
+
+                <tr>
+
+                    <th width="40">
+                        <input
+                            type="checkbox"
+                            class="form-check-input"
+                        >
+                    </th>
+
+                    <th>User</th>
+                    <th>PF Number</th>
+                    <th>Email</th>
+                    <th>Treatment Plant</th>
+                    <th>Section</th>
+                    <th>Groups</th>
+                    <th>Status</th>
+                    <th>MFA</th>
+                    <th>Last Login</th>
+
+                    {% if request.user.is_superuser %}
+                    <th width="160">
+                        Actions
+                    </th>
+                    {% endif %}
+
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+                {% for user in users %}
+
+                <tr>
+
+                    <td>
+                        <input
+                            type="checkbox"
+                            class="form-check-input"
+                        >
+                    </td>
+
+                    <td>
+
+                        <div class="d-flex align-items-center">
+
+                            <img
+                                src="{{ user.profile_picture_url }}"
+                                class="rounded-circle me-3 border"
+                                width="50"
+                                height="50"
+                                style="object-fit:cover;"
+                            >
+
+                            <div>
+
+                                <div class="fw-semibold">
+                                    {{ user.full_name }}
+                                </div>
+
+                                <small class="text-muted">
+                                    {{ user.username }}
+                                </small>
+
+                            </div>
+
+                        </div>
+
+                    </td>
+
+                    <td>
+                        <span class="fw-semibold">
+                            {{ user.username }}
+                        </span>
+                    </td>
+
+                    <td>
+                        {{ user.email }}
+                    </td>
+
+                    <td>
+                        {{ user.assigned_treatment_plant|default:"-" }}
+                    </td>
+
+                    <td>
+                        {{ user.section|default:"-" }}
+                    </td>
+
+                    <td>
+
+                        {% for group in user.groups.all %}
+                            <span class="badge bg-light text-dark border">
+                                {{ group.name }}
+                            </span>
+                        {% empty %}
+                            -
+                        {% endfor %}
+
+                    </td>
+
+                    <td>
+
+                        {% if user.is_locked %}
+                            <span class="badge bg-danger">Locked</span>
+                        {% elif user.is_active %}
+                            <span class="badge bg-success">Active</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Inactive</span>
+                        {% endif %}
+
+                        {% if user.is_staff %}
+                            <span class="badge bg-info">
+                                Staff
+                            </span>
+                        {% endif %}
+
+                        {% if user.is_superuser %}
+                            <span class="badge bg-dark">
+                                Superuser
+                            </span>
+                        {% endif %}
+
+                    </td>
+
+                    <td>
+
+                        {% if user.mfa_enabled %}
+                            <span class="badge bg-success">
+                                Enabled
+                            </span>
+                        {% else %}
+                            <span class="badge bg-warning text-dark">
+                                Disabled
+                            </span>
+                        {% endif %}
+
+                    </td>
+
+                    <td>
+
+                        {% if user.last_login %}
+                            {{ user.last_login|date:"d M Y H:i" }}
+                        {% else %}
+                            <span class="text-muted">
+                                Never
+                            </span>
+                        {% endif %}
+
+                    </td>
+
+                    {% if request.user.is_superuser %}
+                    <td>
+
+                        <div class="btn-group btn-group-sm">
+
+                            <a
+                                href="{% url 'accounts:user_detail' user.pk %}"
+                                class="btn btn-outline-secondary"
+                            >
+                                <i class="fa fa-eye"></i>
+                            </a>
+
+                            <a
+                                href="{% url 'accounts:user_update' user.pk %}"
+                                class="btn btn-outline-primary"
+                            >
+                                <i class="fa fa-pen"></i>
+                            </a>
+
+                            <a
+                                href="{% url 'accounts:user_delete' user.pk %}"
+                                class="btn btn-outline-danger"
+                            >
+                                <i class="fa fa-trash"></i>
+                            </a>
+
+                        </div>
+
+                    </td>
+                    {% endif %}
+
+                </tr>
+
+                {% empty %}
+
+                <tr>
+
+                    <td colspan="11">
+
+                        <div class="text-center py-5">
+
+                            <i
+                                class="fa fa-users text-muted mb-3"
+                                style="font-size:4rem;"
+                            ></i>
+
+                            <h5 class="text-muted">
+                                No users found
+                            </h5>
+
+                            <p class="text-muted">
+                                Try changing your search criteria or create a new user.
+                            </p>
+
+                        </div>
+
+                    </td>
+
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+
+    <!-- ================================================= -->
+    <!-- FOOTER -->
+    <!-- ================================================= -->
+
+    <div class="card-footer bg-light">
+
+        <div class="d-flex justify-content-between align-items-center flex-wrap">
+
+            <small class="text-muted">
+                Showing {{ users|length }} user{{ users|pluralize }}
+            </small>
+
+            {% if is_paginated %}
+                {% include "partials/pagination.html" %}
+            {% endif %}
+
+        </div>
+
+    </div>
+
+</div>

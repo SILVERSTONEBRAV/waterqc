@@ -1,0 +1,106 @@
+{% extends "ca/dashboard/layout/app.html" %}
+
+{% block title %}Pending QA Reviews{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h1>Pending QA Reviews</h1>
+        <p>Chemical analysis processes awaiting quality assurance review.</p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h2>QA Review Queue</h2>
+            <span>{{ processes|length }} pending review{{ processes|length|pluralize }}</span>
+        </div>
+    </div>
+
+{% if processes %}
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Batch</th>
+                    <th>Request</th>
+                    <th>Sample</th>
+                    <th>Analyst</th>
+                    <th>Analysis Status</th>
+                    <th>Updated</th>
+                    <th></th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for process in processes %}
+                <tr>
+                    <td>
+                        {% if process.batch %}
+                            <strong>{{ process.batch }}</strong>
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if process.analysis_request %}
+                            {{ process.analysis_request }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if process.batch.sample_id %}
+                            {{ process.batch.sample_id }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if process.assigned_analyst %}
+                            {{ process.assigned_analyst }}
+                        {% else %}
+                            Unassigned
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        <span class="badge badge-warning">
+                            QA Review
+                        </span>
+                    </td>
+
+                    <td>
+                        {% if process.updated_at %}
+                            {{ process.updated_at|date:"d M Y H:i" }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        <a
+                            href="{% url 'ca:qa-review' process.pk %}"
+                            class="btn btn-primary"
+                        >
+                            Review
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% else %}
+    <div class="empty-state">
+        <h3>No pending QA reviews</h3>
+        <p>There are currently no chemical analysis processes awaiting QA review.</p>
+    </div>
+{% endif %}
+</div>
+{% endblock %}

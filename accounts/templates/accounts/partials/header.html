@@ -1,0 +1,118 @@
+<header class="topbar" role="banner">
+
+    <!-- =====================================================
+    BRAND SECTION (LEFT)
+    ===================================================== -->
+    <div class="brand-section">
+
+        {% if request.user.is_authenticated %}
+        <a
+            href="{{ user_home_url }}"
+            class="header-home-btn"
+            title="Go to Dashboard"
+            aria-label="Home">
+
+            <i class="fas fa-home" aria-hidden="true"></i>
+            <span>Home</span>
+        </a>
+        {% endif %}
+
+        <a href="{{ user_home_url|default:'/' }}" class="brand" aria-label="Company Home">
+
+            {% if company.logo %}
+                <img
+                    src="{{ company.logo.url }}"
+                    alt="{{ company.name }} Logo"
+                    class="logo"
+                    loading="lazy">
+            {% endif %}
+
+            <div class="brand-info">
+                <span class="company-name">
+                    {{ company.name|default:"NCWSC" }}
+                </span>
+
+                <span class="company-subtitle">
+                    Water Quality Management System
+                </span>
+            </div>
+
+        </a>
+
+    </div>
+
+
+    <!-- =====================================================
+    RIGHT CONTROLS (GLOBAL ACTIONS)
+    ===================================================== -->
+    <div class="user-menu" role="navigation" aria-label="User controls">
+
+        {% if request.user.is_authenticated %}
+
+            <!-- =================================================
+            THEME TOGGLE
+            ================================================= -->
+            <button
+                id="themeToggle"
+                class="theme-toggle"
+                type="button"
+                aria-label="Toggle dark/light theme"
+                title="Toggle Theme">
+
+                <i class="fas fa-moon" aria-hidden="true"></i>
+            </button>
+
+
+            <!-- =================================================
+            NOTIFICATIONS
+            ================================================= -->
+            <div class="notification-container">
+
+                <button
+                    id="notificationBtn"
+                    class="notification-btn"
+                    type="button"
+                    aria-haspopup="true"
+                    aria-expanded="false"
+                    aria-controls="notificationDropdown">
+
+                    <i class="fas fa-bell" aria-hidden="true"></i>
+
+                    <span
+                        id="notificationBadge"
+                        class="notification-badge"
+                        style="display:none;"
+                        aria-label="New notifications count">
+                    </span>
+
+                </button>
+
+                <ul
+                    id="notificationDropdown"
+                    class="notification-dropdown"
+                    role="menu"
+                    aria-label="Notifications">
+
+                    <li class="notification-header" role="presentation">
+                        Notifications
+                    </li>
+
+                    <li class="notification-empty" role="presentation">
+                        No new notifications
+                    </li>
+
+                </ul>
+
+            </div>
+
+
+            <!-- =================================================
+            USER DROPDOWN (ONLY TRIGGER + MENU)
+            ================================================= -->
+            {% include "accounts/partials/user_dropdown.html" %}
+
+        {% endif %}
+
+    </div>
+
+</header>

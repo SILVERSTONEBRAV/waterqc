@@ -1,0 +1,173 @@
+{% extends "ca/dashboard/layout/app.html" %}
+
+{% block title %}Chemical Receiving Checklists{% endblock %}
+
+{% block content %}
+
+<div class="ca-page">
+
+<div class="page-header">
+    <div>
+        <h1>Chemical Receiving Checklists</h1>
+        <p>Review receiving checklists associated with chemical analysis workflows.</p>
+    </div>
+
+    <div class="page-actions">
+        <a href="{% url 'ca:dashboard' %}" class="btn btn-secondary">
+            Dashboard
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h2>Checklists</h2>
+            <span>
+                {{ checklists|length }}
+                checklist{{ checklists|length|pluralize }}
+            </span>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Checklist</th>
+                    <th>Batch</th>
+                    <th>Process</th>
+                    <th>Status</th>
+                    <th>Completed By</th>
+                    <th>Completed</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for checklist in checklists %}
+                <tr>
+                    <td>
+                        <strong>
+                            {% if checklist.pk %}
+                                #{{ checklist.pk }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </strong>
+                    </td>
+
+                    <td>
+                        {% if checklist.batch %}
+                            {% if checklist.batch.pk %}
+                                <a href="{% url 'ca:batch-detail' checklist.batch.pk %}">
+                                    {{ checklist.batch }}
+                                </a>
+                            {% else %}
+                                {{ checklist.batch }}
+                            {% endif %}
+                        {% elif checklist.process %}
+                            {% if checklist.process.batch %}
+                                {% if checklist.process.batch.pk %}
+                                    <a href="{% url 'ca:batch-detail' checklist.process.batch.pk %}">
+                                        {{ checklist.process.batch }}
+                                    </a>
+                                {% else %}
+                                    {{ checklist.process.batch }}
+                                {% endif %}
+                            {% else %}
+                                —
+                            {% endif %}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if checklist.process %}
+                            {% if checklist.process.pk %}
+                                <a href="{% url 'ca:process-detail' checklist.process.pk %}">
+                                    {{ checklist.process.sample_id|default:checklist.process }}
+                                </a>
+                            {% else %}
+                                {{ checklist.process }}
+                            {% endif %}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if checklist.status == "COMPLETED" %}
+                            <span class="badge badge-success">
+                                Completed
+                            </span>
+                        {% elif checklist.status == "REOPENED" %}
+                            <span class="badge badge-warning">
+                                Reopened
+                            </span>
+                        {% elif checklist.status == "PENDING" %}
+                            <span class="badge badge-info">
+                                Pending
+                            </span>
+                        {% elif checklist.status %}
+                            <span class="badge">
+                                {{ checklist.get_status_display|default:checklist.status }}
+                            </span>
+                        {% else %}
+                            <span class="badge badge-warning">
+                                Pending
+                            </span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if checklist.completed_by %}
+                            {{ checklist.completed_by.get_full_name|default:checklist.completed_by.username }}
+                        {% elif checklist.completed_by_user %}
+                            {{ checklist.completed_by_user.get_full_name|default:checklist.completed_by_user.username }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if checklist.completed_at %}
+                            {{ checklist.completed_at|date:"d M Y H:i" }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if checklist.pk %}
+                            <a
+                                href="{% url 'ca:checklist-detail' checklist.pk %}"
+                                class="btn btn-sm btn-primary"
+                            >
+                                View
+                            </a>
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                </tr>
+
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="empty-state">
+                        <strong>No receiving checklists found</strong>
+                        <p>
+                            There are currently no chemical receiving checklists
+                            available for review.
+                        </p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+</div>
+
+{% endblock %}

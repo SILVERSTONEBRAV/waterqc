@@ -1,0 +1,45 @@
+<script>
+
+document.addEventListener(
+
+    "keydown",
+
+    function(e){
+
+        if(e.target.tagName==="INPUT") return;
+
+        if(e.target.tagName==="TEXTAREA") return;
+
+        if(e.ctrlKey && e.key==="r"){
+
+            e.preventDefault();
+
+            dispatchAppEvent(APP.events.REFRESH);
+
+        }
+
+        if(e.key==="Escape"){
+
+            document.activeElement.blur();
+
+        }
+
+        if(e.key==="/"){
+
+            const search=document.querySelector("[data-search]");
+
+            if(search){
+
+                e.preventDefault();
+
+                search.focus();
+
+            }
+
+        }
+
+    }
+
+);
+
+</script>

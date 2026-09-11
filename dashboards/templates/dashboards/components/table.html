@@ -1,0 +1,261 @@
+<div
+    x-data="{
+        search:'',
+        sortColumn:null,
+        sortAsc:true,
+
+        sort(col){
+            if(this.sortColumn===col){
+                this.sortAsc=!this.sortAsc;
+            }else{
+                this.sortColumn=col;
+                this.sortAsc=true;
+            }
+        }
+    }"
+    class="dashboard-table-wrapper"
+>
+
+    {% if widget.title or widget.description %}
+    <div class="table-toolbar">
+
+        <div class="table-info">
+            {% if widget.title %}
+            <h4>{{ widget.title }}</h4>
+            {% endif %}
+
+            {% if widget.description %}
+            <p>{{ widget.description }}</p>
+            {% endif %}
+        </div>
+
+        <div class="table-actions">
+
+            <div class="table-search">
+                <i class="fas fa-search"></i>
+
+                <input
+                    type="text"
+                    placeholder="Search records..."
+                    x-model="search"
+                >
+            </div>
+
+            <button class="icon-btn">
+                <i class="fas fa-filter"></i>
+            </button>
+
+            <button class="icon-btn">
+                <i class="fas fa-download"></i>
+            </button>
+
+            <button class="icon-btn">
+                <i class="fas fa-expand"></i>
+            </button>
+
+        </div>
+
+    </div>
+    {% endif %}
+
+    <div class="table-scroll">
+
+        <table class="dashboard-table">
+
+            <thead>
+
+                <tr>
+
+                    <th class="table-checkbox">
+                        <input type="checkbox">
+                    </th>
+
+                    {% for column in widget.columns %}
+                    <th
+                        @click="sort('{{ column }}')"
+                        class="sortable"
+                    >
+                        <div class="th-content">
+
+                            <span>
+                                {{ column }}
+                            </span>
+
+                            <i
+                                class="fas fa-sort"
+                            ></i>
+
+                        </div>
+                    </th>
+                    {% endfor %}
+
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+                {% for row in widget.rows %}
+                <tr
+                    x-show="
+                        JSON.stringify(
+                            {{ row|safe }}
+                        ).toLowerCase()
+                        .includes(
+                            search.toLowerCase()
+                        )
+                    "
+                >
+
+                    <td class="table-checkbox">
+                        <input
+                            type="checkbox"
+                        >
+                    </td>
+
+                    {% for cell in row %}
+
+                    <td
+                        class="
+                        {% if cell|length < 15 %}
+                        compact
+                        {% endif %}
+                        "
+                    >
+
+                        {% if cell.status %}
+                        <span
+                            class="
+                            status-badge
+                            status-{{ cell.status|lower }}
+                            "
+                        >
+                            {{ cell.label }}
+                        </span>
+
+                        {% elif cell.url %}
+                        <a
+                            href="{{ cell.url }}"
+                            class="table-link"
+                        >
+                            {{ cell.label }}
+                        </a>
+
+                        {% elif cell.icon %}
+                        <div class="table-cell-flex">
+
+                            <i
+                                class="{{ cell.icon }}"
+                            ></i>
+
+                            <span>
+                                {{ cell.label }}
+                            </span>
+
+                        </div>
+
+                        {% else %}
+                            {{ cell }}
+                        {% endif %}
+
+                    </td>
+
+                    {% endfor %}
+
+                </tr>
+
+                {% empty %}
+
+                <tr>
+
+                    <td
+                        colspan="{{ widget.columns|length|add:1 }}"
+                        class="table-empty"
+                    >
+
+                        <div class="empty-state">
+
+                            <i
+                                class="fas fa-database"
+                            ></i>
+
+                            <h4>
+                                No Data Available
+                            </h4>
+
+                            <p>
+                                There are no records to display.
+                            </p>
+
+                        </div>
+
+                    </td>
+
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+            {% if widget.footer %}
+            <tfoot>
+
+                <tr>
+
+                    <td
+                        colspan="{{ widget.columns|length|add:1 }}"
+                    >
+                        {{ widget.footer }}
+                    </td>
+
+                </tr>
+
+            </tfoot>
+            {% endif %}
+
+        </table>
+
+    </div>
+
+    {% if widget.pagination %}
+    <div class="table-pagination">
+
+        <div class="pagination-info">
+            Showing
+            {{ widget.pagination.start }}
+            -
+            {{ widget.pagination.end }}
+            of
+            {{ widget.pagination.total }}
+        </div>
+
+        <div class="pagination-actions">
+
+            <button
+                class="icon-btn"
+                {% if not widget.pagination.has_previous %}
+                disabled
+                {% endif %}
+            >
+                <i
+                    class="fas fa-chevron-left"
+                ></i>
+            </button>
+
+            <button
+                class="icon-btn"
+                {% if not widget.pagination.has_next %}
+                disabled
+                {% endif %}
+            >
+                <i
+                    class="fas fa-chevron-right"
+                ></i>
+            </button>
+
+        </div>
+
+    </div>
+    {% endif %}
+
+</div>

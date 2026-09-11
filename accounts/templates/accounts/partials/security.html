@@ -1,0 +1,268 @@
+{# templates/accounts/partials/security.html #}
+
+<div class="container-fluid px-0">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="fw-bold mb-1">
+                Security Dashboard
+            </h4>
+            <p class="text-muted mb-0">
+                Monitor your account security settings and authentication status.
+            </p>
+        </div>
+
+        {% if request.user.mfa_enabled %}
+            <span class="badge bg-success fs-6">
+                <i class="fa-solid fa-shield-check me-1"></i>
+                Protected
+            </span>
+        {% else %}
+            <span class="badge bg-warning text-dark fs-6">
+                <i class="fa-solid fa-triangle-exclamation me-1"></i>
+                Attention Required
+            </span>
+        {% endif %}
+    </div>
+
+    <div class="row g-4 mb-4">
+
+        <div class="col-xl-3 col-md-6">
+
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+                <div class="card-body text-center">
+
+                    <div class="mb-3">
+                        <i class="fa-solid fa-shield-halved fa-3x text-primary"></i>
+                    </div>
+
+                    <h6 class="text-muted">
+                        Multi-Factor Authentication
+                    </h6>
+
+                    {% if request.user.mfa_enabled %}
+                        <h4 class="text-success fw-bold">
+                            Enabled
+                        </h4>
+                    {% else %}
+                        <h4 class="text-danger fw-bold">
+                            Disabled
+                        </h4>
+                    {% endif %}
+
+                </div>
+            </div>
+
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+                <div class="card-body text-center">
+
+                    <div class="mb-3">
+                        <i class="fa-solid fa-lock fa-3x text-warning"></i>
+                    </div>
+
+                    <h6 class="text-muted">
+                        Account Status
+                    </h6>
+
+                    {% if request.user.is_locked %}
+                        <h4 class="text-danger fw-bold">
+                            Locked
+                        </h4>
+                    {% else %}
+                        <h4 class="text-success fw-bold">
+                            Active
+                        </h4>
+                    {% endif %}
+
+                </div>
+            </div>
+
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+                <div class="card-body text-center">
+
+                    <div class="mb-3">
+                        <i class="fa-solid fa-circle-exclamation fa-3x text-danger"></i>
+                    </div>
+
+                    <h6 class="text-muted">
+                        Failed Login Attempts
+                    </h6>
+
+                    <h2 class="fw-bold">
+                        {{ request.user.failed_login_attempts }}
+                    </h2>
+
+                </div>
+            </div>
+
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+                <div class="card-body text-center">
+
+                    <div class="mb-3">
+                        <i class="fa-solid fa-clock fa-3x text-info"></i>
+                    </div>
+
+                    <h6 class="text-muted">
+                        Last Login
+                    </h6>
+
+                    <div class="fw-semibold">
+                        {{ request.user.last_login|date:"d M Y H:i"|default:"Never" }}
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="row g-4">
+
+        <div class="col-lg-6">
+
+            <div class="card border-0 shadow-sm rounded-4">
+
+                <div class="card-header bg-white border-0 py-3">
+                    <h5 class="mb-0">
+                        Authentication Information
+                    </h5>
+                </div>
+
+                <div class="card-body">
+
+                    <table class="table align-middle">
+
+                        <tbody>
+
+                            <tr>
+                                <th width="40%">
+                                    Username
+                                </th>
+                                <td>
+                                    {{ request.user.username }}
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <th>
+                                    Email Verified
+                                </th>
+                                <td>
+                                    {% if request.user.email_verified %}
+                                        <span class="badge bg-success">
+                                            Verified
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-danger">
+                                            Not Verified
+                                        </span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <th>
+                                    MFA Enabled
+                                </th>
+                                <td>
+                                    {{ request.user.mfa_enabled|yesno:"Yes,No" }}
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <th>
+                                    Password Changed
+                                </th>
+                                <td>
+                                    {{ request.user.password_last_set|date:"d M Y H:i"|default:"Unknown" }}
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <th>
+                                    Last Login
+                                </th>
+                                <td>
+                                    {{ request.user.last_login|date:"d M Y H:i"|default:"Never" }}
+                                </td>
+                            </tr>
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="col-lg-6">
+
+            <div class="card border-0 shadow-sm rounded-4">
+
+                <div class="card-header bg-white border-0 py-3">
+                    <h5 class="mb-0">
+                        Security Recommendations
+                    </h5>
+                </div>
+
+                <div class="card-body">
+
+                    <ul class="list-group list-group-flush">
+
+                        {% if not request.user.mfa_enabled %}
+                        <li class="list-group-item px-0">
+                            <i class="fa-solid fa-shield-halved text-warning me-2"></i>
+                            Enable Multi-Factor Authentication.
+                        </li>
+                        {% endif %}
+
+                        {% if not request.user.email_verified %}
+                        <li class="list-group-item px-0">
+                            <i class="fa-solid fa-envelope-circle-check text-warning me-2"></i>
+                            Verify your email address.
+                        </li>
+                        {% endif %}
+
+                        {% if request.user.failed_login_attempts > 0 %}
+                        <li class="list-group-item px-0">
+                            <i class="fa-solid fa-triangle-exclamation text-danger me-2"></i>
+                            Review recent login attempts.
+                        </li>
+                        {% endif %}
+
+                        <li class="list-group-item px-0">
+                            <i class="fa-solid fa-key text-primary me-2"></i>
+                            Change your password regularly.
+                        </li>
+
+                        <li class="list-group-item px-0">
+                            <i class="fa-solid fa-user-shield text-success me-2"></i>
+                            Never share your login credentials.
+                        </li>
+
+                    </ul>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>

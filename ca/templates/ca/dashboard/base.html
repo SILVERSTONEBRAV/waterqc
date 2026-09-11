@@ -1,0 +1,148 @@
+
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="utf-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <meta
+        name="application-name"
+        content="Chemical Analysis Management System"
+    >
+
+    <meta
+        name="theme-color"
+        content="#2563eb"
+    >
+
+    <meta
+        name="description"
+        content="{% block meta_description %}Chemical Analysis Management System{% endblock %}"
+    >
+
+    <title>{% block title %}Chemical Analysis Management System{% endblock %}</title>
+
+    {% block meta %}{% endblock %}
+    {% block preload %}{% endblock %}
+    {% block fonts %}{% endblock %}
+
+    <link rel="stylesheet" href="{% static 'ca/css/base/reset.css' %}">
+    <link rel="stylesheet" href="{% static 'ca/css/base/tokens.css' %}">
+    <link rel="stylesheet" href="{% static 'ca/css/base/base.css' %}">
+
+    <link rel="stylesheet" href="{% static 'ca/css/layout/app.css' %}">
+    <link rel="stylesheet" href="{% static 'ca/css/layout/layout.css' %}">
+    <link rel="stylesheet" href="{% static 'ca/css/layout/sidebar.css' %}">
+    <link rel="stylesheet" href="{% static 'ca/css/layout/topbar.css' %}">
+    <link rel="stylesheet" href="{% static 'ca/css/layout/responsive.css' %}">
+
+    <link rel="stylesheet" href="{% static 'ca/css/components/components.css' %}">
+    <link rel="stylesheet" href="{% static 'ca/css/components/buttons.css' %}">
+    <link rel="stylesheet" href="{% static 'ca/css/components/cards.css' %}">
+    <link rel="stylesheet" href="{% static 'ca/css/components/forms.css' %}">
+    <link rel="stylesheet" href="{% static 'ca/css/components/tables.css' %}">
+    <link rel="stylesheet" href="{% static 'ca/css/components/badges.css' %}">
+    <link rel="stylesheet" href="{% static 'ca/css/components/alerts.css' %}">
+
+    <link rel="stylesheet" href="{% static 'ca/css/navigation/navigation.css' %}">
+    <link rel="stylesheet" href="{% static 'ca/css/dialogs/dialogs.css' %}">
+
+    {% block vendor_css %}{% endblock %}
+    {% block page_css %}{% endblock %}
+    {% block extra_css %}{% endblock %}
+    {% block head %}{% endblock %}
+</head>
+
+<body
+    class="ca-app"
+    data-app="chemical-analysis"
+    data-module="{% block app_module %}dashboard{% endblock %}"
+    data-authenticated="{% if request.user.is_authenticated %}true{% else %}false{% endif %}"
+    data-user-id="{% if request.user.is_authenticated %}{{ request.user.pk|default:'' }}{% endif %}"
+    data-username="{% if request.user.is_authenticated %}{{ request.user.username|default:'' }}{% endif %}"
+>
+    {% block app_shell %}{% endblock %}
+
+    {% include "ca/dashboard/navigation/command_palette.html" %}
+    {% include "ca/dashboard/navigation/search_overlay.html" %}
+    {% include "ca/dashboard/layout/notifications.html" %}
+
+    {% include "ca/dashboard/dialogs/modal.html" %}
+    {% include "ca/dashboard/dialogs/drawer.html" %}
+    {% include "ca/dashboard/dialogs/toast.html" %}
+    {% include "ca/dashboard/dialogs/loading.html" %}
+
+    <script>
+        (() => {
+            const shell = document.getElementById("app-shell");
+
+            window.CA = window.CA || {};
+
+            const body = document.body;
+            const data = shell ? shell.dataset : {};
+
+            window.CA.config = {
+                app: body.dataset.app || "chemical-analysis",
+                module: body.dataset.module || "dashboard",
+                authenticated: body.dataset.authenticated === "true",
+
+                user: {
+                    id: body.dataset.userId || null,
+                    username: body.dataset.username || null
+                },
+
+                urls: {
+                    dashboard: data.dashboardUrl || "",
+                    dashboardAlt: data.dashboardAltUrl || "",
+
+                    batches: data.batchesUrl || "",
+                    requests: data.requestsUrl || "",
+                    processes: data.processesUrl || "",
+                    results: data.resultsUrl || "",
+                    certificates: data.certificatesUrl || "",
+
+                    tasks: data.tasksUrl || "",
+                    pendingAnalysis: data.pendingAnalysisUrl || "",
+                    pendingApproval: data.pendingApprovalUrl || "",
+                    overdue: data.overdueUrl || "",
+
+                    reports: data.reportsUrl || "",
+                    analytics: data.analyticsUrl || "",
+
+                    workflow: data.workflowUrl || "",
+
+                    search: data.searchUrl || "",
+                    notifications: data.notificationsUrl || ""
+                },
+
+                dashboard: {
+                    view: data.dashboardView || "dashboard",
+                    liveEnabled: data.liveEnabled !== "false",
+                    sidebarState: data.sidebarState || "collapsed"
+                },
+
+                csrf: "{{ csrf_token|escapejs }}"
+            };
+        })();
+    </script>
+
+    <script
+        src="{% static 'ca/js/core/app.js' %}"
+        defer
+    ></script>
+
+    {% block vendor_js %}{% endblock %}
+    {% block layout_js %}{% endblock %}
+    {% block page_js %}{% endblock %}
+    {% block extra_js %}{% endblock %}
+    {% block scripts %}{% endblock %}
+    {% block body_scripts %}{% endblock %}
+</body>
+</html>
+

@@ -1,0 +1,172 @@
+<div class="card widget-card audit-log-card">
+
+    <!-- HEADER -->
+    <div class="card-header d-flex justify-content-between align-items-center">
+
+        <div class="d-flex align-items-center gap-2">
+            <i class="fa-solid fa-file-shield text-primary"></i>
+            <span class="fw-semibold">Audit Logs</span>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+
+            <input
+                type="text"
+                class="form-control form-control-sm"
+                placeholder="Search logs..."
+                style="max-width:200px;"
+                oninput="filterAuditLogs(this.value)"
+            >
+
+            <span class="badge bg-primary">
+                {{ audit_logs|length }}
+            </span>
+
+        </div>
+
+    </div>
+
+    <!-- BODY -->
+    <div class="card-body p-0">
+
+        <div class="table-responsive audit-log-table">
+
+            <table class="table table-hover align-middle mb-0">
+
+                <thead class="table-light">
+                    <tr>
+                        <th>User</th>
+                        <th>Action</th>
+                        <th>Model</th>
+                        <th>Object</th>
+                        <th>IP</th>
+                        <th>Timestamp</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody id="auditLogTableBody">
+
+                    {% for log in audit_logs %}
+
+                        <tr class="audit-row">
+
+                            <td>
+                                <div class="fw-semibold">
+                                    {{ log.user.get_full_name|default:log.user.username|default:"System" }}
+                                </div>
+                                <small class="text-muted">
+                                    {{ log.user.username|default:"system" }}
+                                </small>
+                            </td>
+
+                            <td>
+                                <span class="fw-semibold text-dark">
+                                    {{ log.action|default:"-" }}
+                                </span>
+                            </td>
+
+                            <td>
+                                <span class="badge bg-light text-dark border">
+                                    {{ log.model_name|default:"-" }}
+                                </span>
+                            </td>
+
+                            <td>
+                                <code class="text-muted">
+                                    {{ log.object_id|default:"-" }}
+                                </code>
+                            </td>
+
+                            <td>
+                                <span class="text-muted">
+                                    {{ log.ip_address|default:"-" }}
+                                </span>
+                            </td>
+
+                            <td>
+                                <div class="small">
+                                    {{ log.created_at|date:"d M Y" }}
+                                </div>
+                                <div class="text-muted small">
+                                    {{ log.created_at|date:"H:i:s" }}
+                                </div>
+                            </td>
+
+                            <td>
+                                {% if log.status == "success" %}
+                                    <span class="badge bg-success-subtle text-success border">
+                                        Success
+                                    </span>
+
+                                {% elif log.status == "failed" %}
+                                    <span class="badge bg-danger-subtle text-danger border">
+                                        Failed
+                                    </span>
+
+                                {% elif log.status == "warning" %}
+                                    <span class="badge bg-warning-subtle text-warning border">
+                                        Warning
+                                    </span>
+
+                                {% else %}
+                                    <span class="badge bg-secondary-subtle text-secondary border">
+                                        Unknown
+                                    </span>
+                                {% endif %}
+                            </td>
+
+                        </tr>
+
+                    {% empty %}
+
+                        <tr>
+                            <td colspan="7" class="text-center py-5 text-muted">
+                                <i class="fa-solid fa-inbox fa-2x mb-2 d-block"></i>
+                                No audit logs available
+                            </td>
+                        </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+<style>
+.audit-log-card{
+    border-radius:18px;
+    overflow:hidden;
+}
+
+.audit-log-table{
+    max-height:420px;
+    overflow:auto;
+}
+
+.audit-row:hover{
+    background:#f8fafc;
+}
+
+.audit-log-card code{
+    font-size:.85rem;
+}
+</style>
+
+<script>
+function filterAuditLogs(query){
+    const rows = document.querySelectorAll(".audit-row");
+    query = query.toLowerCase();
+
+    rows.forEach(row => {
+        const text = row.innerText.toLowerCase();
+        row.style.display = text.includes(query) ? "" : "none";
+    });
+}
+</script>

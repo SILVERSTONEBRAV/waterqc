@@ -1,0 +1,43 @@
+<!-- templates/microbiological_analysis/microbial_analysis_list.html -->
+
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Microbial Analysis List</title>
+    <link rel="stylesheet" href="{% static 'styles.css' %}">
+</head>
+<body>
+    <h1>Microbial Analysis List</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>UUID</th>
+                <th>Timestamp</th>
+                <th>Treatment Plant</th>
+                <th>Phase</th>
+                <th>Method</th>
+                <th>State</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for analysis in analyses %}
+            <tr>
+                <td>{{ analysis.uuid }}</td>
+                <td>{{ analysis.timestamp }}</td>
+                <td>{{ analysis.treatment_plant.name }}</td>
+                <td>{{ analysis.treatment_plant_phase.name }}</td>
+                <td>{{ analysis.method.name }}</td>
+                <td>{{ analysis.state }}</td>
+                <td>
+                    <a href="{% url 'microbial_analysis_detail' analysis.uuid %}">View</a>
+                    <a href="{% url 'microbial_analysis_edit' analysis.uuid %}">Edit</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

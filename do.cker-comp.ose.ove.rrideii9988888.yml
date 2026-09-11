@@ -1,0 +1,15 @@
+version: "3.9"
+
+services:
+  web1:
+    volumes:
+      - ./:/app
+  web2:
+    volumes:
+      - ./:/app
+  web3:
+    volumes:
+      - ./:/app
+  web4:
+    volumes:
+      - ./:/app

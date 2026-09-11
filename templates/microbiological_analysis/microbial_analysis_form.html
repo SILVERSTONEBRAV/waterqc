@@ -1,0 +1,24 @@
+<!-- templates/microbiological_analysis/microbial_analysis_form.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Microbial Analysis Form</title>
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+</head>
+<body>
+    <h1>{% if form.instance.pk %}Edit{% else %}Add{% endif %} Microbial Analysis</h1>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <h2>Results</h2>
+        {{ results.management_form }}
+        {% for formset_form in results %}
+            {{ formset_form.as_p }}
+        {% endfor %}
+        <button type="submit">Save</button>
+    </form>
+    <a href="{% url 'microbial_analysis_list' %}">Back to List</a>
+</body>
+</html>

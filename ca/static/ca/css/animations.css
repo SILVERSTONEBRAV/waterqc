@@ -1,0 +1,23 @@
+/* static/accounts/css/animations.css */
+
+/* Simple pulse animation */
+@keyframes pulse-slow {
+    0% { transform: scale(1); opacity: 0.9; }
+    50% { transform: scale(1.05); opacity: 1; }
+    100% { transform: scale(1); opacity: 0.9; }
+}
+
+.pulse {
+    animation: pulse-slow 2s infinite;
+}
+
+/* Bounce in effect */
+@keyframes bounce-in {
+    0% { transform: scale(0.5); opacity: 0; }
+    60% { transform: scale(1.05); opacity: 1; }
+    100% { transform: scale(1); }
+}
+
+.bounce-in {
+    animation: bounce-in 0.6s forwards;
+}

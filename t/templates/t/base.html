@@ -1,0 +1,29 @@
+{% extends "core/base/base.html" %}
+{% load static %}
+
+{% block title %}
+    NCWSCwaterLAB - Accounts
+{% endblock %}
+
+{% block header %}
+    {% include "accounts/partials/header.html" %}
+<link rel="stylesheet" href="{% static 't/css/dashboard.css' %}">
+{% endblock %}
+
+{% block extra_styles %}
+{% endblock %}
+
+{% block sidebar %}
+    {% include "t/partials/sidebar.html" %}
+{% endblock %}
+
+{% block content %}
+    {% block page_content %}{% endblock %}
+{% endblock %}
+
+{% block modals %}
+    {% include "accounts/profile/change_password.html" %}
+{% endblock %}
+
+{% block extra_scripts %}
+{% endblock %}

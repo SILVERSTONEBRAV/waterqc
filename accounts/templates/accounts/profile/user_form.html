@@ -1,0 +1,14 @@
+{% extends "accounts/base.html" %}
+{% block content %}
+<h2>{% if form.instance.pk %}Edit User{% else %}Create User{% endif %}</h2>
+
+<form method="post" enctype="multipart/form-data" class="user-form">
+    {% csrf_token %}
+    {{ form.as_p }}
+
+    <button type="submit" class="btn btn-primary">
+        {% if form.instance.pk %}Update{% else %}Create{% endif %}
+    </button>
+    <a href="{% url 'accounts:user_list' %}" class="btn btn-light">Cancel</a>
+</form>
+{% endblock %}

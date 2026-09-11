@@ -1,0 +1,35 @@
+<div class="wf-models">
+
+    {% for m in models %}
+
+    <div class="wf-model-card"
+         hx-get="?section=model&model={{ m.key }}"
+         hx-target="#wf-detail"
+         hx-swap="innerHTML">
+
+        <div class="model-title">
+            {{ m.label }}
+        </div>
+
+        <div class="model-meta">
+            <span>{{ m.key }}</span>
+        </div>
+
+        <div class="state-grid">
+
+            {% for k, v in m.counts.items %}
+                <div class="state-chip">
+                    <b>{{ k }}</b>
+                    <span>{{ v }}</span>
+                </div>
+            {% endfor %}
+
+        </div>
+
+    </div>
+
+    {% endfor %}
+
+</div>
+
+<div id="wf-detail"></div>

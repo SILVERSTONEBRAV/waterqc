@@ -1,0 +1,40 @@
+<div
+    class="ca-overlay ca-search-overlay"
+    id="search-overlay"
+    hidden
+    aria-hidden="true"
+>
+    <div class="ca-search-modal" role="dialog" aria-modal="true">
+        <div class="ca-search-header">
+            <div class="ca-search-input-wrapper">
+                <span class="ca-icon ca-icon-search"></span>
+
+                <input
+                    type="search"
+                    id="global-search-input"
+                    placeholder="Search batches, requests, parameters, reports..."
+                    autocomplete="off"
+                />
+
+                <button
+                    type="button"
+                    class="ca-icon-button"
+                    data-action="close-search"
+                    aria-label="Close search"
+                >
+                    <span class="ca-icon ca-icon-close"></span>
+                </button>
+            </div>
+        </div>
+
+        <div class="ca-search-body">
+            <div id="global-search-results" class="ca-search-results">
+                <div class="ca-search-empty">
+                    <span class="ca-icon ca-icon-search"></span>
+                    <strong>Search the chemical analysis system</strong>
+                    <span>Find batches, requests, results, certificates and reports.</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,72 @@
+# =====================================================
+# 🐳 Production-Ready Patroni + PostgreSQL + ETCD Image
+# Optimized for Kubernetes HA setups
+# =====================================================
+FROM python:3.12-alpine
+
+# ---------------------------
+# 1️⃣ Build & runtime dependencies
+# ---------------------------
+RUN apk add --no-cache \
+    bash curl su-exec tini tzdata postgresql15-client postgresql15-dev \
+    libffi-dev gcc musl-dev make linux-headers \
+    && apk add --no-cache --virtual .build-deps \
+       build-base libressl-dev libpq-dev python3-dev \
+    && pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# ---------------------------
+# 2️⃣ Install Patroni with ETCD support
+# ---------------------------
+RUN pip install --no-cache-dir patroni[etcd]
+
+# ---------------------------
+# 3️⃣ Clean up build tools to reduce image size
+# ---------------------------
+RUN apk del .build-deps gcc musl-dev python3-dev linux-headers make
+
+# ---------------------------
+# 4️⃣ Create non-root Patroni user
+# ---------------------------
+RUN addgroup -S patroni && adduser -S -G patroni patroni \
+    && mkdir -p /patroni /var/lib/postgresql/data \
+    && chown -R patroni:patroni /patroni /var/lib/postgresql/data
+
+# ---------------------------
+# 5️⃣ Environment variables (overridable in K8s)
+# ---------------------------
+ENV PATRONI_SCOPE=postgres \
+    PATRONI_NAME=node1 \
+    PATRONI_ETCD_HOST=etcd:2379 \
+    PATRONI_REPLICATION_USERNAME=replicator \
+    PATRONI_REPLICATION_PASSWORD=replica_pass \
+    PATRONI_SUPERUSER_USERNAME=postgres \
+    PATRONI_SUPERUSER_PASSWORD=postgres_pass \
+    PATRONI_POSTGRESQL_DATA_DIR=/var/lib/postgresql/data \
+    PATRONI_LOG_LEVEL=INFO \
+    TZ=UTC \
+    WAIT_TIMEOUT=120 \
+    WAIT_INTERVAL=2
+
+# ---------------------------
+# 6️⃣ Copy entrypoint & wait scripts
+# ---------------------------
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY wait-for-services.sh /usr/local/bin/wait-for-services.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/wait-for-services.sh
+
+# ---------------------------
+# 7️⃣ Expose ports
+# ---------------------------
+EXPOSE 5432 8008
+
+# ---------------------------
+# 8️⃣ Healthcheck (Postgres + Patroni API)
+# ---------------------------
+HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=3 \
+    CMD pg_isready -U $PATRONI_SUPERUSER_USERNAME -d postgres >/dev/null 2>&1 || exit 1
+
+# ---------------------------
+# 9️⃣ Entrypoint
+# ---------------------------
+ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/docker-entrypoint.sh"]
+CMD ["patroni", "/patroni/patroni.yml"]

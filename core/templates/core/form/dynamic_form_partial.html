@@ -1,0 +1,379 @@
+{% load static %}
+
+<div class="card shadow-sm border-0">
+
+    <!-- HEADER -->
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+
+        <div>
+            <strong>
+                {% if object %}
+                    Update {{ meta.verbose_name }}
+                {% else %}
+                    Edit {{ meta.verbose_name }}
+                {% endif %}
+            </strong>
+        </div>
+
+
+    </div>
+
+    <!-- FORM BODY -->
+    <div class="card-body">
+
+        <form method="POST"
+              hx-post="{{ action_url }}"
+              hx-target="this"
+              hx-swap="outerHTML"
+              class="dynamic-form">
+
+            {% csrf_token %}
+
+            <!-- Non-field errors -->
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {{ form.non_field_errors }}
+                </div>
+            {% endif %}
+
+            <div class="row g-3">
+
+                {% for field in form %}
+
+                    <div class="col-md-6">
+
+                        <label class="form-label fw-semibold">
+                            {{ field.label }}
+                        </label>
+
+                        {{ field }}
+
+                        {% if field.help_text %}
+                            <div class="form-text">
+                                {{ field.help_text }}
+                            </div>
+                        {% endif %}
+
+                        {% if field.errors %}
+                            <div class="text-danger small mt-1">
+                                {{ field.errors }}
+                            </div>
+                        {% endif %}
+
+                    </div>
+
+                {% endfor %}
+
+            </div>
+
+            <!-- ACTIONS -->
+            <div class="mt-4 d-flex justify-content-between">
+
+                <button type="button"
+                        class="btn btn-outline-secondary"
+                        onclick="history.back()">
+                    Cancel
+                </button>
+
+                <button type="submit"
+                        class="btn btn-primary">
+                    {% if object %}
+                        Update
+                    {% else %}
+                        Save
+                    {% endif %}
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+<style>
+:root{
+    --form-bg: #f8fbff;
+    --form-bg2: #eef6ff;
+
+    --card-bg: rgba(255,255,255,.82);
+    --card-border: rgba(59,130,246,.15);
+
+    --primary: #3b82f6;
+    --primary-light: #60a5fa;
+    --cyan: #22d3ee;
+    --violet: #8b5cf6;
+
+    --text: #0f172a;
+    --muted: #64748b;
+    --danger: #ef4444;
+
+    --radius: 22px;
+    --transition: 250ms cubic-bezier(.4,0,.2,1);
+}
+
+/* =====================================================
+   CARD
+===================================================== */
+
+.card.dynamic-card{
+    position: relative;
+    overflow: hidden;
+
+    background:
+        radial-gradient(circle at top left,
+            rgba(96,165,250,.08),
+            transparent 50%),
+        linear-gradient(180deg,
+            var(--form-bg),
+            var(--form-bg2));
+
+    border: 1px solid var(--card-border);
+    border-radius: 28px;
+
+    box-shadow:
+        0 10px 30px rgba(15,23,42,.05),
+        0 1px 2px rgba(15,23,42,.04);
+}
+
+/* subtle glow */
+.card.dynamic-card::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    pointer-events:none;
+
+    background:
+        radial-gradient(circle at 20% 20%,
+            rgba(59,130,246,.12),
+            transparent 35%),
+        radial-gradient(circle at 80% 80%,
+            rgba(34,211,238,.10),
+            transparent 35%);
+}
+
+/* =====================================================
+   HEADER
+===================================================== */
+
+.dynamic-card .card-header{
+    position: relative;
+    z-index: 2;
+
+    padding: 1.25rem 1.5rem;
+
+    background: rgba(255,255,255,.7);
+    backdrop-filter: blur(8px);
+
+    border-bottom: 1px solid var(--card-border);
+}
+
+.dynamic-card .card-header strong{
+    font-size: 1.1rem;
+    font-weight: 800;
+
+    background:
+        linear-gradient(
+            90deg,
+            var(--primary),
+            var(--cyan),
+            var(--violet)
+        );
+
+    -webkit-background-clip:text;
+    -webkit-text-fill-color:transparent;
+}
+
+/* =====================================================
+   BODY
+===================================================== */
+
+.dynamic-card .card-body{
+    position: relative;
+    z-index: 2;
+    padding: 1.75rem;
+}
+
+/* =====================================================
+   FORM GRID
+===================================================== */
+
+.dynamic-form .row{
+    --bs-gutter-x: 1rem;
+    --bs-gutter-y: 1rem;
+}
+
+/* =====================================================
+   FIELD
+===================================================== */
+
+.dynamic-form .col-md-6{
+    position: relative;
+}
+
+.dynamic-form .col-md-6 > label{
+    display:block;
+    margin-bottom:.6rem;
+
+    color: var(--text);
+    font-size:.92rem;
+    font-weight:700;
+}
+
+.dynamic-form input,
+.dynamic-form select,
+.dynamic-form textarea{
+    width:100%;
+
+    min-height:48px;
+
+    padding:.8rem 1rem;
+
+    border-radius:16px;
+    border:1px solid rgba(148,163,184,.25);
+
+    background: rgba(255,255,255,.9);
+    color: var(--text);
+
+    transition:
+        border-color var(--transition),
+        box-shadow var(--transition),
+        transform var(--transition);
+}
+
+.dynamic-form textarea{
+    min-height:120px;
+    resize:vertical;
+}
+
+.dynamic-form input:focus,
+.dynamic-form select:focus,
+.dynamic-form textarea:focus{
+    outline:none;
+
+    border-color: var(--primary);
+
+    box-shadow:
+        0 0 0 4px rgba(59,130,246,.12);
+
+    transform: translateY(-1px);
+}
+
+/* =====================================================
+   HELP TEXT
+===================================================== */
+
+.dynamic-form .form-text{
+    margin-top:.5rem;
+    color: var(--muted);
+    font-size:.8rem;
+}
+
+/* =====================================================
+   ERRORS
+===================================================== */
+
+.dynamic-form .text-danger{
+    margin-top:.5rem;
+    font-size:.82rem;
+    font-weight:600;
+}
+
+.dynamic-form .is-invalid,
+.dynamic-form input:invalid,
+.dynamic-form select:invalid,
+.dynamic-form textarea:invalid{
+    border-color: rgba(239,68,68,.4);
+}
+
+/* =====================================================
+   BUTTONS
+===================================================== */
+
+.dynamic-form .btn{
+    border-radius:16px;
+    padding:.75rem 1.4rem;
+    font-weight:700;
+    transition:all var(--transition);
+}
+
+.dynamic-form .btn-primary{
+    border:none;
+
+    background:
+        linear-gradient(
+            135deg,
+            var(--primary),
+            var(--cyan)
+        );
+
+    box-shadow:
+        0 8px 20px rgba(59,130,246,.25);
+}
+
+.dynamic-form .btn-primary:hover{
+    transform: translateY(-2px);
+
+    box-shadow:
+        0 14px 28px rgba(59,130,246,.3);
+}
+
+.dynamic-form .btn-outline-secondary{
+    border:1px solid rgba(148,163,184,.3);
+    background:rgba(255,255,255,.7);
+}
+
+.dynamic-form .btn-outline-secondary:hover{
+    background:#fff;
+    transform: translateY(-2px);
+}
+
+/* =====================================================
+   NON FIELD ERRORS
+===================================================== */
+
+.dynamic-form .alert-danger{
+    border:none;
+    border-radius:18px;
+
+    background:
+        rgba(239,68,68,.08);
+
+    color:#991b1b;
+}
+
+/* =====================================================
+   MOBILE
+===================================================== */
+
+@media (max-width:768px){
+
+    .dynamic-card .card-body{
+        padding:1rem;
+    }
+
+    .dynamic-form .btn{
+        width:100%;
+    }
+
+    .dynamic-form .mt-4{
+        flex-direction:column;
+        gap:.75rem;
+    }
+}
+
+/* =====================================================
+   REDUCED MOTION
+===================================================== */
+
+@media (prefers-reduced-motion: reduce){
+
+    *,
+    *::before,
+    *::after{
+        animation:none !important;
+        transition:none !important;
+    }
+}
+</style>

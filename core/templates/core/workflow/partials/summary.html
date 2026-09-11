@@ -1,0 +1,32 @@
+<div class="wf-summary">
+
+    <div class="wf-summary-header">
+        <h2>System Intelligence Overview</h2>
+        <small>{{ generated_at }}</small>
+    </div>
+
+    <div class="wf-summary-grid">
+
+        <div class="card">
+            <div class="label">Active Models</div>
+            <div class="value">{{ models|length }}</div>
+        </div>
+
+        <div class="card">
+            <div class="label">State Buckets</div>
+            <div class="value">{{ totals|length }}</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Event Mode</div>
+            <div class="value">STREAMING</div>
+        </div>
+
+        <div class="card">
+            <div class="label">System Health</div>
+            <div class="value ok">OPERATIONAL</div>
+        </div>
+
+    </div>
+
+</div>

@@ -1,0 +1,47 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block content %}
+<h1>Sample Analysis Dashboard</h1>
+
+<div class="dashboard-section">
+    <h2>Sample Counts</h2>
+    <ul>
+        <li>Region Samples: {{ sample_counts.region_samples }}</li>
+        <li>FCA Samples: {{ sample_counts.fca_samples }}</li>
+        <li>Catchment Samples: {{ sample_counts.catchment_samples }}</li>
+        <li>Kabete Samples: {{ sample_counts.kabete_samples }}</li>
+        <li>Gigiri Samples: {{ sample_counts.gigiri_samples }}</li>
+    </ul>
+</div>
+
+<div class="dashboard-section">
+    <h2>Compliance Rates</h2>
+    <ul>
+        <li>Region Compliance: {{ compliance_stats.region_compliance.average|floatformat:2 }}%</li>
+        <li>FCA Compliance: {{ compliance_stats.fca_compliance.average|floatformat:2 }}%</li>
+        <li>Catchment Compliance: {{ compliance_stats.catchment_compliance.average|floatformat:2 }}%</li>
+        <li>Kabete Compliance: {{ compliance_stats.kabete_compliance.average|floatformat:2 }}%</li>
+        <li>Gigiri Compliance: {{ compliance_stats.gigiri_compliance.average|floatformat:2 }}%</li>
+    </ul>
+</div>
+
+<div class="dashboard-section">
+    <h2>Latest Region Samples</h2>
+    <ul>
+        {% for sample in latest_samples %}
+            <li>{{ sample.reference_id }} — {{ sample.sampling_date }}</li>
+        {% empty %}
+            <li>No samples found.</li>
+        {% endfor %}
+    </ul>
+</div>
+
+<div class="dashboard-section">
+    <h2>Quick Actions</h2>
+    <ul>
+        <li><a href="{% url 'admin:app_label_regionsample_changelist' %}">Manage Region Samples</a></li>
+        <li><a href="{% url 'admin:app_label_samplecategory_changelist' %}">Manage Sample Categories</a></li>
+    </ul>
+</div>
+{% endblock %}

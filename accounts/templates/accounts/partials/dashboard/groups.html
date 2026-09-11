@@ -1,0 +1,30 @@
+<div class="tab-pane fade"
+     id="groupsTab"
+     data-list-url="{{ urls.groups.ajax_list }}">
+
+    <div class="d-flex justify-content-between mb-2">
+        <button
+            type="button"
+            class="btn btn-primary edit-group"
+            data-action="create">
+            <i class="fa fa-plus"></i> Add Group
+        </button>
+    </div>
+
+    <table class="table table-striped align-middle" id="groupsTable">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th class="text-center">Users</th>
+                <th class="text-end"></th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for group in groups %}
+                {% include "accounts/partials/group_row.html" %}
+            {% endfor %}
+        </tbody>
+    </table>
+
+</div>

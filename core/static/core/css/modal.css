@@ -1,0 +1,352 @@
+/* ==========================================================================
+   MODAL TOKENS (HEADER-INTEGRATED, NO DUPLICATION)
+========================================================================== */
+
+:root {
+    --modal-width: 360px;
+    --modal-width-lg: 420px;
+
+    --modal-padding: 1rem;
+    --modal-gap: .875rem;
+
+    /* strictly derived from header system */
+    --modal-offset-top: calc(var(--header-height) + 1rem);
+    --modal-offset-right: 1rem;
+
+    --modal-overlay-opacity: .18;
+
+    /* always above header stack */
+    --z-modal: calc(var(--z-header) + 1000);
+}
+
+/* ==========================================================================
+   ROOT LAYER
+========================================================================== */
+
+#modal-root {
+    position: relative;
+    z-index: var(--z-modal);
+}
+
+/* ==========================================================================
+   MODAL BACKDROP LAYER
+========================================================================== */
+
+.app-modal {
+    position: fixed;
+    inset: 0;
+
+    z-index: var(--z-modal);
+
+    overflow: hidden;
+
+    background: color-mix(
+        in srgb,
+        var(--theme-bg) calc(var(--modal-overlay-opacity) * 100%),
+        transparent
+    );
+
+    backdrop-filter: blur(3px) saturate(160%);
+    -webkit-backdrop-filter: blur(3px) saturate(160%);
+
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+
+    transition:
+        opacity var(--t-fast),
+        visibility var(--t-fast),
+        background var(--t-med) var(--ease-fluid);
+
+    isolation: isolate;
+}
+
+.app-modal.show {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+/* ==========================================================================
+   PANEL (TOP-RIGHT POPOVER ENGINE)
+========================================================================== */
+
+.app-modal__panel {
+    position: absolute;
+
+    top: var(--modal-offset-top);
+    right: var(--modal-offset-right);
+
+    width: min(var(--modal-width), 92vw);
+    max-height: min(80vh, 700px);
+
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    padding: var(--modal-padding);
+
+    color: var(--theme-text);
+
+    background: linear-gradient(
+        135deg,
+        var(--theme-surface),
+        color-mix(in srgb, var(--theme-accent) 6%, var(--theme-surface)),
+        var(--theme-surface-strong)
+    );
+
+    border: 1px solid var(--theme-border);
+    border-radius: var(--radius-lg);
+
+    box-shadow:
+        0 24px 60px rgba(0,0,0,.28),
+        0 0 30px var(--theme-accent-soft);
+
+    backdrop-filter: blur(18px) saturate(180%) brightness(1.04);
+    -webkit-backdrop-filter: blur(18px) saturate(180%) brightness(1.04);
+
+    transform: translateY(-10px) scale(.96);
+    opacity: 0;
+
+    transition:
+        transform var(--t-med) var(--ease-fluid),
+        opacity var(--t-med) var(--ease-fluid);
+
+    isolation: isolate;
+}
+
+/* OPEN STATE */
+.app-modal.show .app-modal__panel {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+}
+
+/* ==========================================================================
+   GLOW LAYER (VISUAL DEPTH ONLY)
+========================================================================== */
+
+.app-modal__panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+
+    pointer-events: none;
+
+    background:
+        radial-gradient(circle at 20% 20%, var(--nebula-1), transparent 45%),
+        radial-gradient(circle at 80% 20%, var(--nebula-2), transparent 45%),
+        radial-gradient(circle at 50% 90%, var(--nebula-3), transparent 60%);
+
+    filter: blur(22px);
+    opacity: .35;
+}
+
+/* ==========================================================================
+   LARGE PANEL VARIANT
+========================================================================== */
+
+.app-modal__panel--lg {
+    width: min(var(--modal-width-lg), 92vw);
+}
+
+/* ==========================================================================
+   HEADER INSIDE MODAL (ISOLATED FROM TOPBAR)
+========================================================================== */
+
+.app-modal__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    margin:
+        calc(var(--modal-padding) * -1)
+        calc(var(--modal-padding) * -1)
+        1rem;
+
+    padding: .85rem 1rem;
+
+    background: color-mix(
+        in srgb,
+        var(--theme-accent) 4%,
+        var(--theme-surface)
+    );
+
+    border-bottom: 1px solid var(--theme-border);
+
+    backdrop-filter: blur(12px) saturate(180%);
+}
+
+/* ==========================================================================
+   BODY LAYOUT
+========================================================================== */
+
+.app-modal__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--modal-gap);
+}
+
+/* ==========================================================================
+   INPUT SYSTEM
+========================================================================== */
+
+.app-modal__input,
+.app-modal__textarea,
+.app-modal__select {
+    width: 100%;
+
+    padding: .72rem .85rem;
+
+    background: var(--theme-surface-strong);
+    color: var(--theme-text);
+
+    border: 1px solid var(--theme-border);
+    border-radius: var(--radius-sm);
+
+    transition:
+        border-color var(--t-fast),
+        box-shadow var(--t-fast);
+}
+
+.app-modal__input:focus,
+.app-modal__textarea:focus,
+.app-modal__select:focus {
+    outline: none;
+
+    border-color: var(--theme-accent);
+
+    box-shadow:
+        0 0 0 3px
+        color-mix(in srgb, var(--theme-accent) 25%, transparent);
+}
+
+/* ==========================================================================
+   FOOTER
+========================================================================== */
+
+.app-modal__footer {
+    display: flex;
+    justify-content: flex-end;
+
+    margin-top: 1rem;
+    padding-top: .85rem;
+
+    border-top: 1px solid var(--theme-border);
+}
+
+/* ==========================================================================
+   STATUS BADGES
+========================================================================== */
+
+.app-modal__status {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+
+    padding: .35rem .7rem;
+    border-radius: 999px;
+
+    font-size: .72rem;
+    font-weight: 600;
+}
+
+/* ==========================================================================
+   SCROLLBAR (PANEL ONLY)
+========================================================================== */
+
+.app-modal__panel::-webkit-scrollbar {
+    width: 6px;
+}
+
+.app-modal__panel::-webkit-scrollbar-thumb {
+    background: var(--theme-accent-soft);
+    border-radius: 999px;
+}
+
+/* ==========================================================================
+   MOBILE RESPONSIVE (PRESERVES TOP-RIGHT LOGIC)
+========================================================================== */
+
+@media (max-width: 640px) {
+
+    .app-modal {
+        padding: 0;
+    }
+
+    .app-modal__panel,
+    .app-modal__panel--lg {
+        top: var(--modal-offset-top);
+        right: 0;
+        left: 0;
+
+        width: 100%;
+        max-height: 90vh;
+
+        border-radius: 0;
+    }
+}
+
+/* ==========================================================================
+   ACCESSIBILITY MOTION REDUCTION
+========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+    .app-modal,
+    .app-modal__panel {
+        transition: none;
+    }
+}
+.compact-field {
+    margin-bottom: .75rem;
+}
+
+.field-inner {
+    position: relative;
+    display: flex;
+    align-items: center;
+
+    background: var(--theme-surface-strong);
+    border: 1px solid var(--theme-border);
+    border-radius: var(--radius-sm);
+
+    padding: .55rem .75rem;
+}
+
+/* icon on the left */
+.field-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    margin-right: .5rem;
+    color: var(--theme-muted);
+}
+
+/* input takes full space */
+.field-inner input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--theme-text);
+    min-width: 0;
+}
+
+/* THIS is the key fix */
+.password-toggle {
+    position: absolute;
+    right: .6rem;
+    top: 50%;
+    transform: translateY(-50%);
+
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+
+    color: var(--theme-muted);
+    padding: .25rem;
+}
+
+.password-toggle:hover {
+    color: var(--theme-accent);
+}

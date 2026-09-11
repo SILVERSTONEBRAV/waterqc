@@ -1,0 +1,178 @@
+{% if messages %}
+
+<div id="messages-container"
+     class="mb-6 space-y-4">
+
+    {% for message in messages %}
+
+    <div
+        x-data="{ show: true }"
+        x-show="show"
+        x-transition:enter="transform ease-out duration-300"
+        x-transition:enter-start="opacity-0 -translate-y-3"
+        x-transition:enter-end="opacity-100 translate-y-0"
+        x-transition:leave="transform ease-in duration-200"
+        x-transition:leave-start="opacity-100 translate-y-0"
+        x-transition:leave-end="opacity-0 -translate-y-3"
+        x-init="setTimeout(() => show = false, 5000)"
+        class="relative overflow-hidden rounded-2xl border shadow-sm">
+
+        <div
+            class="absolute left-0 top-0 h-full w-1
+            {% if message.tags == 'success' %}
+                bg-emerald-500
+            {% elif message.tags == 'error' %}
+                bg-rose-500
+            {% elif message.tags == 'warning' %}
+                bg-amber-500
+            {% elif message.tags == 'info' %}
+                bg-sky-500
+            {% else %}
+                bg-blue-500
+            {% endif %}">
+        </div>
+
+        <div
+            class="flex items-start gap-4 px-5 py-4
+            {% if message.tags == 'success' %}
+                border-emerald-200 bg-emerald-50 text-emerald-800
+            {% elif message.tags == 'error' %}
+                border-rose-200 bg-rose-50 text-rose-800
+            {% elif message.tags == 'warning' %}
+                border-amber-200 bg-amber-50 text-amber-800
+            {% elif message.tags == 'info' %}
+                border-sky-200 bg-sky-50 text-sky-800
+            {% else %}
+                border-blue-200 bg-blue-50 text-blue-800
+            {% endif %}">
+
+            <div class="mt-0.5 flex-shrink-0">
+
+                {% if message.tags == "success" %}
+
+                <svg class="h-6 w-6"
+                     fill="none"
+                     stroke="currentColor"
+                     viewBox="0 0 24 24">
+
+                    <path stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M5 13l4 4L19 7"/>
+
+                </svg>
+
+                {% elif message.tags == "error" %}
+
+                <svg class="h-6 w-6"
+                     fill="none"
+                     stroke="currentColor"
+                     viewBox="0 0 24 24">
+
+                    <path stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M6 18L18 6M6 6l12 12"/>
+
+                </svg>
+
+                {% elif message.tags == "warning" %}
+
+                <svg class="h-6 w-6"
+                     fill="none"
+                     stroke="currentColor"
+                     viewBox="0 0 24 24">
+
+                    <path stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z"/>
+
+                </svg>
+
+                {% elif message.tags == "info" %}
+
+                <svg class="h-6 w-6"
+                     fill="none"
+                     stroke="currentColor"
+                     viewBox="0 0 24 24">
+
+                    <path stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M13 16h-1v-4h-1m1-4h.01M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
+
+                </svg>
+
+                {% else %}
+
+                <svg class="h-6 w-6"
+                     fill="none"
+                     stroke="currentColor"
+                     viewBox="0 0 24 24">
+
+                    <path stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M13 16h-1v-4h-1m1-4h.01M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
+
+                </svg>
+
+                {% endif %}
+
+            </div>
+
+            <div class="min-w-0 flex-1">
+
+                <h4 class="text-sm font-semibold uppercase tracking-wide">
+
+                    {% if message.tags == "success" %}
+                        Success
+                    {% elif message.tags == "error" %}
+                        Error
+                    {% elif message.tags == "warning" %}
+                        Warning
+                    {% elif message.tags == "info" %}
+                        Information
+                    {% else %}
+                        Notification
+                    {% endif %}
+
+                </h4>
+
+                <p class="mt-1 text-sm leading-relaxed">
+
+                    {{ message }}
+
+                </p>
+
+            </div>
+
+            <button
+                type="button"
+                @click="show=false"
+                class="rounded-lg p-1 transition hover:bg-black/5">
+
+                <svg class="h-5 w-5"
+                     fill="none"
+                     stroke="currentColor"
+                     viewBox="0 0 24 24">
+
+                    <path stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M6 18L18 6M6 6l12 12"/>
+
+                </svg>
+
+            </button>
+
+        </div>
+
+    </div>
+
+    {% endfor %}
+
+</div>
+
+{% endif %}

@@ -1,0 +1,40 @@
+{% load static %}
+{% block extra_scripts %}
+<script type="module">
+import { Manager } from "{% static 'core/js/manager.js' %}";
+
+window.Manager = Manager;
+
+/**
+ * GLOBAL ACTION ROUTER
+ */
+document.addEventListener("click", (e) => {
+    const el = e.target.closest(".js-action");
+    if (!el) return;
+
+    Manager.dispatch({
+        action: el.dataset.action,
+        id: el.dataset.id,
+        model: el.dataset.model,
+        parent: el.dataset.parent || null,
+    });
+});
+
+/**
+ * LAZY RELATION LOADER (APP SCOPED ONLY)
+ */
+document.addEventListener("click", async (e) => {
+    const el = e.target.closest(".js-load-relation");
+    if (!el) return;
+
+    const model = el.dataset.model;
+    const app = el.dataset.app;
+    const parent = el.dataset.parent;
+
+    const res = await fetch(`/api/${app}/${model}/relations/?parent=${parent}`);
+    const html = await res.text();
+
+    document.querySelector(`#rel-${model}`).innerHTML = html;
+});
+</script>
+{% endblock %}

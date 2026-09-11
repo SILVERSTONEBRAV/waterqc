@@ -1,0 +1,41 @@
+# =========================================================
+# TRAEFIK STATIC CONFIGURATION
+# =========================================================
+
+api:
+  dashboard: true
+  insecure: true   # set false in production with auth
+
+log:
+  level: INFO
+
+accessLog:
+  bufferingSize: 100
+
+entryPoints:
+  web:
+    address: ":80"
+  websecure:
+    address: ":443"
+
+providers:
+  docker:
+    exposedByDefault: false
+    network: backend
+    endpoint: "unix:///var/run/docker.sock"
+
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: admin@local.dev
+      storage: /etc/traefik/acme.json
+      httpChallenge:
+        entryPoint: web
+
+metrics:
+  prometheus:
+    entryPoint: web

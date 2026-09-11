@@ -1,0 +1,17 @@
+<header class="bg-white border-b border-slate-200 shadow-sm">
+    <div class="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
+        <h1 class="text-xl font-bold text-blue-700">Water Quality Control</h1>
+           <div class="text-sm text-slate-600">
+            Current Plant: {{ plant.name|default:"—" }}<br>
+        </div>
+        <div class="flex items-center gap-4">
+            <span class="text-sm text-slate-600">Logged in as {{ request.user.username }}</span>
+            <a href="{% url 'logout' %}" class="text-sm font-medium text-blue-600 hover:underline">Logout</a>
+            <!-- Mobile sidebar toggle -->
+            <button @click="sidebarOpen = !sidebarOpen"
+                    class="md:hidden px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold">
+                Menu
+            </button>
+        </div>
+    </div>
+</header>

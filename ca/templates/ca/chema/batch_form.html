@@ -1,0 +1,179 @@
+{% extends "ca/dashboard/layout/app.html" %}
+
+{% block title %}
+    {% if object %}Edit Chemical Batch{% else %}Register Chemical Batch{% endif %}
+{% endblock %}
+
+{% block content %}
+
+<div class="ca-page">
+
+    <div class="page-header">
+        <div>
+            <h1>
+                {% if object %}
+                    Edit Chemical Batch
+                {% else %}
+                    Register Chemical Batch
+                {% endif %}
+            </h1>
+
+            <p>
+                {% if object %}
+                    Update the chemical batch information below.
+                {% else %}
+                    Register a new chemical batch for analysis.
+                {% endif %}
+            </p>
+        </div>
+
+        <div class="page-actions">
+            <a
+                href="{% url 'ca:batch-list' %}"
+                class="btn btn-secondary"
+            >
+                Back to Batches
+            </a>
+        </div>
+    </div>
+
+    {% if form.non_field_errors %}
+        <div class="alert alert-danger">
+            {% for error in form.non_field_errors %}
+                <div>{{ error }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+
+        <div class="card">
+
+            <div class="card-header">
+                <div>
+                    <h2>Batch Information</h2>
+                    <span>
+                        Enter the details of the chemical batch.
+                    </span>
+                </div>
+            </div>
+
+            <div class="card-body">
+
+                <div class="form-grid">
+
+                    {% for field in form %}
+
+                        {% if field.name != "sample_id" and field.name != "created_at" and field.name != "updated_at" %}
+
+                            <div class="form-group {% if field.errors %}has-error{% endif %}">
+
+                                <label for="{{ field.id_for_label }}">
+                                    {{ field.label }}
+
+                                    {% if field.field.required %}
+                                        <span class="required">*</span>
+                                    {% endif %}
+                                </label>
+
+                                {{ field }}
+
+                                {% if field.help_text %}
+                                    <small class="form-help">
+                                        {{ field.help_text }}
+                                    </small>
+                                {% endif %}
+
+                                {% if field.errors %}
+                                    <div class="field-errors">
+                                        {% for error in field.errors %}
+                                            <span>{{ error }}</span>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+
+                            </div>
+
+                        {% endif %}
+
+                    {% endfor %}
+
+                </div>
+
+            </div>
+
+        </div>
+
+        {% if object %}
+
+            <div class="card">
+
+                <div class="card-header">
+                    <h2>Batch Identification</h2>
+                </div>
+
+                <div class="card-body">
+
+                    <div class="details-grid">
+
+                        <div class="detail-item">
+                            <span class="detail-label">Sample ID</span>
+                            <span class="detail-value">
+                                {{ object.sample_id|default:"Generated automatically" }}
+                            </span>
+                        </div>
+
+                        {% if object.created_at %}
+                            <div class="detail-item">
+                                <span class="detail-label">Created</span>
+                                <span class="detail-value">
+                                    {{ object.created_at|date:"d M Y H:i" }}
+                                </span>
+                            </div>
+                        {% endif %}
+
+                        {% if object.updated_at %}
+                            <div class="detail-item">
+                                <span class="detail-label">Last Updated</span>
+                                <span class="detail-value">
+                                    {{ object.updated_at|date:"d M Y H:i" }}
+                                </span>
+                            </div>
+                        {% endif %}
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        {% endif %}
+
+        <div class="page-actions">
+
+            <a
+                href="{% url 'ca:batch-list' %}"
+                class="btn btn-secondary"
+            >
+                Cancel
+            </a>
+
+            <button
+                type="submit"
+                class="btn btn-primary"
+            >
+                {% if object %}
+                    Update Batch
+                {% else %}
+                    Register Batch
+                {% endif %}
+            </button>
+
+        </div>
+
+    </form>
+
+</div>
+
+{% endblock %}

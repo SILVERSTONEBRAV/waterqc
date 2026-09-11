@@ -1,0 +1,74 @@
+
+<div class="ca-workflow-card">
+
+    <div class="ca-workflow-pipeline">
+        {% for stage in stages %}
+            <div
+                class="ca-workflow-stage
+                {% if stage.status == 'completed' %}is-completed{% endif %}
+                {% if stage.status == 'active' %}is-active{% endif %}
+                {% if stage.status == 'blocked' %}is-blocked{% endif %}"
+            >
+                <div class="ca-workflow-stage-node">
+                    {% if stage.status == "completed" %}
+                        <span class="ca-icon ca-icon-check"></span>
+                    {% else %}
+                        <span>{{ forloop.counter }}</span>
+                    {% endif %}
+                </div>
+
+                <div class="ca-workflow-stage-content">
+                    <strong>{{ stage.label }}</strong>
+
+                    <span>
+                        {{ stage.count|default:0 }}
+                        {% if stage.status == "active" %}
+                            active
+                        {% elif stage.status == "completed" %}
+                            completed
+                        {% elif stage.status == "blocked" %}
+                            blocked
+                        {% else %}
+                            pending
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+
+            {% if not forloop.last %}
+                <div
+                    class="ca-workflow-connector
+                    {% if stage.status == 'completed' %}is-completed{% endif %}"
+                ></div>
+            {% endif %}
+        {% empty %}
+            <div class="ca-workflow-empty">
+                No workflow stages are currently available.
+            </div>
+        {% endfor %}
+    </div>
+
+    <div class="ca-workflow-summary">
+        <div>
+            <span>Active</span>
+            <strong>{{ workflow_summary.active|default:0 }}</strong>
+        </div>
+
+        <div>
+            <span>Pending</span>
+            <strong>{{ workflow_summary.pending|default:0 }}</strong>
+        </div>
+
+        <div>
+            <span>Blocked</span>
+            <strong>{{ workflow_summary.blocked|default:0 }}</strong>
+        </div>
+
+        <div>
+            <span>Completed</span>
+            <strong>{{ workflow_summary.completed|default:0 }}</strong>
+        </div>
+    </div>
+
+</div>
+

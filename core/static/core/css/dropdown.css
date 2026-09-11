@@ -1,0 +1,523 @@
+.dropdown-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+
+    overflow: visible;
+    isolation: isolate;
+
+    z-index: calc(var(--z-header) + 50);
+}
+
+.dropdown-toggle {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+
+    padding: .5rem .85rem;
+
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+
+    color: var(--theme-text);
+
+    cursor: pointer;
+
+    transition:
+        background-color var(--t-fast),
+        border-color var(--t-fast),
+        transform var(--t-fast),
+        box-shadow var(--t-fast);
+}
+
+.dropdown-toggle:hover {
+    background: var(--theme-surface);
+    border-color: var(--theme-border);
+
+    box-shadow:
+        0 0 24px var(--theme-accent-soft);
+
+    transform: translateY(-1px);
+}
+
+.dropdown-toggle:active {
+    transform: scale(.98);
+}
+
+.dropdown-toggle:focus-visible {
+    outline: none;
+
+    box-shadow:
+        0 0 0 3px
+        color-mix(
+            in srgb,
+            var(--theme-accent) 40%,
+            transparent
+        );
+}
+
+/* ==========================================================================
+   CARET
+========================================================================== */
+
+.dropdown-toggle .fa-caret-down {
+    font-size: .75rem;
+    opacity: .7;
+
+    transition:
+        transform var(--t-fast),
+        opacity var(--t-fast);
+}
+
+.dropdown-toggle[aria-expanded="true"] .fa-caret-down {
+    transform: rotate(180deg);
+    opacity: 1;
+}
+
+/* ==========================================================================
+   USER NAME
+========================================================================== */
+
+.user-name {
+    max-width: 140px;
+
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    font-size: .88rem;
+    font-weight: 600;
+}
+
+/* ==========================================================================
+   AVATARS
+========================================================================== */
+
+.avatar-wrapper,
+.dropdown-avatar-wrapper {
+    position: relative;
+
+    width: 40px;
+    height: 40px;
+
+    display: grid;
+    place-items: center;
+
+    flex-shrink: 0;
+}
+
+.avatar,
+.dropdown-avatar {
+    width: 36px;
+    height: 36px;
+
+    object-fit: cover;
+
+    border-radius: 50%;
+    border: 2px solid var(--theme-border);
+
+    background: var(--theme-surface);
+
+    position: relative;
+    z-index: 2;
+}
+
+/* ==========================================================================
+   AVATAR EFFECTS
+========================================================================== */
+
+.avatar-wrapper::before,
+.dropdown-avatar-wrapper::before {
+    content: "";
+
+    position: absolute;
+    inset: -4px;
+
+    border-radius: 50%;
+
+    background:
+        conic-gradient(
+            from 0deg,
+            var(--theme-accent),
+            var(--theme-accent-soft),
+            var(--nebula-2),
+            var(--theme-accent)
+        );
+
+    mask:
+        radial-gradient(circle, transparent 60%, black 62%);
+    -webkit-mask:
+        radial-gradient(circle, transparent 60%, black 62%);
+
+    animation:
+        avatarOrbit 8s linear infinite;
+
+    pointer-events: none;
+}
+
+.avatar-wrapper::after,
+.dropdown-avatar-wrapper::after {
+    content: "";
+
+    position: absolute;
+    inset: 0;
+
+    border-radius: 50%;
+
+    background:
+        radial-gradient(
+            circle,
+            var(--theme-accent-soft),
+            transparent 70%
+        );
+
+    filter: blur(8px);
+
+    opacity: .55;
+
+    animation:
+        avatarPulse 3.5s ease-in-out infinite;
+
+    pointer-events: none;
+}
+
+/* ==========================================================================
+   STATUS DOT
+========================================================================== */
+
+.status-dot {
+    position: absolute;
+
+    right: 0;
+    bottom: 0;
+
+    width: 10px;
+    height: 10px;
+
+    border-radius: 50%;
+
+    background: #22c55e;
+    border: 2px solid var(--theme-surface-strong);
+
+    z-index: 3;
+
+    box-shadow:
+        0 0 12px rgba(34, 197, 94, .5);
+}
+
+.status-dot.offline {
+    background: var(--theme-muted);
+    box-shadow: none;
+}
+
+/* ==========================================================================
+   DROPDOWN PANEL
+========================================================================== */
+
+.dropdown-menu {
+    /*
+        Override Bootstrap's display:none.
+    */
+    display: block !important;
+
+    position: absolute;
+
+    top: calc(100% + 12px);
+    right: 0;
+
+    min-width: 320px;
+    max-width: min(92vw, 420px);
+    max-height: min(70vh, 600px);
+
+    margin: 0;
+    padding: .6rem 0;
+
+    list-style: none;
+
+    background: var(--theme-surface-strong);
+
+    border: 1px solid var(--theme-border);
+    border-radius: var(--radius-lg);
+
+    backdrop-filter:
+        blur(24px)
+        saturate(180%);
+
+    -webkit-backdrop-filter:
+        blur(24px)
+        saturate(180%);
+
+    box-shadow: var(--shadow-lg);
+
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    overscroll-behavior: contain;
+
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+
+    transform:
+        translateY(-10px)
+        scale(.97);
+
+    transform-origin: top right;
+
+    transition:
+        opacity var(--t-fast) var(--ease-fluid),
+        transform var(--t-fast) var(--ease-fluid),
+        visibility var(--t-fast);
+
+    z-index: calc(var(--z-header) + 100);
+}
+
+.dropdown-menu.show {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+
+    transform:
+        translateY(0)
+        scale(1);
+}
+
+/* ==========================================================================
+   SCROLLBAR
+========================================================================== */
+
+.dropdown-menu {
+    scrollbar-width: thin;
+    scrollbar-color:
+        var(--theme-accent-soft)
+        transparent;
+}
+
+.dropdown-menu::-webkit-scrollbar {
+    width: 6px;
+}
+
+.dropdown-menu::-webkit-scrollbar-thumb {
+    background: var(--theme-accent-soft);
+    border-radius: 999px;
+}
+
+/* ==========================================================================
+   DECORATIVE FX
+========================================================================== */
+
+.dropdown-menu::before,
+.dropdown-menu::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+}
+
+.dropdown-menu::before {
+    width: 240px;
+    height: 240px;
+
+    top: -120px;
+    left: -120px;
+
+    filter: blur(50px);
+
+    background:
+        radial-gradient(
+            circle,
+            var(--theme-accent-soft),
+            transparent 70%
+        );
+
+    opacity: .55;
+}
+
+.dropdown-menu::after {
+    width: 220px;
+    height: 220px;
+
+    right: -110px;
+    bottom: -110px;
+
+    filter: blur(50px);
+
+    background:
+        radial-gradient(
+            circle,
+            var(--nebula-2),
+            transparent 70%
+        );
+
+    opacity: .45;
+}
+
+/* ==========================================================================
+   HEADER SECTION
+========================================================================== */
+
+.dropdown-header {
+    padding: 1rem 1.2rem;
+}
+
+.dropdown-user-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.dropdown-fullname {
+    font-weight: 700;
+    color: var(--theme-text);
+}
+
+.dropdown-username,
+.dropdown-email {
+    font-size: .82rem;
+    color: var(--theme-muted);
+}
+
+/* ==========================================================================
+   DIVIDERS
+========================================================================== */
+
+.divider {
+    height: 1px;
+    margin: .5rem 0;
+
+    background:
+        linear-gradient(
+            90deg,
+            transparent,
+            var(--theme-border),
+            transparent
+        );
+}
+
+/* ==========================================================================
+   SECTION LABEL
+========================================================================== */
+
+.dropdown-section-label {
+    padding:
+        .5rem
+        1.2rem;
+
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+
+    color: var(--theme-muted);
+}
+
+/* ==========================================================================
+   ITEMS
+========================================================================== */
+
+.dropdown-menu li a {
+    display: flex;
+    align-items: center;
+    gap: .85rem;
+
+    padding: .85rem 1.2rem;
+
+    text-decoration: none;
+
+    color: var(--theme-muted);
+
+    transition:
+        background-color var(--t-fast),
+        color var(--t-fast),
+        transform var(--t-fast);
+}
+
+.dropdown-menu li a:hover,
+.dropdown-menu li a:focus-visible {
+    background: var(--theme-surface);
+
+    color: var(--theme-text);
+
+    transform: translateX(4px);
+}
+
+.dropdown-menu li a i {
+    width: 20px;
+    text-align: center;
+
+    color: var(--theme-accent);
+}
+
+/* ==========================================================================
+   LOGOUT
+========================================================================== */
+
+.logout-link {
+    color: #ef4444 !important;
+}
+
+.logout-link i {
+    color: inherit !important;
+}
+
+/* ==========================================================================
+   ANIMATIONS
+========================================================================== */
+
+@keyframes avatarOrbit {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@keyframes avatarPulse {
+    0%,100% {
+        transform: scale(1);
+        opacity: .45;
+    }
+
+    50% {
+        transform: scale(1.08);
+        opacity: .85;
+    }
+}
+
+/* ==========================================================================
+   RESPONSIVE
+========================================================================== */
+
+@media (max-width: 768px) {
+    .dropdown-menu {
+        min-width: 280px;
+    }
+
+    .dropdown-username {
+        display: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .dropdown-menu {
+        min-width: 240px;
+        right: -8px;
+    }
+
+    .user-name {
+        display: none;
+    }
+}
+
+/* ==========================================================================
+   REDUCED MOTION
+========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+    .dropdown-menu,
+    .dropdown-toggle,
+    .avatar-wrapper::before,
+    .avatar-wrapper::after,
+    .dropdown-avatar-wrapper::before,
+    .dropdown-avatar-wrapper::after {
+        animation: none !important;
+        transition: none !important;
+    }
+}

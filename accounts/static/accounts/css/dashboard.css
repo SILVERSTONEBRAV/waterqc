@@ -1,0 +1,246 @@
+:root {
+    /* density system (inherits from base.css) */
+    --dash-density: var(--density, 1);
+
+    --dash-gap: var(--space-4);
+    --dash-gap-lg: var(--space-5);
+    --dash-gap-sm: var(--space-3);
+
+    --dash-grid-min: 220px;
+    --dash-grid-min-compact: 180px;
+}
+
+/* compact operator mode */
+body.compact {
+    --dash-density: 0.78;
+}
+
+/* =========================
+   DASHBOARD LAYOUT
+========================= */
+.content,
+main.content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--dash-gap-lg);
+    min-width: 0; /* prevent overflow */
+}
+
+/* =========================
+   PAGE HEADER
+========================= */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: var(--dash-gap);
+}
+
+.page-title {
+    font-size: var(--text-md);
+    font-weight: 900;
+    letter-spacing: -0.04em;
+    line-height: 1.1;
+    color: var(--theme-text);
+}
+
+.page-subtitle {
+    font-size: var(--text-xs);
+    color: var(--theme-muted);
+    max-width: 70ch;
+}
+
+/* =========================
+   DASHBOARD GRID
+========================= */
+.stats-grid,
+.kpi-grid,
+.panel-grid,
+.quick-actions {
+    display: grid;
+    grid-template-columns: repeat(
+        auto-fit,
+        minmax(
+            calc(var(--dash-grid-min) * var(--dash-density)),
+            1fr
+        )
+    );
+    gap: var(--dash-gap);
+}
+
+/* =========================
+   SURFACE SYSTEM
+   → inherit base.css surfaces (card/panel/widget)
+========================= */
+.stat-card,
+.quick-action,
+.panel {
+    padding: var(--space-4);
+}
+
+/* optional hover transform is inherited from base.css */
+
+/* =========================
+   STAT CARDS (KPI / TELEMETRY)
+========================= */
+.stat-card::before {
+    content: "";
+    position: absolute;
+    width: 180px;
+    height: 180px;
+    top: -70px;
+    right: -70px;
+    background: radial-gradient(circle, var(--theme-accent-soft), transparent 70%);
+    opacity: 0.6;
+    pointer-events: none;
+    animation: dashDrift 16s var(--ease-fluid) infinite alternate;
+}
+
+@keyframes dashDrift {
+    from { transform: translate(0,0); }
+    to   { transform: translate(-8px,6px); }
+}
+
+.stat-title {
+    font-size: var(--text-xs);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--theme-muted);
+}
+
+.stat-value {
+    margin-top: 0.35rem;
+    font-size: 1.9rem;
+    font-weight: 900;
+    color: var(--theme-text);
+}
+
+.stat-change {
+    margin-top: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--text-sm);
+    font-weight: 600;
+}
+.stat-change.positive { color: #22c55e; }
+.stat-change.negative { color: #ef4444; }
+.stat-change.neutral  { color: var(--theme-muted); }
+
+/* =========================
+   PANEL SYSTEM (CONTROL SURFACE)
+========================= */
+.panel::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        110deg,
+        transparent,
+        var(--theme-accent-soft),
+        transparent
+    );
+    transform: translateX(-120%);
+    animation: dashScan 14s linear infinite;
+    pointer-events: none;
+}
+
+@keyframes dashScan {
+    100% { transform: translateX(120%); }
+}
+
+/* =========================
+   QUICK ACTIONS
+========================= */
+.quick-action {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: var(--space-4);
+    cursor: pointer;
+}
+
+/* icon hover inherited from base.css */
+
+/* =========================
+   TABLES
+========================= */
+.table {
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--theme-surface);
+    border: 1px solid var(--theme-border);
+}
+
+.table table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--text-sm);
+}
+
+.table th {
+    text-align: left;
+    padding: var(--space-4);
+    background: var(--theme-surface-strong);
+    font-weight: 800;
+    position: sticky;
+    top: 0;
+}
+
+.table td {
+    padding: var(--space-4);
+    border-top: 1px solid var(--theme-border);
+}
+
+.table tbody tr:hover {
+    background: var(--theme-surface-strong);
+}
+
+/* =========================
+   LIVE STATUS INDICATOR
+========================= */
+.live-indicator::after {
+    content: "";
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 0 12px #22c55e;
+    animation: livePulse 1.8s ease-in-out infinite;
+}
+
+@keyframes livePulse {
+    0%,100% { transform: scale(1); opacity: 0.4; }
+    50% { transform: scale(1.6); opacity: 1; }
+}
+
+/* =========================
+   RESPONSIVE GRID
+========================= */
+@media (max-width: 1024px) {
+    .stats-grid,
+    .panel-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 768px) {
+    .stats-grid,
+    .panel-grid,
+    .quick-actions { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 480px) {
+    .stat-value { font-size: 1.6rem; }
+}
+
+/* =========================
+   PERFORMANCE MODE
+========================= */
+body.compact .panel::after,
+body.compact .stat-card::before {
+    display: none;
+}

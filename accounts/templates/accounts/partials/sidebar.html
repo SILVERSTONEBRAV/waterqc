@@ -1,0 +1,433 @@
+{% load static %}
+
+<aside
+    class="sidebar collapsed"
+    id="accountSidebar"
+>
+
+    <nav class="sidebar-nav">
+
+        <ul
+            class="nav flex-column sidebar-menu"
+            id="accountDashboardTabs"
+            role="tablist"
+        >
+
+            <!-- ===================================================== -->
+            <!-- DASHBOARD -->
+            <!-- ===================================================== -->
+
+            <li class="sidebar-item active">
+
+                <a
+                    href="#overview-tab"
+                    class="nav-link active"
+                    data-bs-toggle="pill"
+                    data-bs-target="#overview-tab"
+                    data-title="Dashboard"
+                    data-subtitle="Account dashboard overview and statistics"
+                    data-icon="gauge-high"
+                    role="tab"
+                    aria-controls="overview-tab"
+                    aria-selected="true"
+                    title="Dashboard"
+                >
+                    <i
+                        class="fas fa-gauge-high sidebar-icon"
+                        aria-hidden="true"
+                    ></i>
+
+                    <span class="label">
+                        Dashboard
+                    </span>
+                </a>
+
+            </li>
+
+
+            <!-- ===================================================== -->
+            <!-- ACCOUNT -->
+            <!-- ===================================================== -->
+
+            <li class="sidebar-section-title">
+                <span class="label">
+                    Account
+                </span>
+            </li>
+
+            <li class="sidebar-item">
+
+                <a
+                    href="#profile-tab"
+                    class="nav-link"
+                    data-bs-toggle="pill"
+                    data-bs-target="#profile-tab"
+                    data-title="Profile"
+                    data-subtitle="Personal information, preferences and account settings"
+                    data-icon="user"
+                    role="tab"
+                    aria-controls="profile-tab"
+                    aria-selected="false"
+                    title="Profile"
+                >
+                    <i
+                        class="fas fa-user sidebar-icon"
+                        aria-hidden="true"
+                    ></i>
+
+                    <span class="label">
+                        Profile
+                    </span>
+                </a>
+
+            </li>
+
+
+            <!-- ===================================================== -->
+            <!-- MANAGEMENT -->
+            <!-- ===================================================== -->
+
+            <li class="sidebar-section-title">
+                <span class="label">
+                    Management
+                </span>
+            </li>
+
+            <li class="sidebar-item">
+
+                <a
+                    href="#users-tab"
+                    class="nav-link"
+                    data-bs-toggle="pill"
+                    data-bs-target="#users-tab"
+                    data-title="Users"
+                    data-subtitle="Manage system users and user administration"
+                    data-icon="users"
+                    role="tab"
+                    aria-controls="users-tab"
+                    aria-selected="false"
+                    title="Users"
+                >
+                    <i
+                        class="fas fa-users sidebar-icon"
+                        aria-hidden="true"
+                    ></i>
+
+                    <span class="label">
+                        Users
+                    </span>
+
+                    <span class="badge">
+                        {{ users|length }}
+                    </span>
+                </a>
+
+            </li>
+
+
+            <li class="sidebar-item">
+
+                <a
+                    href="#sections-tab"
+                    class="nav-link"
+                    data-bs-toggle="pill"
+                    data-bs-target="#sections-tab"
+                    data-title="Sections"
+                    data-subtitle="Manage organizational sections and departments"
+                    data-icon="building"
+                    role="tab"
+                    aria-controls="sections-tab"
+                    aria-selected="false"
+                    title="Sections"
+                >
+                    <i
+                        class="fas fa-building sidebar-icon"
+                        aria-hidden="true"
+                    ></i>
+
+                    <span class="label">
+                        Sections
+                    </span>
+
+                    <span class="badge">
+                        {{ sections|length }}
+                    </span>
+                </a>
+
+            </li>
+
+
+            <li class="sidebar-item">
+
+                <a
+                    href="#groups-tab"
+                    class="nav-link"
+                    data-bs-toggle="pill"
+                    data-bs-target="#groups-tab"
+                    data-title="Groups"
+                    data-subtitle="Manage security groups and user roles"
+                    data-icon="user-shield"
+                    role="tab"
+                    aria-controls="groups-tab"
+                    aria-selected="false"
+                    title="Groups"
+                >
+                    <i
+                        class="fas fa-user-shield sidebar-icon"
+                        aria-hidden="true"
+                    ></i>
+
+                    <span class="label">
+                        Groups
+                    </span>
+
+                    <span class="badge">
+                        {{ groups|length }}
+                    </span>
+                </a>
+
+            </li>
+
+
+            <li class="sidebar-item">
+
+                <a
+                    href="#permissions-tab"
+                    class="nav-link"
+                    data-bs-toggle="pill"
+                    data-bs-target="#permissions-tab"
+                    data-title="Permissions"
+                    data-subtitle="Manage system permissions and access control"
+                    data-icon="key"
+                    role="tab"
+                    aria-controls="permissions-tab"
+                    aria-selected="false"
+                    title="Permissions"
+                >
+                    <i
+                        class="fas fa-key sidebar-icon"
+                        aria-hidden="true"
+                    ></i>
+
+                    <span class="label">
+                        Permissions
+                    </span>
+
+                    <span class="badge">
+                        {{ permissions|length }}
+                    </span>
+                </a>
+
+            </li>
+
+
+            <li class="sidebar-item">
+
+                <a
+                    href="#plants-tab"
+                    class="nav-link"
+                    data-bs-toggle="pill"
+                    data-bs-target="#plants-tab"
+                    data-title="Treatment Plants"
+                    data-subtitle="Manage treatment plants and plant assignments"
+                    data-icon="industry"
+                    role="tab"
+                    aria-controls="plants-tab"
+                    aria-selected="false"
+                    title="Treatment Plants"
+                >
+                    <i
+                        class="fas fa-industry sidebar-icon"
+                        aria-hidden="true"
+                    ></i>
+
+                    <span class="label">
+                        Treatment Plants
+                    </span>
+                </a>
+
+            </li>
+
+
+            <li class="sidebar-item">
+
+                <a
+                    href="#labs-tab"
+                    class="nav-link"
+                    data-bs-toggle="pill"
+                    data-bs-target="#labs-tab"
+                    data-title="Laboratories"
+                    data-subtitle="Manage laboratories and laboratory assignments"
+                    data-icon="flask"
+                    role="tab"
+                    aria-controls="labs-tab"
+                    aria-selected="false"
+                    title="Laboratories"
+                >
+                    <i
+                        class="fas fa-flask sidebar-icon"
+                        aria-hidden="true"
+                    ></i>
+
+                    <span class="label">
+                        Laboratories
+                    </span>
+                </a>
+
+            </li>
+
+
+            <li class="sidebar-item">
+
+                <a
+                    href="#sessions-tab"
+                    class="nav-link"
+                    data-bs-toggle="pill"
+                    data-bs-target="#sessions-tab"
+                    data-title="Sessions"
+                    data-subtitle="View active sessions and login history"
+                    data-icon="clock"
+                    role="tab"
+                    aria-controls="sessions-tab"
+                    aria-selected="false"
+                    title="Sessions"
+                >
+                    <i
+                        class="fas fa-clock sidebar-icon"
+                        aria-hidden="true"
+                    ></i>
+
+                    <span class="label">
+                        Sessions
+                    </span>
+                </a>
+
+            </li>
+
+
+            <!-- ===================================================== -->
+            <!-- SECURITY -->
+            <!-- ===================================================== -->
+
+            <li class="sidebar-section-title">
+                <span class="label">
+                    Security
+                </span>
+            </li>
+
+            <li class="sidebar-item">
+
+                <a
+                    href="#security-tab"
+                    class="nav-link"
+                    data-bs-toggle="pill"
+                    data-bs-target="#security-tab"
+                    data-title="Security"
+                    data-subtitle="Authentication, MFA and account security"
+                    data-icon="lock"
+                    role="tab"
+                    aria-controls="security-tab"
+                    aria-selected="false"
+                    title="Security"
+                >
+                    <i
+                        class="fas fa-lock sidebar-icon"
+                        aria-hidden="true"
+                    ></i>
+
+                    <span class="label">
+                        Security
+                    </span>
+                </a>
+
+            </li>
+
+
+            <li class="sidebar-item">
+
+                <a
+                    href="#password-tab"
+                    class="nav-link"
+                    data-bs-toggle="pill"
+                    data-bs-target="#password-tab"
+                    data-title="Reset Password"
+                    data-subtitle="Update and manage account credentials"
+                    data-icon="unlock-keyhole"
+                    role="tab"
+                    aria-controls="password-tab"
+                    aria-selected="false"
+                    title="Reset Password"
+                >
+                    <i
+                        class="fas fa-unlock-keyhole sidebar-icon"
+                        aria-hidden="true"
+                    ></i>
+
+                    <span class="label">
+                        Reset Password
+                    </span>
+                </a>
+
+            </li>
+
+
+            <li class="sidebar-item">
+
+                <a
+                    href="#config-tab"
+                    class="nav-link"
+                    data-bs-toggle="pill"
+                    data-bs-target="#config-tab"
+                    data-title="Configuration"
+                    data-subtitle="Application configuration and administrative settings"
+                    data-icon="gears"
+                    role="tab"
+                    aria-controls="config-tab"
+                    aria-selected="false"
+                    title="Configuration"
+                >
+                    <i
+                        class="fas fa-gears sidebar-icon"
+                        aria-hidden="true"
+                    ></i>
+
+                    <span class="label">
+                        Configuration
+                    </span>
+                </a>
+
+            </li>
+
+
+            <li class="sidebar-item">
+
+                <a
+                    href="#system-tab"
+                    class="nav-link"
+                    data-bs-toggle="pill"
+                    data-bs-target="#system-tab"
+                    data-title="System Information"
+                    data-subtitle="Server information and application diagnostics"
+                    data-icon="server"
+                    role="tab"
+                    aria-controls="system-tab"
+                    aria-selected="false"
+                    title="System Information"
+                >
+                    <i
+                        class="fas fa-server sidebar-icon"
+                        aria-hidden="true"
+                    ></i>
+
+                    <span class="label">
+                        System Information
+                    </span>
+                </a>
+
+            </li>
+
+        </ul>
+
+    </nav>
+
+</aside>

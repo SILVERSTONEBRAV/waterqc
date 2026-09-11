@@ -1,0 +1,178 @@
+:root {
+    --header-height: 62px;
+    --header-height-compact: 54px;
+    --header-padding-x: 1rem;
+    --header-z: var(--z-header, 2000);
+}
+.topbar {
+    overflow: visible;
+}
+
+.user-menu,
+.brand-section {
+    overflow: visible;
+}
+
+/* ==========================================================================
+   BRAND INFO
+========================================================================== */
+
+.brand {
+    text-decoration: none;
+    color: inherit;
+}
+
+.brand-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.company-name {
+    font-size: .95rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--theme-text);
+
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.company-subtitle {
+    font-size: .72rem;
+    color: var(--theme-muted);
+
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ==========================================================================
+   HOME BUTTON
+========================================================================== */
+
+.header-home-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+
+    padding: .5rem .75rem;
+
+    border-radius: var(--radius-md);
+
+    text-decoration: none;
+
+    background: var(--theme-surface);
+    border: 1px solid var(--theme-border);
+
+    color: var(--theme-text);
+
+    transition:
+        background-color var(--t-fast),
+        border-color var(--t-fast),
+        transform var(--t-fast),
+        box-shadow var(--t-fast);
+}
+
+.header-home-btn:hover {
+    background: var(--theme-surface-strong);
+    border-color: var(--theme-accent);
+
+    transform: translateY(-2px);
+
+    box-shadow:
+        0 0 20px var(--theme-accent-soft);
+}
+
+.header-home-btn i {
+    color: var(--theme-accent);
+}
+
+.header-home-btn:focus-visible {
+    outline: none;
+
+    box-shadow:
+        0 0 0 3px
+        color-mix(
+            in srgb,
+            var(--theme-accent) 40%,
+            transparent
+        );
+}
+
+/* ==========================================================================
+   NOTIFICATION BADGE
+========================================================================== */
+
+.notification-container {
+    position: relative;
+}
+
+.notification-badge {
+    position: absolute;
+
+    top: -5px;
+    right: -5px;
+
+    min-width: 18px;
+    height: 18px;
+
+    padding-inline: 4px;
+
+    border-radius: 999px;
+
+    display: grid;
+    place-items: center;
+
+    font-size: .65rem;
+    font-weight: 700;
+
+    background: #ef4444;
+    color: #fff;
+
+    border: 2px solid var(--theme-surface);
+
+    z-index: 20;
+}
+
+/* ==========================================================================
+   STACKING FIXES
+========================================================================== */
+
+.user-menu {
+    position: relative;
+    z-index: calc(var(--header-z) + 1);
+}
+
+/* ==========================================================================
+   MOBILE
+========================================================================== */
+
+@media (max-width: 768px) {
+    .company-subtitle {
+        display: none;
+    }
+}
+
+@media (max-width: 560px) {
+    .company-name {
+        max-width: 140px;
+    }
+}
+
+@media (max-width: 480px) {
+    .header-home-btn span {
+        display: none;
+    }
+
+    .header-home-btn {
+        padding: .5rem;
+    }
+}
+
+@media (max-width: 360px) {
+    .company-name {
+        display: none;
+    }
+}

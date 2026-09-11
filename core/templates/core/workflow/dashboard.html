@@ -1,0 +1,282 @@
+{% extends "t/base.html" %}
+{% load static %}
+
+{% block content %}
+
+<div class="wf-os">
+
+<!-- =========================================================
+⚡ TOP RIBBON (LIGHT GLASS CONTROL BAR)
+========================================================= -->
+<div class="wf-ribbon">
+
+    <div class="wf-brand">
+        <span>WF.OS</span>
+        <small>Intelligent Workflow Engine</small>
+    </div>
+
+    <div class="wf-ribbon-controls">
+
+        <input id="wf-global-search"
+               placeholder="Search events, models, states..."
+               oninput="WorkflowUI.search(this.value)" />
+
+        <div class="wf-actions">
+            <button onclick="WorkflowRuntime.play()">▶</button>
+            <button onclick="WorkflowRuntime.pause()">⏸</button>
+            <button onclick="WorkflowRuntime.step()">⏭</button>
+            <button onclick="WorkflowRuntime.replay()">⟲</button>
+        </div>
+
+    </div>
+
+    <div class="wf-status">
+        <span id="wf-connection">● LIVE</span>
+        <span id="wf-latency">0ms</span>
+    </div>
+
+</div>
+
+
+<!-- =========================================================
+📊 KPI STRIP (LIGHT BLUE INTELLIGENCE METRICS)
+========================================================= -->
+<div class="wf-metrics-bar">
+
+    <div class="metric-card">
+        <label>Events / sec</label>
+        <div id="wf-eps">0</div>
+    </div>
+
+    <div class="metric-card danger">
+        <label>Anomaly Score</label>
+        <div id="wf-anomaly-score">0%</div>
+    </div>
+
+    <div class="metric-card">
+        <label>Active Nodes</label>
+        <div id="wf-nodes">0</div>
+    </div>
+
+    <div class="metric-card">
+        <label>Replay Cursor</label>
+        <div id="wf-time">--</div>
+    </div>
+
+</div>
+
+
+<!-- =========================================================
+🧬 MAIN WORKSPACE
+========================================================= -->
+<div class="wf-workspace">
+
+    <!-- LEFT PANEL -->
+    <aside class="wf-sidebar"
+           hx-get="?section=models"
+           hx-trigger="load, workflow:update from:body"
+           hx-swap="innerHTML">
+    </aside>
+
+
+    <!-- CENTER CANVAS -->
+    <main class="wf-canvas">
+
+        <div class="wf-canvas-header">
+
+            <div class="tabs">
+                <button class="active">DAG View</button>
+                <button>Timeline</button>
+                <button>Heatmap</button>
+            </div>
+
+        </div>
+
+        <div id="wf-graph-root"></div>
+        <div id="wf-timeline" class="hidden"></div>
+
+    </main>
+
+
+    <!-- RIGHT PANEL -->
+    <aside class="wf-debug">
+
+        <div class="wf-panel">
+            <div class="panel-title">
+                Event Stream
+                <button onclick="WorkflowUI.clear()">clear</button>
+            </div>
+            <div id="wf-events"></div>
+        </div>
+
+        <div class="wf-panel">
+            <div class="panel-title">Replay Engine</div>
+            <input type="range" min="0" max="100"
+                   oninput="WorkflowReplay.seek(this.value)" />
+        </div>
+
+        <div class="wf-panel anomaly-panel">
+            <div class="panel-title">Anomaly Detection</div>
+            <div id="wf-anomalies"></div>
+        </div>
+
+    </aside>
+
+</div>
+
+</div>
+
+
+<!-- =========================================================
+🎨 LIGHT BLUE GLASS THEME STYLES
+========================================================= -->
+<style>
+
+:root{
+    --bg: #f5f9ff;
+    --panel: rgba(255,255,255,0.7);
+    --stroke: rgba(148,163,184,0.25);
+    --text: #0f172a;
+    --muted: #64748b;
+    --blue: #3b82f6;
+    --blue-soft: #93c5fd;
+    --danger: #ef4444;
+}
+
+/* BASE */
+.wf-os{
+    height:100vh;
+    display:flex;
+    flex-direction:column;
+    background: radial-gradient(circle at top, #eaf3ff, #f8fbff);
+    color:var(--text);
+    font-family: ui-sans-serif;
+}
+
+/* RIBBON */
+.wf-ribbon{
+    display:flex;
+    justify-content:space-between;
+    padding:10px 14px;
+    background:var(--panel);
+    backdrop-filter: blur(12px);
+    border-bottom:1px solid var(--stroke);
+}
+
+.wf-brand span{
+    font-weight:700;
+    color:var(--blue);
+}
+
+.wf-ribbon input{
+    width:320px;
+    padding:6px 10px;
+    border-radius:8px;
+    border:1px solid var(--stroke);
+    outline:none;
+}
+
+.wf-actions button{
+    margin-left:6px;
+    border:none;
+    background:var(--blue-soft);
+    padding:6px 10px;
+    border-radius:8px;
+    cursor:pointer;
+}
+
+/* METRICS */
+.wf-metrics-bar{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:10px;
+    padding:10px;
+}
+
+.metric-card{
+    background:var(--panel);
+    border:1px solid var(--stroke);
+    border-radius:14px;
+    padding:12px;
+    backdrop-filter: blur(10px);
+    transition:0.2s;
+}
+
+.metric-card:hover{
+    transform:translateY(-2px);
+}
+
+.metric-card label{
+    font-size:12px;
+    color:var(--muted);
+}
+
+.metric-card div{
+    font-size:20px;
+    font-weight:600;
+}
+
+.metric-card.danger div{
+    color:var(--danger);
+}
+
+/* WORKSPACE */
+.wf-workspace{
+    flex:1;
+    display:grid;
+    grid-template-columns:260px 1fr 320px;
+}
+
+/* SIDEBAR */
+.wf-sidebar{
+    background:var(--panel);
+    border-right:1px solid var(--stroke);
+    overflow:auto;
+}
+
+/* CANVAS */
+.wf-canvas{
+    position:relative;
+}
+
+#wf-graph-root{
+    height:100%;
+    background: radial-gradient(circle at center, #dbeafe, #f8fbff);
+}
+
+/* DEBUG PANEL */
+.wf-debug{
+    background:var(--panel);
+    border-left:1px solid var(--stroke);
+    overflow:auto;
+}
+
+.wf-panel{
+    padding:12px;
+    border-bottom:1px solid var(--stroke);
+}
+
+.panel-title{
+    font-weight:600;
+    margin-bottom:8px;
+}
+
+/* EVENTS */
+.wf-event-item{
+    font-size:12px;
+    padding:6px;
+    border-bottom:1px solid var(--stroke);
+}
+
+/* ANOMALY */
+.anomaly-item{
+    color:var(--danger);
+    font-size:12px;
+}
+
+/* UTILS */
+.hidden{ display:none; }
+
+</style>
+
+{% endblock %}

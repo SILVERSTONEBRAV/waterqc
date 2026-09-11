@@ -1,0 +1,160 @@
+{% load static %}
+
+<aside class="sidebar collapsed" id="appSidebar">
+    <nav class="sidebar-nav">
+
+        <ul class="sidebar-menu">
+
+            {# ====================================================== #}
+            {# DASHBOARD #}
+            {# ====================================================== #}
+
+            <li class="sidebar-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                <a
+                    href="{% url 'audit_logs:dashboard' %}"
+                    class="nav-link"
+                    title="Dashboard"
+                    aria-label="Dashboard"
+                >
+                    <i class="fas fa-gauge-high sidebar-icon"></i>
+
+                    <span class="label">
+                        Dashboard
+                    </span>
+                </a>
+            </li>
+
+
+            {# ====================================================== #}
+            {# REGISTRY MODELS #}
+            {# ====================================================== #}
+
+            {% if app_groups %}
+
+                {% for app, models in app_groups.items %}
+
+                    {% if models %}
+
+                        <li class="sidebar-section-title">
+                            <span class="label">
+                                {{ app|default:"Unknown App"|title }}
+                            </span>
+                        </li>
+
+                        {% for model in models %}
+
+                            {% with route=model.routes.list|default:'' %}
+                            {% with icon=model.icon|default:'cube' %}
+                            {% with label=model.label|default:model.model|capfirst %}
+
+                                <li class="sidebar-item
+                                    {% if route and request.path|slice:':route|length' == route %}active{% endif %}
+                                    {% if not route or route == '#' %}disabled{% endif %}
+                                ">
+
+                                    {% if route and route != "#" %}
+
+                                        <a
+                                            href="{{ route }}"
+                                            class="nav-link"
+                                            title="{{ label }}"
+                                            aria-label="{{ label }}"
+                                            data-model="{{ model.model }}"
+                                            data-group="{{ model.group|default:'general' }}"
+                                        >
+
+                                            <i
+                                                class="fas fa-{{ icon }} sidebar-icon"
+                                                aria-hidden="true"
+                                            ></i>
+
+                                            <span class="label">
+                                                {{ label }}
+                                            </span>
+
+                                            {% if model.badge %}
+                                                <span class="badge">
+                                                    {{ model.badge }}
+                                                </span>
+                                            {% endif %}
+
+                                        </a>
+
+                                    {% else %}
+
+                                        <span
+                                            class="nav-link disabled"
+                                            title="{{ label }} (unrouted)"
+                                            aria-disabled="true"
+                                        >
+
+                                            <i
+                                                class="fas fa-circle-exclamation sidebar-icon"
+                                                aria-hidden="true"
+                                            ></i>
+
+                                            <span class="label">
+                                                {{ label }}
+                                                <small>(unrouted)</small>
+                                            </span>
+
+                                        </span>
+
+                                    {% endif %}
+
+                                </li>
+
+                            {% endwith %}
+                            {% endwith %}
+                            {% endwith %}
+
+                        {% empty %}
+
+                            <li class="sidebar-item empty-state">
+
+                                <span class="nav-link disabled">
+
+                                    <i
+                                        class="fas fa-folder-open sidebar-icon"
+                                        aria-hidden="true"
+                                    ></i>
+
+                                    <span class="label">
+                                        No models registered
+                                    </span>
+
+                                </span>
+
+                            </li>
+
+                        {% endfor %}
+
+                    {% endif %}
+
+                {% endfor %}
+
+            {% else %}
+
+                <li class="sidebar-item empty-state">
+
+                    <span class="nav-link disabled">
+
+                        <i
+                            class="fas fa-database sidebar-icon"
+                            aria-hidden="true"
+                        ></i>
+
+                        <span class="label">
+                            Registry is empty
+                        </span>
+
+                    </span>
+
+                </li>
+
+            {% endif %}
+
+        </ul>
+
+    </nav>
+</aside>

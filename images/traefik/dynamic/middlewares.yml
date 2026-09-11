@@ -1,0 +1,19 @@
+# =========================================================
+# SECURITY MIDDLEWARES
+# =========================================================
+
+http:
+  middlewares:
+
+    secure-headers:
+      headers:
+        sslRedirect: true
+        frameDeny: true
+        browserXssFilter: true
+        contentTypeNosniff: true
+        referrerPolicy: no-referrer
+        forceSTSHeader: true
+        stsSeconds: 31536000
+
+    gzip:
+      compress: {}

@@ -1,0 +1,83 @@
+<div class="row g-4 mb-4">
+
+    <div class="col-xxl-3 col-md-6">
+        <div class="dashboard-card kpi-card">
+            <div class="kpi-icon bg-primary-subtle text-primary">
+                <i class="fas fa-cubes"></i>
+            </div>
+
+            <div class="mt-4 text-muted">
+                Registry Models
+            </div>
+
+            <div class="kpi-value">
+                {{ cards.models }}
+            </div>
+
+            <div class="small text-success">
+                {{ cards.apps }} Applications
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xxl-3 col-md-6">
+        <div class="dashboard-card kpi-card">
+            <div class="kpi-icon bg-success-subtle text-success">
+                <i class="fas fa-users"></i>
+            </div>
+
+            <div class="mt-4 text-muted">
+                Users
+            </div>
+
+            <div class="kpi-value">
+                {{ cards.users }}
+            </div>
+
+            <div class="small text-success">
+                {{ cards.active_users }} Active
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xxl-3 col-md-6">
+        <div class="dashboard-card kpi-card">
+            <div class="kpi-icon bg-danger-subtle text-danger">
+                <i class="fas fa-shield-halved"></i>
+            </div>
+
+            <div class="mt-4 text-muted">
+                Secure Models
+            </div>
+
+            <div class="kpi-value">
+                {{ security.secure_models }}
+            </div>
+
+            <div class="small text-muted">
+                Registry Security
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xxl-3 col-md-6">
+        <div class="dashboard-card kpi-card">
+            <div class="kpi-icon bg-warning-subtle text-warning">
+                <i class="fas fa-code-branch"></i>
+            </div>
+
+            <div class="mt-4 text-muted">
+                Registry Actions
+            </div>
+
+            <div class="kpi-value">
+                {{ analytics.actions }}
+            </div>
+
+            <div class="small text-muted">
+                Custom Actions
+            </div>
+        </div>
+    </div>
+
+</div>

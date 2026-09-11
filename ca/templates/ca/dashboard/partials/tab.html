@@ -1,0 +1,167 @@
+{% load static %}
+
+<div
+    class="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
+    x-data="{ activeTab: '{{ active_tab|default:"overview" }}' }"
+>
+    <div class="border-b border-gray-200 dark:border-gray-800">
+        <div class="flex items-center gap-1 overflow-x-auto px-4 py-2">
+
+            <button
+                type="button"
+                @click="activeTab = 'overview'"
+                :class="activeTab === 'overview'
+                    ? 'border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-400'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'"
+                class="inline-flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold transition"
+            >
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0h6"/>
+                </svg>
+                Overview
+            </button>
+
+            <button
+                type="button"
+                @click="activeTab = 'workflow'"
+                :class="activeTab === 'workflow'
+                    ? 'border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-400'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'"
+                class="inline-flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold transition"
+            >
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                </svg>
+                Workflow
+            </button>
+
+            <button
+                type="button"
+                @click="activeTab = 'batches'"
+                :class="activeTab === 'batches'
+                    ? 'border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-400'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'"
+                class="inline-flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold transition"
+            >
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                </svg>
+                Batches
+                {% if statistics.pending_batches %}
+                    <span class="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                        {{ statistics.pending_batches }}
+                    </span>
+                {% endif %}
+            </button>
+
+            <button
+                type="button"
+                @click="activeTab = 'analysis'"
+                :class="activeTab === 'analysis'
+                    ? 'border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-400'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'"
+                class="inline-flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold transition"
+            >
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M9 19V6l12-3v13M9 19a3 3 0 11-6 0 3 3 0 016 0zm12-3a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                Analysis
+            </button>
+
+            <button
+                type="button"
+                @click="activeTab = 'quality'"
+                :class="activeTab === 'quality'
+                    ? 'border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-400'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'"
+                class="inline-flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold transition"
+            >
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622C17.176 19.29 21 14.591 21 9c0-1.04-.133-2.049-.382-3.016z"/>
+                </svg>
+                QA / Approval
+            </button>
+
+            <button
+                type="button"
+                @click="activeTab = 'coa'"
+                :class="activeTab === 'coa'
+                    ? 'border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-400'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'"
+                class="inline-flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold transition"
+            >
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M7 21h10a2 2 0 002-2V7.414A2 2 0 0018.414 7l-4.828-4.828A2 2 0 0012.172 2H7a2 2 0 00-2 2v15a2 2 0 002 2z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M13 2v6h6M8 13h8M8 17h5"/>
+                </svg>
+                Certificates
+            </button>
+
+            <button
+                type="button"
+                @click="activeTab = 'tasks'"
+                :class="activeTab === 'tasks'
+                    ? 'border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-400'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'"
+                class="inline-flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold transition"
+            >
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M9 5H5a2 2 0 00-2 2v12a2 2 0 002 2h14a2 2 0 002-2V7a2 2 0 00-2-2h-4M9 5a3 3 0 006 0M9 5h6"/>
+                </svg>
+                My Tasks
+                {% if statistics.my_tasks %}
+                    <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                        {{ statistics.my_tasks }}
+                    </span>
+                {% endif %}
+            </button>
+
+        </div>
+    </div>
+
+    <div class="p-5">
+
+        <div x-show="activeTab === 'overview'" x-cloak>
+            {% include "chemical_analysis/tabs/overview.html" %}
+        </div>
+
+        <div x-show="activeTab === 'workflow'" x-cloak>
+            {% include "chemical_analysis/tabs/workflow.html" %}
+        </div>
+
+        <div x-show="activeTab === 'batches'" x-cloak>
+            {% include "chemical_analysis/tabs/batches.html" %}
+        </div>
+
+        <div x-show="activeTab === 'analysis'" x-cloak>
+            {% include "chemical_analysis/tabs/analysis.html" %}
+        </div>
+
+        <div x-show="activeTab === 'quality'" x-cloak>
+            {% include "chemical_analysis/tabs/quality.html" %}
+        </div>
+
+        <div x-show="activeTab === 'coa'" x-cloak>
+            {% include "chemical_analysis/tabs/coa.html" %}
+        </div>
+
+        <div x-show="activeTab === 'tasks'" x-cloak>
+            {% include "chemical_analysis/tabs/tasks.html" %}
+        </div>
+
+    </div>
+</div>
+
+<style>
+    [x-cloak] {
+        display: none !important;
+    }
+</style>

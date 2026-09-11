@@ -1,0 +1,171 @@
+<tr id="row-{{ object.pk }}"
+    data-id="{{ object.pk }}"
+    data-state="clean"
+    class="table-row align-middle transition-all duration-150"
+    hx-trigger="row-updated-{{ object.pk }} from:body, refresh-row-{{ object.pk }} from:body">
+
+    <!-- SELECT -->
+    <td class="text-center">
+        <input type="checkbox"
+               class="row-select form-check-input"
+               name="selected_ids"
+               value="{{ object.pk }}"
+               hx-on:change="window.tableManager?.updateBulkState()">
+    </td>
+
+    <!-- INDEX -->
+    {% if forloop.counter %}
+    <td class="text-muted small fw-semibold">
+        {{ forloop.counter }}
+    </td>
+    {% endif %}
+
+    <!-- DRILL TOGGLE -->
+    <td class="text-center cursor-pointer drill-toggle"
+        hx-get="{% url urls.detail object.pk %}"
+        hx-target="#drill-{{ object.pk }}"
+        hx-swap="innerHTML"
+        hx-indicator="#loader-{{ object.pk }}"
+        hx-on:click="document.getElementById('drill-{{ object.pk }}').classList.toggle('d-none')">
+        ▸
+    </td>
+
+    <!-- FIELDS -->
+    {% for field in fields %}
+    {% with value=object|attr:field.name %}
+    <td class="editable-cell position-relative px-2 py-1"
+        data-field="{{ field.name }}"
+        data-type="{{ field.get_internal_type }}"
+        data-pk="{{ object.pk }}"
+        data-original="{{ value|default:'' }}"
+        data-dirty="false"
+        tabindex="0"
+
+        {% if field.name in inline_edit_fields or not inline_edit_fields %}
+            contenteditable="true"
+            hx-post="{% url urls.inline object.pk %}"
+            hx-trigger="blur changed delay:350ms"
+            hx-swap="none"
+            hx-vals='js:{ pk: {{ object.pk }}, field: "{{ field.name }}", value: this.innerText.trim() }'
+
+            hx-on:focus="
+                this.dataset.before = this.innerText;
+                this.closest('tr').dataset.state = 'editing';
+                this.classList.add('editing');
+            "
+            hx-on:keydown="
+                const cell = this;
+                const row = cell.closest('tr');
+                const cells = Array.from(row.querySelectorAll('[contenteditable]'));
+                const idx = cells.indexOf(cell);
+
+                if(event.key==='Enter'){ event.preventDefault(); cell.blur(); }
+                if(event.key==='ArrowRight'){ event.preventDefault(); cells[idx+1]?.focus(); }
+                if(event.key==='ArrowLeft'){ event.preventDefault(); cells[idx-1]?.focus(); }
+                if(event.key==='ArrowDown'){ event.preventDefault(); row.nextElementSibling?.querySelectorAll('[contenteditable]')[idx]?.focus(); }
+                if(event.key==='ArrowUp'){ event.preventDefault(); row.previousElementSibling?.querySelectorAll('[contenteditable]')[idx]?.focus(); }
+            "
+            hx-on:blur="
+                if(this.dataset.before!==this.innerText){
+                    this.dataset.dirty='true';
+                    this.closest('tr').dataset.state='dirty';
+                    this.classList.add('dirty');
+                }
+            "
+            hx-on::before-request="this.classList.add('loading');"
+            hx-on::after-request="
+                this.classList.remove('loading');
+                if(event.detail.successful){
+                    this.dataset.original=this.innerText;
+                    this.dataset.dirty='false';
+                    this.classList.remove('dirty','bg-danger-subtle');
+                    this.classList.add('bg-success-subtle');
+                    this.closest('tr').dataset.state='clean';
+                    setTimeout(()=>this.classList.remove('bg-success-subtle'),500);
+                } else {
+                    this.innerText=this.dataset.original;
+                    this.classList.add('bg-danger-subtle');
+                    this.closest('tr').dataset.state='error';
+                    setTimeout(()=>this.classList.remove('bg-danger-subtle'),1200);
+                }
+            "
+        {% endif %}
+    >
+        {% if field.many_to_many %}
+            <div class="d-flex flex-wrap gap-1">
+                {% for v in value.all %}
+                    <span class="badge bg-light text-dark border">{{ v }}</span>
+                {% empty %}
+                    <span class="text-muted">—</span>
+                {% endfor %}
+            </div>
+        {% elif field.is_relation %}
+            <span class="text-primary fw-semibold">{{ value }}</span>
+        {% elif field.get_internal_type=="BooleanField" %}
+            <span class="badge toggle-bool {% if value %}bg-success{% else %}bg-secondary{% endif %}"
+                  hx-post="{% url urls.inline object.pk %}"
+                  hx-trigger="click"
+                  hx-vals='js:{ pk: {{ object.pk }}, field: "{{ field.name }}", value: {{ value|yesno:"false,true" }} }'
+                  hx-swap="none">
+                {% if value %}✔{% else %}✖{% endif %}
+            </span>
+        {% elif field.get_internal_type=="JSONField" %}
+            <pre class="small text-muted m-0">{{ value|safe }}</pre>
+        {% elif field.get_internal_type=="DateTimeField" %}
+            <span class="text-nowrap">{{ value|date:"Y-m-d H:i" }}</span>
+        {% elif field.get_internal_type in ["FloatField","DecimalField"] %}
+            <span class="text-end d-block">{{ value|floatformat:3 }}</span>
+        {% elif field.choices %}
+            <span class="badge bg-info text-dark">{{ value }}</span>
+        {% elif value is None or value=="" %}
+            <span class="text-muted fst-italic">—</span>
+        {% else %}
+            {{ value }}
+        {% endif %}
+    </td>
+    {% endwith %}
+    {% endfor %}
+
+    <!-- ACTIONS -->
+    <td class="text-end">
+        <div class="btn-group btn-group-sm">
+            <!-- VIEW -->
+            <button class="btn btn-outline-secondary"
+                    hx-get="{% url urls.detail object.pk %}"
+                    hx-target="#crud-modal-body">👁</button>
+
+            <!-- EDIT -->
+            <button class="btn btn-outline-primary"
+                    hx-get="{% url urls.edit object.pk %}"
+                    hx-target="#crud-modal-body">✎</button>
+
+            <!-- CLONE -->
+            <button class="btn btn-outline-info"
+                    hx-post="{% url urls.clone object.pk %}"
+                    hx-swap="none"
+                    hx-on::after-request="window.tableManager?.refresh()">⧉</button>
+
+            <!-- DELETE -->
+            <button class="btn btn-outline-danger"
+                    hx-delete="{% url urls.delete object.pk %}"
+                    hx-confirm="Delete this item?"
+                    hx-swap="none"
+                    hx-on::after-request="
+                        if(event.detail.successful){
+                            const row=this.closest('tr');
+                            row.style.opacity='0';
+                            setTimeout(()=>row.remove(),250);
+                        }
+                    ">🗑</button>
+        </div>
+    </td>
+</tr>
+
+<!-- DRILL ROW -->
+<tr id="drill-{{ object.pk }}" class="d-none bg-light">
+    <td colspan="100%">
+        <div id="loader-{{ object.pk }}" class="htmx-indicator small text-muted">
+            Loading nested data...
+        </div>
+    </td>
+</tr>

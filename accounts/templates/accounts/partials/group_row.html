@@ -1,0 +1,21 @@
+<tr id="group-row-{{ group.id }}" data-id="{{ group.id }}">
+    <td>{{ group.name }}</td>
+    <td class="text-center">
+        <span class="badge bg-info">{{ group.user_count|default:"0" }}</span>
+    </td>
+    <td class="text-end">
+        <button
+            class="btn btn-sm btn-outline-primary edit-group"
+            data-id="{{ group.id }}"
+            data-tab="groups">
+            <i class="fas fa-edit"></i>
+        </button>
+
+        <button
+            class="btn btn-sm btn-outline-danger delete-group"
+            data-id="{{ group.id }}"
+            data-tab="groups">
+            <i class="fas fa-trash"></i>
+        </button>
+    </td>
+</tr>

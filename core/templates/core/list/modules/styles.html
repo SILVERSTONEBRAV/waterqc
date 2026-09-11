@@ -1,0 +1,30 @@
+<style>
+td.cell {
+    position: relative;
+    cursor: text;
+    transition: all 0.15s ease;
+}
+
+td.cell.editing {
+    padding: 0 !important;
+    background: #fff7d6;
+}
+
+td.cell input,
+td.cell select {
+    width: 100%;
+    border: none;
+    outline: none;
+    padding: 6px;
+    font-size: 14px;
+    background: transparent;
+}
+
+td.cell.dirty { background: #fff3cd; }
+td.cell.saving { opacity: 0.5; }
+
+tr.selected-row { background: #e7f1ff; }
+.cell-focus { outline: 2px solid #0d6efd; outline-offset: -2px; }
+
+tr.new-row { background: #f0fff4; }
+</style>

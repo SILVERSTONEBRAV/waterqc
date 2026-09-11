@@ -1,0 +1,21 @@
+<td>
+
+<form
+    hx-post="{{ registry.url(meta.model_name, 'inline_edit', meta.app_label, row.id) }}"
+    hx-target="closest tr"
+    hx-swap="outerHTML"
+>
+
+    <input type="hidden" name="field" value="{{ field_name }}">
+
+    <input
+        type="text"
+        name="value"
+        value="{{ value }}"
+        class="form-control form-control-sm"
+        autofocus
+    >
+
+</form>
+
+</td>

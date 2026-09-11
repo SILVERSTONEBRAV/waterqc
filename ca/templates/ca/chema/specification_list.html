@@ -1,0 +1,170 @@
+{% extends "ca/dashboard/layout/app.html" %}
+
+{% block title %}Chemical Specifications{% endblock %}
+
+{% block content %}
+
+<div class="ca-page">
+
+```
+<div class="page-header">
+    <div>
+        <h1>Chemical Specifications</h1>
+        <p>View and manage chemical analysis specification requirements.</p>
+    </div>
+
+    <div class="page-actions">
+        <a href="{% url 'ca:dashboard' %}" class="btn btn-secondary">
+            Dashboard
+        </a>
+    </div>
+</div>
+
+<div class="card">
+
+    <div class="card-header">
+        <div>
+            <h2>Specifications</h2>
+            <span>
+                {{ specifications|length }}
+                specification{{ specifications|length|pluralize }}
+            </span>
+        </div>
+
+        <div class="page-actions">
+            <a
+                href="{% url 'ca:specification-filter' %}"
+                class="btn btn-secondary"
+            >
+                Filter
+            </a>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table">
+
+            <thead>
+                <tr>
+                    <th>Chemical</th>
+                    <th>Parameter</th>
+                    <th>Unit</th>
+                    <th>Minimum</th>
+                    <th>Maximum</th>
+                    <th>Requirement</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% for specification in specifications %}
+
+                <tr>
+
+                    <td>
+                        {% if specification.chemical %}
+                            {{ specification.chemical }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if specification.parameter %}
+                            {{ specification.parameter }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if specification.unit %}
+                            {{ specification.unit }}
+                        {% elif specification.parameter %}
+                            {{ specification.parameter.unit|default:"—" }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if specification.min_value != None %}
+                            {{ specification.min_value }}
+                        {% elif specification.minimum != None %}
+                            {{ specification.minimum }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if specification.max_value != None %}
+                            {{ specification.max_value }}
+                        {% elif specification.maximum != None %}
+                            {{ specification.maximum }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if specification.requirement %}
+                            {{ specification.requirement }}
+                        {% elif specification.specification %}
+                            {{ specification.specification }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if specification.is_active %}
+                            <span class="badge badge-success">
+                                Active
+                            </span>
+                        {% elif specification.active %}
+                            <span class="badge badge-success">
+                                Active
+                            </span>
+                        {% elif specification.is_active == False %}
+                            <span class="badge badge-warning">
+                                Inactive
+                            </span>
+                        {% elif specification.active == False %}
+                            <span class="badge badge-warning">
+                                Inactive
+                            </span>
+                        {% else %}
+                            <span class="badge">
+                                —
+                            </span>
+                        {% endif %}
+                    </td>
+
+                </tr>
+
+                {% empty %}
+
+                <tr>
+                    <td colspan="7" class="empty-state">
+                        <strong>No specifications found</strong>
+                        <p>
+                            No chemical analysis specifications are currently
+                            available.
+                        </p>
+                    </td>
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+    </div>
+
+</div>
+
+</div>
+
+{% endblock %}

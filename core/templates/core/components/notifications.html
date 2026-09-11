@@ -1,0 +1,60 @@
+<div
+    x-data="notifications()"
+    class="fixed top-6 right-6 z-[9999] space-y-3">
+
+    <template x-for="note in notifications" :key="note.id">
+
+        <div
+            class="rounded-xl shadow-lg bg-white border px-5 py-4 w-80"
+            x-transition>
+
+            <div
+                class="font-semibold"
+                x-text="note.message">
+            </div>
+
+        </div>
+
+    </template>
+
+</div>
+
+<script>
+
+function notifications(){
+
+    return{
+
+        notifications:[],
+
+        add(note){
+
+            note.id=Date.now();
+
+            this.notifications.push(note);
+
+            setTimeout(()=>{
+
+                this.notifications=this.notifications.filter(n=>n.id!==note.id);
+
+            },3500);
+
+        },
+
+        init(){
+
+            window.addEventListener(
+
+                APP.events.NOTIFY,
+
+                e=>this.add(e.detail)
+
+            );
+
+        }
+
+    }
+
+}
+
+</script>

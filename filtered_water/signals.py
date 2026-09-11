@@ -1,0 +1,30 @@
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from .models import FilteredWaterAnalysis, FilteredWaterResults, FilteredWaterLimit, WaterFilter, WaterFilterStatus
+
+@receiver(post_save, sender=FilteredWaterAnalysis)
+def create_default_results(sender, instance, created, **kwargs):
+    if not created:
+        return
+
+    # Get filters in WORKING state only
+    working_filters = WaterFilter.objects.filter(
+        treatment_plant_phase=instance.treatment_plant_phase,
+        status=WaterFilterStatus.WORKING.value
+    )
+
+    # Create default results for each limit associated with working filters
+    limits = FilteredWaterLimit.objects.filter(
+        treatment_plant=instance.treatment_plant,
+        water_filter__in=working_filters
+    )
+
+    for limit in limits:
+        FilteredWaterResults.objects.get_or_create(
+            analysis=instance,
+            water_filter=limit.water_filter,
+            parameter=limit,
+            defaults={
+                'result_value': 0.00  # Or use limit.default_value if such a field exists
+            }
+        )

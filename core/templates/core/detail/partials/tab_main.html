@@ -1,0 +1,53 @@
+{% load custom_filters %}
+{% if object and editable %}
+<form id="detail-form"
+      data-engine="patch-v6"
+      data-model="{{ meta.key }}"
+      data-app="{{ meta.app_label }}"
+      data-id="{{ object.pk }}">
+{% endif %}
+
+<div class="card shadow-sm">
+
+    <div class="card-header d-flex justify-content-between">
+        <span>Main Fields</span>
+
+        <button class="btn btn-sm btn-primary js-action"
+                data-action="save-all">
+            💾 Save
+        </button>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+
+            <tbody>
+            {% for field in fields %}
+                {% if field.name != "id" and not field.hidden %}
+
+                <tr>
+                    <th style="width:260px;">{{ field.verbose }}</th>
+
+                    <td>
+                        {% if object and editable %}
+                        <input class="form-control form-control-sm js-field"
+                               data-field="{{ field.name }}"
+                               value="{{ object|get_attr:field.name|default:'' }}">
+                        {% else %}
+                            {{ object|get_attr:field.name|default:"—" }}
+                        {% endif %}
+                    </td>
+                </tr>
+
+                {% endif %}
+            {% endfor %}
+            </tbody>
+
+        </table>
+    </div>
+
+</div>
+
+{% if object and editable %}
+</form>
+{% endif %}

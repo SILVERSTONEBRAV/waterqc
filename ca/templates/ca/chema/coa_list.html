@@ -1,0 +1,177 @@
+{% extends "ca/dashboard/layout/app.html" %}
+
+{% block title %}Certificates of Analysis{% endblock %}
+
+{% block content %}
+
+<div class="ca-page">
+    <div class="page-header">
+        <div>
+            <h1>Certificates of Analysis</h1>
+            <p>Review, verify, approve, and download chemical certificates of analysis.</p>
+        </div>
+
+    <div class="page-actions">
+        <a href="{% url 'ca:dashboard' %}" class="btn btn-secondary">
+            Dashboard
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h2>Certificates</h2>
+            <span>
+                {{ coas|length }}
+                certificate{{ coas|length|pluralize }}
+            </span>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>CoA Number</th>
+                    <th>Batch</th>
+                    <th>Sample ID</th>
+                    <th>Analysis Request</th>
+                    <th>Status</th>
+                    <th>Generated</th>
+                    <th>Approved</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for coa in coas %}
+                <tr>
+                    <td>
+                        <strong>
+                            {{ coa.coa_number|default:coa.certificate_number|default:"—" }}
+                        </strong>
+                    </td>
+
+                    <td>
+                        {% if coa.batch %}
+                            <a href="{% url 'ca:batch-detail' coa.batch.pk %}">
+                                {{ coa.batch }}
+                            </a>
+                        {% elif coa.analysis_request.batch %}
+                            <a href="{% url 'ca:batch-detail' coa.analysis_request.batch.pk %}">
+                                {{ coa.analysis_request.batch }}
+                            </a>
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if coa.batch %}
+                            {{ coa.batch.sample_id|default:"—" }}
+                        {% else %}
+                            {{ coa.sample_id|default:"—" }}
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if coa.analysis_request %}
+                            <a href="{% url 'ca:request-detail' coa.analysis_request.pk %}">
+                                {{ coa.analysis_request.request_id|default:coa.analysis_request }}
+                            </a>
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if coa.status == "APPROVED" %}
+                            <span class="badge badge-success">Approved</span>
+                        {% elif coa.status == "VERIFIED" %}
+                            <span class="badge badge-info">Verified</span>
+                        {% elif coa.status == "REJECTED" %}
+                            <span class="badge badge-danger">Rejected</span>
+                        {% elif coa.status == "DRAFT" %}
+                            <span class="badge badge-warning">Draft</span>
+                        {% elif coa.status %}
+                            <span class="badge">
+                                {{ coa.get_status_display|default:coa.status }}
+                            </span>
+                        {% else %}
+                            <span class="badge badge-warning">Pending</span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if coa.generated_at %}
+                            {{ coa.generated_at|date:"d M Y H:i" }}
+                        {% elif coa.created_at %}
+                            {{ coa.created_at|date:"d M Y H:i" }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if coa.approved_at %}
+                            {{ coa.approved_at|date:"d M Y H:i" }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        <div class="page-actions">
+                            <a
+                                href="{% url 'ca:coa-detail' coa.pk %}"
+                                class="btn btn-sm btn-primary"
+                            >
+                                View
+                            </a>
+
+                            {% if coa.status != "APPROVED" %}
+                                {% if coa.status != "VERIFIED" %}
+                                    <a
+                                        href="{% url 'ca:coa-verify' coa.pk %}"
+                                        class="btn btn-sm btn-secondary"
+                                    >
+                                        Verify
+                                    </a>
+                                {% endif %}
+
+                                <a
+                                    href="{% url 'ca:coa-approve' coa.pk %}"
+                                    class="btn btn-sm btn-success"
+                                >
+                                    Approve
+                                </a>
+                            {% endif %}
+
+                            <a
+                                href="{% url 'ca:coa-download' coa.pk %}"
+                                class="btn btn-sm btn-secondary"
+                            >
+                                Download
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="empty-state">
+                        <strong>No certificates of analysis found</strong>
+                        <p>
+                            Certificates will appear here once chemical analyses
+                            are completed and CoAs are generated.
+                        </p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+</div>
+{% endblock %}

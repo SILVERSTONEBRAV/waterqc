@@ -1,0 +1,24 @@
+<div class="tab-pane fade" id="sectionsTab">
+
+    <div class="d-flex justify-content-between mb-2">
+        <button class="btn btn-primary edit-section">
+            <i class="fa fa-plus"></i> Add Section
+        </button>
+    </div>
+
+    <table class="table table-striped" id="sectionsTable">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Users</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for section in sections %}
+                {% include "accounts/partials/section_row.html" %}
+            {% endfor %}
+        </tbody>
+    </table>
+
+</div>

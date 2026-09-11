@@ -1,0 +1,385 @@
+<div
+    class="chart-widget-container"
+    x-data="chartWidget('{{ widget.key }}')"
+>
+
+    <div class="chart-toolbar">
+
+        <div class="chart-toolbar-left">
+
+            {% if widget.subtitle %}
+            <span class="chart-subtitle">
+                {{ widget.subtitle }}
+            </span>
+            {% endif %}
+
+            {% if widget.last_updated %}
+            <span class="chart-meta">
+                Updated:
+                {{ widget.last_updated }}
+            </span>
+            {% endif %}
+
+        </div>
+
+        <div class="chart-toolbar-right">
+
+            <button
+                class="icon-btn"
+                @click="toggleFullscreen"
+            >
+                <i class="fas fa-expand"></i>
+            </button>
+
+            <button
+                class="icon-btn"
+                @click="downloadPNG"
+            >
+                <i class="fas fa-image"></i>
+            </button>
+
+            <button
+                class="icon-btn"
+                @click="downloadSVG"
+            >
+                <i class="fas fa-vector-square"></i>
+            </button>
+
+            <button
+                class="icon-btn"
+                @click="reset"
+            >
+                <i class="fas fa-rotate-left"></i>
+            </button>
+
+        </div>
+
+    </div>
+
+    <div
+        id="chart-{{ widget.key }}"
+        class="dashboard-chart"
+
+        style="
+            width:100%;
+            min-height:
+            {{ widget.chart_height|default:'450px' }};
+        "
+    ></div>
+
+</div>
+
+<script>
+(function () {
+
+    const chartId =
+        "chart-{{ widget.key }}";
+
+    const el =
+        document.getElementById(
+            chartId
+        );
+
+    if (!el) return;
+
+    const data =
+        {{ widget.chart_data|default:"[]"|safe }};
+
+    const layout =
+        Object.assign(
+            {
+                autosize: true,
+                paper_bgcolor: "transparent",
+                plot_bgcolor: "transparent",
+                hovermode: "x unified",
+                dragmode: "zoom",
+                margin: {
+                    l: 50,
+                    r: 30,
+                    t: 40,
+                    b: 50
+                },
+                font: {
+                    color:
+                        getComputedStyle(
+                            document.documentElement
+                        ).getPropertyValue(
+                            "--theme-text"
+                        )
+                }
+            },
+            {{ widget.chart_layout|default:"{}"|safe }}
+        );
+
+    const config = Object.assign(
+        {
+            responsive: true,
+            displaylogo: false,
+            editable: true,
+            scrollZoom: true,
+            doubleClick: "reset",
+
+            modeBarButtonsToAdd: [
+
+                "drawline",
+                "drawopenpath",
+                "drawclosedpath",
+                "drawcircle",
+                "drawrect",
+                "eraseshape",
+
+                {
+                    name:
+                        "Download CSV",
+
+                    icon:
+                        Plotly.Icons.disk,
+
+                    click:
+                        function () {
+                            exportCSV();
+                        }
+                }
+            ],
+
+            toImageButtonOptions: {
+                format: "png",
+                filename:
+                    "{{ widget.key }}",
+                scale: 3
+            }
+        },
+        {{ widget.chart_config|default:"{}"|safe }}
+    );
+
+    if (el.data) {
+        Plotly.react(
+            chartId,
+            data,
+            layout,
+            config
+        );
+    } else {
+        Plotly.newPlot(
+            chartId,
+            data,
+            layout,
+            config
+        );
+    }
+
+    {% if widget.streaming %}
+    const eventSource =
+        new EventSource(
+            "{{ widget.stream_url }}"
+        );
+
+    eventSource.onmessage =
+        function (event) {
+
+            const payload =
+                JSON.parse(
+                    event.data
+                );
+
+            Plotly.extendTraces(
+                chartId,
+                payload.data,
+                payload.traces,
+                payload.max_points || 500
+            );
+        };
+    {% endif %}
+
+    {% if widget.drilldown_url %}
+    el.on(
+        "plotly_click",
+        function (event) {
+
+            if (
+                !event.points.length
+            ) {
+                return;
+            }
+
+            const point =
+                event.points[0];
+
+            const url =
+                "{{ widget.drilldown_url }}"
+                + "?label="
+                + encodeURIComponent(
+                    point.label
+                    || point.x
+                    || point.y
+                );
+
+            window.location.href =
+                url;
+        }
+    );
+    {% endif %}
+
+    {% if widget.selection_url %}
+    el.on(
+        "plotly_selected",
+        function (event) {
+
+            if (!event) {
+                return;
+            }
+
+            const payload =
+                event.points.map(
+                    p => ({
+                        x: p.x,
+                        y: p.y,
+                        label:
+                            p.label
+                    })
+                );
+
+            fetch(
+                "{{ widget.selection_url }}",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+                        "X-CSRFToken":
+                            "{{ csrf_token }}"
+                    },
+                    body:
+                        JSON.stringify(
+                            payload
+                        )
+                }
+            );
+        }
+    );
+    {% endif %}
+
+    function exportCSV() {
+
+        const rows = [];
+
+        data.forEach(trace => {
+
+            const x =
+                trace.x || [];
+
+            const y =
+                trace.y || [];
+
+            for (
+                let i = 0;
+                i < x.length;
+                i++
+            ) {
+                rows.push([
+                    x[i],
+                    y[i]
+                ]);
+            }
+        });
+
+        const csv =
+            rows
+            .map(
+                r => r.join(",")
+            )
+            .join("\n");
+
+        const blob =
+            new Blob(
+                [csv],
+                {
+                    type:
+                        "text/csv"
+                }
+            );
+
+        const a =
+            document.createElement(
+                "a"
+            );
+
+        a.href =
+            URL.createObjectURL(
+                blob
+            );
+
+        a.download =
+            "{{ widget.key }}.csv";
+
+        a.click();
+    }
+
+})();
+</script>
+
+<script>
+function chartWidget(id) {
+
+    return {
+
+        toggleFullscreen() {
+
+            const card =
+                document
+                .getElementById(
+                    "chart-" + id
+                )
+                .closest(
+                    ".dashboard-widget"
+                );
+
+            card.classList.toggle(
+                "widget-fullscreen"
+            );
+
+            setTimeout(
+                () =>
+                    Plotly.Plots.resize(
+                        document.getElementById(
+                            "chart-" + id
+                        )
+                    ),
+                300
+            );
+        },
+
+        downloadPNG() {
+            Plotly.downloadImage(
+                "chart-" + id,
+                {
+                    format: "png",
+                    filename: id
+                }
+            );
+        },
+
+        downloadSVG() {
+            Plotly.downloadImage(
+                "chart-" + id,
+                {
+                    format: "svg",
+                    filename: id
+                }
+            );
+        },
+
+        reset() {
+            Plotly.relayout(
+                "chart-" + id,
+                {
+                    "xaxis.autorange":
+                        true,
+                    "yaxis.autorange":
+                        true
+                }
+            );
+        }
+    };
+}
+</script>

@@ -1,0 +1,72 @@
+<div class="card widget-card">
+
+    <div class="card-header">
+        IP Restrictions
+    </div>
+
+    <div class="card-body table-responsive">
+
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>IP Address</th>
+                    <th>Type</th>
+                    <th>Reason</th>
+                    <th>Created At</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for ip in ip_restrictions %}
+                <tr>
+
+                    <td>
+                        {{ ip.user.get_full_name|default:ip.user.username|default:"System" }}
+                    </td>
+
+                    <td>
+                        <code>{{ ip.ip_address }}</code>
+                    </td>
+
+                    <td>
+                        {% if ip.type == "allow" %}
+                            <span class="badge bg-success">Allow</span>
+                        {% elif ip.type == "block" %}
+                            <span class="badge bg-danger">Block</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Unknown</span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {{ ip.reason|default:"-" }}
+                    </td>
+
+                    <td>
+                        {{ ip.created_at|date:"d M Y H:i" }}
+                    </td>
+
+                    <td>
+                        {% if ip.is_active %}
+                            <span class="badge bg-primary">Active</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Inactive</span>
+                        {% endif %}
+                    </td>
+
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-muted">
+                        No IP restrictions configured.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+    </div>
+
+</div>

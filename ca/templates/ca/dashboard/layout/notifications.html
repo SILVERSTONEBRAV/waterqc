@@ -1,0 +1,54 @@
+<div class="ca-notification-wrapper" data-component="notifications">
+    <button
+        type="button"
+        class="ca-icon-button ca-notification-button"
+        data-action="toggle-notifications"
+        aria-label="Notifications"
+        aria-expanded="false"
+    >
+        <span class="ca-icon ca-icon-bell"></span>
+
+        {% if notification_count %}
+            <span class="ca-notification-count">
+                {{ notification_count }}
+            </span>
+        {% endif %}
+    </button>
+
+    <div class="ca-notification-panel" hidden>
+        <div class="ca-panel-header">
+            <div>
+                <strong>Notifications</strong>
+                <small>Recent workflow events</small>
+            </div>
+
+            <button type="button" data-action="mark-notifications-read">
+                Mark all read
+            </button>
+        </div>
+
+        <div class="ca-notification-list">
+            {% if notifications %}
+                {% for notification in notifications %}
+                    <a href="{{ notification.url|default:'#' }}" class="ca-notification-item">
+                        <span class="ca-notification-icon">
+                            <span class="ca-icon ca-icon-info"></span>
+                        </span>
+
+                        <span class="ca-notification-content">
+                            <strong>{{ notification.title }}</strong>
+                            <small>{{ notification.message }}</small>
+                            <time>{{ notification.created_at }}</time>
+                        </span>
+                    </a>
+                {% endfor %}
+            {% else %}
+                <div class="ca-empty-notifications">
+                    <span class="ca-icon ca-icon-bell-off"></span>
+                    <strong>No new notifications</strong>
+                    <span>You're all caught up.</span>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>

@@ -1,0 +1,41 @@
+.profile-card {
+    max-width: 600px;
+    margin: auto;
+    padding: 20px;
+    border-radius: 12px;
+    background: #f9fafb;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+.avatar {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid #6366f1;
+}
+.profile-fields {
+    list-style: none;
+    padding: 0;
+}
+.profile-fields li {
+    margin: 8px 0;
+}
+.user-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.user-table th, .user-table td {
+    padding: 8px;
+    border: 1px solid #ddd;
+}
+.btn {
+    display: inline-block;
+    margin: 6px 4px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    text-decoration: none;
+}
+.btn-primary { background: #6366f1; color: #fff; }
+.btn-danger { background: #dc2626; color: #fff; }
+.btn-success { background: #16a34a; color: #fff; }
+.btn-light { background: #e5e7eb; color: #111; }

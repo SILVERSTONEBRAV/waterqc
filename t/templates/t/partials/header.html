@@ -1,0 +1,30 @@
+<header class="navbar navbar-light bg-white shadow-sm px-3">
+
+    <div class="d-flex align-items-center w-100">
+
+        <!-- Sidebar toggle placeholder -->
+        <button class="btn btn-sm btn-outline-secondary me-3" id="sidebarToggle">
+            <i class="fas fa-bars"></i>
+        </button>
+
+        <!-- App title -->
+        <div class="fw-bold">
+            Treatment Plant System
+        </div>
+
+        <!-- right side -->
+        <div class="ms-auto d-flex align-items-center gap-3">
+
+            <span class="text-muted small">
+                {{ request.user.username }}
+            </span>
+
+            <a href="{% url 'logout' %}" class="btn btn-sm btn-danger">
+                Logout
+            </a>
+
+        </div>
+
+    </div>
+
+</header>

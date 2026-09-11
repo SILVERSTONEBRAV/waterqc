@@ -1,0 +1,35 @@
+<div class="sticky-top bg-white border-bottom p-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
+
+    <input type="search" id="table-search"
+           class="form-control form-control-sm"
+           placeholder="Search..."
+           style="max-width:260px;">
+
+    <div class="d-flex gap-2 flex-wrap">
+
+        <select id="sort-select" class="form-select form-select-sm" style="width:180px;">
+            <option value="">Sort</option>
+            {% for field in fields %}
+                <option value="{{ field.name }}">{{ field.verbose }}</option>
+            {% endfor %}
+        </select>
+
+        <div class="dropdown">
+            <button class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+                ⬇ Export
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item export" data-type="csv">CSV</a></li>
+                <li><a class="dropdown-item export" data-type="xlsx">Excel</a></li>
+                <li><a class="dropdown-item export" data-type="pdf">PDF</a></li>
+                <li><a class="dropdown-item export" data-type="json">JSON</a></li>
+                <li><a class="dropdown-item export" data-type="docx">Word</a></li>
+            </ul>
+        </div>
+
+        <button id="add-btn" class="btn btn-primary btn-sm">＋ New</button>
+        <button id="save-all" class="btn btn-success btn-sm">💾 Save All</button>
+        <button id="bulk-delete-btn" class="btn btn-danger btn-sm">🗑 Bulk</button>
+
+    </div>
+</div>

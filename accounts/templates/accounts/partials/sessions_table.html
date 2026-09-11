@@ -1,0 +1,140 @@
+{% load static %}
+
+<div class="card shadow-sm border-0 rounded-4">
+
+    <div class="card-header bg-white border-bottom py-3">
+
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+
+            <div>
+                <h5 class="mb-1 fw-bold">
+                    <i class="fa fa-clock text-primary me-2"></i>
+                    Active Sessions
+                </h5>
+
+                <small class="text-muted">
+                    Currently active authenticated sessions.
+                </small>
+            </div>
+
+            <div class="badge bg-primary fs-6">
+                {{ sessions|length }} Sessions
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="card-body">
+
+        {% if sessions %}
+
+        <div class="table-responsive">
+
+            <table class="table table-hover align-middle">
+
+                <thead class="table-light">
+
+                    <tr>
+                        <th width="80">#</th>
+                        <th>Session Key</th>
+                        <th>Expires</th>
+                        <th>Status</th>
+                        <th>Remaining</th>
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    {% for session in sessions %}
+
+                    <tr>
+
+                        <td>
+                            {{ forloop.counter }}
+                        </td>
+
+                        <td>
+
+                            <code class="small">
+                                {{ session.session_key|truncatechars:32 }}
+                            </code>
+
+                        </td>
+
+                        <td>
+                            {{ session.expire_date|date:"d M Y H:i:s" }}
+                        </td>
+
+                        <td>
+
+                            {% if session.expire_date > now %}
+                                <span class="badge bg-success">
+                                    Active
+                                </span>
+                            {% else %}
+                                <span class="badge bg-danger">
+                                    Expired
+                                </span>
+                            {% endif %}
+
+                        </td>
+
+                        <td>
+
+                            {% if session.expire_date > now %}
+                                {{ session.expire_date|timeuntil }}
+                            {% else %}
+                                —
+                            {% endif %}
+
+                        </td>
+
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+                <tfoot class="table-light">
+
+                    <tr>
+                        <th colspan="4">
+                            Total Active Sessions
+                        </th>
+                        <th>
+                            {{ sessions|length }}
+                        </th>
+                    </tr>
+
+                </tfoot>
+
+            </table>
+
+        </div>
+
+        {% else %}
+
+        <div class="text-center py-5">
+
+            <i
+                class="fa fa-clock text-muted mb-3"
+                style="font-size:4rem;"
+            ></i>
+
+            <h4 class="text-muted">
+                No Active Sessions
+            </h4>
+
+            <p class="text-muted mb-0">
+                There are currently no active authenticated sessions.
+            </p>
+
+        </div>
+
+        {% endif %}
+
+    </div>
+
+</div>

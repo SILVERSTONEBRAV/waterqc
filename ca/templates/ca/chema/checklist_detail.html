@@ -1,0 +1,336 @@
+{% extends "ca/dashboard/layout/app.html" %}
+
+{% block title %}Receiving Checklist{% endblock %}
+
+{% block content %}
+
+<div class="ca-page">
+
+    <div class="page-header">
+        <div>
+            <h1>Receiving Checklist</h1>
+            <p>Review chemical batch receiving and inspection details.</p>
+        </div>
+
+        <div class="page-actions">
+            <a
+                href="{% url 'ca:checklist-list' %}"
+                class="btn btn-secondary"
+            >
+                Back to Checklists
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+
+        <div class="card-header">
+            <div>
+                <h2>Checklist #{{ checklist.pk }}</h2>
+
+                {% if checklist.status == "COMPLETED" %}
+                    <span class="badge badge-success">
+                        Completed
+                    </span>
+                {% elif checklist.status == "REOPENED" %}
+                    <span class="badge badge-warning">
+                        Reopened
+                    </span>
+                {% elif checklist.status == "PENDING" %}
+                    <span class="badge badge-info">
+                        Pending
+                    </span>
+                {% elif checklist.status %}
+                    <span class="badge">
+                        {{ checklist.get_status_display|default:checklist.status }}
+                    </span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card-body">
+
+            <div class="details-grid">
+
+                <div class="detail-item">
+                    <span class="detail-label">Checklist ID</span>
+                    <span class="detail-value">
+                        {{ checklist.pk|default:"—" }}
+                    </span>
+                </div>
+
+                <div class="detail-item">
+                    <span class="detail-label">Status</span>
+                    <span class="detail-value">
+                        {% if checklist.status %}
+                            {{ checklist.get_status_display|default:checklist.status }}
+                        {% else %}
+                            Pending
+                        {% endif %}
+                    </span>
+                </div>
+
+                <div class="detail-item">
+                    <span class="detail-label">Batch</span>
+                    <span class="detail-value">
+
+                        {% if checklist.batch %}
+
+                            <a
+                                href="{% url 'ca:batch-detail' checklist.batch.pk %}"
+                            >
+                                {{ checklist.batch }}
+                            </a>
+
+                        {% elif checklist.process %}
+
+                            {% if checklist.process.batch %}
+
+                                <a
+                                    href="{% url 'ca:batch-detail' checklist.process.batch.pk %}"
+                                >
+                                    {{ checklist.process.batch }}
+                                </a>
+
+                            {% else %}
+                                —
+                            {% endif %}
+
+                        {% else %}
+                            —
+                        {% endif %}
+
+                    </span>
+                </div>
+
+                <div class="detail-item">
+                    <span class="detail-label">Process</span>
+                    <span class="detail-value">
+
+                        {% if checklist.process %}
+
+                            <a
+                                href="{% url 'ca:process-detail' checklist.process.pk %}"
+                            >
+                                {{ checklist.process.sample_id|default:checklist.process }}
+                            </a>
+
+                        {% else %}
+                            —
+                        {% endif %}
+
+                    </span>
+                </div>
+
+                <div class="detail-item">
+                    <span class="detail-label">Completed By</span>
+                    <span class="detail-value">
+
+                        {% if checklist.completed_by %}
+
+                            {{ checklist.completed_by.get_full_name|default:checklist.completed_by.username }}
+
+                        {% elif checklist.completed_by_user %}
+
+                            {{ checklist.completed_by_user.get_full_name|default:checklist.completed_by_user.username }}
+
+                        {% else %}
+
+                            —
+
+                        {% endif %}
+
+                    </span>
+                </div>
+
+                <div class="detail-item">
+                    <span class="detail-label">Completed At</span>
+                    <span class="detail-value">
+
+                        {% if checklist.completed_at %}
+                            {{ checklist.completed_at|date:"d M Y H:i" }}
+                        {% else %}
+                            —
+                        {% endif %}
+
+                    </span>
+                </div>
+
+                <div class="detail-item">
+                    <span class="detail-label">Created</span>
+                    <span class="detail-value">
+
+                        {% if checklist.created_at %}
+                            {{ checklist.created_at|date:"d M Y H:i" }}
+                        {% else %}
+                            —
+                        {% endif %}
+
+                    </span>
+                </div>
+
+                <div class="detail-item">
+                    <span class="detail-label">Updated</span>
+                    <span class="detail-value">
+
+                        {% if checklist.updated_at %}
+                            {{ checklist.updated_at|date:"d M Y H:i" }}
+                        {% else %}
+                            —
+                        {% endif %}
+
+                    </span>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    {% if checklist.items.all %}
+
+        <div class="card">
+
+            <div class="card-header">
+                <div>
+                    <h2>Checklist Items</h2>
+                    <p>
+                        Receiving inspection and verification results.
+                    </p>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+
+                <table class="table">
+
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Requirement</th>
+                            <th>Result</th>
+                            <th>Remarks</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        {% for item in checklist.items.all %}
+
+                            <tr>
+
+                                <td>
+                                    {% if item.name %}
+                                        {{ item.name }}
+                                    {% elif item.item %}
+                                        {{ item.item }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+
+                                <td>
+                                    {{ item.requirement|default:"—" }}
+                                </td>
+
+                                <td>
+
+                                    {% if item.passed %}
+
+                                        <span class="badge badge-success">
+                                            Pass
+                                        </span>
+
+                                    {% elif item.failed %}
+
+                                        <span class="badge badge-danger">
+                                            Fail
+                                        </span>
+
+                                    {% elif item.result %}
+
+                                        {{ item.result }}
+
+                                    {% else %}
+
+                                        —
+
+                                    {% endif %}
+
+                                </td>
+
+                                <td>
+                                    {{ item.remarks|default:"—" }}
+                                </td>
+
+                            </tr>
+
+                        {% empty %}
+
+                            <tr>
+                                <td colspan="4" class="empty-state">
+                                    No checklist items recorded.
+                                </td>
+                            </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    {% endif %}
+
+    {% if checklist.remarks %}
+
+        <div class="card">
+
+            <div class="card-header">
+                <h2>Remarks</h2>
+            </div>
+
+            <div class="card-body">
+                <p>{{ checklist.remarks }}</p>
+            </div>
+
+        </div>
+
+    {% endif %}
+
+    <div class="page-actions">
+
+        {% if checklist.process %}
+            <a
+                href="{% url 'ca:process-detail' checklist.process.pk %}"
+                class="btn btn-primary"
+            >
+                View Process
+            </a>
+        {% endif %}
+
+        {% if checklist.status == "COMPLETED" %}
+            <a
+                href="{% url 'ca:checklist-reopen' checklist.pk %}"
+                class="btn btn-warning"
+            >
+                Reopen Checklist
+            </a>
+        {% endif %}
+
+        <a
+            href="{% url 'ca:checklist-list' %}"
+            class="btn btn-secondary"
+        >
+            Back to List
+        </a>
+
+    </div>
+
+</div>
+
+{% endblock %}

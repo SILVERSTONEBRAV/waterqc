@@ -1,0 +1,197 @@
+<div
+    id="widget-{{ widget.key }}"
+    class="
+        dashboard-widget
+        widget-type-{{ widget.widget_type|default:'generic' }}
+        {% if widget.realtime %}widget-live{% endif %}
+    "
+
+    {% if widget.refresh_interval %}
+    hx-get="{{ widget.url }}"
+    hx-trigger="every {{ widget.refresh_interval }}s"
+    hx-target="#widget-{{ widget.key }}"
+    hx-swap="outerHTML"
+    {% endif %}
+
+    x-data="{
+        loading:false,
+        fullscreen:false,
+        collapsed:false
+    }"
+>
+
+    <header class="widget-header">
+
+        <div class="widget-heading">
+
+            {% if widget.icon %}
+            <div class="widget-icon">
+                <i class="{{ widget.icon }}"></i>
+            </div>
+            {% endif %}
+
+            <div>
+
+                <h3>
+                    {{ widget.title }}
+                </h3>
+
+                {% if widget.description %}
+                <p>
+                    {{ widget.description }}
+                </p>
+                {% endif %}
+
+            </div>
+
+        </div>
+
+        <div class="widget-actions">
+
+            {% if widget.realtime %}
+            <span class="widget-live-badge">
+                <span class="live-dot"></span>
+                LIVE
+            </span>
+            {% endif %}
+
+            <button
+                class="icon-btn"
+                title="Refresh"
+                hx-get="{{ widget.url }}"
+                hx-target="#widget-{{ widget.key }}"
+                hx-swap="outerHTML"
+            >
+                <i class="fas fa-rotate"></i>
+            </button>
+
+            <button
+                class="icon-btn"
+                title="Fullscreen"
+                @click="
+                    fullscreen=!fullscreen;
+                    $el.closest('.dashboard-widget')
+                        .classList.toggle(
+                            'widget-fullscreen'
+                        );
+                "
+            >
+                <i class="fas fa-expand"></i>
+            </button>
+
+            <button
+                class="icon-btn"
+                title="Collapse"
+                @click="collapsed=!collapsed"
+            >
+                <i class="fas fa-minus"></i>
+            </button>
+
+            <button
+                class="icon-btn"
+                title="Settings"
+            >
+                <i class="fas fa-cog"></i>
+            </button>
+
+            <button
+                class="icon-btn"
+                title="More"
+            >
+                <i class="fas fa-ellipsis-v"></i>
+            </button>
+
+        </div>
+
+    </header>
+
+    <div
+        class="widget-loading"
+        x-show="loading"
+    >
+        <div class="widget-spinner"></div>
+        <span>Updating widget...</span>
+    </div>
+
+    <section
+        class="widget-body"
+        x-show="!collapsed"
+    >
+
+        {% if widget.template %}
+            {% include widget.template %}
+        {% elif widget.type == "chart" %}
+            {% include "dashboards/components/chart.html" %}
+        {% elif widget.type == "kpi" %}
+            {% include "dashboards/components/kpi.html" %}
+        {% elif widget.type == "table" %}
+            {% include "dashboards/components/table.html" %}
+        {% elif widget.type == "map" %}
+            {% include "dashboards/components/map.html" %}
+        {% elif widget.type == "gauge" %}
+            {% include "dashboards/components/gauge.html" %}
+        {% elif widget.type == "timeline" %}
+            {% include "dashboards/components/timeline.html" %}
+        {% elif widget.type == "metric-grid" %}
+            {% include "dashboards/components/metric_grid.html" %}
+        {% elif widget.type == "forecast" %}
+            {% include "dashboards/components/forecast.html" %}
+        {% elif widget.type == "heatmap" %}
+            {% include "dashboards/components/heatmap.html" %}
+        {% elif widget.type == "network" %}
+            {% include "dashboards/components/network.html" %}
+        {% elif widget.type == "treemap" %}
+            {% include "dashboards/components/treemap.html" %}
+        {% elif widget.type == "sankey" %}
+            {% include "dashboards/components/sankey.html" %}
+        {% elif widget.type == "calendar" %}
+            {% include "dashboards/components/calendar.html" %}
+        {% else %}
+            {{ widget.content|safe }}
+        {% endif %}
+
+    </section>
+
+    <footer class="widget-footer">
+
+        <div class="widget-meta">
+
+            {% if widget.owner %}
+            <span>
+                <i class="fas fa-user"></i>
+                {{ widget.owner }}
+            </span>
+            {% endif %}
+
+            {% if widget.updated_at %}
+            <span>
+                <i class="fas fa-clock"></i>
+                {{ widget.updated_at }}
+            </span>
+            {% endif %}
+
+            {% if widget.datasource %}
+            <span>
+                <i class="fas fa-database"></i>
+                {{ widget.datasource }}
+            </span>
+            {% endif %}
+
+        </div>
+
+        <div class="widget-status">
+
+            <span class="status-dot"></span>
+
+            {% if widget.refresh_interval %}
+                Updates every
+                {{ widget.refresh_interval }}s
+            {% else %}
+                Static
+            {% endif %}
+
+        </div>
+
+    </footer>
+
+</div>

@@ -1,0 +1,142 @@
+{# templates/accounts/partials/user_sessions_table.html #}
+
+<div class="card border-0 shadow-sm rounded-4">
+
+    <div class="card-header bg-white border-0 py-3">
+
+        <div class="d-flex justify-content-between align-items-center">
+
+            <div>
+                <h5 class="fw-bold mb-1">
+                    User Sessions
+                </h5>
+                <small class="text-muted">
+                    Active and historical authenticated user sessions.
+                </small>
+            </div>
+
+            <span class="badge bg-primary fs-6">
+                {{ user_sessions|length }} Session{{ user_sessions|length|pluralize }}
+            </span>
+
+        </div>
+
+    </div>
+
+    <div class="card-body">
+
+        {% if user_sessions %}
+
+            <div class="table-responsive">
+
+                <table class="table table-hover align-middle">
+
+                    <thead class="table-light">
+
+                        <tr>
+                            <th>#</th>
+                            <th>User</th>
+                            <th>IP Address</th>
+                            <th>Device</th>
+                            <th>Browser</th>
+                            <th>Operating System</th>
+                            <th>Login Time</th>
+                            <th>Last Activity</th>
+                            <th>Status</th>
+                        </tr>
+
+                    </thead>
+
+                    <tbody>
+
+                        {% for session in user_sessions %}
+
+                            <tr>
+
+                                <td>
+                                    {{ forloop.counter }}
+                                </td>
+
+                                <td>
+
+                                    <div class="fw-semibold">
+                                        {{ session.user.get_full_name|default:session.user.username }}
+                                    </div>
+
+                                    <small class="text-muted">
+                                        {{ session.user.username }}
+                                    </small>
+
+                                </td>
+
+                                <td>
+                                    <code>
+                                        {{ session.ip_address|default:"-" }}
+                                    </code>
+                                </td>
+
+                                <td>
+                                    {{ session.device|default:"Unknown" }}
+                                </td>
+
+                                <td>
+                                    {{ session.browser|default:"Unknown" }}
+                                </td>
+
+                                <td>
+                                    {{ session.operating_system|default:"Unknown" }}
+                                </td>
+
+                                <td>
+                                    {{ session.created_at|date:"d M Y H:i" }}
+                                </td>
+
+                                <td>
+                                    {{ session.last_activity|date:"d M Y H:i"|default:"-" }}
+                                </td>
+
+                                <td>
+
+                                    {% if session.is_active %}
+                                        <span class="badge bg-success">
+                                            Active
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">
+                                            Expired
+                                        </span>
+                                    {% endif %}
+
+                                </td>
+
+                            </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        {% else %}
+
+            <div class="text-center py-5">
+
+                <i class="fa-solid fa-desktop fa-3x text-muted mb-3"></i>
+
+                <h5 class="text-muted">
+                    No User Sessions Found
+                </h5>
+
+                <p class="text-muted mb-0">
+                    There are currently no tracked user sessions.
+                </p>
+
+            </div>
+
+        {% endif %}
+
+    </div>
+
+</div>

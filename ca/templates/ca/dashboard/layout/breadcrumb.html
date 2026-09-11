@@ -1,0 +1,8 @@
+<nav class="ca-breadcrumb" aria-label="Breadcrumb">
+    <a href="{% url 'ca:dashboard' %}">Dashboard</a>
+
+    {% block breadcrumb %}
+        <span class="ca-breadcrumb-separator">/</span>
+        <span class="ca-breadcrumb-current">Chemical Analysis</span>
+    {% endblock %}
+</nav>

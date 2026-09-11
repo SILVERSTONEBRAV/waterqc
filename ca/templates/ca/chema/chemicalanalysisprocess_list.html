@@ -1,0 +1,126 @@
+{% extends "ca/dashboard/layout/app.html" %}
+
+{% block title %}Pending QA Reviews{% endblock %}
+
+{% block content %}
+
+<div class="ca-page">
+
+<div class="page-header">
+    <div>
+        <h1>Pending QA Reviews</h1>
+        <p>Review chemical analysis processes awaiting quality assurance review.</p>
+    </div>
+
+    <div class="page-actions">
+        <a href="{% url 'ca:dashboard' %}" class="btn btn-secondary">
+            Dashboard
+        </a>
+    </div>
+</div>
+
+<div class="card">
+
+    <div class="card-header">
+        <div>
+            <h2>QA Review Queue</h2>
+            <span>
+                {{ processes|length }}
+                process{{ processes|length|pluralize }}
+            </span>
+        </div>
+    </div>
+
+    {% if processes %}
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Batch</th>
+                        <th>Request</th>
+                        <th>Analyst</th>
+                        <th>Updated</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for process in processes %}
+                    <tr>
+
+                        <td>
+                            {% if process.batch %}
+                                {% if process.batch.pk %}
+                                    <a href="{% url 'ca:batch-detail' process.batch.pk %}">
+                                        {{ process.batch.sample_id|default:process.batch }}
+                                    </a>
+                                {% else %}
+                                    {{ process.batch }}
+                                {% endif %}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if process.analysis_request %}
+                                {% if process.analysis_request.pk %}
+                                    <a href="{% url 'ca:request-detail' process.analysis_request.pk %}">
+                                        {{ process.analysis_request.request_id|default:process.analysis_request }}
+                                    </a>
+                                {% else %}
+                                    {{ process.analysis_request }}
+                                {% endif %}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if process.assigned_analyst %}
+                                {{ process.assigned_analyst.get_full_name|default:process.assigned_analyst.username }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if process.updated_at %}
+                                {{ process.updated_at|date:"d M Y H:i" }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if process.pk %}
+                                <a
+                                    href="{% url 'ca:process-detail' process.pk %}"
+                                    class="btn btn-sm btn-primary"
+                                >
+                                    Review
+                                </a>
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+    {% else %}
+
+        <div class="card-body">
+            <p>No pending QA reviews.</p>
+        </div>
+
+    {% endif %}
+
+</div>
+
+</div>
+
+{% endblock %}

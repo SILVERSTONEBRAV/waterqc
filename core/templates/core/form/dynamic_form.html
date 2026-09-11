@@ -1,0 +1,624 @@
+{% load custom_filters %}
+
+<form
+    method="post"
+    enctype="multipart/form-data"
+    hx-encoding="multipart/form-data"
+    hx-post="{{ form_action }}"
+    hx-target="this"
+    hx-swap="outerHTML"
+    hx-indicator="#form-loader"
+    hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}'
+    class="dynamic-form"
+>
+
+{% csrf_token %}
+
+{# ================= HIDDEN FIELDS ================= #}
+{% for hidden in form.hidden_fields %}
+    {{ hidden }}
+{% endfor %}
+
+{# ================= NON FIELD ERRORS ================= #}
+{% if form.non_field_errors %}
+<div class="form-errors">
+    {{ form.non_field_errors }}
+</div>
+{% endif %}
+
+{# ================= HEADER ================= #}
+<div class="form-header">
+
+    <div class="form-title">
+        {% if action == "update" %}
+            ✏️ Edit {{ entry.meta.verbose_name|capfirst }}
+        {% else %}
+            ➕ Add New {{ entry.meta.verbose_name|capfirst }}
+        {% endif %}
+    </div>
+
+</div>
+
+{# ================= GRID ================= #}
+<div class="form-grid">
+
+{% for field in form.visible_fields %}
+
+    {# SAFE widget resolution (NO dot access on dashed keys) #}
+    {% with widget=field.field.widget.attrs|get_item:"data-widget"|fallback:"text" %}
+
+    <div
+        class="form-group {% if field.errors %}has-errors{% endif %}"
+        data-field="{{ field.name }}"
+        data-widget="{{ widget }}"
+    >
+
+        {# ================= LABEL ================= #}
+        <label class="form-label" for="{{ field.id_for_label }}">
+            <span>
+                {{ field.label }}
+                {% if field.field.required %}
+                    <span class="req">*</span>
+                {% endif %}
+            </span>
+
+            <span class="badge">{{ widget }}</span>
+        </label>
+
+        {# ================= FIELD ================= #}
+        <div class="field-wrapper">
+
+            {# ===== FILE / IMAGE ===== #}
+            {% if field.field.widget.input_type == "file" or widget == "file-upload" or widget == "image-upload" %}
+
+                {{ field }}
+
+                {% if field.value %}
+                    <div class="file-preview">
+
+                        {% if widget == "image-upload" %}
+                            <img src="{{ field.value.url }}" class="preview-image">
+                        {% else %}
+                            <a href="{{ field.value.url }}" target="_blank">
+                                Current file
+                            </a>
+                        {% endif %}
+
+                    </div>
+                {% endif %}
+
+            {# ===== BOOLEAN ===== #}
+            {% elif field.field.widget.input_type == "checkbox" or widget == "toggle" %}
+
+                <div class="toggle-wrapper">
+                    {{ field }}
+                </div>
+
+            {# ===== JSON EDITOR ===== #}
+            {% elif widget == "json-editor" %}
+
+                <textarea
+                    name="{{ field.name }}"
+                    class="input-control json-editor"
+                    rows="7"
+                >{{ field.value|default:'' }}</textarea>
+
+            {# ===== DATE / TIME ===== #}
+            {% elif field.field.widget.input_type == "date"
+                or field.field.widget.input_type == "datetime-local"
+                or field.field.widget.input_type == "time" %}
+
+                {{ field }}
+
+            {# ===== TEXTAREA ===== #}
+            {% elif field.field.widget.input_type == "textarea" %}
+
+                {{ field }}
+
+            {# ===== SELECT / FK / M2M ===== #}
+            {% elif field.field.queryset %}
+
+                {{ field }}
+
+            {# ===== DEFAULT ===== #}
+            {% else %}
+
+                {{ field }}
+
+            {% endif %}
+
+        </div>
+
+        {# ================= HELP TEXT ================= #}
+        {% if field.help_text %}
+            <div class="help-text">
+                {{ field.help_text|safe }}
+            </div>
+        {% endif %}
+
+        {# ================= ERRORS ================= #}
+        {% if field.errors %}
+            <div class="field-errors">
+                {{ field.errors }}
+            </div>
+        {% endif %}
+
+    </div>
+
+    {% endwith %}
+
+{% endfor %}
+
+</div>
+
+{# ================= ACTIONS ================= #}
+<div class="form-actions">
+
+    <button class="btn-primary" type="submit">
+        {% if action == "update" %}
+            💾 Save Changes
+        {% else %}
+            ➕ Create Record
+        {% endif %}
+    </button>
+
+    <button type="reset" class="btn-ghost">
+        Reset
+    </button>
+
+</div>
+
+</form>
+
+<style>
+:root {
+    --bg0: #eef6ff;
+    --bg1: #f7fbff;
+
+    --glass: rgba(255,255,255,.72);
+    --glass-strong: rgba(255,255,255,.88);
+
+    --stroke: rgba(59,130,246,.18);
+    --stroke-hover: rgba(34,211,238,.35);
+
+    --blue: #3b82f6;
+    --cyan: #22d3ee;
+    --violet: #a78bfa;
+
+    --text: #0f172a;
+    --muted: #64748b;
+
+    --radius-lg: 22px;
+    --radius-md: 18px;
+    --radius-sm: 14px;
+
+    --ease-fluid: cubic-bezier(.22,1,.36,1);
+}
+
+/* ======================================================
+   FORM CONTAINER
+====================================================== */
+
+.dynamic-form {
+    position: relative;
+    z-index: 1;
+
+    padding: 1.5rem;
+    border-radius: var(--radius-lg);
+
+    overflow-x: hidden;
+    overflow-y: visible;
+    isolation: isolate;
+
+    background:
+        radial-gradient(1000px 700px at 10% 0%, #ffffff, transparent),
+        linear-gradient(180deg, var(--bg0), var(--bg1));
+
+    border: 1px solid var(--stroke);
+
+    box-shadow:
+        0 25px 70px rgba(59,130,246,.10),
+        inset 0 1px 0 rgba(255,255,255,.95);
+
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+/* make sure decorations never block clicks */
+.dynamic-form::before,
+.dynamic-form::after,
+.form-group::before {
+    pointer-events: none;
+}
+
+/* keep content above decorative layers */
+.dynamic-form > * {
+    position: relative;
+    z-index: 2;
+}
+
+/* ======================================================
+   AURORA
+====================================================== */
+
+.dynamic-form::before {
+    content: "";
+    position: absolute;
+    inset: -20%;
+    z-index: 0;
+
+    background:
+        radial-gradient(circle at 20% 30%,
+            rgba(59,130,246,.20),
+            transparent 45%),
+
+        radial-gradient(circle at 80% 60%,
+            rgba(34,211,238,.18),
+            transparent 50%),
+
+        radial-gradient(circle at 50% 90%,
+            rgba(167,139,250,.16),
+            transparent 55%);
+
+    filter: blur(35px);
+    opacity: .7;
+
+    animation: auroraPan 90s linear infinite;
+}
+
+@keyframes auroraPan {
+    0% {
+        transform: translate3d(-3%, -2%, 0) scale(1.05);
+    }
+    50% {
+        transform: translate3d(4%, 3%, 0) scale(1.12);
+    }
+    100% {
+        transform: translate3d(-3%, -2%, 0) scale(1.05);
+    }
+}
+
+/* ======================================================
+   PARTICLES
+====================================================== */
+
+.dynamic-form::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+
+    background-image:
+        radial-gradient(circle at 20% 30%,
+            rgba(59,130,246,.08) 0 2px,
+            transparent 3px),
+
+        radial-gradient(circle at 70% 60%,
+            rgba(34,211,238,.08) 0 3px,
+            transparent 4px),
+
+        radial-gradient(circle at 40% 80%,
+            rgba(167,139,250,.08) 0 2px,
+            transparent 3px);
+
+    opacity: .45;
+
+    animation: particleDrift 120s linear infinite;
+}
+
+@keyframes particleDrift {
+    0% {
+        transform: translate(0,0);
+    }
+    50% {
+        transform: translate(20px,-10px);
+    }
+    100% {
+        transform: translate(0,0);
+    }
+}
+
+/* ======================================================
+   HEADER
+====================================================== */
+
+.form-header {
+    margin-bottom: 1.5rem;
+}
+
+.form-title {
+    font-size: 1.3rem;
+    font-weight: 800;
+
+    background:
+        linear-gradient(
+            90deg,
+            var(--blue),
+            var(--cyan),
+            var(--violet)
+        );
+
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.form-subtitle {
+    margin-top: .35rem;
+    color: var(--muted);
+    font-size: .85rem;
+}
+
+/* ======================================================
+   GRID
+====================================================== */
+
+.form-grid {
+    display: grid;
+    grid-template-columns:
+        repeat(auto-fit, minmax(260px,1fr));
+    gap: 1rem;
+}
+
+/* ======================================================
+   FIELD
+====================================================== */
+
+.form-group {
+    position: relative;
+
+    padding: 1rem;
+    border-radius: var(--radius-md);
+
+    background: var(--glass);
+
+    border: 1px solid var(--stroke);
+
+    transition:
+        transform .35s var(--ease-fluid),
+        border-color .35s ease,
+        box-shadow .35s ease;
+
+    box-shadow:
+        0 8px 20px rgba(59,130,246,.05),
+        inset 0 1px 0 rgba(255,255,255,.8);
+}
+
+.form-group:hover {
+    transform: translateY(-4px);
+
+    border-color: var(--stroke-hover);
+
+    box-shadow:
+        0 18px 35px rgba(59,130,246,.10);
+}
+
+/* light effect only on hover */
+.form-group::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+
+    opacity: 0;
+    transition: opacity .4s ease;
+
+    background:
+        linear-gradient(
+            120deg,
+            transparent,
+            rgba(255,255,255,.45),
+            transparent
+        );
+}
+
+.form-group:hover::before {
+    opacity: 1;
+}
+
+/* ======================================================
+   LABELS
+====================================================== */
+
+.form-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    gap: 1rem;
+
+    margin-bottom: .75rem;
+
+    font-size: .92rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.req {
+    color: #ef4444;
+}
+
+.badge {
+    flex-shrink: 0;
+
+    padding: .3rem .65rem;
+
+    border-radius: 999px;
+
+    font-size: .72rem;
+    font-weight: 600;
+
+    background: rgba(59,130,246,.10);
+    color: var(--blue);
+
+    border: 1px solid rgba(59,130,246,.20);
+}
+
+/* ======================================================
+   INPUTS
+====================================================== */
+
+.field-wrapper input,
+.field-wrapper select,
+.field-wrapper textarea {
+    width: 100%;
+    min-height: 48px;
+
+    padding: .85rem 1rem;
+
+    border-radius: var(--radius-sm);
+
+    border: 1px solid rgba(148,163,184,.25);
+
+    background: var(--glass-strong);
+
+    color: var(--text);
+    font-size: .95rem;
+
+    transition:
+        border-color .25s ease,
+        box-shadow .25s ease,
+        background .25s ease;
+
+    outline: none;
+}
+
+.field-wrapper textarea {
+    min-height: 120px;
+    resize: vertical;
+}
+
+.field-wrapper input:focus,
+.field-wrapper select:focus,
+.field-wrapper textarea:focus {
+    border-color: var(--blue);
+
+    box-shadow:
+        0 0 0 4px rgba(59,130,246,.12);
+
+    background: #fff;
+}
+
+/* ======================================================
+   FILE PREVIEW
+====================================================== */
+
+.file-preview {
+    margin-top: .75rem;
+}
+
+.preview-image {
+    max-width: 140px;
+    border-radius: 12px;
+    display: block;
+}
+
+/* ======================================================
+   HELP / ERRORS
+====================================================== */
+
+.help-text {
+    margin-top: .5rem;
+    color: var(--muted);
+    font-size: .8rem;
+}
+
+.field-errors,
+.form-errors {
+    margin-top: .6rem;
+    color: #dc2626;
+    font-size: .85rem;
+}
+
+.has-errors {
+    border-color: rgba(220,38,38,.35);
+}
+
+/* ======================================================
+   ACTIONS
+====================================================== */
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: .75rem;
+    margin-top: 1.5rem;
+}
+
+/* ======================================================
+   BUTTONS
+====================================================== */
+
+.btn-primary,
+.btn-ghost {
+    position: relative;
+    z-index: 5;
+
+    padding: .9rem 1.35rem;
+
+    border-radius: 14px;
+
+    cursor: pointer;
+
+    font-weight: 700;
+    font-size: .92rem;
+
+    transition:
+        transform .25s ease,
+        box-shadow .25s ease,
+        opacity .25s ease;
+}
+
+.btn-primary {
+    border: none;
+    color: #fff;
+
+    background:
+        linear-gradient(
+            135deg,
+            var(--blue),
+            var(--cyan),
+            var(--violet)
+        );
+
+    background-size: 200% 200%;
+    animation: buttonFlow 18s linear infinite;
+
+    box-shadow:
+        0 12px 30px rgba(59,130,246,.20);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+}
+
+.btn-ghost {
+    border: 1px solid var(--stroke);
+    background: rgba(255,255,255,.7);
+    color: var(--muted);
+}
+
+.btn-ghost:hover {
+    background: #fff;
+}
+
+@keyframes buttonFlow {
+    0% {
+        background-position: 0% 50%;
+    }
+    100% {
+        background-position: 100% 50%;
+    }
+}
+
+/* ======================================================
+   REDUCED MOTION
+====================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation: none !important;
+        transition: none !important;
+    }
+}
+</style>

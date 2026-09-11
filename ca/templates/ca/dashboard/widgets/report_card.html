@@ -1,0 +1,48 @@
+
+<article class="ca-report-card">
+
+    <div class="ca-report-icon ca-report-{{ report.tone|default:'primary' }}">
+        <span class="ca-icon ca-icon-{{ report.icon|default:'report' }}"></span>
+    </div>
+
+    <div class="ca-report-content">
+        <h3>{{ report.name }}</h3>
+
+        {% if report.description %}
+            <p>{{ report.description }}</p>
+        {% endif %}
+
+        <div class="ca-report-meta">
+            {% if report.count is not None %}
+                <span>{{ report.count }} generated</span>
+            {% endif %}
+
+            {% if report.last_generated %}
+                <span>Last: {{ report.last_generated }}</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="ca-report-actions">
+        {% if report.url %}
+            <a
+                href="{{ report.url }}"
+                class="ca-icon-button"
+                aria-label="Open report"
+            >
+                <span class="ca-icon ca-icon-arrow-right"></span>
+            </a>
+        {% else %}
+            <button
+                type="button"
+                class="ca-icon-button"
+                data-action="generate-report"
+                data-report="{{ report.code }}"
+                aria-label="Generate report"
+            >
+                <span class="ca-icon ca-icon-download"></span>
+            </button>
+        {% endif %}
+    </div>
+
+</article>

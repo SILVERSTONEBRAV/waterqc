@@ -1,0 +1,129 @@
+<tr id="row-{{ obj.id }}"
+    data-id="{{ obj.id }}"
+    class="grid-row"
+    tabindex="0"
+    hx-target="this"
+    hx-swap="outerHTML"
+    data-state="{{ state|default:'view' }}">
+
+    <!-- SELECT -->
+    <td class="text-center">
+        <input type="checkbox" class="row-check" value="{{ obj.id }}">
+    </td>
+
+    <!-- =========================================
+        FIELDS
+    ========================================== -->
+    {% for field in fields %}
+        {% with value=obj|attr:field.name %}
+        {% with kind=field.kind|default:"text" %}
+
+        <td class="grid-cell"
+            data-field="{{ field.name }}"
+            data-kind="{{ kind }}">
+
+            <!-- VIEW MODE -->
+            <div class="cell-view">
+                {% if kind == "boolean" %}
+                    <span class="badge {% if value %}bg-success{% else %}bg-secondary{% endif %}">
+                        {{ value|yesno:"Yes,No" }}
+                    </span>
+
+                {% elif kind == "date" %}
+                    {{ value|date:"Y-m-d" }}
+
+                {% elif kind == "datetime" %}
+                    {{ value|date:"Y-m-d H:i" }}
+
+                {% else %}
+                    {{ value }}
+                {% endif %}
+            </div>
+
+            <!-- EDIT MODE -->
+            <div class="cell-edit d-none">
+
+                {% if kind == "text" or kind == "number" %}
+                    <input class="form-control form-control-sm"
+                           name="{{ field.name }}"
+                           value="{{ value|default:'' }}">
+
+                {% elif kind == "date" %}
+                    <input type="date"
+                           class="form-control form-control-sm"
+                           name="{{ field.name }}"
+                           value="{{ value|date:'Y-m-d' }}">
+
+                {% elif kind == "datetime" %}
+                    <input type="datetime-local"
+                           class="form-control form-control-sm"
+                           name="{{ field.name }}"
+                           value="{{ value|date:'Y-m-d\\TH:i' }}">
+
+                {% elif kind == "boolean" %}
+                    <select class="form-select form-select-sm"
+                            name="{{ field.name }}">
+                        <option value="true" {% if value %}selected{% endif %}>True</option>
+                        <option value="false" {% if not value %}selected{% endif %}>False</option>
+                    </select>
+
+                {% else %}
+                    <input class="form-control form-control-sm"
+                           name="{{ field.name }}"
+                           value="{{ value|default:'' }}">
+                {% endif %}
+
+            </div>
+
+        </td>
+
+        {% endwith %}
+        {% endwith %}
+    {% endfor %}
+
+    <!-- =========================================
+        ACTIONS (HTMX POWERED)
+    ========================================== -->
+    <td class="text-end">
+
+        <div class="btn-group btn-group-sm">
+
+            <!-- VIEW (no request) -->
+            <button class="btn btn-outline-primary"
+                    onclick="toggleView(this)">
+                View
+            </button>
+
+            <!-- EDIT (switch to edit mode) -->
+            <button class="btn btn-outline-warning"
+                    onclick="toggleEdit(this)">
+                Edit
+            </button>
+
+            <!-- SAVE (HTMX POST) -->
+            <button class="btn btn-success"
+                    hx-post="/{{ entry.meta.app_label }}/{{ entry.meta.model_name }}/{{ obj.id }}/inline_edit/"
+                    hx-include="closest tr"
+                    hx-vals='{"action":"inline_edit"}'>
+                Save
+            </button>
+
+            <!-- CANCEL -->
+            <button class="btn btn-secondary"
+                    onclick="cancelEdit(this)">
+                Cancel
+            </button>
+
+            <!-- DELETE -->
+            <button class="btn btn-outline-danger"
+                    hx-delete="/{{ entry.meta.app_label }}/{{ entry.meta.model_name }}/{{ obj.id }}/delete/"
+                    hx-confirm="Delete this row?"
+                    hx-swap="outerHTML">
+                Delete
+            </button>
+
+        </div>
+
+    </td>
+
+</tr>

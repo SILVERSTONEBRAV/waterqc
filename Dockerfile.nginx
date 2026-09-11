@@ -1,0 +1,53 @@
+# =========================================================
+# 🧱 NGINX Dockerfile — Production + Dynamic SSL + Fallback + Safe Defaults
+# =========================================================
+FROM nginx:mainline-alpine
+
+# ---------------------------------------------------------
+# 🧩 Install required tools
+# ---------------------------------------------------------
+RUN apk add --no-cache \
+    bash \
+    curl \
+    tzdata \
+    tini \
+    gettext \
+    openssl
+
+# ---------------------------------------------------------
+# 📂 Copy configuration, HTML, and SSL setup scripts
+# ---------------------------------------------------------
+COPY ./nginx/conf.d /etc/nginx/conf.d
+COPY ./nginx/html /usr/share/nginx/html
+COPY ./nginx/certs /etc/letsencrypt
+
+COPY ./nginx/entrypoint.sh /docker-entrypoint.d/entrypoint.sh
+COPY ./nginx/generate-fallback-certs.sh /docker-entrypoint.d/generate-fallback-certs.sh
+
+RUN chmod +x /docker-entrypoint.d/entrypoint.sh \
+    && chmod +x /docker-entrypoint.d/generate-fallback-certs.sh
+
+# ---------------------------------------------------------
+# 🌍 Environment defaults
+# ---------------------------------------------------------
+ENV DOMAIN_NAME="nairobiwater.or.ke" \
+    LETSENCRYPT_EMAIL="admin@nairobiwater.or.ke" \
+    SSL_DIR="/etc/letsencrypt" \
+    TZ="Africa/Nairobi" \
+    NGINX_TEMPLATE="/etc/nginx/conf.d/nginx.template" \
+    NGINX_OUTPUT="/etc/nginx/conf.d/default.conf" \
+    NGINX_DEBUG="false"
+
+# Expose HTTP + HTTPS + fallback
+EXPOSE 80 443 8443
+
+# ---------------------------------------------------------
+# 🚀 Use tini + custom entrypoint
+# ---------------------------------------------------------
+ENTRYPOINT ["/sbin/tini", "--", "/bin/bash", "/docker-entrypoint.d/entrypoint.sh"]
+
+# ---------------------------------------------------------
+# 🩺 Healthcheck
+# ---------------------------------------------------------
+HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=10 \
+  CMD curl -sf http://localhost/health/ >/dev/null 2>&1 || exit 1

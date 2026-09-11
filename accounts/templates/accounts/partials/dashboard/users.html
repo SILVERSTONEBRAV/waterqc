@@ -1,0 +1,38 @@
+<div class="tab-pane fade show active" id="usersTab">
+
+    <div class="d-flex justify-content-between mb-2">
+        <button class="btn btn-primary edit-user">
+            <i class="fa fa-plus"></i> Add User
+        </button>
+
+        <div>
+            <button class="btn btn-outline-secondary export-btn"
+                    data-tab="users" data-format="csv">CSV</button>
+            <button class="btn btn-outline-secondary export-btn"
+                    data-tab="users" data-format="xlsx">Excel</button>
+            <button class="btn btn-outline-secondary export-btn"
+                    data-tab="users" data-format="pdf">PDF</button>
+        </div>
+    </div>
+
+    <table class="table table-striped align-middle" id="usersTable">
+        <thead>
+            <tr>
+                <th>Username</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Section</th>
+                <th>Groups</th>
+                <th>Active</th>
+                <th>Locked</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+                {% include "accounts/partials/user_row.html" %}
+            {% endfor %}
+        </tbody>
+    </table>
+
+</div>

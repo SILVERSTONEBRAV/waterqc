@@ -1,0 +1,17 @@
+
+<article class="ca-metric-card ca-metric-{{ tone|default:'primary' }}">
+    <div class="ca-metric-header">
+        <span>{{ label }}</span>
+    </div>
+
+    <div class="ca-metric-value">
+        {{ value|default:0 }}{{ suffix }}
+    </div>
+
+    {% if description %}
+        <div class="ca-metric-description">
+            {{ description }}
+        </div>
+    {% endif %}
+</article>
+

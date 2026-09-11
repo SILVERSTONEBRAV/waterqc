@@ -1,0 +1,27 @@
+/* Tree card styling */
+#entity-tree {
+    max-height: 600px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    padding: 10px;
+    background: #fff;
+}
+
+/* jsTree nodes hover highlight */
+#entity-tree .jstree-node:hover {
+    background: #f0f8ff !important;
+    cursor: pointer;
+}
+
+/* Modal styling enhancements */
+#editNodeModal .modal-body .form-label {
+    font-weight: 600;
+}
+#editNodeModal .modal-body .form-control {
+    border-radius: 0.25rem;
+}
+
+/* Optional: responsive adjustments */
+@media (max-width: 768px){
+    #entity-tree { max-height: 400px; }
+}

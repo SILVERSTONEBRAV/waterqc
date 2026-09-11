@@ -1,0 +1,28 @@
+# =========================================================
+# 🐳 PgBouncer Dockerfile — Advanced Connection Pooler
+# =========================================================
+FROM edoburu/pgbouncer:1.17.0
+
+# Copy custom PgBouncer config and userlist
+COPY docker/pgbouncer.ini /etc/pgbouncer/pgbouncer.ini
+COPY docker/userlist.txt /etc/pgbouncer/userlist.txt
+
+# Environment defaults tuned for Django + Postgres
+ENV PGB_LISTEN_ADDR=0.0.0.0 \
+    PGB_LISTEN_PORT=6432 \
+    PGB_POOL_MODE=session \            # Django requires session pooling
+    PGB_MAX_CLIENT_CONN=500 \          # Allow more concurrent clients
+    PGB_DEFAULT_POOL_SIZE=50 \         # Larger pool for production workloads
+    PGB_RESERVE_POOL_SIZE=20 \         # Reserve pool for spikes
+    PGB_RESERVE_POOL_TIMEOUT=5 \       # Timeout before using reserve pool
+    PGB_SERVER_IDLE_TIMEOUT=300 \      # Close idle server connections
+    PGB_SERVER_RESET_QUERY="DISCARD ALL" \  # Reset connections safely
+    PGB_LOG_CONNECTIONS=1 \            # Log client connects/disconnects
+    PGB_LOG_STATS=1 \                  # Periodic stats logging
+    PGB_STATS_PERIOD=60                # Log stats every 60s
+
+# Expose PgBouncer port
+EXPOSE ${PGB_LISTEN_PORT}
+
+# Run PgBouncer with custom config
+CMD ["pgbouncer", "/etc/pgbouncer/pgbouncer.ini"]

@@ -1,0 +1,433 @@
+:root {
+
+    --dash-density: 1;
+    --dash-text-scale: 1;
+    --dash-space-scale: 1;
+
+    --dash-gap: calc(var(--space-base) * var(--dash-space-scale));
+    --dash-gap-lg: calc(var(--space-relaxed) * var(--dash-space-scale));
+    --dash-gap-sm: calc(var(--space-3) * var(--dash-space-scale));
+
+    --dash-grid-min: 220px;
+    --dash-grid-min-compact: 180px;
+
+    --dash-radius: var(--radius-lg);
+}
+
+/* compact operator mode */
+body.compact {
+    --dash-density: 0.78;
+    --dash-text-scale: 0.92;
+    --dash-space-scale: 0.72;
+}
+
+/* ==========================================================================
+   MAIN DASHBOARD SHELL
+========================================================================== */
+
+.container,
+main.container,
+.content {
+
+    width: 100%;
+    min-width: 0;
+
+    display: flex;
+    flex-direction: column;
+
+    gap: var(--dash-gap-lg);
+
+    padding: var(--dash-gap-lg);
+}
+
+/* ==========================================================================
+   CONTROL HEADER (PAGE TITLE SYSTEM)
+========================================================================== */
+
+.page-header {
+
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+
+    gap: var(--dash-gap);
+}
+
+.page-title {
+
+    font-size: calc(2rem * var(--dash-text-scale));
+    font-weight: 900;
+    letter-spacing: -0.04em;
+
+    color: var(--theme-text);
+}
+
+.page-subtitle {
+
+    font-size: calc(0.95rem * var(--dash-text-scale));
+    color: var(--theme-muted);
+
+    max-width: 70ch;
+}
+
+/* ==========================================================================
+   TAB SYSTEM (CONTROL ROOM INTERFACE)
+========================================================================== */
+
+.nav-tabs {
+
+    display: flex;
+    gap: .4rem;
+
+    border-bottom: 1px solid var(--theme-border);
+
+    padding-bottom: .5rem;
+}
+
+.nav-tabs .nav-link {
+
+    position: relative;
+
+    padding: .6rem 1rem;
+
+    font-weight: 600;
+    font-size: .9rem;
+
+    color: var(--theme-muted);
+
+    border-radius: var(--radius-md);
+
+    transition:
+        background var(--t-fast),
+        color var(--t-fast),
+        transform var(--t-fast);
+
+    cursor: pointer;
+}
+
+/* hover physics */
+.nav-tabs .nav-link:hover {
+
+    background: var(--theme-surface);
+    color: var(--theme-text);
+    transform: translateY(-1px);
+}
+
+/* active tab (SCADA signal) */
+.nav-tabs .nav-link.active {
+
+    background: var(--theme-accent-soft);
+    color: var(--theme-text);
+
+    box-shadow: 0 0 0 1px var(--theme-border);
+}
+
+/* active indicator bar */
+.nav-tabs .nav-link.active::after {
+
+    content: "";
+    position: absolute;
+
+    left: 12px;
+    right: 12px;
+    bottom: -6px;
+
+    height: 2px;
+
+    border-radius: 999px;
+
+    background: var(--theme-accent);
+    box-shadow: 0 0 14px var(--theme-accent-glow);
+}
+
+/* ==========================================================================
+   TAB CONTENT PANELS
+========================================================================== */
+
+.tab-pane {
+
+    padding: var(--dash-gap-lg);
+
+    background: var(--theme-surface);
+
+    border: 1px solid var(--theme-border);
+    border-radius: 0 0 var(--dash-radius) var(--dash-radius);
+
+    box-shadow: var(--shadow-sm);
+
+    position: relative;
+    overflow: hidden;
+}
+
+/* scanline energy layer */
+.tab-pane::after {
+
+    content: "";
+    position: absolute;
+    inset: 0;
+
+    background: linear-gradient(
+        110deg,
+        transparent 0%,
+        rgba(255,255,255,0.03) 50%,
+        transparent 100%
+    );
+
+    transform: translateX(-120%);
+    animation: dashScan 14s linear infinite;
+
+    pointer-events: none;
+}
+
+@keyframes dashScan {
+    0% { transform: translateX(-120%); }
+    100% { transform: translateX(120%); }
+}
+
+/* ==========================================================================
+   GRID SYSTEM (SCADA TELEMETRY LAYOUT)
+========================================================================== */
+
+.stats-grid,
+.panel-grid,
+.module-grid {
+
+    display: grid;
+
+    grid-template-columns: repeat(
+        auto-fit,
+        minmax(
+            calc(var(--dash-grid-min) * var(--dash-density)),
+            1fr
+        )
+    );
+
+    gap: var(--dash-gap);
+}
+
+/* ==========================================================================
+   SURFACE MODULES (UNIFIED CARD SYSTEM)
+========================================================================== */
+
+.surface,
+.panel,
+.stat-card,
+.module-card {
+
+    background: var(--theme-surface);
+
+    border: 1px solid var(--theme-border);
+    border-radius: var(--dash-radius);
+
+    box-shadow: var(--shadow-sm);
+
+    position: relative;
+    overflow: hidden;
+
+    transition:
+        transform var(--t-fast),
+        box-shadow var(--t-fast),
+        background var(--t-fast);
+}
+
+.surface:hover,
+.panel:hover,
+.stat-card:hover,
+.module-card:hover {
+
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+/* ==========================================================================
+   MODULE LOADING STATE (HTMX / AJAX PLACEHOLDER)
+========================================================================== */
+
+[ hx-get ],
+.loading-placeholder {
+
+    min-height: 80px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    color: var(--theme-muted);
+    font-style: italic;
+
+    position: relative;
+}
+
+/* pulse shimmer */
+[ hx-get ]::before,
+.loading-placeholder::before {
+
+    content: "";
+    position: absolute;
+    inset: 0;
+
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255,255,255,0.04),
+        transparent
+    );
+
+    animation: loadingSweep 1.8s infinite;
+}
+
+@keyframes loadingSweep {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+/* ==========================================================================
+   BUTTON SYSTEM (CONTROL ROOM ACTIONS)
+========================================================================== */
+
+.btn-primary {
+
+    font-size: .875rem;
+    padding: .4rem .85rem;
+
+    border-radius: var(--radius-md);
+
+    background: var(--theme-accent);
+    color: #fff;
+
+    border: none;
+
+    cursor: pointer;
+
+    transition: transform var(--t-fast), box-shadow var(--t-fast);
+}
+
+.btn-primary:hover {
+
+    transform: translateY(-2px);
+    box-shadow: 0 0 18px var(--theme-accent-glow);
+}
+
+/* ==========================================================================
+   SELECT CONTROL (INLINE OPERATOR MODE)
+========================================================================== */
+
+.form-select-sm {
+
+    width: auto;
+    display: inline-block;
+
+    padding: .35rem .6rem;
+
+    border-radius: var(--radius-md);
+
+    background: var(--theme-surface);
+
+    border: 1px solid var(--theme-border);
+
+    color: var(--theme-text);
+}
+
+/* ==========================================================================
+   LIVE INDICATOR SYSTEM
+========================================================================== */
+
+.live-indicator {
+
+    position: relative;
+}
+
+.live-indicator::after {
+
+    content: "";
+    position: absolute;
+
+    top: 8px;
+    right: 8px;
+
+    width: 9px;
+    height: 9px;
+
+    border-radius: 50%;
+
+    background: var(--status-ok);
+
+    box-shadow: 0 0 12px var(--status-ok);
+
+    animation: livePulse 1.8s infinite ease-in-out;
+}
+
+@keyframes livePulse {
+    0%,100% { transform: scale(1); opacity: .5; }
+    50% { transform: scale(1.6); opacity: 1; }
+}
+
+/* ==========================================================================
+   MICRO UX POLISH
+========================================================================== */
+
+button,
+.btn-primary,
+.nav-tabs .nav-link {
+
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* ==========================================================================
+   RESPONSIVE CONTROL GRID
+========================================================================== */
+
+@media (max-width: 1024px) {
+
+    .stats-grid,
+    .panel-grid,
+    .module-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+
+    .stats-grid,
+    .panel-grid,
+    .module-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .page-title {
+        font-size: 1.5rem;
+    }
+}
+
+/* ==========================================================================
+   PERFORMANCE MODE
+========================================================================== */
+
+body.compact .tab-pane::after,
+body.compact [ hx-get ]::before {
+
+    display: none;
+}
+
+/* ==========================================================================
+   ACCESSIBILITY
+========================================================================== */
+
+:focus-visible {
+
+    outline: 2px solid var(--theme-accent);
+    outline-offset: 2px;
+}
+
+/* ==========================================================================
+   REDUCED MOTION SAFETY
+========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+
+    * {
+        animation: none !important;
+        transition: none !important;
+    }
+}

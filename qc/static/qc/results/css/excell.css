@@ -1,0 +1,175 @@
+/* ================================
+   Advanced Excel-like Stylesheet
+   excell.css (Upgraded)
+   ================================ */
+
+/* Fit dashboard to viewport */
+html, body {
+  height: 100%;
+  margin: 0;
+  overflow-y: auto;   /* vertical scroll bar enabled */
+  background: #f4f7fb;
+  font-family: "Segoe UI", Inter, sans-serif;
+}
+
+/* Main dashboard grid */
+.dashboard-page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-dashboard {
+  flex: 1;
+  display: grid;
+  grid-template-columns: var(--left-sidebar-width) 1fr var(--right-sidebar-width);
+  overflow: hidden;
+}
+
+/* Workspace behaves like Excel sheet */
+.dashboard-workspace {
+  height: calc(100vh - var(--global-header-height) - var(--module-header-height));
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-auto-rows: minmax(0, auto);
+  gap: 1rem;
+  overflow-x: auto;   /* allow horizontal scroll for wide tables */
+  overflow-y: auto;   /* vertical scroll bar enabled */
+  align-items: start;
+  justify-items: stretch;
+  padding: 0.75rem;
+  scrollbar-gutter: stable;
+}
+
+/* Excel-like table grid */
+.excel-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: clamp(0.75rem, 0.9vw, 0.85rem);
+  background: #fff;
+}
+
+.excel-th, .excel-cell {
+  border: 1px solid #d0d7de;
+  padding: clamp(4px, 0.5vw, 6px);
+  font-size: clamp(0.7rem, 0.8vw, 0.85rem);
+}
+
+.excel-th {
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #334155;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.excel-cell {
+  vertical-align: middle;
+  transition: background 0.2s ease;
+}
+
+.excel-row:nth-child(even) .excel-cell {
+  background: #fbfcfd; /* striped rows */
+}
+
+.excel-row:hover .excel-cell {
+  background: #f1f5f9; /* hover highlight */
+}
+
+/* Inputs styled like Excel cells */
+.excel-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: center;
+  font-size: 0.85rem;
+  padding: 2px;
+  transition: background 0.2s ease, outline 0.2s ease;
+}
+
+.excel-input:focus {
+  outline: 2px solid #2563eb;
+  background: #eff6ff;
+}
+
+/* Row/column highlight */
+.excel-row-highlight {
+  background: #eaf2fd !important;
+}
+
+.excel-cell-highlight {
+  outline: 2px solid #3b82f6;
+}
+
+/* Status indicators */
+.status-indicator {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.status-indicator.text-success {
+  color: #15803d;
+}
+
+.status-indicator.text-danger {
+  color: #b91c1c;
+}
+
+/* Spec text */
+.spec-text {
+  font-size: 0.7rem;
+  color: #64748b;
+  display: none; /* hidden by default */
+}
+
+.form-control-danger + .spec-text {
+  display: block; /* show spec when abnormal */
+}
+
+/* Wrapper ensures horizontal scroll only */
+.excel-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  background: #fff;
+}
+
+/* Sticky first column */
+.excel-cell.sticky,
+.excel-th.sticky {
+  position: sticky;
+  left: 0;
+  background: #f8fafc;
+  z-index: 5;
+}
+
+/* Footer pinned at bottom */
+.dashboard-panel-footer,
+.page-footer {
+  position: sticky;
+  bottom: 0;
+  width: 100%;
+  background: #f0f4f8;
+  border-top: 1px solid #d0d7de;
+  z-index: var(--z-sticky);
+  padding: 0.5rem 1rem;
+}
+
+/* Responsive tweaks */
+@media (max-width: 900px) {
+  .dashboard-workspace {
+    grid-template-columns: 1fr;
+    padding: 0.5rem;
+  }
+  .excel-th, .excel-cell {
+    font-size: 0.75rem;
+    padding: 4px;
+  }
+}

@@ -1,0 +1,90 @@
+
+<article class="ca-stat-card ca-stat-{{ tone|default:'primary' }}">
+    <div class="ca-stat-card-top">
+        <span class="ca-stat-icon">
+            <span class="ca-icon ca-icon-{{ icon|default:'activity' }}"></span>
+        </span>
+
+        {% if change is not None %}
+            <span class="ca-stat-change {% if change >= 0 %}is-positive{% else %}is-negative{% endif %}">
+                {% if change >= 0 %}+{% endif %}{{ change }}%
+            </span>
+        {% endif %}
+    </div>
+
+    <div class="ca-stat-value">
+        {{ value|default:0 }}
+    </div>
+
+    <div class="ca-stat-label">
+        {{ label }}
+    </div>
+
+    {% if href %}
+        <a href="{{ href }}" class="ca-stat-link">
+            View details
+            <span class="ca-icon ca-icon-arrow-right"></span>
+        </a>
+    {% endif %}
+</article>
+
+`templates/ca/dashboard/widgets/approval_card.html`
+
+```html
+<article class="ca-approval-card">
+
+    <div class="ca-approval-header">
+        <div class="ca-approval-icon">
+            <span class="ca-icon ca-icon-shield"></span>
+        </div>
+
+        <div class="ca-approval-heading">
+            <strong>
+                {{ approval.sample_id|default:approval.batch.sample_id|default:"Analysis" }}
+            </strong>
+
+            <span>
+                {{ approval.request_id|default:"QA Review" }}
+            </span>
+        </div>
+
+        <span class="ca-status-badge ca-status-{{ approval.status|default:'pending' }}">
+            {{ approval.status_label|default:approval.status|default:"Pending" }}
+        </span>
+    </div>
+
+    <div class="ca-approval-body">
+        <div>
+            <span>Completed tests</span>
+            <strong>
+                {{ approval.completed_tests|default:0 }}/{{ approval.required_tests|default:0 }}
+            </strong>
+        </div>
+
+        <div>
+            <span>Pass rate</span>
+            <strong>
+                {{ approval.pass_rate|default:0 }}%
+            </strong>
+        </div>
+    </div>
+
+    <div class="ca-approval-footer">
+        {% if approval.url %}
+            <a href="{{ approval.url }}" class="ca-button ca-button-secondary">
+                Review
+            </a>
+        {% else %}
+            <button
+                type="button"
+                class="ca-button ca-button-secondary"
+                data-action="review-approval"
+                data-id="{{ approval.id }}"
+            >
+                Review
+            </button>
+        {% endif %}
+    </div>
+
+</article>
+

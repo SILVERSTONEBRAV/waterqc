@@ -1,0 +1,190 @@
+<div class="row g-3 mb-4 justify-content-center floating-row">
+
+    <div class="col-md-2">
+        <div class="card stat-card stat-gradient-1" data-type="total">
+            <div class="card-body d-flex justify-content-center align-items-center">
+                <span class="stat-text">Total Users : {{ total_users }}</span>
+                <div class="shine"></div>
+                <div class="particle particle-1"></div>
+                <div class="particle particle-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-2">
+        <div class="card stat-card stat-gradient-2" data-type="active">
+            <div class="card-body d-flex justify-content-center align-items-center">
+                <span class="stat-text">Active : {{ active_users }}</span>
+                <div class="shine"></div>
+                <div class="particle particle-1"></div>
+                <div class="particle particle-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-2">
+        <div class="card stat-card stat-gradient-3" data-type="locked">
+            <div class="card-body d-flex justify-content-center align-items-center">
+                <span class="stat-text">Locked : {{ locked_users }}</span>
+                <div class="shine"></div>
+                <div class="particle particle-1"></div>
+                <div class="particle particle-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-2">
+        <div class="card stat-card stat-gradient-4" data-type="inactive">
+            <div class="card-body d-flex justify-content-center align-items-center">
+                <span class="stat-text">Inactive : {{ inactive_users }}</span>
+                <div class="shine"></div>
+                <div class="particle particle-1"></div>
+                <div class="particle particle-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-2">
+        <div class="card stat-card stat-gradient-5" data-type="sections">
+            <div class="card-body d-flex justify-content-center align-items-center">
+                <span class="stat-text">Sections : {{ total_sections }}</span>
+                <div class="shine"></div>
+                <div class="particle particle-1"></div>
+                <div class="particle particle-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-2">
+        <div class="card stat-card stat-gradient-6" data-type="groups">
+            <div class="card-body d-flex justify-content-center align-items-center">
+                <span class="stat-text">Groups : {{ total_groups }}</span>
+                <div class="shine"></div>
+                <div class="particle particle-1"></div>
+                <div class="particle particle-2"></div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Container for showing users dynamically -->
+<div id="user-list" class="mt-4"></div>
+
+
+<style>
+/* ------------------------------
+   FLOATING ROW
+------------------------------ */
+.floating-row {
+    animation: floatRow 8s ease-in-out infinite alternate;
+}
+@keyframes floatRow {
+    0% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+    100% { transform: translateY(0); }
+}
+
+/* ------------------------------
+   STAT CARD BASE
+------------------------------ */
+.stat-card {
+    border: none;
+    border-radius: 14px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    cursor: default;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.18), inset 0 0 6px rgba(255,255,255,0.05);
+    transition: transform 0.5s ease, box-shadow 0.5s ease;
+}
+.stat-card:hover {
+    transform: scale(1.07);
+    box-shadow: 0 14px 28px rgba(0,0,0,0.25), inset 0 0 12px rgba(255,255,255,0.12);
+}
+
+/* ------------------------------
+   STAT TEXT
+------------------------------ */
+.stat-text {
+    font-size: 1rem;
+    font-weight: 800;
+    color: #ffffff;
+    text-shadow: 0 1px 6px rgba(0,0,0,0.6);
+    white-space: nowrap;
+    z-index: 2;
+}
+
+/* ------------------------------
+   BLUE GRADIENTS
+------------------------------ */
+.stat-gradient-1 { background: linear-gradient(135deg, #1e3c72, #2a5298); }
+.stat-gradient-2 { background: linear-gradient(135deg, #1565c0, #42a5f5); }
+.stat-gradient-3 { background: linear-gradient(135deg, #0d47a1, #1976d2); }
+.stat-gradient-4 { background: linear-gradient(135deg, #283593, #5c6bc0); }
+.stat-gradient-5 { background: linear-gradient(135deg, #1976d2, #64b5f6); }
+.stat-gradient-6 { background: linear-gradient(135deg, #0d47a1, #42a5f5); }
+
+/* ------------------------------
+   SHINE ANIMATION
+------------------------------ */
+
+@keyframes shineAnim {
+    0% { left: -75%; }
+    50% { left: 100%; }
+    100% { left: 100%; }
+}
+
+/* ------------------------------
+   SOFT PULSATING GLOW
+------------------------------ */
+.stat-card::before {
+    content: "";
+    position: absolute;
+    top: -10%; left: -10%;
+    width: 120%; height: 120%;
+    border-radius: 14px;
+    background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 60%);
+    filter: blur(10px);
+    opacity: 0.7;
+    animation: pulseGlow 6s ease-in-out infinite alternate;
+    z-index: 0;
+}
+@keyframes pulseGlow {
+    0% { transform: scale(1); opacity: 0.6; }
+    50% { transform: scale(1.1); opacity: 0.8; }
+    100% { transform: scale(1); opacity: 0.6; }
+}
+
+/* ------------------------------
+   SHINY PARTICLES
+------------------------------ */
+.particle {
+    position: absolute;
+    width: 3px; height: 3px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.5);
+    animation: particleMove 8s linear infinite;
+    z-index: 1;
+}
+.particle-1 { top: 15%; left: 20%; animation-delay: 0s; }
+.particle-2 { top: 70%; left: 80%; animation-delay: 4s; }
+@keyframes particleMove {
+    0% { transform: translate(0,0) scale(1); opacity: 0.5; }
+    25% { transform: translate(5px,-5px) scale(1.2); opacity: 0.7; }
+    50% { transform: translate(-5px,5px) scale(0.8); opacity: 0.6; }
+    75% { transform: translate(5px,3px) scale(1); opacity: 0.7; }
+    100% { transform: translate(0,0) scale(1); opacity: 0.5; }
+}
+
+/* ------------------------------
+   RESPONSIVE
+------------------------------ */
+@media (max-width: 768px) {
+    .stat-card { height: 45px; padding: 0.4rem 0.6rem; }
+    .stat-text { font-size: 0.85rem; }
+}
+</style>

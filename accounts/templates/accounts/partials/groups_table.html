@@ -1,0 +1,147 @@
+{% load static %}
+
+<div class="card shadow-sm border-0 rounded-4">
+
+    <div class="card-header bg-white border-bottom py-3">
+
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+
+            <div>
+                <h5 class="mb-1 fw-bold">
+                    <i class="fa fa-user-shield text-primary me-2"></i>
+                    User Groups
+                </h5>
+
+                <small class="text-muted">
+                    Security groups and role assignments.
+                </small>
+            </div>
+
+            <div class="badge bg-primary fs-6">
+                {{ groups|length }} Groups
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="card-body">
+
+        <div class="table-responsive">
+
+            <table class="table table-hover align-middle">
+
+                <thead class="table-light">
+
+                    <tr>
+                        <th width="70">#</th>
+                        <th>Group Name</th>
+                        <th>Users</th>
+                        <th>Permissions</th>
+                        <th>Description</th>
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    {% for group in groups %}
+
+                    <tr>
+
+                        <td>
+                            {{ forloop.counter }}
+                        </td>
+
+                        <td>
+
+                            <div class="fw-semibold">
+                                {{ group.name }}
+                            </div>
+
+                        </td>
+
+                        <td>
+
+                            <span class="badge bg-info">
+                                {{ group.user_count|default:0 }}
+                            </span>
+
+                        </td>
+
+                        <td>
+
+                            <span class="badge bg-secondary">
+                                {{ group.permissions.count }}
+                            </span>
+
+                        </td>
+
+                        <td>
+
+                            {% if group.permissions.exists %}
+                                <small class="text-muted">
+                                    {{ group.permissions.all|join:", "|truncatechars:80 }}
+                                </small>
+                            {% else %}
+                                <span class="text-muted">
+                                    No permissions assigned
+                                </span>
+                            {% endif %}
+
+                        </td>
+
+                    </tr>
+
+                    {% empty %}
+
+                    <tr>
+
+                        <td colspan="5">
+
+                            <div class="text-center py-5">
+
+                                <i
+                                    class="fa fa-user-shield text-muted mb-3"
+                                    style="font-size:3rem;"
+                                ></i>
+
+                                <h5 class="text-muted">
+                                    No groups found
+                                </h5>
+
+                            </div>
+
+                        </td>
+
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+                {% if groups %}
+                <tfoot class="table-light">
+
+                    <tr>
+
+                        <th colspan="2">
+                            Total Groups
+                        </th>
+
+                        <th colspan="3">
+                            {{ groups|length }}
+                        </th>
+
+                    </tr>
+
+                </tfoot>
+                {% endif %}
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>

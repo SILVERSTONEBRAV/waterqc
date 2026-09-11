@@ -1,0 +1,127 @@
+{% extends "accounts/base.html" %}
+
+{% block content %}
+
+<div class="container-fluid mt-3">
+
+    <!-- ================= CONTENT ================= -->
+    <div class="card shadow-sm border-0">
+        <div class="card-body">
+
+            <div class="tab-content">
+
+                <!-- OVERVIEW -->
+                <div class="tab-pane fade show active"
+                     id="overview-tab">
+
+                    <div class="row g-3">
+
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <small class="text-muted">MFA</small>
+                                    <h4>
+                                        {{ request.user.mfa_enabled|yesno:"Enabled,Disabled" }}
+                                    </h4>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <small class="text-muted">
+                                        Failed Logins
+                                    </small>
+                                    <h4>
+                                        {{ request.user.failed_login_attempts }}
+                                    </h4>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <small class="text-muted">
+                                        Account Locked
+                                    </small>
+                                    <h4>
+                                        {{ request.user.is_locked|yesno:"Yes,No" }}
+                                    </h4>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div class="tab-pane fade"
+                     id="profile-tab">
+                    {% include "accounts/profile/profile.html" %}
+                </div>
+
+                <div class="tab-pane fade"
+                     id="users-tab">
+                    {% include "accounts/partials/users_table.html" %}
+                </div>
+
+                <div class="tab-pane fade"
+                     id="sections-tab">
+                    {% include "accounts/partials/sections_table.html" %}
+                </div>
+
+                <div class="tab-pane fade"
+                     id="groups-tab">
+                    {% include "accounts/partials/groups_table.html" %}
+                </div>
+
+                <div class="tab-pane fade"
+                     id="permissions-tab">
+                    {% include "accounts/partials/permissions_table.html" %}
+                </div>
+
+                <div class="tab-pane fade"
+                     id="plants-tab">
+                    {% include "accounts/partials/plants_table.html" %}
+                </div>
+
+                <div class="tab-pane fade"
+                     id="labs-tab">
+                    {% include "accounts/partials/labs_table.html" %}
+                </div>
+
+                <div class="tab-pane fade"
+                     id="sessions-tab">
+                    {% include "accounts/partials/sessions_table.html" %}
+                </div>
+
+                <div class="tab-pane fade"
+                     id="security-tab">
+                    {% include "accounts/partials/security.html" %}
+                </div>
+
+                <div class="tab-pane fade"
+                     id="password-tab">
+                    {% include "accounts/partials/reset_password_form.html" %}
+                </div>
+
+                <div class="tab-pane fade"
+                     id="config-tab">
+                    {% include "accounts/partials/configuration.html" %}
+                </div>
+
+                <div class="tab-pane fade"
+                     id="system-tab">
+                    {% include "accounts/partials/system_information.html" %}
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+{% endblock %}

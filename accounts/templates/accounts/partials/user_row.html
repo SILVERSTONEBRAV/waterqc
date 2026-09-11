@@ -1,0 +1,52 @@
+<tr id="user-row-{{ user.id }}" data-id="{{ user.id }}">
+    <td>
+        <strong>{{ user.username }}</strong><br>
+        <small class="text-muted">{{ user.get_full_name|default:"—" }}</small>
+    </td>
+
+    <td>{{ user.email|default:"—" }}</td>
+
+    <td>{{ user.section.name|default:"—" }}</td>
+
+    <td>{{ user.assigned_treatment_plant.name|default:"—" }}</td>
+
+    <td>
+        {% for g in user.groups.all %}
+            <span class="badge bg-secondary">{{ g.name }}</span>
+        {% empty %}
+            <span class="text-muted">—</span>
+        {% endfor %}
+    </td>
+
+    <td class="text-center">
+        {% if user.is_active %}
+            <span class="badge bg-success">Active</span>
+        {% else %}
+            <span class="badge bg-secondary">Inactive</span>
+        {% endif %}
+    </td>
+
+    <td class="text-center">
+        {% if user.is_locked %}
+            <span class="badge bg-danger">Locked</span>
+        {% else %}
+            <span class="badge bg-success">Unlocked</span>
+        {% endif %}
+    </td>
+
+    <td class="text-end">
+        <button
+            class="btn btn-sm btn-outline-primary edit-user"
+            data-id="{{ user.id }}"
+            data-tab="users">
+            <i class="fas fa-edit"></i>
+        </button>
+
+        <button
+            class="btn btn-sm btn-outline-danger delete-user"
+            data-id="{{ user.id }}"
+            data-tab="users">
+            <i class="fas fa-trash"></i>
+        </button>
+    </td>
+</tr>

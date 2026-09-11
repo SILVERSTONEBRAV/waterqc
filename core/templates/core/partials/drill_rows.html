@@ -1,0 +1,102 @@
+{% comment %}
+Partial template for rendering drill-down rows
+Context:
+- rows: [
+    {
+        "relation": "related_field_name",
+        "object": <related_model_instance>,
+        "fields": ["field1", "field2"]
+    },
+    ...
+  ]
+{% endcomment %}
+
+{% for row in rows %}
+<tr class="drill-row bg-light" data-relation="{{ row.relation }}">
+    {% for field_name in row.fields %}
+        {% with value=row.object|attr:field_name %}
+        <td class="editable-cell position-relative px-2 py-1"
+            data-pk="{{ row.object.pk }}"
+            data-field="{{ field_name }}"
+            data-type="{{ row.object._meta.get_field(field_name).get_internal_type }}"
+            data-original="{{ value|default:'' }}"
+            contenteditable="true"
+
+            hx-post="{% url urls.inline row.object.pk %}"
+            hx-trigger="blur changed delay:400ms"
+            hx-vals='js:{
+                pk: {{ row.object.pk }},
+                field: "{{ field_name }}",
+                value: this.innerText.trim()
+            }'
+            hx-swap="none"
+
+            hx-on:focus="
+                this.dataset.before = this.innerText;
+                this.classList.add('editing');
+            "
+            hx-on:keydown="
+                if(event.key === 'Enter'){
+                    event.preventDefault();
+                    this.blur();
+                }
+            "
+            hx-on:blur="
+                if(this.dataset.before !== this.innerText){
+                    this.classList.add('dirty');
+                }
+            "
+            hx-on::after-request="
+                if(event.detail.successful){
+                    this.classList.remove('dirty','bg-danger-subtle');
+                    this.classList.add('bg-success-subtle');
+                    this.dataset.original = this.innerText;
+                    setTimeout(()=>{this.classList.remove('bg-success-subtle');},600);
+                } else {
+                    this.innerText = this.dataset.original;
+                    this.classList.add('bg-danger-subtle');
+                    setTimeout(()=>{this.classList.remove('bg-danger-subtle');},1200);
+                }
+            "
+        >
+            {% if value is None or value == "" %}
+                <span class="text-muted fst-italic">—</span>
+            {% else %}
+                {{ value }}
+            {% endif %}
+        </td>
+        {% endwith %}
+    {% endfor %}
+
+    <!-- Actions for the related row -->
+    <td class="text-end">
+        <div class="btn-group btn-group-sm shadow-sm">
+            <button class="btn btn-outline-secondary"
+                    hx-get="{% url urls.detail row.object.pk %}"
+                    hx-target="#crud-modal-body"
+                    hx-swap="innerHTML">
+                👁
+            </button>
+            <button class="btn btn-outline-primary"
+                    hx-get="{% url urls.edit row.object.pk %}"
+                    hx-target="#crud-modal-body"
+                    hx-swap="innerHTML">
+                ✎
+            </button>
+            <button class="btn btn-outline-danger"
+                    hx-delete="{% url urls.delete row.object.pk %}"
+                    hx-confirm="Delete this item?"
+                    hx-swap="none"
+                    hx-on::after-request="
+                        if(event.detail.successful){
+                            const row = this.closest('tr');
+                            row.classList.add('fade-out');
+                            setTimeout(()=>row.remove(),300);
+                        }
+                    ">
+                🗑
+            </button>
+        </div>
+    </td>
+</tr>
+{% endfor %}

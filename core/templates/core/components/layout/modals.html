@@ -1,0 +1,58 @@
+<div id="modal-container">
+
+    {% block modal_content %}
+
+        {% if user.is_authenticated %}
+
+            {% include "accounts/profile/change_password.html" %}
+
+        {% endif %}
+
+        {% block profile_modals %}
+        {% endblock %}
+
+        {% block authentication_modals %}
+        {% endblock %}
+
+        {% block dashboard_modals %}
+        {% endblock %}
+
+        {% block analysis_modals %}
+        {% endblock %}
+
+        {% block sampling_modals %}
+        {% endblock %}
+
+        {% block result_modals %}
+        {% endblock %}
+
+        {% block verification_modals %}
+        {% endblock %}
+
+        {% block approval_modals %}
+        {% endblock %}
+
+        {% block report_modals %}
+        {% endblock %}
+
+        {% block inventory_modals %}
+        {% endblock %}
+
+        {% block laboratory_modals %}
+        {% endblock %}
+
+        {% block administration_modals %}
+        {% endblock %}
+
+        {% block notification_modals %}
+        {% endblock %}
+
+        {% block help_modals %}
+        {% endblock %}
+
+        {% block custom_modals %}
+        {% endblock %}
+
+    {% endblock %}
+
+</div>

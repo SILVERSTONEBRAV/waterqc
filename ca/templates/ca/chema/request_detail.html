@@ -1,0 +1,304 @@
+{% extends "ca/dashboard/layout/app.html" %}
+
+{% block title %}Analysis Request{% endblock %}
+
+{% block content %}
+
+<div class="ca-page">
+    <div class="page-header">
+        <div>
+            <h1>Analysis Request</h1>
+            <p>
+                {{ analysis_request.request_id|default:"Request" }}
+            </p>
+        </div>
+
+```
+    <div class="page-actions">
+        <a href="{% url 'ca:request-list' %}" class="btn btn-secondary">
+            Requests
+        </a>
+
+        {% if analysis_request.batch %}
+            <a
+                href="{% url 'ca:batch-detail' analysis_request.batch.pk %}"
+                class="btn btn-secondary"
+            >
+                View Batch
+            </a>
+        {% endif %}
+
+        {% if analysis_request.status != "COMPLETED" %}
+            <a
+                href="{% url 'ca:request-transition' analysis_request.pk %}"
+                class="btn btn-primary"
+            >
+                Update Status
+            </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="details-grid">
+    <div class="card">
+        <div class="card-header">
+            <h2>Request Details</h2>
+        </div>
+
+        <div class="card-body">
+            <div class="details-grid">
+                <div class="detail-item">
+                    <span class="detail-label">Request ID</span>
+                    <span class="detail-value">
+                        {{ analysis_request.request_id|default:"—" }}
+                    </span>
+                </div>
+
+                <div class="detail-item">
+                    <span class="detail-label">Status</span>
+                    <span class="detail-value">
+                        {% if analysis_request.status == "COMPLETED" %}
+                            <span class="badge badge-success">
+                                {{ analysis_request.get_status_display|default:analysis_request.status }}
+                            </span>
+                        {% elif analysis_request.status == "IN_PROGRESS" %}
+                            <span class="badge badge-info">
+                                {{ analysis_request.get_status_display|default:analysis_request.status }}
+                            </span>
+                        {% else %}
+                            <span class="badge badge-warning">
+                                {{ analysis_request.get_status_display|default:analysis_request.status }}
+                            </span>
+                        {% endif %}
+                    </span>
+                </div>
+
+                <div class="detail-item">
+                    <span class="detail-label">Location</span>
+                    <span class="detail-value">
+                        {{ analysis_request.location|default:"—" }}
+                    </span>
+                </div>
+
+                <div class="detail-item">
+                    <span class="detail-label">Created</span>
+                    <span class="detail-value">
+                        {{ analysis_request.created_at|date:"d M Y H:i"|default:"—" }}
+                    </span>
+                </div>
+
+                <div class="detail-item">
+                    <span class="detail-label">Updated</span>
+                    <span class="detail-value">
+                        {{ analysis_request.updated_at|date:"d M Y H:i"|default:"—" }}
+                    </span>
+                </div>
+
+                <div class="detail-item">
+                    <span class="detail-label">Deadline</span>
+                    <span class="detail-value">
+                        {% if analysis_request.deadline %}
+                            {{ analysis_request.deadline|date:"d M Y H:i" }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2>Chemical Batch</h2>
+        </div>
+
+        <div class="card-body">
+            {% if analysis_request.batch %}
+                <div class="details-grid">
+                    <div class="detail-item">
+                        <span class="detail-label">Sample ID</span>
+                        <span class="detail-value">
+                            <a
+                                href="{% url 'ca:batch-detail' analysis_request.batch.pk %}"
+                            >
+                                {{ analysis_request.batch.sample_id|default:"—" }}
+                            </a>
+                        </span>
+                    </div>
+
+                    <div class="detail-item">
+                        <span class="detail-label">Batch</span>
+                        <span class="detail-value">
+                            #{{ analysis_request.batch.pk }}
+                        </span>
+                    </div>
+
+                    <div class="detail-item">
+                        <span class="detail-label">Chemical</span>
+                        <span class="detail-value">
+                            {{ analysis_request.batch.chemical|default:"—" }}
+                        </span>
+                    </div>
+
+                    <div class="detail-item">
+                        <span class="detail-label">Supplier</span>
+                        <span class="detail-value">
+                            {{ analysis_request.batch.supplier|default:"—" }}
+                        </span>
+                    </div>
+
+                    <div class="detail-item">
+                        <span class="detail-label">Batch Status</span>
+                        <span class="detail-value">
+                            {{ analysis_request.batch.get_status_display|default:analysis_request.batch.status }}
+                        </span>
+                    </div>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    No chemical batch is associated with this request.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h2>Assigned Analysts</h2>
+        </div>
+
+        {% if analysis_request.assigned_analysts %}
+            <span>
+                {{ analysis_request.assigned_analysts.all|length }}
+                analyst{{ analysis_request.assigned_analysts.all|length|pluralize }}
+            </span>
+        {% endif %}
+    </div>
+
+    <div class="card-body">
+        {% if analysis_request.assigned_analysts.all %}
+            <div class="details-grid">
+                {% for analyst in analysis_request.assigned_analysts.all %}
+                    <div class="detail-item">
+                        <span class="detail-label">Analyst</span>
+                        <span class="detail-value">
+                            {{ analyst.get_full_name|default:analyst.username }}
+                        </span>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                No analysts have been assigned to this request.
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if analysis_request.process %}
+<div class="card">
+    <div class="card-header">
+        <h2>Analysis Process</h2>
+
+        <a
+            href="{% url 'ca:process-detail' analysis_request.process.pk %}"
+            class="btn btn-sm btn-primary"
+        >
+            View Process
+        </a>
+    </div>
+
+    <div class="card-body">
+        <div class="details-grid">
+            <div class="detail-item">
+                <span class="detail-label">Process</span>
+                <span class="detail-value">
+                    #{{ analysis_request.process.pk }}
+                </span>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Workflow Status</span>
+                <span class="detail-value">
+                    {{ analysis_request.process.get_status_display|default:analysis_request.process.status }}
+                </span>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Progress</span>
+                <span class="detail-value">
+                    {{ analysis_request.process.analysis_progress|default:"0" }}%
+                </span>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Analysis Complete</span>
+                <span class="detail-value">
+                    {% if analysis_request.process.is_analysis_complete %}
+                        <span class="badge badge-success">Yes</span>
+                    {% else %}
+                        <span class="badge badge-warning">No</span>
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-header">
+        <h2>Request Timeline</h2>
+    </div>
+
+    <div class="card-body">
+        <div class="details-grid">
+            <div class="detail-item">
+                <span class="detail-label">Requested</span>
+                <span class="detail-value">
+                    {{ analysis_request.created_at|date:"d M Y H:i"|default:"—" }}
+                </span>
+            </div>
+
+            {% if analysis_request.started_at %}
+            <div class="detail-item">
+                <span class="detail-label">Started</span>
+                <span class="detail-value">
+                    {{ analysis_request.started_at|date:"d M Y H:i" }}
+                </span>
+            </div>
+            {% endif %}
+
+            {% if analysis_request.completed_at %}
+            <div class="detail-item">
+                <span class="detail-label">Completed</span>
+                <span class="detail-value">
+                    {{ analysis_request.completed_at|date:"d M Y H:i" }}
+                </span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="page-actions">
+    <a href="{% url 'ca:request-list' %}" class="btn btn-secondary">
+        Back to Requests
+    </a>
+
+    {% if analysis_request.status != "COMPLETED" %}
+        <a
+            href="{% url 'ca:request-transition' analysis_request.pk %}"
+            class="btn btn-primary"
+        >
+            Update Status
+        </a>
+    {% endif %}
+</div>
+
+
+</div>
+{% endblock %}

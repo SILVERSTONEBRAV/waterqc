@@ -1,0 +1,34 @@
+<script>
+
+window.addEventListener(
+
+    APP.events.REFRESH,
+
+    function(){
+
+        document.querySelectorAll("[data-auto-refresh]").forEach(function(el){
+
+            if(el.hasAttribute("hx-get")){
+
+                htmx.ajax(
+
+                    "GET",
+
+                    el.getAttribute("hx-get"),
+
+                    {
+                        target:el,
+                        swap:"outerHTML"
+                    }
+
+                );
+
+            }
+
+        });
+
+    }
+
+);
+
+</script>

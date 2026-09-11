@@ -1,0 +1,21 @@
+# Use an official Python image
+FROM python:3.11-slim
+
+# Set working directory inside the container
+WORKDIR /app
+
+# Copy the dependency file first
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
+
+# Copy the rest of the application code
+COPY . .
+
+# Expose the Django port
+EXPOSE 8000
+
+# Default command (used for the web service)
+CMD ["gunicorn", "qad.wsgi:application", "--bind", "0.0.0.0:8000"]

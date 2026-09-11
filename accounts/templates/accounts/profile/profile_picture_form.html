@@ -1,0 +1,9 @@
+{% block content %}
+<h2>Update Profile Picture</h2>
+<form method="post" enctype="multipart/form-data" class="profile-picture-form">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a href="{% url 'accounts:profile' %}" class="btn btn-light">Cancel</a>
+</form>
+{% endblock %}

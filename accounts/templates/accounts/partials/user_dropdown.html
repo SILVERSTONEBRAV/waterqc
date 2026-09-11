@@ -1,0 +1,142 @@
+<div class="dropdown-wrapper user-dropdown" data-dropdown="user">
+
+    <!-- =====================================================
+    TOGGLE
+    ===================================================== -->
+    <button
+        id="userMenuBtn"
+        class="dropdown-toggle"
+        type="button"
+        data-dropdown-toggle="userDropdown"
+        aria-haspopup="menu"
+        aria-expanded="false"
+        aria-controls="userDropdown">
+
+        <span class="avatar-wrapper">
+            <img
+                src="{{ request.user.profile_picture_url }}"
+                alt="{{ request.user.username }} profile"
+                class="avatar"
+                loading="lazy">
+
+            <span class="status-dot online" aria-hidden="true"></span>
+        </span>
+
+        <span class="user-name">
+            {{ request.user.full_name|default:request.user.username }}
+        </span>
+
+        <i class="fas fa-caret-down" aria-hidden="true"></i>
+    </button>
+
+    <!-- =====================================================
+    DROPDOWN PANEL
+    ===================================================== -->
+    <ul
+        id="userDropdown"
+        class="dropdown-menu"
+        role="menu"
+        aria-labelledby="userMenuBtn"
+        data-dropdown-menu="user">
+
+        <!-- USER HEADER -->
+        <li class="dropdown-header" role="none">
+
+            <div class="dropdown-user-info">
+
+                <div class="dropdown-avatar-wrapper">
+                    <img
+                        src="{{ request.user.profile_picture_url }}"
+                        alt="{{ request.user.username }}"
+                        class="dropdown-avatar"
+                        loading="lazy">
+
+                    <span class="status-dot online" aria-hidden="true"></span>
+                </div>
+
+                <div class="dropdown-user-meta">
+
+                    <div class="dropdown-fullname">
+                        {{ request.user.full_name|default:request.user.username }}
+                    </div>
+
+                    <div class="dropdown-username">
+                        @{{ request.user.username }}
+                    </div>
+
+                    {% if request.user.email %}
+                    <div class="dropdown-email">
+                        {{ request.user.email }}
+                    </div>
+                    {% endif %}
+
+                </div>
+
+            </div>
+
+        </li>
+
+        <li class="divider" role="separator"></li>
+
+        <!-- ACCOUNT ACTIONS -->
+        <li role="none">
+            <a href="{% url 'accounts:profile' %}" role="menuitem">
+                <i class="fas fa-user"></i>
+                <span>My Profile</span>
+            </a>
+        </li>
+
+        <li role="none">
+            <a href="{% url 'accounts:profile_picture_update' %}" role="menuitem">
+                <i class="fas fa-image"></i>
+                <span>Change Picture</span>
+            </a>
+        </li>
+
+        <!-- =====================================================
+        CHANGE PASSWORD (TOP-RIGHT MODAL TRIGGER)
+        ===================================================== -->
+        <li role="none">
+           <a href="#"
+   role="menuitem"
+   class="dropdown-item-link"
+   data-modal-open="changePasswordModal">
+
+    <i class="fas fa-key"></i>
+    <span>Change Password</span>
+</a>
+        </li>
+
+        {% if request.user.is_superuser %}
+
+        <li class="divider" role="separator"></li>
+
+        <li class="dropdown-section-label" role="presentation">
+            Administration
+        </li>
+
+        <li role="none">
+            <a href="{% url 'accounts:user_list' %}" role="menuitem">
+                <i class="fas fa-users"></i>
+                <span>Manage Users</span>
+            </a>
+        </li>
+
+        <li role="none">
+            <a href="{% url 'accounts:user_create' %}" role="menuitem">
+                <i class="fas fa-user-plus"></i>
+                <span>Create User</span>
+            </a>
+        </li>
+
+        {% endif %}
+
+        <li role="none">
+            <a href="{% url 'accounts:logout' %}" role="menuitem" class="logout-link">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Logout</span>
+            </a>
+        </li>
+
+    </ul>
+</div>

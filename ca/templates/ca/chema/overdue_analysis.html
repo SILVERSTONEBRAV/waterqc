@@ -1,0 +1,133 @@
+{% extends "ca/dashboard/layout/app.html" %}
+
+{% block title %}Overdue Analyses{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h1>Overdue Analyses</h1>
+        <p>Chemical analysis processes that have exceeded their required completion time.</p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h2>Overdue Analysis Queue</h2>
+            <span>
+                {{ processes|length }}
+                overdue analysis{{ processes|length|pluralize }}
+            </span>
+        </div>
+    </div>
+
+```
+{% if processes %}
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Batch</th>
+                    <th>Request</th>
+                    <th>Sample</th>
+                    <th>Analyst</th>
+                    <th>Status</th>
+                    <th>Deadline</th>
+                    <th>Overdue</th>
+                    <th></th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for process in processes %}
+                <tr>
+                    <td>
+                        {% if process.batch %}
+                            <strong>{{ process.batch }}</strong>
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if process.analysis_request %}
+                            {{ process.analysis_request }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if process.batch and process.batch.sample_id %}
+                            {{ process.batch.sample_id }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if process.assigned_analyst %}
+                            {{ process.assigned_analyst }}
+                        {% else %}
+                            Unassigned
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if process.workflow_status %}
+                            <span class="badge badge-warning">
+                                {{ process.get_workflow_status_display }}
+                            </span>
+                        {% else %}
+                            <span class="badge badge-warning">
+                                Overdue
+                            </span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if process.analysis_request.requested_at %}
+                            {{ process.analysis_request.requested_at|date:"d M Y H:i" }}
+                        {% elif process.created_at %}
+                            {{ process.created_at|date:"d M Y H:i" }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if process.is_overdue %}
+                            <span class="badge badge-danger">
+                                Overdue
+                            </span>
+                        {% else %}
+                            <span class="badge badge-warning">
+                                Attention
+                            </span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        <a
+                            href="{% url 'ca:process-detail' process.pk %}"
+                            class="btn btn-primary"
+                        >
+                            View
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% else %}
+    <div class="empty-state">
+        <h3>No overdue analyses</h3>
+        <p>All chemical analysis processes are currently within their required completion time.</p>
+    </div>
+{% endif %}
+```
+
+</div>
+{% endblock %}

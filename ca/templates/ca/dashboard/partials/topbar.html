@@ -1,0 +1,61 @@
+<header class="topbar">
+
+    <div class="brand">
+
+        <div
+            class="brand-mark"
+            aria-hidden="true"
+        >
+            ⚗
+        </div>
+
+        <div>
+
+            <h1>
+                Chemical Analysis Control Center
+            </h1>
+
+            <p>
+                Laboratory workflow
+                • Analytical intelligence
+                • QA
+                • Certification
+            </p>
+
+        </div>
+
+    </div>
+
+    <div class="header-actions">
+
+        <div class="system-status">
+
+            <span class="status-dot"></span>
+
+            Workflow monitoring active
+
+        </div>
+
+        <button
+            type="button"
+            class="btn"
+            onclick="window.location.reload()"
+        >
+            ↻ Refresh
+        </button>
+
+        {% if process %}
+
+            <button
+                type="button"
+                class="btn btn-primary"
+                onclick="scrollToSection('workflow-actions')"
+            >
+                ⚡ Workflow Actions
+            </button>
+
+        {% endif %}
+
+    </div>
+
+</header>

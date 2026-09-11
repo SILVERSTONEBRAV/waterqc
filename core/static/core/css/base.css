@@ -1,0 +1,321 @@
+.topbar {
+    position: fixed;
+
+    top: 0;
+
+    /*
+      Override base.css sidebar coupling.
+    */
+    left: 0 !important;
+    right: 0 !important;
+
+    width: 100%;
+
+    height: var(--header-height);
+
+    z-index: var(--z-header);
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    padding-inline: var(--space-6);
+
+    background:
+        linear-gradient(
+            135deg,
+            var(--theme-surface),
+            color-mix(
+                in srgb,
+                var(--theme-accent) 8%,
+                var(--theme-surface)
+            ),
+            var(--theme-surface-strong)
+        );
+
+    border-bottom: 1px solid var(--theme-border);
+
+    backdrop-filter:
+        blur(18px)
+        saturate(180%)
+        brightness(1.05);
+
+    -webkit-backdrop-filter:
+        blur(18px)
+        saturate(180%)
+        brightness(1.05);
+
+    box-shadow:
+        0 8px 32px rgba(0,0,0,.16);
+
+    isolation: isolate;
+
+    overflow: hidden;
+
+    transform: translateZ(0);
+
+    transition:
+        height var(--t-med) var(--ease-fluid),
+        backdrop-filter var(--t-med) var(--ease-fluid),
+        box-shadow var(--t-med) var(--ease-fluid);
+}
+
+/* =========================================================
+   KILL SIDEBAR HEADER SHIFTS
+========================================================= */
+
+body.sidebar-collapsed .topbar {
+    left: 0 !important;
+}
+
+body.sidebar-open .topbar {
+    left: 0 !important;
+}
+
+/* =========================================================
+   SCROLLED STATE
+========================================================= */
+
+.topbar.scrolled {
+    height: 54px;
+
+    backdrop-filter:
+        blur(28px)
+        saturate(220%)
+        brightness(1.08);
+
+    -webkit-backdrop-filter:
+        blur(28px)
+        saturate(220%)
+        brightness(1.08);
+
+    box-shadow:
+        0 16px 48px rgba(0,0,0,.26);
+}
+
+/* =========================================================
+   VISUAL FX
+========================================================= */
+
+.topbar::before {
+    content: "";
+
+    position: absolute;
+    inset: 0;
+
+    pointer-events: none;
+
+    background:
+        radial-gradient(
+            circle at 15% 40%,
+            var(--nebula-1),
+            transparent 45%
+        ),
+
+        radial-gradient(
+            circle at 82% 30%,
+            var(--nebula-2),
+            transparent 45%
+        ),
+
+        radial-gradient(
+            circle at 60% 90%,
+            var(--nebula-3),
+            transparent 55%
+        );
+
+    filter: blur(20px);
+
+    opacity: .55;
+
+    z-index: 0;
+}
+
+.topbar::after {
+    content: "";
+
+    position: absolute;
+    inset: 0;
+
+    pointer-events: none;
+
+    background:
+        linear-gradient(
+            110deg,
+            transparent 25%,
+            var(--theme-accent-soft),
+            transparent 75%
+        );
+
+    transform: translateX(-120%);
+
+    animation: headerSweep 22s linear infinite;
+
+    z-index: 0;
+}
+
+@keyframes headerSweep {
+
+    0% {
+        transform: translateX(-120%);
+        opacity: 0;
+    }
+
+    40% {
+        opacity: .25;
+    }
+
+    100% {
+        transform: translateX(120%);
+        opacity: 0;
+    }
+}
+
+/* =========================================================
+   CONTENT LAYERS
+========================================================= */
+
+.brand,
+.brand-section,
+.user-menu {
+    position: relative;
+    z-index: 2;
+}
+
+/* =========================================================
+   BRAND
+========================================================= */
+
+.brand,
+.brand-section {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+}
+
+.logo {
+    width: 40px;
+    height: 40px;
+
+    object-fit: cover;
+
+    border-radius: var(--radius-lg);
+
+    border: 1px solid var(--theme-border);
+
+    box-shadow:
+        0 0 18px var(--theme-accent-soft);
+
+    transition:
+        transform var(--t-fast),
+        box-shadow var(--t-fast);
+}
+
+.brand:hover .logo {
+    transform: scale(1.06);
+
+    box-shadow:
+        0 0 24px var(--theme-accent-soft);
+}
+
+/* =========================================================
+   USER AREA
+========================================================= */
+
+.user-menu {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+}
+
+/* =========================================================
+   BUTTONS
+========================================================= */
+
+.theme-toggle,
+.notification-btn,
+.quick-action-btn {
+    width: 40px;
+    height: 40px;
+
+    display: grid;
+    place-items: center;
+
+    cursor: pointer;
+
+    border-radius: var(--radius-md);
+
+    border: 1px solid var(--theme-border);
+
+    background: var(--theme-surface);
+
+    color: var(--theme-text);
+
+    transition:
+        transform var(--t-fast),
+        background-color var(--t-fast),
+        border-color var(--t-fast);
+}
+
+.theme-toggle:hover,
+.notification-btn:hover,
+.quick-action-btn:hover {
+    transform: translateY(-2px);
+
+    background: var(--theme-surface-strong);
+
+    border-color: var(--theme-accent);
+}
+
+/* =========================================================
+   ACCESSIBILITY
+========================================================= */
+
+.theme-toggle:focus-visible,
+.notification-btn:focus-visible,
+.quick-action-btn:focus-visible {
+    box-shadow:
+        0 0 0 3px
+        color-mix(
+            in srgb,
+            var(--theme-accent) 40%,
+            transparent
+        );
+}
+
+/* =========================================================
+   RESPONSIVE
+========================================================= */
+
+@media (max-width: 768px) {
+
+    .topbar {
+        padding-inline: var(--space-5);
+    }
+}
+
+@media (max-width: 480px) {
+
+    .logo {
+        width: 34px;
+        height: 34px;
+    }
+
+    .theme-toggle,
+    .notification-btn,
+    .quick-action-btn {
+        width: 36px;
+        height: 36px;
+    }
+}
+
+/* =========================================================
+   REDUCED MOTION
+========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+
+    .topbar::after {
+        animation: none;
+    }
+}

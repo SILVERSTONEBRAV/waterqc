@@ -1,0 +1,30 @@
+{% extends "core/base/base.html" %}
+{% load static %}
+
+{% block title %}
+    NCWSCwaterLAB - Chemical Analysis
+{% endblock %}
+
+{% block header %}
+    {% include "accounts/partials/header.html" %}
+<link rel="stylesheet" href="{% static 'ca/css/dashboard.css' %}">
+
+{% endblock %}
+
+{% block extra_styles %}
+{% endblock %}
+
+{% block sidebar %}
+    {% include "ca/partials/sidebar.html" %}
+{% endblock %}
+
+{% block content %}
+    {% block accounts_content %}{% endblock %}
+{% endblock %}
+
+{% block modals %}
+
+{% endblock %}
+
+{% block extra_scripts %}
+{% endblock %}

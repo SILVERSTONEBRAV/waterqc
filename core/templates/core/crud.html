@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+{% load static dynamic_tags %}
+
+{% block title %}
+{% if view_type == 'list' %}
+    {{ model._meta.verbose_name_plural }}
+{% elif view_type == 'form' %}
+    {% if obj %}Edit {{ model._meta.verbose_name }}{% else %}Add {{ model._meta.verbose_name }}{% endif %}
+{% elif view_type == 'detail' %}
+    {{ obj }} Details
+{% elif view_type == 'delete' %}
+    Delete {{ obj }}
+{% endif %}
+{% endblock %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'core/css/table-manager.css' %}">
+<link rel="stylesheet" href="{% static 'core/css/crud.css' %}">
+<style>
+.table-container { overflow-x:auto; max-height:70vh; position:relative; }
+.drill-down { display: none; background-color: #f9f9f9; transition: all 0.3s ease; }
+.drill-toggle::before { content: '▶'; display:inline-block; margin-right:5px; transition: transform 0.2s; }
+.drill-toggle.expanded::before { transform: rotate(90deg); }
+.editable:focus { outline:2px solid #007bff; background-color:#fffbea; }
+tr:hover { background-color:#f1f1f1; }
+.loading-spinner { text-align:center; font-style:italic; color:#666; }
+.add-related-btn { font-size:0.85em; margin-left:5px; }
+.column-toggle { cursor:pointer; font-size:0.9em; margin-right:5px; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% if view_type == 'list' %}
+<div class="sticky-action-bar d-flex justify-content-between align-items-center p-2">
+    <input type="text" id="search-input" class="form-control form-control-sm" placeholder="🔍 Search {{ model._meta.verbose_name_plural|lower }}">
+    <div class="d-flex align-items-center gap-1">
+        {% if bulk_actions %}
+        <div class="btn-group">
+            <button class="btn btn-sm btn-secondary dropdown-toggle" data-bs-toggle="dropdown">Bulk Actions</button>
+            <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                {% for action in bulk_actions %}
+                <li>
+                    <a class="dropdown-item" href="#"
+                       onclick="document.getElementById('bulk-action-type').value='{{ action }}';
+                                document.getElementById('bulk-action-form').submit();">
+                        {{ action|capfirst }}
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+        <div class="btn-group">
+            <button class="btn btn-sm btn-dark dropdown-toggle" data-bs-toggle="dropdown">Export</button>
+            <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                <li><a class="dropdown-item export-link" data-type="csv" href="#">📄 CSV</a></li>
+                <li><a class="dropdown-item export-link" data-type="xlsx" href="#">📊 Excel</a></li>
+                <li><a class="dropdown-item export-link" data-type="docx" href="#">📝 Word</a></li>
+                <li><a class="dropdown-item export-link" data-type="pdf" href="#">📕 PDF</a></li>
+            </ul>
+        </div>
+        <button id="add-btn" class="btn btn-primary fw-bold p-1 ms-2">+</button>
+        <button id="print-btn" class="btn btn-sm btn-outline-dark ms-1">🖨 Print</button>
+    </div>
+</div>
+
+<!-- Bulk action form (HTMX) -->
+<form id="bulk-action-form" hx-post="" hx-include="#dynamic-table input.row-select:checked" hx-swap="none">
+    <input type="hidden" name="bulk_action" id="bulk-action-type">
+</form>
+
+<div class="table-container">
+    {% with fields=table_fields|default:model._meta.fields %}
+    <table id="dynamic-table" class="table table-striped table-hover">
+        <thead>
+            <tr>
+                <th><input type="checkbox" id="select-all"></th>
+                <th>#</th>
+                <th></th> <!-- Drill-down toggle -->
+                {% for field in fields %}
+                    <th>{{ field.verbose_name|capfirst }}</th>
+                {% endfor %}
+                <th class="text-end">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for obj in objects %}
+            <tr data-id="{{ obj.pk }}" class="row-clickable">
+                <td><input type="checkbox" class="row-select" name="selected_ids" value="{{ obj.pk }}"></td>
+                <td>{{ forloop.counter }}</td>
+                <td class="drill-toggle" data-parent="{{ obj.pk }}"></td>
+                {% for field in fields %}
+                    <td class="editable"
+                        {% if enable_inline_edit %}
+                        contenteditable="true"
+                        hx-post="{% url 'inline_edit' obj.pk %}"
+                        hx-trigger="blur"
+                        hx-vals='{"field":"{{ field.name }}","value":this.innerText}'
+                        hx-swap="none"
+                        {% endif %}
+                    >
+                        {{ obj|attr:field.name }}
+                    </td>
+                {% endfor %}
+                <td class="text-end">
+                    <button class="btn btn-sm btn-primary"
+                            hx-get="{% url edit_url_name obj.pk %}"
+                            hx-target="#crud-modal-body"
+                            hx-trigger="click"
+                            hx-swap="innerHTML">
+                        Edit
+                    </button>
+                    <button class="btn btn-sm btn-danger"
+                            hx-post="{% url delete_url_name obj.pk %}"
+                            hx-trigger="click"
+                            hx-confirm="Delete this item?"
+                            hx-swap="none"
+                            hx-on="htmx:afterRequest: this.closest('tr').remove()">
+                        Delete
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary"
+                            hx-get="{% url detail_url_name obj.pk %}"
+                            hx-target="#crud-modal-body"
+                            hx-trigger="click"
+                            hx-swap="innerHTML">
+                        View
+                    </button>
+                    <button class="btn btn-sm btn-outline-success add-related-btn"
+                            hx-get="/add-related/{{ obj.pk }}/"
+                            hx-target="#crud-modal-body"
+                            hx-trigger="click"
+                            hx-swap="innerHTML">
+                        + Related
+                    </button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endwith %}
+</div>
+
+<div id="crud-modal" class="modal fade" tabindex="-1" hx-target="#crud-modal-body" hx-swap="innerHTML">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-body" id="crud-modal-body">
+        <div class="text-center text-muted">Loading...</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+{% if view_type == 'list' %}
+<script type="module">
+import { TableManager } from "{% static 'core/js/table-manager.js' %}";
+const csrfToken = document.querySelector("[name=csrfmiddlewaretoken]")?.value;
+
+// Initialize TableManager with all features
+const tableManager = new TableManager({
+    tableSelector:"#dynamic-table",
+    searchSelector:"#search-input",
+    addBtnSelector:"#add-btn",
+    printBtnSelector:"#print-btn",
+    exportSelector:".export-link",
+    enableVirtualScroll:true,
+    enableColumnToggle:true,
+    enableDragDrop:true,
+    enableDebouncedSearch:true,
+    csrfToken
+});
+
+// Modal helpers for JS fallback
+const modalEl = document.getElementById("crud-modal");
+const modalBody = document.getElementById("crud-modal-body");
+const modalInstance = new bootstrap.Modal(modalEl);
+function openModal(html){ modalBody.innerHTML=html; modalInstance.show(); const first=modalBody.querySelector("input,select,textarea"); if(first) first.focus(); }
+function closeModal(){ modalInstance.hide(); modalBody.innerHTML=""; }
+async function fetchHTML(url){ const res=await fetch(url,{headers:{"X-CSRFToken":csrfToken}}); if(!res.ok) throw Error(res.status); return await res.text(); }
+
+// Drill-down lazy loading
+document.querySelectorAll(".drill-toggle").forEach(toggle=>{
+    toggle.onclick=async e=>{
+        e.stopPropagation();
+        const tr=toggle.closest("tr");
+        const parentId=tr.dataset.id;
+        const expanded=toggle.classList.toggle("expanded");
+        const existingRows=document.querySelectorAll(`tr.drill-down[data-parent="${parentId}"]`);
+        if(existingRows.length){ existingRows.forEach(r=>r.style.display=expanded?"table-row":"none"); return; }
+        if(expanded){
+            const placeholder=document.createElement("tr");
+            placeholder.className="drill-down";
+            placeholder.dataset.parent=parentId;
+            placeholder.innerHTML=`<td colspan="${tr.children.length}" class="loading-spinner">Loading related objects...</td>`;
+            tr.after(placeholder);
+            try{
+                const html=await fetchHTML(`/lazy-drill/${parentId}/`);
+                const temp=document.createElement("tbody"); temp.innerHTML=html;
+                placeholder.replaceWith(...temp.querySelectorAll("tr"));
+                bindTableActions();
+            }catch(err){ placeholder.innerHTML=`<td colspan="${tr.children.length}" class="text-danger">Failed: ${err.message}</td>`; }
+        }
+    };
+});
+
+// JS fallback for modal forms
+document.getElementById("add-btn")?.addEventListener("click", async ()=>{
+    openModal(await fetchHTML("{% url create_url_name %}"));
+    bindFormSubmit();
+});
+function bindFormSubmit(){
+    const form=modalBody.querySelector("form"); if(!form) return;
+    form.onsubmit=async e=>{
+        e.preventDefault();
+        const data=new FormData(form);
+        try{
+            const res=await fetch(form.action,{method:"POST",body:data,headers:{"X-CSRFToken":csrfToken}});
+            const html=await res.text();
+            if(res.ok){ closeModal(); bindTableActions(); }
+            else { modalBody.innerHTML=html; bindFormSubmit(); }
+        }catch(err){ alert(err.message); }
+    };
+}
+
+// Row click fallback to edit
+document.querySelectorAll(".row-clickable").forEach(row=>{
+    row.addEventListener("click", e=>{
+        if(!["BUTTON","INPUT","A"].includes(e.target.tagName)) {
+            row.querySelector(".edit-btn")?.click();
+        }
+    });
+});
+
+// Inline edit fallback
+document.querySelectorAll(".editable[contenteditable]").forEach(cell=>{
+    cell.addEventListener("blur", async ()=>{
+        const tr=cell.closest("tr");
+        const id=tr.dataset.id;
+        const field=cell.dataset.field;
+        const value=cell.innerText;
+        try{
+            await fetch(`/inline-edit/${id}/`,{
+                method:"POST",
+                headers:{"X-CSRFToken":csrfToken,"Content-Type":"application/json"},
+                body:JSON.stringify({field,value})
+            });
+        }catch(err){alert(err.message);}
+    });
+});
+
+bindTableActions();
+</script>
+{% endif %}
+{% endblock %}

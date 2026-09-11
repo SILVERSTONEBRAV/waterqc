@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Report</title>
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 12px; }
+    h2 { border-bottom: 1px solid #ccc; padding-bottom: 5px; }
+    h3 { margin-top: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    td, th { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    .section { margin-bottom: 40px; page-break-inside: avoid; }
+    .label { font-weight: bold; width: 150px; display: inline-block; }
+  </style>
+</head>
+<body>
+
+  {% if section %}
+  <div class="section">
+    <h2>Section Report</h2>
+    <p><span class="label">Name:</span> {{ section.name }}</p>
+    <p><span class="label">Treatment Plant:</span> {{ section.treatment_plant.name }}</p>
+  </div>
+  {% endif %}
+
+  {% if shift %}
+  <div class="section">
+    <h2>Shift Report</h2>
+    <p><span class="label">Name:</span> {{ shift.name }}</p>
+    <p><span class="label">Treatment Plant:</span> {{ shift.treatment_plant.name }}</p>
+    <p><span class="label">Section:</span> {{ shift.section.name }}</p>
+    <p><span class="label">Start:</span> {{ shift.start_time }}</p>
+    <p><span class="label">End:</span> {{ shift.end_time }}</p>
+    <p><span class="label">Supervisor:</span> {{ shift.supervisor.get_full_name }}</p>
+  </div>
+  {% endif %}
+
+  {% if roster %}
+  <div class="section">
+    <h2>Monthly Roster</h2>
+    <p><span class="label">Month:</span> {{ roster.month }}</p>
+    <p><span class="label">Year:</span> {{ roster.year }}</p>
+    <p><span class="label">Section:</span> {{ roster.section.name }}</p>
+    <p><span class="label">Treatment Plant:</span> {{ roster.treatment_plant.name }}</p>
+    <h3>Assignments:</h3>
+    <table>
+      <thead>
+        <tr><th>Employee</th><th>Shift</th><th>Date</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        {% for a in roster.assignments.all %}
+        <tr>
+          <td>{{ a.employee.get_full_name }}</td>
+          <td>{{ a.shift.name }}</td>
+          <td>{{ a.date }}</td>
+          <td>{{ a.attendance_status }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if assignment %}
+  <div class="section">
+    <h2>Shift Assignment</h2>
+    <p><span class="label">Employee:</span> {{ assignment.employee.get_full_name }}</p>
+    <p><span class="label">Shift:</span> {{ assignment.shift.name }}</p>
+    <p><span class="label">Date:</span> {{ assignment.date }}</p>
+    <p><span class="label">Status:</span> {{ assignment.attendance_status }}</p>
+  </div>
+  {% endif %}
+
+  {% if apparatus %}
+  <div class="section">
+    <h2>Apparatus</h2>
+    <p><span class="label">Name:</span> {{ apparatus.name }}</p>
+    <p><span class="label">Equipment:</span> {{ apparatus.equipment.name }}</p>
+  </div>
+  {% endif %}
+
+  {% if condition %}
+  <div class="section">
+    <h2>Apparatus Condition</h2>
+    <p><span class="label">Status:</span> {{ condition.status }}</p>
+    <p><span class="label">Apparatus:</span> {{ condition.apparatus.name }}</p>
+    <p><span class="label">Handover ID:</span> {{ condition.handover.id }}</p>
+  </div>
+  {% endif %}
+
+  {% if handover %}
+  <div class="section">
+    <h2>Shift Handover</h2>
+    <p><span class="label">Date:</span> {{ handover.date }}</p>
+    <p><span class="label">Shift:</span> {{ handover.shift.name }}</p>
+    <p><span class="label">Outgoing Supervisor:</span> {{ handover.outgoing_supervisor.get_full_name }}</p>
+    <p><span class="label">Incoming Supervisor:</span> {{ handover.incoming_supervisor.get_full_name }}</p>
+    <h3>Apparatus Conditions:</h3>
+    <table>
+      <thead>
+        <tr><th>Apparatus</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        {% for ac in handover.apparatus_conditions.all %}
+        <tr>
+          <td>{{ ac.apparatus.name }}</td>
+          <td>{{ ac.status }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+{% if equipment %}
+<div class="section">
+  <h2>Equipment Detail</h2>
+  <p><strong>Name:</strong> {{ equipment.name }}</p>
+  <p><strong>Section:</strong> {{ equipment.section }}</p>
+  <p><strong>Status:</strong> {{ equipment.status }}</p>
+  <p><strong>Main Category:</strong> {{ equipment.main_category }}</p>
+  <p><strong>Sub Category:</strong> {{ equipment.sub_category }}</p>
+  <p><strong>Supplier:</strong> {{ equipment.supplier }}</p>
+  <p><strong>Purchase Date:</strong> {{ equipment.purchase_date }}</p>
+  <p><strong>Next Maintenance:</strong> {{ equipment.next_maintenance_date }}</p>
+</div>
+{% endif %}
+
+{% if item %}
+<div class="section">
+  <h2>Inventory Item Detail</h2>
+  <p><strong>Name:</strong> {{ item.name }}</p>
+  <p><strong>Section:</strong> {{ item.section }}</p>
+  <p><strong>Category:</strong> {{ item.category }}</p>
+  <p><strong>Type:</strong> {{ item.item_type }}</p>
+  <p><strong>Supplier:</strong> {{ item.supplier }}</p>
+  <p><strong>Quantity:</strong> {{ item.quantity }}</p>
+  <p><strong>Unit:</strong> {{ item.unit }}</p>
+  <p><strong>Purchase Date:</strong> {{ item.purchase_date }}</p>
+</div>
+{% endif %}
+
+{% if reagent %}
+<div class="section">
+  <h2>Laboratory Reagent Detail</h2>
+  <p><strong>Name:</strong> {{ reagent.name }}</p>
+  <p><strong>Section:</strong> {{ reagent.section }}</p>
+  <p><strong>Category:</strong> {{ reagent.category }}</p>
+  <p><strong>Type:</strong> {{ reagent.item_type }}</p>
+  <p><strong>Supplier:</strong> {{ reagent.supplier }}</p>
+  <p><strong>Quantity:</strong> {{ reagent.quantity }}</p>
+  <p><strong>Unit:</strong> {{ reagent.unit }}</p>
+  <p><strong>Hazard Class:</strong> {{ reagent.get_hazard_class_display }}</p>
+  <p><strong>Formula:</strong> {{ reagent.formula }}</p>
+  <p><strong>Purchase Date:</strong> {{ reagent.purchase_date }}</p>
+</div>
+{% endif %}
+
+

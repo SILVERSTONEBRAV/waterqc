@@ -1,0 +1,21 @@
+
+<div class="ca-empty-state">
+    <div class="ca-empty-icon">
+        <span class="ca-icon ca-icon-{{ icon|default:'info' }}"></span>
+    </div>
+
+    <strong>{{ title|default:"Nothing to display" }}</strong>
+
+    <p>
+        {{ message|default:"There is currently no information available." }}
+    </p>
+
+    {% if action_url %}
+        <a
+            href="{{ action_url }}"
+            class="ca-button ca-button-secondary"
+        >
+            {{ action_label|default:"View details" }}
+        </a>
+    {% endif %}
+</div>

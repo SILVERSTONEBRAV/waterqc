@@ -1,0 +1,494 @@
+{% extends "base.html" %}
+
+{% block title %}Chemical Analysis Process{% endblock %}
+
+{% block content %}
+
+<div class="ca-page">
+    <div class="page-header">
+        <div>
+            <h1>Chemical Analysis Process</h1>
+            <p>
+                Process #{{ process.pk }}
+                {% if process.batch.sample_id %}
+                    · {{ process.batch.sample_id }}
+                {% endif %}
+            </p>
+        </div>
+    <div class="page-actions">
+        <a href="{% url 'ca:process-list' %}" class="btn btn-secondary">
+            Processes
+        </a>
+
+        <a
+            href="{% url 'ca:process-json' process.pk %}"
+            class="btn btn-secondary"
+        >
+            Process Data
+        </a>
+
+        {% if process.status == "RECEIVED" %}
+            <a
+                href="{% url 'ca:process-action-form' process.pk %}"
+                class="btn btn-primary"
+            >
+                Continue Workflow
+            </a>
+        {% elif process.status == "ANALYSIS" %}
+            <a
+                href="{% url 'ca:process-action-form' process.pk %}"
+                class="btn btn-primary"
+            >
+                Record Analysis
+            </a>
+        {% elif process.status == "QA" %}
+            <a
+                href="{% url 'ca:process-action-form' process.pk %}"
+                class="btn btn-warning"
+            >
+                QA Review
+            </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="details-grid">
+    <div class="card">
+        <div class="card-header">
+            <h2>Process</h2>
+        </div>
+
+        <div class="card-body">
+            <div class="details-grid">
+                <div class="detail-item">
+                    <span class="detail-label">Process ID</span>
+                    <span class="detail-value">#{{ process.pk }}</span>
+                </div>
+
+                <div class="detail-item">
+                    <span class="detail-label">Status</span>
+                    <span class="detail-value">
+                        {% if process.status == "COMPLETED" %}
+                            <span class="badge badge-success">
+                                {{ process.get_status_display|default:process.status }}
+                            </span>
+                        {% elif process.status == "REJECTED" %}
+                            <span class="badge badge-danger">
+                                {{ process.get_status_display|default:process.status }}
+                            </span>
+                        {% elif process.status == "QA" or process.status == "APPROVED" %}
+                            <span class="badge badge-info">
+                                {{ process.get_status_display|default:process.status }}
+                            </span>
+                        {% else %}
+                            <span class="badge badge-warning">
+                                {{ process.get_status_display|default:process.status }}
+                            </span>
+                        {% endif %}
+                    </span>
+                </div>
+
+                <div class="detail-item">
+                    <span class="detail-label">Created</span>
+                    <span class="detail-value">
+                        {{ process.created_at|date:"d M Y H:i" }}
+                    </span>
+                </div>
+
+                <div class="detail-item">
+                    <span class="detail-label">Last Updated</span>
+                    <span class="detail-value">
+                        {{ process.updated_at|date:"d M Y H:i" }}
+                    </span>
+                </div>
+
+                <div class="detail-item">
+                    <span class="detail-label">Initiated By</span>
+                    <span class="detail-value">
+                        {% if process.initiated_by %}
+                            {{ process.initiated_by.get_full_name|default:process.initiated_by.username }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </span>
+                </div>
+
+                <div class="detail-item">
+                    <span class="detail-label">Assigned Analyst</span>
+                    <span class="detail-value">
+                        {% if process.assigned_analyst %}
+                            {{ process.assigned_analyst.get_full_name|default:process.assigned_analyst.username }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </span>
+                </div>
+
+                <div class="detail-item">
+                    <span class="detail-label">QA Officer</span>
+                    <span class="detail-value">
+                        {% if process.qa_officer %}
+                            {{ process.qa_officer.get_full_name|default:process.qa_officer.username }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </span>
+                </div>
+
+                <div class="detail-item">
+                    <span class="detail-label">Approver</span>
+                    <span class="detail-value">
+                        {% if process.approver %}
+                            {{ process.approver.get_full_name|default:process.approver.username }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2>Batch</h2>
+        </div>
+
+        <div class="card-body">
+            {% if process.batch %}
+                <div class="details-grid">
+                    <div class="detail-item">
+                        <span class="detail-label">Sample ID</span>
+                        <span class="detail-value">
+                            <a href="{% url 'ca:batch-detail' process.batch.pk %}">
+                                {{ process.batch.sample_id }}
+                            </a>
+                        </span>
+                    </div>
+
+                    <div class="detail-item">
+                        <span class="detail-label">Batch ID</span>
+                        <span class="detail-value">
+                            #{{ process.batch.pk }}
+                        </span>
+                    </div>
+
+                    <div class="detail-item">
+                        <span class="detail-label">Status</span>
+                        <span class="detail-value">
+                            {% if process.batch.status == "APPROVED" %}
+                                <span class="badge badge-success">
+                                    {{ process.batch.get_status_display|default:process.batch.status }}
+                                </span>
+                            {% elif process.batch.status == "REJECTED" %}
+                                <span class="badge badge-danger">
+                                    {{ process.batch.get_status_display|default:process.batch.status }}
+                                </span>
+                            {% else %}
+                                <span class="badge badge-warning">
+                                    {{ process.batch.get_status_display|default:process.batch.status }}
+                                </span>
+                            {% endif %}
+                        </span>
+                    </div>
+
+                    <div class="detail-item">
+                        <span class="detail-label">Supplier</span>
+                        <span class="detail-value">
+                            {{ process.batch.supplier|default:"—" }}
+                        </span>
+                    </div>
+
+                    <div class="detail-item">
+                        <span class="detail-label">Chemical</span>
+                        <span class="detail-value">
+                            {{ process.batch.chemical|default:"—" }}
+                        </span>
+                    </div>
+
+                    <div class="detail-item">
+                        <span class="detail-label">Received</span>
+                        <span class="detail-value">
+                            {{ process.batch.received_date|date:"d M Y H:i" }}
+                        </span>
+                    </div>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    No batch is associated with this process.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if process.analysis_request %}
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h2>Analysis Request</h2>
+        </div>
+
+        <a
+            href="{% url 'ca:request-detail' process.analysis_request.pk %}"
+            class="btn btn-sm btn-secondary"
+        >
+            View Request
+        </a>
+    </div>
+
+    <div class="card-body">
+        <div class="details-grid">
+            <div class="detail-item">
+                <span class="detail-label">Request ID</span>
+                <span class="detail-value">
+                    {{ process.analysis_request.request_id }}
+                </span>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Status</span>
+                <span class="detail-value">
+                    {{ process.analysis_request.get_status_display|default:process.analysis_request.status }}
+                </span>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Location</span>
+                <span class="detail-value">
+                    {{ process.analysis_request.location|default:"—" }}
+                </span>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Deadline</span>
+                <span class="detail-value">
+                    {{ process.analysis_request.deadline|date:"d M Y H:i" }}
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h2>Analysis Progress</h2>
+        </div>
+
+        <a
+            href="{% url 'ca:process-statistics' process.pk %}"
+            class="btn btn-sm btn-secondary"
+        >
+            Statistics
+        </a>
+    </div>
+
+    <div class="card-body">
+        <div class="details-grid">
+            <div class="detail-item">
+                <span class="detail-label">Required Tests</span>
+                <span class="detail-value">
+                    {{ process.required_test_count|default:"0" }}
+                </span>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Completed Tests</span>
+                <span class="detail-value">
+                    {{ process.completed_test_count|default:"0" }}
+                </span>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Passed Tests</span>
+                <span class="detail-value">
+                    {{ process.passed_test_count|default:"0" }}
+                </span>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Pending Tests</span>
+                <span class="detail-value">
+                    {{ process.pending_tests|default:"0" }}
+                </span>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Progress</span>
+                <span class="detail-value">
+                    {{ process.analysis_progress|default:"0" }}%
+                </span>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Analysis Complete</span>
+                <span class="detail-value">
+                    {% if process.is_analysis_complete %}
+                        <span class="badge badge-success">Yes</span>
+                    {% else %}
+                        <span class="badge badge-warning">No</span>
+                    {% endif %}
+                </span>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Overdue</span>
+                <span class="detail-value">
+                    {% if process.is_overdue %}
+                        <span class="badge badge-danger">Overdue</span>
+                    {% else %}
+                        <span class="badge badge-success">On Schedule</span>
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if process.test_results %}
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h2>Test Results</h2>
+        </div>
+
+        <a href="{% url 'ca:result-list' %}" class="btn btn-sm btn-secondary">
+            All Results
+        </a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Parameter</th>
+                    <th>Value</th>
+                    <th>Unit</th>
+                    <th>Status</th>
+                    <th>Analyst</th>
+                    <th>Tested</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for result in process.test_results %}
+                <tr>
+                    <td>
+                        {{ result.parameter|default:"—" }}
+                    </td>
+
+                    <td>
+                        {% if result.value is not None %}
+                            {{ result.value }}
+                        {% elif result.textual_result %}
+                            {{ result.textual_result }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {{ result.parameter.unit|default:"—" }}
+                    </td>
+
+                    <td>
+                        {% if result.status == "PASS" %}
+                            <span class="badge badge-success">Pass</span>
+                        {% elif result.status == "FAIL" %}
+                            <span class="badge badge-danger">Fail</span>
+                        {% elif result.status == "NA" %}
+                            <span class="badge">N/A</span>
+                        {% else %}
+                            <span class="badge badge-warning">
+                                {{ result.get_status_display|default:result.status }}
+                            </span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if result.analyst %}
+                            {{ result.analyst.get_full_name|default:result.analyst.username }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {{ result.tested_at|date:"d M Y H:i" }}
+                    </td>
+                </tr>
+
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="empty-state">
+                        No test results have been recorded.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-header">
+        <h2>Workflow</h2>
+    </div>
+
+    <div class="card-body">
+        <div class="details-grid">
+            <div class="detail-item">
+                <span class="detail-label">Current Stage</span>
+                <span class="detail-value">
+                    {{ process.get_status_display|default:process.status }}
+                </span>
+            </div>
+
+            {% if process.analysis_started_at %}
+            <div class="detail-item">
+                <span class="detail-label">Analysis Started</span>
+                <span class="detail-value">
+                    {{ process.analysis_started_at|date:"d M Y H:i" }}
+                </span>
+            </div>
+            {% endif %}
+
+            {% if process.analysis_completed_at %}
+            <div class="detail-item">
+                <span class="detail-label">Analysis Completed</span>
+                <span class="detail-value">
+                    {{ process.analysis_completed_at|date:"d M Y H:i" }}
+                </span>
+            </div>
+            {% endif %}
+
+            {% if process.completed_at %}
+            <div class="detail-item">
+                <span class="detail-label">Process Completed</span>
+                <span class="detail-value">
+                    {{ process.completed_at|date:"d M Y H:i" }}
+                </span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="page-actions">
+    <a href="{% url 'ca:process-list' %}" class="btn btn-secondary">
+        Back to Processes
+    </a>
+
+    <a
+        href="{% url 'ca:process-refresh' process.pk %}"
+        class="btn btn-secondary"
+    >
+        Refresh
+    </a>
+</div>
+
+</div>
+{% endblock %}

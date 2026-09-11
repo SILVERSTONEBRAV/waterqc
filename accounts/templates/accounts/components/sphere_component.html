@@ -1,0 +1,131 @@
+{% load static %}
+<!-- accounts/templates/accounts/components/sphere_component.html -->
+
+<div id="sphereWrapper"
+     class="sphere-wrapper"
+     aria-hidden="true">
+    <canvas id="sphereCanvas"></canvas>
+</div>
+
+<style>
+.sphere-wrapper {
+    width: 100%;
+    max-width: 320px;
+    aspect-ratio: 1 / 1;      /* CRITICAL */
+    margin: 0 auto 1rem auto;
+    position: relative;
+}
+
+#sphereCanvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    pointer-events: none;
+}
+</style>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r155/three.min.js"></script>
+
+<script>
+(function () {
+    if (window.__sphereInitialized) return;
+    window.__sphereInitialized = true;
+
+    const wrapper = document.getElementById('sphereWrapper');
+    const canvas  = document.getElementById('sphereCanvas');
+
+    if (!wrapper || !canvas || !window.THREE) return;
+
+    const scene = new THREE.Scene();
+
+    const camera = new THREE.PerspectiveCamera(
+        60,
+        1,
+        0.1,
+        100
+    );
+    camera.position.z = 4;
+
+    const renderer = new THREE.WebGLRenderer({
+        canvas,
+        antialias: true,
+        alpha: true
+    });
+
+    renderer.setPixelRatio(window.devicePixelRatio);
+
+    /* ---------- Resize ---------- */
+    function resize() {
+        const size = wrapper.clientWidth;
+        renderer.setSize(size, size, false);
+        camera.aspect = 1;
+        camera.updateProjectionMatrix();
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    /* ---------- Lighting ---------- */
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+
+    const light = new THREE.PointLight(0xffffff, 1.5);
+    light.position.set(5, 5, 5);
+    scene.add(light);
+
+    /* ---------- Center logo ---------- */
+    const loader = new THREE.TextureLoader();
+    loader.load(
+        "{% static 'image/favicon.ico' %}",
+        texture => {
+            const plane = new THREE.Mesh(
+                new THREE.PlaneGeometry(1, 1),
+                new THREE.MeshBasicMaterial({
+                    map: texture,
+                    transparent: true
+                })
+            );
+            scene.add(plane);
+        }
+    );
+
+    /* ---------- Spheres ---------- */
+    const inner = new THREE.Mesh(
+        new THREE.SphereGeometry(0.9, 64, 32),
+        new THREE.MeshPhysicalMaterial({
+            color: 0xff00cc,
+            emissive: 0xff00cc,
+            emissiveIntensity: 0.6,
+            transparent: true,
+            opacity: 0.35,
+            roughness: 0.1,
+            metalness: 0.9
+        })
+    );
+    scene.add(inner);
+
+    const outer = new THREE.Mesh(
+        new THREE.SphereGeometry(1.1, 64, 32),
+        new THREE.MeshPhysicalMaterial({
+            color: 0x00ccff,
+            emissive: 0x00ccff,
+            emissiveIntensity: 0.5,
+            transparent: true,
+            opacity: 0.25,
+            roughness: 0.2,
+            metalness: 0.4
+        })
+    );
+    scene.add(outer);
+
+    /* ---------- Animation ---------- */
+    function animate() {
+        inner.rotation.y += 0.005;
+        inner.rotation.x += 0.003;
+        outer.rotation.y -= 0.004;
+        outer.rotation.x += 0.002;
+
+        renderer.render(scene, camera);
+        requestAnimationFrame(animate);
+    }
+    animate();
+})();
+</script>

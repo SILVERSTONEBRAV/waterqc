@@ -1,0 +1,64 @@
+<div class="wf-model-detail">
+
+    <h2>{{ model.label }}</h2>
+
+    <!-- STATE DISTRIBUTION -->
+    <div class="panel">
+
+        <h3>State Distribution</h3>
+
+        {% for state, items in model.states.items %}
+            <div class="state-row">
+                <span class="state-name">{{ state }}</span>
+                <span class="state-count">{{ items|length }}</span>
+            </div>
+        {% endfor %}
+
+    </div>
+
+    <!-- RECENT EVENTS -->
+    <div class="panel">
+
+        <h3>Recent Execution Trace</h3>
+
+        {% for r in model.recent %}
+            <div class="event-item">
+                {{ r }}
+            </div>
+        {% empty %}
+            <div class="empty">No recent activity</div>
+        {% endfor %}
+
+    </div>
+
+    <!-- ANOMALY SIGNAL -->
+    <div class="panel">
+
+        <h3>ML Signal Layer</h3>
+
+        {% if model.anomalies %}
+            <div class="danger">⚠ Anomaly Detected in Event Path</div>
+        {% else %}
+            <div class="ok">Stable Execution Pattern</div>
+        {% endif %}
+
+    </div>
+
+    <!-- DAG LINK -->
+    <div class="panel">
+
+        <button hx-get="?section=dag&model={{ model.key }}"
+                hx-target="#wf-detail"
+                hx-swap="innerHTML">
+            Open DAG View
+        </button>
+
+        <button hx-get="?section=debug&model={{ model.key }}"
+                hx-target="#wf-detail"
+                hx-swap="innerHTML">
+            Debug Workflow
+        </button>
+
+    </div>
+
+</div>

@@ -1,0 +1,76 @@
+{% load static %}
+
+{% comment %}
+Enhanced Company Branding Component
+- Displays logo if available.
+- If no logo, shows initials in a circular dynamic gradient placeholder.
+- Company label shows initials + "waterLAB".
+{% endcomment %}
+
+<div id="companyBrandingWrapper"
+     style="text-align:center; margin-bottom:1.5rem;"
+     {% if company and company.logo %}data-logo="{{ company.logo.url }}"{% endif %}>
+
+    {% if company and company.logo %}
+        <img src="{{ company.logo.url }}"
+             alt="{{ company.name|default:'Company' }}"
+             class="company-logo"
+             style="
+                 height:100px;
+                 width:auto;
+                 border-radius:12px;
+                 object-fit:contain;
+                 box-shadow:0 4px 12px rgba(0,0,0,0.4);
+                 transition: transform 0.3s ease;
+             ">
+    {% else %}
+        {% comment %} Placeholder with company initials and gradient {% endcomment %}
+        {% with initials=company.name|default:"NCWSC"|slice:":2" %}
+        <div class="company-placeholder" style="
+            height:100px;
+            width:100px;
+            border-radius:50%;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            color:#fff;
+            font-weight:700;
+            font-size:1.4rem;
+            box-shadow:0 4px 12px rgba(0,0,0,0.4);
+            margin:0 auto;
+            background: linear-gradient(135deg, #00ffcc, #0066ff);
+            animation: placeholderGradient 8s ease infinite;
+        ">
+            {{ initials }}
+        </div>
+        {% endwith %}
+    {% endif %}
+
+    {% if company and company.name %}
+        {% with initials=company.name|slice:":2" %}
+        <div class="company-name" style="
+            margin-top:0.5rem;
+            font-size:1.4rem;
+            font-weight:700;
+            color:#002a50; /* darker, sleek color */
+            text-shadow:0 1px 4px rgba(0,0,0,0.6);
+        ">
+            {{ initials }}waterLAB
+        </div>
+        {% endwith %}
+    {% endif %}
+
+</div>
+
+<style>
+/* Dynamic gradient animation for placeholder */
+@keyframes placeholderGradient {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+.company-placeholder {
+    background-size: 200% 200%;
+}
+</style>

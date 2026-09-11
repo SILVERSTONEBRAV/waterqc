@@ -1,0 +1,105 @@
+{% load static %}
+
+<nav
+    aria-label="Breadcrumb"
+    class="border-b border-slate-200 bg-white shadow-sm">
+
+    <div class="mx-auto flex w-full max-w-[1800px] items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+
+        <div class="flex min-w-0 items-center gap-2 overflow-x-auto whitespace-nowrap">
+
+            <a href="{% url 'qc_analytics:dashboard' %}"
+               class="flex items-center gap-2 rounded-lg px-2 py-1 text-sm font-medium text-slate-500 transition hover:bg-slate-100 hover:text-blue-700">
+
+                <svg class="h-4 w-4"
+                     fill="none"
+                     stroke="currentColor"
+                     viewBox="0 0 24 24">
+
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M3 10.5L12 3l9 7.5V21a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1v-10.5z"/>
+
+                </svg>
+
+                <span>Dashboard</span>
+
+            </a>
+
+            {% if breadcrumbs %}
+
+                {% for crumb in breadcrumbs %}
+
+                    <svg class="h-4 w-4 flex-shrink-0 text-slate-400"
+                         fill="none"
+                         stroke="currentColor"
+                         viewBox="0 0 24 24">
+
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M9 5l7 7-7 7"/>
+
+                    </svg>
+
+                    {% if crumb.url and not forloop.last %}
+
+                        <a href="{{ crumb.url }}"
+                           class="rounded-lg px-2 py-1 text-sm font-medium text-slate-500 transition hover:bg-slate-100 hover:text-blue-700">
+
+                            {{ crumb.label }}
+
+                        </a>
+
+                    {% else %}
+
+                        <span class="rounded-lg bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-700">
+
+                            {{ crumb.label }}
+
+                        </span>
+
+                    {% endif %}
+
+                {% endfor %}
+
+            {% else %}
+
+                <svg class="h-4 w-4 flex-shrink-0 text-slate-400"
+                     fill="none"
+                     stroke="currentColor"
+                     viewBox="0 0 24 24">
+
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M9 5l7 7-7 7"/>
+
+                </svg>
+
+                <span class="rounded-lg bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-700">
+
+                    {% block page_title %}
+                        {{ page_title|default:"Current Page" }}
+                    {% endblock %}
+
+                </span>
+
+            {% endif %}
+
+        </div>
+
+        <div class="hidden items-center gap-3 lg:flex">
+
+            {% block breadcrumb_actions %}
+            {% endblock %}
+
+        </div>
+
+    </div>
+
+</nav>

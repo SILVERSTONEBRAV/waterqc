@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; font-size: 12px; }
+        h1, h2 { color: #333; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #aaa; padding: 4px; text-align: left; }
+    </style>
+</head>
+<body>
+    <h1>Shift Handover Report</h1>
+    <p><strong>Date:</strong> {{ handover.date }}</p>
+    <p><strong>Shift:</strong> {{ handover.shift }}</p>
+    <p><strong>Outgoing Supervisor:</strong> {{ handover.outgoing_supervisor }}</p>
+    <p><strong>Incoming Supervisor:</strong> {{ handover.incoming_supervisor }}</p>
+    <p><strong>Notes:</strong> {{ handover.handover_notes }}</p>
+
+    <h2>Apparatus Conditions</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Apparatus</th>
+                <th>Status</th>
+                <th>Remarks</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ac in handover.apparatus_conditions.all %}
+            <tr>
+                <td>{{ ac.apparatus.name }}</td>
+                <td>{{ ac.status }}</td>
+                <td>{{ ac.remarks }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

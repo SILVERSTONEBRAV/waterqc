@@ -1,0 +1,513 @@
+/* =========================================================
+   ADVANCED MULTI-THEME DESIGN SYSTEM (CLEAN VERSION)
+========================================================= */
+
+/* ---------------- BASE TOKENS ---------------- */
+:root {
+    --ease-fluid: cubic-bezier(.22,1,.36,1);
+    --ease-spring: cubic-bezier(.34,1.56,.64,1);
+    --ease-smooth: cubic-bezier(.4,0,.2,1);
+    --ease-snap: cubic-bezier(.83,0,.17,1);
+
+    --t-instant: 80ms;
+    --t-fast: 140ms;
+    --t-med: 280ms;
+    --t-slow: 520ms;
+    --t-ultra: 1000ms;
+
+    --blur-xs: 4px;
+    --blur-sm: 10px;
+    --blur-md: 18px;
+    --blur-lg: 28px;
+    --blur-xl: 40px;
+    --blur-xxl: 70px;
+
+    --radius-xs: 8px;
+    --radius-sm: 12px;
+    --radius-md: 18px;
+    --radius-lg: 24px;
+    --radius-xl: 32px;
+    --radius-xxl: 42px;
+
+    --shadow-xs: 0 2px 8px rgba(0,0,0,.08);
+    --shadow-sm: 0 8px 24px rgba(0,0,0,.10);
+    --shadow-md: 0 18px 40px rgba(0,0,0,.14);
+    --shadow-lg: 0 28px 70px rgba(0,0,0,.20);
+    --shadow-xl: 0 50px 140px rgba(0,0,0,.28);
+
+    --z-background: -10;
+    --z-particles: -5;
+    --z-content: 10;
+    --z-sidebar: 500;
+    --z-header: 1000;
+    --z-modal: 5000;
+    --z-overlay: 10000;
+
+    --color-success:#22c55e;
+    --color-warning:#f59e0b;
+    --color-danger:#ef4444;
+    --color-info:#3b82f6;
+
+    /* DEFAULT THEME */
+    --theme-bg:#edf4ff;
+    --theme-surface:rgba(255,255,255,.72);
+    --theme-surface-strong:rgba(255,255,255,.92);
+    --theme-text:#0f172a;
+    --theme-muted:#64748b;
+    --theme-border:rgba(255,255,255,.65);
+
+    --theme-accent:#2563eb;
+    --theme-accent-soft:rgba(37,99,235,.20);
+    --theme-accent-glow:rgba(37,99,235,.35);
+
+    --nebula-1:rgba(37,99,235,.20);
+    --nebula-2:rgba(168,85,247,.15);
+    --nebula-3:rgba(34,211,238,.15);
+
+    --theme-gradient: linear-gradient(135deg, var(--theme-accent), rgba(255,255,255,.1));
+    --theme-depth: linear-gradient(180deg, rgba(255,255,255,.08), transparent);
+}
+
+/* =========================================================
+   GLOBAL LAYOUT ENHANCEMENTS
+========================================================= */
+html, body {
+    min-height: 100%;
+    background: var(--theme-bg);
+    color: var(--theme-text);
+    transition: background var(--t-ultra) var(--ease-fluid),
+                color var(--t-slow) var(--ease-fluid);
+    overflow-x: hidden;
+}
+
+.surface,.card,.panel,.widget,.modal,.dropdown-menu{
+    background: var(--theme-depth), var(--theme-surface);
+    backdrop-filter: blur(32px) saturate(180%);
+}
+
+.glow-theme{
+    box-shadow:
+        0 0 30px var(--theme-accent-soft),
+        0 0 80px var(--theme-accent-soft);
+}
+
+.hero-panel::after{
+    background: var(--theme-accent-soft);
+    opacity: .85;
+    filter: blur(140px);
+}
+
+.border-glow{
+    box-shadow:
+        0 0 18px var(--theme-accent-soft),
+        inset 0 0 10px rgba(255,255,255,.04);
+}
+
+::selection{
+    background: var(--theme-accent-soft);
+    color: var(--theme-text);
+}
+
+@media (prefers-reduced-motion: reduce){
+    *{ animation:none !important; transition:none !important; }
+}
+
+/* =========================================================
+   THEMES
+========================================================= */
+
+/* ---------------- OLED ---------------- */
+html[data-theme="oled"]{
+    --theme-bg:#000;
+    --theme-surface:rgba(10,10,10,.82);
+    --theme-surface-strong:rgba(18,18,18,.96);
+    --theme-text:#fff;
+    --theme-muted:#a1a1aa;
+    --theme-border:rgba(255,255,255,.06);
+
+    --theme-accent:#00e5ff;
+    --theme-accent-soft:rgba(0,229,255,.25);
+    --theme-accent-glow:rgba(0,229,255,.55);
+
+    --nebula-1:rgba(0,229,255,.18);
+    --nebula-2:rgba(120,80,255,.12);
+    --nebula-3:rgba(255,255,255,.06);
+
+    --theme-gradient: radial-gradient(circle at 30% 20%, #00e5ff22, transparent 60%);
+    --theme-depth: linear-gradient(180deg, rgba(0,229,255,.08), transparent);
+}
+
+/* ---------------- AURORA ---------------- */
+html[data-theme="aurora"]{
+    --theme-bg:#120018;
+    --theme-surface:rgba(60,0,90,.55);
+    --theme-surface-strong:rgba(90,0,130,.75);
+    --theme-text:#fff;
+    --theme-muted:#f5d0fe;
+    --theme-border:rgba(255,255,255,.08);
+
+    --theme-accent:#ff00ff;
+    --theme-accent-soft:rgba(255,0,255,.22);
+    --theme-accent-glow:rgba(255,0,255,.50);
+
+    --nebula-1:rgba(255,0,255,.35);
+    --nebula-2:rgba(0,255,255,.18);
+    --nebula-3:rgba(255,120,200,.22);
+
+    --theme-gradient: linear-gradient(120deg,#ff00ff33,#00ffff22);
+    --theme-depth: radial-gradient(circle at 70% 30%, rgba(255,0,255,.12), transparent 60%);
+}
+
+/* ---------------- CELESTIAL ---------------- */
+html[data-theme="celestial"]{
+    --theme-bg:#01040f;
+    --theme-surface:rgba(10,20,60,.55);
+    --theme-surface-strong:rgba(20,40,90,.85);
+    --theme-text:#eaf7ff;
+    --theme-muted:#93c5fd;
+
+    --theme-accent:#38bdf8;
+    --theme-accent-soft:rgba(56,189,248,.22);
+    --theme-accent-glow:rgba(56,189,248,.45);
+
+    --nebula-1:rgba(59,130,246,.25);
+    --nebula-2:rgba(34,211,238,.18);
+    --nebula-3:rgba(255,255,255,.08);
+
+    --theme-gradient: radial-gradient(circle at 50% 20%, rgba(56,189,248,.18), transparent 70%);
+}
+
+/* ---------------- OCEAN ---------------- */
+html[data-theme="ocean"]{
+    --theme-bg:#00181c;
+    --theme-surface:rgba(0,60,70,.55);
+    --theme-surface-strong:rgba(0,90,110,.85);
+    --theme-text:#e6fffb;
+    --theme-muted:#5eead4;
+
+    --theme-accent:#14b8a6;
+    --theme-accent-soft:rgba(20,184,166,.25);
+    --theme-accent-glow:rgba(20,184,166,.45);
+
+    --nebula-1:rgba(20,184,166,.30);
+    --nebula-2:rgba(34,211,238,.22);
+    --nebula-3:rgba(59,130,246,.18);
+
+    --theme-gradient: linear-gradient(180deg,#002b33,#001014);
+}
+
+/* ---------------- EMERALD ---------------- */
+html[data-theme="emerald"]{
+    --theme-bg:#02150a;
+    --theme-surface:rgba(0,60,25,.55);
+    --theme-surface-strong:rgba(0,90,40,.85);
+    --theme-text:#ecfdf5;
+    --theme-muted:#86efac;
+
+    --theme-accent:#22c55e;
+    --theme-accent-soft:rgba(34,197,94,.22);
+    --theme-accent-glow:rgba(34,197,94,.45);
+
+    --nebula-1:rgba(34,197,94,.30);
+    --nebula-2:rgba(16,185,129,.20);
+    --nebula-3:rgba(255,255,255,.06);
+
+    --theme-gradient: radial-gradient(circle at 20% 10%, rgba(34,197,94,.15), transparent 70%);
+}
+
+/* ---------------- INFERNO ---------------- */
+html[data-theme="inferno"]{
+    --theme-bg:#1a0302;
+    --theme-surface:rgba(90,20,10,.60);
+    --theme-surface-strong:rgba(120,30,15,.85);
+    --theme-text:#fff7ed;
+    --theme-muted:#fdba74;
+
+    --theme-accent:#f97316;
+    --theme-accent-soft:rgba(249,115,22,.25);
+    --theme-accent-glow:rgba(249,115,22,.55);
+
+    --nebula-1:rgba(249,115,22,.35);
+    --nebula-2:rgba(239,68,68,.25);
+    --nebula-3:rgba(251,191,36,.18);
+
+    --theme-gradient: radial-gradient(circle at 40% 30%, rgba(255,100,0,.20), transparent 70%);
+}
+
+/* ---------------- GOLD ---------------- */
+html[data-theme="gold"]{
+    --theme-bg:#0b0a08;
+    --theme-surface:rgba(60,45,15,.60);
+    --theme-surface-strong:rgba(90,70,25,.85);
+    --theme-text:#fff8dc;
+    --theme-muted:#fcd34d;
+
+    --theme-accent:#ffd700;
+    --theme-accent-soft:rgba(255,215,0,.25);
+    --theme-accent-glow:rgba(255,215,0,.55);
+
+    --nebula-1:rgba(255,215,0,.22);
+    --nebula-2:rgba(251,191,36,.18);
+    --nebula-3:rgba(255,255,255,.10);
+
+    --theme-gradient: linear-gradient(135deg,#2b1d00,#0b0a08);
+}
+
+/* ---------------- DAWN ---------------- */
+html[data-theme="dawn"]{
+    --theme-bg:#fff1e6;
+    --theme-surface:rgba(255,255,255,.78);
+    --theme-surface-strong:rgba(255,255,255,.96);
+    --theme-text:#431407;
+    --theme-muted:#9a3412;
+
+    --theme-accent:#fb923c;
+    --theme-accent-soft:rgba(251,146,60,.25);
+    --theme-accent-glow:rgba(251,146,60,.45);
+
+    --nebula-1:rgba(255,180,120,.35);
+    --nebula-2:rgba(255,120,120,.18);
+    --nebula-3:rgba(255,220,120,.20);
+
+    --theme-gradient: linear-gradient(180deg,#fff7ed,#ffe4c7);
+}
+
+/* ---------------- DAYLIGHT ---------------- */
+html[data-theme="daylight"]{
+    --theme-bg:#eef6ff;
+    --theme-surface:rgba(255,255,255,.80);
+    --theme-surface-strong:rgba(255,255,255,.96);
+    --theme-text:#0f172a;
+    --theme-muted:#64748b;
+
+    --theme-accent:#2563eb;
+    --theme-accent-soft:rgba(37,99,235,.18);
+    --theme-accent-glow:rgba(37,99,235,.35);
+
+    --nebula-1:rgba(59,130,246,.18);
+    --nebula-2:rgba(34,211,238,.12);
+    --nebula-3:rgba(255,255,255,.25);
+
+    --theme-gradient: linear-gradient(180deg,#ffffff,#eef6ff);
+}
+
+/* ---------------- GLITCH ---------------- */
+html[data-theme="glitch"]{
+    --theme-bg:#050011;
+    --theme-surface:rgba(40,0,60,.50);
+    --theme-surface-strong:rgba(70,0,90,.80);
+    --theme-text:#ffffff;
+    --theme-muted:#f0abfc;
+
+    --theme-accent:#00ffd5;
+    --theme-accent-soft:rgba(0,255,213,.22);
+    --theme-accent-glow:rgba(0,255,213,.50);
+
+    --nebula-1:rgba(255,0,128,.20);
+    --nebula-2:rgba(0,255,213,.20);
+    --nebula-3:rgba(255,255,255,.05);
+
+    --theme-gradient: linear-gradient(90deg, rgba(255,0,128,.12), rgba(0,255,213,.10));
+}
+
+html[data-theme="glitch"] body{
+    animation: glitchFlicker 6s infinite;
+}
+
+@keyframes glitchFlicker{
+    0%,100%{ filter:none; }
+    48%{ filter:contrast(1.1) saturate(1.2); }
+    49%{ transform:translateX(1px); }
+    50%{ transform:translateX(-1px); }
+    51%{ transform:translateX(0); }
+}
+
+/* ---------------- SUNSET NEBULA ---------------- */
+html[data-theme="sunset_nebula"]{
+    --theme-bg:#12070a;
+    --theme-surface:rgba(70,25,35,.55);
+    --theme-surface-strong:rgba(110,40,55,.85);
+    --theme-text:#fff1eb;
+    --theme-muted:#fecaca;
+
+    --theme-accent:#ff6b6b;
+    --theme-accent-soft:rgba(255,107,107,.25);
+    --theme-accent-glow:rgba(255,107,107,.50);
+
+    --nebula-1:rgba(255,90,120,.30);
+    --nebula-2:rgba(255,140,60,.20);
+    --nebula-3:rgba(255,220,120,.15);
+
+    --theme-gradient: radial-gradient(circle at 30% 20%, rgba(255,120,90,.20), transparent 70%);
+}
+
+/* ---------------- FROSTBYTE ---------------- */
+html[data-theme="frostbyte"]{
+    --theme-bg:#0a1220;
+    --theme-surface:rgba(20,40,70,.55);
+    --theme-surface-strong:rgba(30,60,100,.85);
+    --theme-text:#e6f6ff;
+    --theme-muted:#93c5fd;
+
+    --theme-accent:#3dd5f3;
+    --theme-accent-soft:rgba(61,213,243,.22);
+    --theme-accent-glow:rgba(61,213,243,.45);
+
+    --nebula-1:rgba(61,213,243,.25);
+    --nebula-2:rgba(99,102,241,.18);
+    --nebula-3:rgba(255,255,255,.06);
+
+    --theme-gradient: linear-gradient(180deg,#0a1220,#08101a);
+}
+
+/* ---------------- LAVENDER STATIC ---------------- */
+html[data-theme="lavender_static"]{
+    --theme-bg:#120a1a;
+    --theme-surface:rgba(60,40,80,.55);
+    --theme-surface-strong:rgba(90,60,120,.85);
+    --theme-text:#f5e9ff;
+    --theme-muted:#d8b4fe;
+
+    --theme-accent:#c084fc;
+    --theme-accent-soft:rgba(192,132,252,.22);
+    --theme-accent-glow:rgba(192,132,252,.45);
+
+    --nebula-1:rgba(192,132,252,.25);
+    --nebula-2:rgba(244,114,182,.18);
+    --nebula-3:rgba(255,255,255,.05);
+
+    --theme-gradient: radial-gradient(circle at 50% 30%, rgba(192,132,252,.18), transparent 70%);
+}
+
+/* ---------------- TITANIUM ---------------- */
+html[data-theme="titanium"]{
+    --theme-bg:#0f1115;
+    --theme-surface:rgba(35,38,45,.60);
+    --theme-surface-strong:rgba(55,60,70,.85);
+    --theme-text:#e5e7eb;
+    --theme-muted:#9ca3af;
+
+    --theme-accent:#a1a1aa;
+    --theme-accent-soft:rgba(161,161,170,.20);
+    --theme-accent-glow:rgba(161,161,170,.35);
+
+    --nebula-1:rgba(148,163,184,.10);
+    --nebula-2:rgba(100,116,139,.10);
+    --nebula-3:rgba(255,255,255,.04);
+
+    --theme-gradient: linear-gradient(135deg,#0f1115,#1a1d24);
+}
+
+/* ---------------- ACID GREEN ---------------- */
+html[data-theme="acid_green"]{
+    --theme-bg:#050b05;
+    --theme-surface:rgba(20,60,20,.55);
+    --theme-surface-strong:rgba(30,90,30,.85);
+    --theme-text:#eaffea;
+    --theme-muted:#86efac;
+
+    --theme-accent:#39ff14;
+    --theme-accent-soft:rgba(57,255,20,.25);
+    --theme-accent-glow:rgba(57,255,20,.55);
+
+    --nebula-1:rgba(57,255,20,.20);
+    --nebula-2:rgba(0,255,128,.15);
+    --nebula-3:rgba(255,255,255,.05);
+
+    --theme-gradient: radial-gradient(circle at 40% 20%, rgba(57,255,20,.15), transparent 70%);
+}
+
+/* ---------------- MIDNIGHT SAPPHIRE ---------------- */
+html[data-theme="midnight_sapphire"]{
+    --theme-bg:#050a18;
+    --theme-surface:rgba(20,30,70,.55);
+    --theme-surface-strong:rgba(30,45,100,.85);
+    --theme-text:#e0f2ff;
+    --theme-muted:#93c5fd;
+
+    --theme-accent:#1e40af;
+    --theme-accent-soft:rgba(30,64,175,.25);
+    --theme-accent-glow:rgba(30,64,175,.45);
+
+    --nebula-1:rgba(59,130,246,.25);
+    --nebula-2:rgba(147,197,253,.18);
+    --nebula-3:rgba(255,255,255,.05);
+
+    --theme-gradient: radial-gradient(circle at 60% 30%, rgba(30,64,175,.20), transparent 70%);
+}
+
+/* ---------------- ROSE QUARTZ ---------------- */
+html[data-theme="rose_quartz"]{
+    --theme-bg:#fff0f5;
+    --theme-surface:rgba(255,255,255,.75);
+    --theme-surface-strong:rgba(255,255,255,.95);
+    --theme-text:#3b0a1e;
+    --theme-muted:#9d174d;
+
+    --theme-accent:#fb7185;
+    --theme-accent-soft:rgba(251,113,133,.25);
+    --theme-accent-glow:rgba(251,113,133,.40);
+
+    --nebula-1:rgba(251,113,133,.25);
+    --nebula-2:rgba(244,114,182,.18);
+    --nebula-3:rgba(255,255,255,.30);
+
+    --theme-gradient: linear-gradient(180deg,#fff0f5,#ffe4ec);
+}
+
+/* ---------------- CARBON ---------------- */
+html[data-theme="carbon"]{
+    --theme-bg:#0a0a0a;
+    --theme-surface:rgba(25,25,25,.60);
+    --theme-surface-strong:rgba(40,40,40,.85);
+    --theme-text:#f5f5f5;
+    --theme-muted:#a3a3a3;
+
+    --theme-accent:#ffffff;
+    --theme-accent-soft:rgba(255,255,255,.10);
+    --theme-accent-glow:rgba(255,255,255,.20);
+
+    --nebula-1:rgba(255,255,255,.04);
+    --nebula-2:rgba(120,120,120,.06);
+    --nebula-3:rgba(200,200,200,.03);
+
+    --theme-gradient: linear-gradient(135deg,#0a0a0a,#141414);
+}
+
+/* ---------------- MATRIX CORE ---------------- */
+html[data-theme="matrix_core"]{
+    --theme-bg:#020403;
+    --theme-surface:rgba(0,40,20,.55);
+    --theme-surface-strong:rgba(0,70,35,.85);
+    --theme-text:#b6ffda;
+    --theme-muted:#34d399;
+
+    --theme-accent:#00ff66;
+    --theme-accent-soft:rgba(0,255,102,.22);
+    --theme-accent-glow:rgba(0,255,102,.55);
+
+    --nebula-1:rgba(0,255,102,.20);
+    --nebula-2:rgba(0,200,120,.15);
+    --nebula-3:rgba(255,255,255,.04);
+
+    --theme-gradient: radial-gradient(circle at 50% 50%, rgba(0,255,102,.10), transparent 70%);
+}
+
+/* ---------------- OBSIDIAN ICE ---------------- */
+html[data-theme="obsidian_ice"]{
+    --theme-bg:#07080c;
+    --theme-surface:rgba(20,25,35,.65);
+    --theme-surface-strong:rgba(30,35,50,.88);
+    --theme-text:#f8fafc;
+    --theme-muted:#94a3b8;
+
+    --theme-accent:#38bdf8;
+    --theme-accent-soft:rgba(56,189,248,.20);
+    --theme-accent-glow:rgba(56,189,248,.45);
+
+    --nebula-1:rgba(56,189,248,.20);
+    --nebula-2:rgba(148,163,184,.12);
+    --nebula-3:rgba(255,255,255,.05);
+
+    --theme-gradient: linear-gradient(180deg,#07080c,#0f172a);
+}

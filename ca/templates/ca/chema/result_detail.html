@@ -1,0 +1,278 @@
+{% extends "ca/dashboard/layout/app.html" %}
+
+{% block title %}Analysis Result{% endblock %}
+
+{% block content %}
+
+<div class="ca-page">
+    <div class="page-header">
+        <div>
+            <h1>Analysis Result</h1>
+            <p>Review the recorded chemical analysis result and its evaluation.</p>
+        </div>
+
+    <div class="page-actions">
+        <a href="{% url 'ca:result-list' %}" class="btn btn-secondary">
+            Back to Results
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h2>Result #{{ result.pk }}</h2>
+
+            {% if result.status == "PASS" %}
+                <span class="badge badge-success">Pass</span>
+            {% elif result.status == "FAIL" %}
+                <span class="badge badge-danger">Fail</span>
+            {% elif result.status == "NA" %}
+                <span class="badge">N/A</span>
+            {% elif result.status %}
+                <span class="badge">
+                    {{ result.get_status_display|default:result.status }}
+                </span>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card-body">
+        <div class="details-grid">
+            <div class="detail-item">
+                <span class="detail-label">Result ID</span>
+                <span class="detail-value">
+                    {{ result.pk|default:"—" }}
+                </span>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Batch</span>
+                <span class="detail-value">
+                    {% if result.batch %}
+                        <a href="{% url 'ca:batch-detail' result.batch.pk %}">
+                            {{ result.batch }}
+                        </a>
+                    {% elif result.process.batch %}
+                        <a href="{% url 'ca:batch-detail' result.process.batch.pk %}">
+                            {{ result.process.batch }}
+                        </a>
+                    {% else %}
+                        —
+                    {% endif %}
+                </span>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Sample ID</span>
+                <span class="detail-value">
+                    {{ result.batch.sample_id|default:result.process.sample_id|default:result.sample_id|default:"—" }}
+                </span>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Parameter</span>
+                <span class="detail-value">
+                    {{ result.parameter|default:"—" }}
+                </span>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Value</span>
+                <span class="detail-value">
+                    {% if result.value != None %}
+                        {{ result.value }}
+                    {% elif result.textual_result %}
+                        {{ result.textual_result }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </span>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Unit</span>
+                <span class="detail-value">
+                    {{ result.parameter.unit|default:result.unit|default:"—" }}
+                </span>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Status</span>
+                <span class="detail-value">
+                    {% if result.status == "PASS" %}
+                        <span class="badge badge-success">Pass</span>
+                    {% elif result.status == "FAIL" %}
+                        <span class="badge badge-danger">Fail</span>
+                    {% elif result.status == "NA" %}
+                        <span class="badge">N/A</span>
+                    {% else %}
+                        {{ result.get_status_display|default:result.status|default:"—" }}
+                    {% endif %}
+                </span>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Analyst</span>
+                <span class="detail-value">
+                    {% if result.analyst %}
+                        {{ result.analyst.get_full_name|default:result.analyst.username }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </span>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Tested At</span>
+                <span class="detail-value">
+                    {% if result.tested_at %}
+                        {{ result.tested_at|date:"d M Y H:i" }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </span>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Chemical</span>
+                <span class="detail-value">
+                    {{ result.batch.chemical|default:result.chemical|default:"—" }}
+                </span>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Supplier</span>
+                <span class="detail-value">
+                    {{ result.batch.supplier|default:result.supplier|default:"—" }}
+                </span>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Remarks</span>
+                <span class="detail-value">
+                    {{ result.remarks|default:"—" }}
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if result.parameter %}
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h2>Parameter Specification</h2>
+            <p>Specification information associated with this test parameter.</p>
+        </div>
+    </div>
+
+    <div class="card-body">
+        <div class="details-grid">
+            <div class="detail-item">
+                <span class="detail-label">Parameter</span>
+                <span class="detail-value">
+                    {{ result.parameter }}
+                </span>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Unit</span>
+                <span class="detail-value">
+                    {{ result.parameter.unit|default:"—" }}
+                </span>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Minimum</span>
+                <span class="detail-value">
+                    {{ result.parameter.minimum|default:result.parameter.min_value|default:"—" }}
+                </span>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Maximum</span>
+                <span class="detail-value">
+                    {{ result.parameter.maximum|default:result.parameter.max_value|default:"—" }}
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if result.input %}
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h2>Analysis Input</h2>
+            <p>Calculation input associated with this result.</p>
+        </div>
+    </div>
+
+    <div class="card-body">
+        <div class="details-grid">
+            <div class="detail-item">
+                <span class="detail-label">Calculated Value</span>
+                <span class="detail-value">
+                    {{ result.input.calculated_value|default:"—" }}
+                </span>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Inputs</span>
+                <span class="detail-value">
+                    {{ result.input.inputs|default:"—" }}
+                </span>
+            </div>
+        </div>
+
+        {% if result.input.pk %}
+        <div class="page-actions">
+            <a
+                href="{% url 'ca:analysis-input-detail' result.input.pk %}"
+                class="btn btn-secondary"
+            >
+                View Input
+            </a>
+
+            <a
+                href="{% url 'ca:analysis-input-recalculate' result.input.pk %}"
+                class="btn btn-primary"
+            >
+                Recalculate
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<div class="page-actions">
+    {% if result.process %}
+        <a
+            href="{% url 'ca:process-detail' result.process.pk %}"
+            class="btn btn-secondary"
+        >
+            View Process
+        </a>
+    {% endif %}
+
+    {% if result.batch %}
+        <a
+            href="{% url 'ca:batch-detail' result.batch.pk %}"
+            class="btn btn-secondary"
+        >
+            View Batch
+        </a>
+    {% endif %}
+
+    <a
+        href="{% url 'ca:result-list' %}"
+        class="btn btn-secondary"
+    >
+        Back to Results
+    </a>
+</div>
+</div>
+{% endblock %}

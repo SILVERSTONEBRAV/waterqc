@@ -1,0 +1,216 @@
+<div
+    class="
+        kpi-widget
+        {% if widget.status %}
+        kpi-{{ widget.status }}
+        {% endif %}
+    "
+>
+
+    <div class="kpi-header">
+
+        <div class="kpi-heading">
+
+            {% if widget.icon %}
+            <div class="kpi-icon">
+                <i class="{{ widget.icon }}"></i>
+            </div>
+            {% endif %}
+
+            <div>
+
+                <div class="kpi-label">
+                    {{ widget.label }}
+                </div>
+
+                {% if widget.subtitle %}
+                <div class="kpi-subtitle">
+                    {{ widget.subtitle }}
+                </div>
+                {% endif %}
+
+            </div>
+
+        </div>
+
+        {% if widget.badge %}
+        <span class="kpi-badge">
+            {{ widget.badge }}
+        </span>
+        {% endif %}
+
+    </div>
+
+    <div class="kpi-body">
+
+        <div class="kpi-value-container">
+
+            <div class="kpi-value">
+                {{ widget.value }}
+            </div>
+
+            {% if widget.unit %}
+            <span class="kpi-unit">
+                {{ widget.unit }}
+            </span>
+            {% endif %}
+
+        </div>
+
+        {% if widget.previous_value %}
+        <div class="kpi-previous">
+
+            Previous:
+            {{ widget.previous_value }}
+
+        </div>
+        {% endif %}
+
+    </div>
+
+    {% if widget.change %}
+    <div
+        class="
+            kpi-change
+            {% if widget.change > 0 %}
+            positive
+            {% elif widget.change < 0 %}
+            negative
+            {% else %}
+            neutral
+            {% endif %}
+        "
+    >
+
+        <i
+            class="
+                {% if widget.change > 0 %}
+                fas fa-arrow-trend-up
+                {% elif widget.change < 0 %}
+                fas fa-arrow-trend-down
+                {% else %}
+                fas fa-minus
+                {% endif %}
+            "
+        ></i>
+
+        <span>
+            {{ widget.change }}%
+        </span>
+
+        {% if widget.change_label %}
+        <span class="kpi-change-label">
+            {{ widget.change_label }}
+        </span>
+        {% endif %}
+
+    </div>
+    {% endif %}
+
+    {% if widget.target %}
+    <div class="kpi-target">
+
+        <div class="kpi-target-header">
+
+            <span>
+                Target
+            </span>
+
+            <span>
+                {{ widget.target }}
+            </span>
+
+        </div>
+
+        <div class="kpi-progress">
+
+            <div
+                class="kpi-progress-bar"
+                style="
+                    width:
+                    {% widthratio widget.value widget.target 100 %}%;
+                "
+            ></div>
+
+        </div>
+
+    </div>
+    {% endif %}
+
+    {% if widget.sparkline_data %}
+    <div
+        class="kpi-sparkline"
+        id="sparkline-{{ widget.key }}"
+    ></div>
+
+    <script>
+    (function () {
+
+        const el =
+            document.getElementById(
+                "sparkline-{{ widget.key }}"
+            );
+
+        if (!el) return;
+
+        Plotly.newPlot(
+            el,
+            [{
+                x:
+                    {{ widget.sparkline_x|default:"[]"|safe }},
+                y:
+                    {{ widget.sparkline_data|safe }},
+                mode: "lines",
+                fill: "tozeroy",
+                line: {
+                    width: 2
+                }
+            }],
+            {
+                margin: {
+                    l: 0,
+                    r: 0,
+                    t: 0,
+                    b: 0
+                },
+                paper_bgcolor:
+                    "transparent",
+                plot_bgcolor:
+                    "transparent",
+                xaxis: {
+                    visible: false
+                },
+                yaxis: {
+                    visible: false
+                },
+                showlegend: false,
+                autosize: true
+            },
+            {
+                displayModeBar: false,
+                responsive: true
+            }
+        );
+
+    })();
+    </script>
+    {% endif %}
+
+    {% if widget.forecast %}
+    <div class="kpi-forecast">
+
+        <i class="fas fa-wand-magic-sparkles"></i>
+
+        Forecast:
+        {{ widget.forecast }}
+
+    </div>
+    {% endif %}
+
+    {% if widget.footer %}
+    <div class="kpi-footer">
+        {{ widget.footer }}
+    </div>
+    {% endif %}
+
+</div>

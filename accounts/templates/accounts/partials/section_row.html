@@ -1,0 +1,21 @@
+<tr id="section-row-{{ section.id }}" data-id="{{ section.id }}">
+    <td>{{ section.name }}</td>
+    <td class="text-center">
+        <span class="badge bg-info">{{ section.user_count|default:"0" }}</span>
+    </td>
+    <td class="text-end">
+        <button
+            class="btn btn-sm btn-outline-primary edit-section"
+            data-id="{{ section.id }}"
+            data-tab="sections">
+            <i class="fas fa-edit"></i>
+        </button>
+
+        <button
+            class="btn btn-sm btn-outline-danger delete-section"
+            data-id="{{ section.id }}"
+            data-tab="sections">
+            <i class="fas fa-trash"></i>
+        </button>
+    </td>
+</tr>

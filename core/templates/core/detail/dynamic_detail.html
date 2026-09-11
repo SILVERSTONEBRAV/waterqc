@@ -1,0 +1,307 @@
+{% load custom_filters %}
+{% load static %}
+
+<div class="container-fluid detail-engine-v6"
+     id="detail-container"
+     data-engine="NAMUBUYA_DETAIL_V6"
+     data-model="{{ meta.key }}"
+     data-app="{{ meta.app_label }}"
+     data-object-id="{{ object.pk|default:'' }}"
+     data-has-object="{% if object %}1{% else %}0{% endif %}">
+
+<!-- =========================================================
+     HEADER (REGISTRY-CONTROLLED)
+========================================================= -->
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+
+    <div>
+        <h5 class="mb-0 d-flex align-items-center gap-2">
+
+            {{ meta.verbose_name|title }}
+
+            <span class="badge bg-success">LIVE</span>
+
+            {% if object %}
+                <span class="badge bg-secondary">ID: {{ object.pk }}</span>
+            {% else %}
+                <span class="badge bg-warning text-dark">NEW</span>
+            {% endif %}
+
+        </h5>
+
+        <small class="text-muted">
+            {{ meta.app_label }} / {{ meta.model_name }}
+        </small>
+    </div>
+
+    <!-- =====================================================
+         ACTION BAR (DELEGATED TO manager.js + registry)
+    ====================================================== -->
+    <div class="d-flex gap-2 flex-wrap">
+
+        <button class="btn btn-sm btn-primary js-action"
+                data-action="create"
+                data-model="{{ meta.key }}">
+            ➕ Add
+        </button>
+
+        {% if object %}
+
+        <button class="btn btn-sm btn-outline-secondary js-action"
+                data-action="detail"
+                data-id="{{ object.pk }}"
+                data-model="{{ meta.key }}">
+            👁 View
+        </button>
+
+        <button class="btn btn-sm btn-outline-warning js-action"
+                data-action="update"
+                data-id="{{ object.pk }}"
+                data-model="{{ meta.key }}">
+            ✏ Edit
+        </button>
+
+        <button class="btn btn-sm btn-outline-danger js-action"
+                data-action="delete"
+                data-id="{{ object.pk }}"
+                data-model="{{ meta.key }}">
+            🗑 Delete
+        </button>
+
+        {% endif %}
+
+        <button class="btn btn-sm btn-dark js-action"
+                data-action="print">
+            🖨
+        </button>
+
+        {% if export_enabled %}
+        <button class="btn btn-sm btn-success js-action"
+                data-action="export"
+                data-id="{{ object.pk }}"
+                data-model="{{ meta.key }}">
+            ⬇ Export
+        </button>
+        {% endif %}
+
+    </div>
+</div>
+
+<!-- =========================================================
+     MAIN FORM (PATCH ENGINE v6)
+========================================================= -->
+{% if object and editable %}
+<form id="detail-form"
+      data-engine="patch-v6"
+      data-model="{{ meta.key }}"
+      data-app="{{ meta.app_label }}"
+      data-id="{{ object.pk }}">
+{% endif %}
+
+<!-- =========================================================
+     MAIN FIELDS
+========================================================= -->
+<div class="card mb-3 shadow-sm">
+
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Main Fields</span>
+
+        <button type="button"
+                class="btn btn-sm btn-primary js-action"
+                data-action="save-all"
+                data-model="{{ meta.key }}">
+            💾 Save
+        </button>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+
+            <tbody>
+            {% for field in fields %}
+                {% if field.name != "id" and not field.hidden %}
+
+                <tr data-field="{{ field.name }}">
+
+                    <th style="width:260px;">
+                        {{ field.verbose }}
+                    </th>
+
+                    <td>
+
+                        {% if object and editable %}
+                            <input class="form-control form-control-sm js-field"
+                                   data-field="{{ field.name }}"
+                                   data-model="{{ meta.key }}"
+                                   data-id="{{ object.pk }}"
+                                   value="{{ object|get_attr:field.name|default:'' }}">
+                        {% else %}
+                            {{ object|get_attr:field.name|default:"—" }}
+                        {% endif %}
+
+                    </td>
+
+                </tr>
+
+                {% endif %}
+            {% endfor %}
+            </tbody>
+
+        </table>
+    </div>
+</div>
+
+<!-- =========================================================
+     FK RELATIONS (APP-SCOPED STRICTLY)
+========================================================= -->
+<div class="card mb-3 shadow-sm">
+
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Foreign Key Relations</span>
+
+        <button class="btn btn-sm btn-primary js-action"
+                data-action="create-related"
+                data-model="{{ meta.key }}"
+                data-id="{{ object.pk|default:'' }}">
+            ➕ Add Related
+        </button>
+    </div>
+
+    <div class="card-body">
+
+        {% for rel in fk_relations %}
+
+        <div class="d-flex justify-content-between align-items-center border-bottom py-2">
+
+            <strong>{{ rel.verbose }}</strong>
+
+            <div class="d-flex gap-2">
+
+                {% if rel.value_id %}
+                <button class="btn btn-sm btn-outline-primary js-action"
+                        data-action="detail"
+                        data-model="{{ meta.app_label }}.{{ rel.related_model }}"
+                        data-id="{{ rel.value_id }}">
+                    View
+                </button>
+                {% endif %}
+
+                <button class="btn btn-sm btn-outline-secondary js-action"
+                        data-action="create"
+                        data-model="{{ meta.app_label }}.{{ rel.related_model }}">
+                    Add
+                </button>
+
+            </div>
+
+        </div>
+
+        {% empty %}
+        <div class="text-muted p-2">
+            No relations found in this app scope.
+        </div>
+        {% endfor %}
+
+    </div>
+</div>
+
+<!-- =========================================================
+     REVERSE RELATIONS (LAZY + MANAGER.JS CONTROLLED)
+========================================================= -->
+<div class="card mb-3 shadow-sm">
+
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Linked Records</span>
+
+        <button class="btn btn-sm btn-primary js-action"
+                data-action="create-child"
+                data-parent="{{ object.pk }}"
+                data-model="{{ meta.key }}">
+            ➕ Add Child
+        </button>
+    </div>
+
+    <div class="card-body">
+
+        {% for rel in reverse_relations %}
+
+        <div class="mb-3 border rounded p-2">
+
+            <div class="d-flex justify-content-between align-items-center mb-2">
+
+                <strong>
+                    {{ rel.label }} ({{ rel.count }})
+                </strong>
+
+                <!-- LAZY LOAD CONTROL -->
+                <button class="btn btn-sm btn-outline-primary js-load-relation"
+                        data-model="{{ meta.app_label }}.{{ rel.model }}"
+                        data-app="{{ meta.app_label }}"
+                        data-parent="{{ object.pk }}">
+                    Load
+                </button>
+
+            </div>
+
+            <!-- manager.js injects here -->
+            <div class="relation-container"
+                 id="rel-{{ rel.model }}"
+                 data-loaded="0">
+                <small class="text-muted">Lazy loading enabled via manager.js</small>
+            </div>
+
+        </div>
+
+        {% endfor %}
+
+    </div>
+</div>
+
+{% if object and editable %}
+</form>
+{% endif %}
+
+</div>
+
+<!-- =========================================================
+     MANAGER.JS BRIDGE
+========================================================= -->
+{% block extra_scripts %}
+<script type="module">
+import { Manager } from "{% static 'core/js/manager.js' %}";
+
+window.Manager = Manager;
+
+/**
+ * GLOBAL ACTION DISPATCHER
+ */
+document.addEventListener("click", (e) => {
+    const el = e.target.closest(".js-action");
+    if (!el) return;
+
+    Manager.dispatch({
+        action: el.dataset.action,
+        id: el.dataset.id,
+        model: el.dataset.model,
+        parent: el.dataset.parent || null,
+    });
+});
+
+/**
+ * LAZY RELATION LOADER (APP-SCOPED ONLY)
+ */
+document.addEventListener("click", async (e) => {
+    const el = e.target.closest(".js-load-relation");
+    if (!el) return;
+
+    const model = el.dataset.model;
+    const app = el.dataset.app;
+    const parent = el.dataset.parent;
+
+    const res = await fetch(`/api/${app}/${model}/relations/?parent=${parent}`);
+    const html = await res.text();
+
+    document.querySelector(`#rel-${model}`).innerHTML = html;
+});
+</script>
+{% endblock %}

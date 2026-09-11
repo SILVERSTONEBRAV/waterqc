@@ -1,0 +1,316 @@
+{% load static %}
+
+<div class="card shadow-sm border-0 rounded-4">
+
+    <div class="card-header bg-white border-bottom py-3">
+
+        <div class="d-flex justify-content-between align-items-center">
+
+            <div>
+                <h5 class="mb-1 fw-bold">
+                    <i class="fa fa-cogs text-primary me-2"></i>
+                    System Configuration
+                </h5>
+
+                <small class="text-muted">
+                    Runtime system settings and security policies.
+                </small>
+            </div>
+
+            {% if request.user.is_superuser %}
+            <a
+                href="{% url 'accounts:configuration' %}"
+                class="btn btn-primary"
+            >
+                <i class="fa fa-pen me-2"></i>
+                Manage Configuration
+            </a>
+            {% endif %}
+
+        </div>
+
+    </div>
+
+    <div class="card-body">
+
+        {% if configuration %}
+
+        <div class="row g-4">
+
+            <!-- Password Policy -->
+            <div class="col-lg-6">
+
+                <div class="card border-0 bg-light rounded-4 h-100">
+
+                    <div class="card-header bg-transparent border-0 pb-0">
+                        <h6 class="fw-bold">
+                            <i class="fa fa-key text-primary me-2"></i>
+                            Password Policy
+                        </h6>
+                    </div>
+
+                    <div class="card-body">
+
+                        <table class="table table-sm table-borderless mb-0">
+
+                            <tr>
+                                <th width="55%">Minimum Length</th>
+                                <td>{{ configuration.password_min_length }}</td>
+                            </tr>
+
+                            <tr>
+                                <th>Password History</th>
+                                <td>{{ configuration.password_history_count }}</td>
+                            </tr>
+
+                            <tr>
+                                <th>Password Expiry</th>
+                                <td>{{ configuration.password_expire_days }} days</td>
+                            </tr>
+
+                            <tr>
+                                <th>Require Digit</th>
+                                <td>{{ configuration.password_require_digit|yesno:"Yes,No" }}</td>
+                            </tr>
+
+                            <tr>
+                                <th>Require Uppercase</th>
+                                <td>{{ configuration.password_require_uppercase|yesno:"Yes,No" }}</td>
+                            </tr>
+
+                            <tr>
+                                <th>Require Lowercase</th>
+                                <td>{{ configuration.password_require_lowercase|yesno:"Yes,No" }}</td>
+                            </tr>
+
+                            <tr>
+                                <th>Require Special Character</th>
+                                <td>{{ configuration.password_require_special|yesno:"Yes,No" }}</td>
+                            </tr>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- Session Policy -->
+            <div class="col-lg-6">
+
+                <div class="card border-0 bg-light rounded-4 h-100">
+
+                    <div class="card-header bg-transparent border-0 pb-0">
+                        <h6 class="fw-bold">
+                            <i class="fa fa-clock text-primary me-2"></i>
+                            Session Policy
+                        </h6>
+                    </div>
+
+                    <div class="card-body">
+
+                        <table class="table table-sm table-borderless mb-0">
+
+                            <tr>
+                                <th width="55%">Session Timeout</th>
+                                <td>{{ configuration.session_timeout_minutes }} min</td>
+                            </tr>
+
+                            <tr>
+                                <th>Idle Logout</th>
+                                <td>{{ configuration.session_idle_logout_minutes }} min</td>
+                            </tr>
+
+                            <tr>
+                                <th>Daily Login Limit</th>
+                                <td>{{ configuration.daily_login_limit_minutes }} min</td>
+                            </tr>
+
+                            <tr>
+                                <th>Concurrent Sessions</th>
+                                <td>{{ configuration.max_concurrent_sessions }}</td>
+                            </tr>
+
+                            <tr>
+                                <th>Pagination Size</th>
+                                <td>{{ configuration.paginate_by }}</td>
+                            </tr>
+
+                            <tr>
+                                <th>Cache Timeout</th>
+                                <td>{{ configuration.cache_timeout_seconds }} sec</td>
+                            </tr>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- Security -->
+            <div class="col-lg-6">
+
+                <div class="card border-0 bg-light rounded-4 h-100">
+
+                    <div class="card-header bg-transparent border-0 pb-0">
+                        <h6 class="fw-bold">
+                            <i class="fa fa-shield-halved text-primary me-2"></i>
+                            Security & MFA
+                        </h6>
+                    </div>
+
+                    <div class="card-body">
+
+                        <table class="table table-sm table-borderless mb-0">
+
+                            <tr>
+                                <th width="55%">Adaptive MFA</th>
+                                <td>{{ configuration.adaptive_mfa_enabled|yesno:"Enabled,Disabled" }}</td>
+                            </tr>
+
+                            <tr>
+                                <th>Risk Threshold</th>
+                                <td>{{ configuration.adaptive_risk_threshold }}</td>
+                            </tr>
+
+                            <tr>
+                                <th>2FA for High Risk</th>
+                                <td>{{ configuration.require_2fa_for_high_risk|yesno:"Yes,No" }}</td>
+                            </tr>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- Audit -->
+            <div class="col-lg-6">
+
+                <div class="card border-0 bg-light rounded-4 h-100">
+
+                    <div class="card-header bg-transparent border-0 pb-0">
+                        <h6 class="fw-bold">
+                            <i class="fa fa-clipboard-list text-primary me-2"></i>
+                            Audit Configuration
+                        </h6>
+                    </div>
+
+                    <div class="card-body">
+
+                        <table class="table table-sm table-borderless mb-0">
+
+                            <tr>
+                                <th width="55%">Retention Period</th>
+                                <td>{{ configuration.audit_log_retention_days }} days</td>
+                            </tr>
+
+                            <tr>
+                                <th>Log Data Exports</th>
+                                <td>{{ configuration.log_data_exports|yesno:"Yes,No" }}</td>
+                            </tr>
+
+                            <tr>
+                                <th>Log Anomalies</th>
+                                <td>{{ configuration.log_anomalies|yesno:"Yes,No" }}</td>
+                            </tr>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- Identity -->
+            <div class="col-lg-12">
+
+                <div class="card border-0 bg-light rounded-4">
+
+                    <div class="card-header bg-transparent border-0 pb-0">
+                        <h6 class="fw-bold">
+                            <i class="fa fa-id-card text-primary me-2"></i>
+                            Identity Rules
+                        </h6>
+                    </div>
+
+                    <div class="card-body">
+
+                        <div class="row">
+
+                            <div class="col-md-3 mb-3">
+                                <small class="text-muted d-block">
+                                    Email Domain
+                                </small>
+                                <div class="fw-semibold">
+                                    {{ configuration.email_domain }}
+                                </div>
+                            </div>
+
+                            <div class="col-md-3 mb-3">
+                                <small class="text-muted d-block">
+                                    PF Prefix
+                                </small>
+                                <div class="fw-semibold">
+                                    {{ configuration.pf_prefix }}
+                                </div>
+                            </div>
+
+                            <div class="col-md-3 mb-3">
+                                <small class="text-muted d-block">
+                                    PF Length
+                                </small>
+                                <div class="fw-semibold">
+                                    {{ configuration.pf_length }}
+                                </div>
+                            </div>
+
+                            <div class="col-md-3 mb-3">
+                                <small class="text-muted d-block">
+                                    Mobile Regex
+                                </small>
+                                <code>
+                                    {{ configuration.mobile_number_regex }}
+                                </code>
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        {% else %}
+
+        <div class="text-center py-5">
+
+            <i
+                class="fa fa-cogs text-muted mb-3"
+                style="font-size:4rem;"
+            ></i>
+
+            <h4 class="text-muted">
+                Configuration Not Available
+            </h4>
+
+            <p class="text-muted mb-0">
+                The system configuration has not been initialized.
+            </p>
+
+        </div>
+
+        {% endif %}
+
+    </div>
+
+</div>

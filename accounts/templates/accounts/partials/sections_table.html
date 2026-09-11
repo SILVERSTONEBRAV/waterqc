@@ -1,0 +1,600 @@
+{% load static %}
+
+<div class="card shadow-sm border-0 rounded-4 overflow-hidden">
+
+    <!-- ================================================= -->
+    <!-- HEADER -->
+    <!-- ================================================= -->
+
+    <div class="card-header bg-white border-bottom py-4">
+
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+
+            <div>
+                <h4 class="fw-bold mb-1">
+                    <i class="fa fa-building text-primary me-2"></i>
+                    Sections Management
+                </h4>
+
+                <small class="text-muted">
+                    Manage organisational departments and sections.
+                </small>
+            </div>
+
+            <div class="d-flex gap-2 flex-wrap">
+
+                <button
+                    class="btn btn-outline-dark rounded-pill"
+                    onclick="window.print()"
+                >
+                    <i class="fa fa-print me-2"></i>
+                    Print
+                </button>
+
+                <div class="dropdown">
+
+                    <button
+                        class="btn btn-outline-primary rounded-pill dropdown-toggle"
+                        data-bs-toggle="dropdown"
+                    >
+                        <i class="fa fa-download me-2"></i>
+                        Export
+                    </button>
+
+                    <ul class="dropdown-menu dropdown-menu-end shadow">
+
+                        <li>
+                            <a
+                                class="dropdown-item"
+                                href="?{{ request.GET.urlencode }}&export=csv"
+                            >
+                                <i class="fa fa-file-csv text-success me-2"></i>
+                                CSV
+                            </a>
+                        </li>
+
+                        <li>
+                            <a
+                                class="dropdown-item"
+                                href="?{{ request.GET.urlencode }}&export=xlsx"
+                            >
+                                <i class="fa fa-file-excel text-success me-2"></i>
+                                Excel
+                            </a>
+                        </li>
+
+                        <li>
+                            <a
+                                class="dropdown-item"
+                                href="?{{ request.GET.urlencode }}&export=pdf"
+                            >
+                                <i class="fa fa-file-pdf text-danger me-2"></i>
+                                PDF
+                            </a>
+                        </li>
+
+                        <li>
+                            <a
+                                class="dropdown-item"
+                                href="?{{ request.GET.urlencode }}&export=docx"
+                            >
+                                <i class="fa fa-file-word text-primary me-2"></i>
+                                Word
+                            </a>
+                        </li>
+
+                        <li>
+                            <a
+                                class="dropdown-item"
+                                href="?{{ request.GET.urlencode }}&export=json"
+                            >
+                                <i class="fa fa-code text-warning me-2"></i>
+                                JSON
+                            </a>
+                        </li>
+
+                    </ul>
+
+                </div>
+
+                {% if request.user.is_superuser %}
+                <button
+                    class="btn btn-primary rounded-pill"
+                    data-bs-toggle="modal"
+                    data-bs-target="#sectionModal"
+                    data-url="{% url 'core:section_create' %}"
+                >
+                    <i class="fa fa-plus me-2"></i>
+                    Create Section
+                </button>
+                {% endif %}
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- ================================================= -->
+    <!-- STATS -->
+    <!-- ================================================= -->
+
+    <div class="card-body border-bottom bg-light">
+
+        <div class="row g-3">
+
+            <div class="col-lg-4">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <h6 class="text-muted">Total Sections</h6>
+                        <h2 class="fw-bold mb-0">
+                            {{ sections|length }}
+                        </h2>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <h6 class="text-muted">Active Sections</h6>
+                        <h2 class="fw-bold text-success mb-0">
+                            {{ active_sections_count }}
+                        </h2>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <h6 class="text-muted">Total Users</h6>
+                        <h2 class="fw-bold text-primary mb-0">
+                            {{ total_section_users }}
+                        </h2>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- ================================================= -->
+    <!-- FILTERS -->
+    <!-- ================================================= -->
+
+    <div class="card-body border-bottom">
+
+        <form method="get">
+
+            <div class="row g-3">
+
+                <div class="col-lg-8">
+                    <input
+                        type="text"
+                        name="search"
+                        value="{{ request.GET.search }}"
+                        class="form-control"
+                        placeholder="Search sections..."
+                    >
+                </div>
+
+                <div class="col-lg-2">
+
+                    <select
+                        name="status"
+                        class="form-select"
+                    >
+                        <option value="">All Statuses</option>
+
+                        <option
+                            value="active"
+                            {% if request.GET.status == 'active' %}
+                            selected
+                            {% endif %}
+                        >
+                            Active
+                        </option>
+
+                        <option
+                            value="inactive"
+                            {% if request.GET.status == 'inactive' %}
+                            selected
+                            {% endif %}
+                        >
+                            Inactive
+                        </option>
+
+                    </select>
+
+                </div>
+
+                <div class="col-lg-2 d-grid">
+                    <button class="btn btn-primary">
+                        <i class="fa fa-search me-2"></i>
+                        Filter
+                    </button>
+                </div>
+
+            </div>
+
+        </form>
+
+    </div>
+
+    <!-- ================================================= -->
+    <!-- TABLE -->
+    <!-- ================================================= -->
+
+    <div class="table-responsive">
+
+        <table class="table table-hover align-middle mb-0">
+
+            <thead class="table-light">
+
+                <tr>
+
+                    <th width="60">#</th>
+                    <th>Code</th>
+                    <th>Name</th>
+                    <th>Users</th>
+                    <th>Status</th>
+
+                    {% if request.user.is_superuser %}
+                    <th width="160">
+                        Actions
+                    </th>
+                    {% endif %}
+
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+                {% for section in sections %}
+
+                <tr>
+
+                    <td>
+                        {{ forloop.counter }}
+                    </td>
+
+                    <td>
+                        <span class="fw-semibold text-primary">
+                            {{ section.code }}
+                        </span>
+                    </td>
+
+                    <td>
+
+                        <div class="fw-semibold">
+                            {{ section.name }}
+                        </div>
+
+                        {% if section.description %}
+                        <small class="text-muted">
+                            {{ section.description|truncatechars:80 }}
+                        </small>
+                        {% endif %}
+
+                    </td>
+
+                    <td>
+
+                        <span class="badge bg-info">
+                            {{ section.users.count }}
+                        </span>
+
+                    </td>
+
+                    <td>
+
+                        {% if section.is_active %}
+                            <span class="badge bg-success">
+                                Active
+                            </span>
+                        {% else %}
+                            <span class="badge bg-danger">
+                                Inactive
+                            </span>
+                        {% endif %}
+
+                    </td>
+
+                    {% if request.user.is_superuser %}
+                    <td>
+
+                        <div class="btn-group btn-group-sm">
+
+                            <button
+                                class="btn btn-outline-primary"
+                                data-bs-toggle="modal"
+                                data-bs-target="#sectionModal"
+                                data-url="{% url 'core:section_update' section.pk %}"
+                            >
+                                <i class="fa fa-pen"></i>
+                            </button>
+
+                            <button
+                                class="btn btn-outline-danger"
+                                data-bs-toggle="modal"
+                                data-bs-target="#deleteSectionModal"
+                                data-url="{% url 'core:section_delete' section.pk %}"
+                                data-name="{{ section.name }}"
+                            >
+                                <i class="fa fa-trash"></i>
+                            </button>
+
+                        </div>
+
+                    </td>
+                    {% endif %}
+
+                </tr>
+
+                {% empty %}
+
+                <tr>
+
+                    <td colspan="6">
+
+                        <div class="text-center py-5">
+
+                            <i
+                                class="fa fa-building text-muted mb-3"
+                                style="font-size:4rem;"
+                            ></i>
+
+                            <h5 class="text-muted">
+                                No sections available
+                            </h5>
+
+                        </div>
+
+                    </td>
+
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+<!-- ================================================= -->
+<!-- CREATE / EDIT MODAL -->
+<!-- ================================================= -->
+
+<div
+    class="modal fade"
+    id="sectionModal"
+    tabindex="-1"
+>
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+
+        <div class="modal-content">
+
+            <div class="modal-header">
+
+                <h5 class="modal-title">
+                    Section
+                </h5>
+
+                <button
+                    class="btn-close"
+                    data-bs-dismiss="modal"
+                ></button>
+
+            </div>
+
+            <div
+                class="modal-body"
+                id="sectionModalBody"
+            >
+
+                <div class="text-center p-5">
+
+                    <div
+                        class="spinner-border text-primary"
+                    ></div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+</div>
+
+<!-- ================================================= -->
+<!-- DELETE MODAL -->
+<!-- ================================================= -->
+
+<div
+    class="modal fade"
+    id="deleteSectionModal"
+    tabindex="-1"
+>
+    <div class="modal-dialog modal-dialog-centered">
+
+        <div class="modal-content">
+
+            <div class="modal-header">
+
+                <h5 class="modal-title">
+                    Delete Section
+                </h5>
+
+                <button
+                    class="btn-close"
+                    data-bs-dismiss="modal"
+                ></button>
+
+            </div>
+
+            <div class="modal-body">
+
+                <p>
+                    Are you sure you want to delete
+                    <strong id="deleteSectionName"></strong>?
+                </p>
+
+            </div>
+
+            <div class="modal-footer">
+
+                <button
+                    class="btn btn-secondary"
+                    data-bs-dismiss="modal"
+                >
+                    Cancel
+                </button>
+
+                <a
+                    id="confirmDeleteSection"
+                    href="#"
+                    class="btn btn-danger"
+                >
+                    Delete
+                </a>
+
+            </div>
+
+        </div>
+
+    </div>
+</div>
+
+<script>
+
+document.addEventListener(
+    "DOMContentLoaded",
+    function () {
+
+        const sectionModal =
+            document.getElementById(
+                "sectionModal"
+            );
+
+        sectionModal.addEventListener(
+            "show.bs.modal",
+            function (event) {
+
+                const button =
+                    event.relatedTarget;
+
+                const url =
+                    button.dataset.url;
+
+                const body =
+                    document.getElementById(
+                        "sectionModalBody"
+                    );
+
+                body.innerHTML =
+                    `
+                    <div class="text-center p-5">
+                        <div class="spinner-border text-primary"></div>
+                    </div>
+                    `;
+
+                fetch(url)
+                    .then(
+                        response =>
+                            response.text()
+                    )
+                    .then(
+                        html => {
+                            body.innerHTML =
+                                html;
+                        }
+                    );
+            }
+        );
+
+        document.addEventListener(
+            "submit",
+            function (e) {
+
+                if (
+                    e.target.id ===
+                    "sectionForm"
+                ) {
+
+                    e.preventDefault();
+
+                    const form =
+                        e.target;
+
+                    fetch(
+                        form.action,
+                        {
+                            method: "POST",
+                            body: new FormData(form),
+                            headers: {
+                                "X-Requested-With":
+                                    "XMLHttpRequest"
+                            }
+                        }
+                    )
+                    .then(
+                        response =>
+                            response.text()
+                    )
+                    .then(
+                        html => {
+
+                            if (
+                                html.includes("<form")
+                            ) {
+                                document.getElementById(
+                                    "sectionModalBody"
+                                ).innerHTML = html;
+                            }
+                            else {
+                                location.reload();
+                            }
+
+                        }
+                    );
+
+                }
+
+            }
+        );
+
+        const deleteModal =
+            document.getElementById(
+                "deleteSectionModal"
+            );
+
+        deleteModal.addEventListener(
+            "show.bs.modal",
+            function (event) {
+
+                const button =
+                    event.relatedTarget;
+
+                document.getElementById(
+                    "deleteSectionName"
+                ).textContent =
+                    button.dataset.name;
+
+                document.getElementById(
+                    "confirmDeleteSection"
+                ).href =
+                    button.dataset.url;
+            }
+        );
+
+    }
+);
+
+</script>

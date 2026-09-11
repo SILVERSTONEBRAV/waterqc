@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: "DejaVu Sans"; }
+    h1 { text-align: center; }
+    .section { margin-bottom: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #444; padding: 8px; }
+  </style>
+</head>
+<body>
+  <h1>Shift Handover Report</h1>
+  <div class="section">
+    <strong>Date:</strong> {{ handover.date }}<br>
+    <strong>Shift:</strong> {{ handover.shift.name }} ({{ handover.shift.start_time }} - {{ handover.shift.end_time }})<br>
+    <strong>Plant:</strong> {{ handover.shift.treatment_plant.name }}
+  </div>
+
+  <div class="section">
+    <strong>Outgoing Supervisor:</strong> {{ handover.outgoing_supervisor }}<br>
+    <strong>Incoming Supervisor:</strong> {{ handover.incoming_supervisor }}<br>
+    <strong>Handover Time:</strong> {{ handover.handover_time }}<br>
+    <strong>Taken Over At:</strong> {{ handover.taken_over_at }}
+  </div>
+
+  <div class="section">
+    <h3>Notes</h3>
+    <p><strong>Handover:</strong> {{ handover.handover_notes }}</p>
+    <p><strong>Takeover:</strong> {{ handover.takeover_notes }}</p>
+    <p><strong>Pending Work:</strong> {{ handover.pending_work }}</p>
+  </div>
+
+  {% if handover.apparatus_conditions.all %}
+  <div class="section">
+    <h3>Apparatus Conditions</h3>
+    <table>
+      <tr><th>Apparatus</th><th>Status</th><th>Remarks</th></tr>
+      {% for condition in handover.apparatus_conditions.all %}
+      <tr>
+        <td>{{ condition.apparatus.name }}</td>
+        <td>{{ condition.status }}</td>
+        <td>{{ condition.remarks }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+</body>
+</html>

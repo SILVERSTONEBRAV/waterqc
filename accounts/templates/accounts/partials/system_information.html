@@ -1,0 +1,118 @@
+{# templates/accounts/partials/system_information.html #}
+
+<div class="card border-0 shadow-sm rounded-4">
+
+    <div class="card-header bg-white border-0 py-3">
+
+        <div class="d-flex justify-content-between align-items-center">
+
+            <div>
+                <h5 class="fw-bold mb-1">
+                    System Information
+                </h5>
+                <small class="text-muted">
+                    Runtime environment and server diagnostics.
+                </small>
+            </div>
+
+            <span class="badge bg-dark fs-6">
+                System
+            </span>
+
+        </div>
+
+    </div>
+
+    <div class="card-body">
+
+        <div class="table-responsive">
+
+            <table class="table align-middle system-table">
+
+                <tbody>
+
+                    <tr>
+                        <th>Django Version</th>
+                        <td>{{ django_version|default:"-" }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Environment</th>
+                        <td>
+                            {% if environment %}
+                                <span class="badge bg-primary">
+                                    {{ environment }}
+                                </span>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th>Server Time</th>
+                        <td>
+                            {{ now|date:"d M Y H:i:s"|default:"-" }}
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th>Time Zone</th>
+                        <td>{{ TIME_ZONE|default:"-" }}</td>
+                    </tr>
+
+                    <tr>
+                        <th>Authenticated User</th>
+                        <td>
+                            <div class="fw-semibold">
+                                {{ request.user.get_full_name|default:request.user.username }}
+                            </div>
+                            <small class="text-muted">
+                                {{ request.user.email }}
+                            </small>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th>User Role</th>
+                        <td>
+                            {% if request.user.is_superuser %}
+                                <span class="badge bg-danger">Superuser</span>
+                            {% elif request.user.is_staff %}
+                                <span class="badge bg-primary">Staff</span>
+                            {% else %}
+                                <span class="badge bg-secondary">User</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th>Account Created</th>
+                        <td>
+                            {{ request.user.date_joined|date:"d M Y H:i"|default:"-" }}
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th>Last Login</th>
+                        <td>
+                            {{ request.user.last_login|date:"d M Y H:i"|default:"Never" }}
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th>Session Key</th>
+                        <td>
+                            <code>{{ request.session.session_key|default:"-" }}</code>
+                        </td>
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>

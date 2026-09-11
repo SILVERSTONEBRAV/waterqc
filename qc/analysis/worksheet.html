@@ -1,0 +1,359 @@
+# qc/views/worksheet.py
+
+from collections import defaultdict, OrderedDict
+from datetime import datetime
+
+from django.apps import apps
+from django.db.models import Prefetch
+from django.http import JsonResponse
+from django.utils import timezone
+from django.views.generic import TemplateView
+
+from core.mixins import WanjalaMixin
+from qc.models import (
+    SamplingTime,
+    WaterAnalysis,
+    ResultState,
+)
+
+
+RESULT_MODELS = {
+    "raw": "RawWaterResult",
+    "treated": "TreatedWaterResult",
+    "clarified": "ClarifiedWaterResult",
+    "coagulated": "CoagulatedWaterResult",
+}
+
+WATER_ORDER = [
+    "raw",
+    "coagulated",
+    "clarified",
+    "treated",
+]
+
+WATER_TITLES = {
+    "raw": "Raw Water",
+    "coagulated": "Coagulated Water",
+    "clarified": "Clarified Water",
+    "treated": "Treated Water",
+}
+
+
+def get_result_model(water_type):
+    model_name = RESULT_MODELS.get(
+        str(water_type).lower()
+    )
+
+    if not model_name:
+        return None
+
+    return apps.get_model(
+        "qc",
+        model_name,
+    )
+
+
+class AnalysisWorksheetView(
+    WanjalaMixin,
+    TemplateView,
+):
+    template_name = "qc/analysis/worksheet.html"
+    permission_required_view = (
+        "qc.view_wateranalysis"
+    )
+
+    # =====================================================
+    # DATE
+    # =====================================================
+
+    def get_selected_date(self):
+        value = self.request.GET.get("date")
+
+        if not value:
+            return timezone.localdate()
+
+        try:
+            return datetime.strptime(
+                value,
+                "%Y-%m-%d",
+            ).date()
+        except Exception:
+            return timezone.localdate()
+
+    # =====================================================
+    # CURRENT SAMPLING TIME
+    # =====================================================
+
+    def get_current_sampling_time(self):
+        """
+        Returns the latest sampling time
+        that should currently be displayed.
+
+        Example:
+
+        08:17 → 08:00
+        10:01 → 10:00
+        """
+
+        now = timezone.localtime().time()
+
+        sample = (
+            SamplingTime.objects
+            .filter(
+                time__lte=now
+            )
+            .order_by("-time")
+            .first()
+        )
+
+        if sample:
+            return sample.time
+
+        return (
+            SamplingTime.objects
+            .order_by("time")
+            .values_list(
+                "time",
+                flat=True,
+            )
+            .first()
+        )
+
+    # =====================================================
+    # QUERYSET
+    # =====================================================
+
+    def get_queryset(self):
+        qs = (
+            WaterAnalysis.objects
+            .select_related(
+                "treatment_plant",
+                "analysis_time",
+                "shift",
+                "analysed_by",
+                "verified_by",
+                "approved_by",
+            )
+            .filter(
+                analysis_date=self.get_selected_date(),
+                archived=False,
+            )
+            .order_by(
+                "analysis_time__time",
+                "analysis_time__water_type",
+            )
+        )
+
+        qs = self.filter_by_user_plant(qs)
+
+        state = self.request.GET.get(
+            "state"
+        )
+        if state:
+            qs = qs.filter(
+                state=state
+            )
+
+        shift = self.request.GET.get(
+            "shift"
+        )
+        if shift:
+            qs = qs.filter(
+                shift_id=shift
+            )
+
+        # ======================================
+        # ONLY SHOW CURRENT TIME SLOT TODAY
+        # ======================================
+
+        if (
+            self.get_selected_date()
+            == timezone.localdate()
+        ):
+            current_time = (
+                self.get_current_sampling_time()
+            )
+
+            if current_time:
+                qs = qs.filter(
+                    analysis_time__time=current_time
+                )
+
+        return qs
+
+    # =====================================================
+    # TABLE
+    # =====================================================
+
+    def build_analysis_table(
+        self,
+        analysis,
+    ):
+        ResultModel = get_result_model(
+            analysis.water_type
+        )
+
+        if not ResultModel:
+            return None
+
+        results = (
+            ResultModel.objects
+            .filter(
+                analysis=analysis
+            )
+            .select_related(
+                "parameter",
+                "analysed_by",
+                "verified_by",
+            )
+            .order_by(
+                "parameter__display_order",
+                "parameter__name",
+            )
+        )
+
+        total = results.count()
+
+        completed = (
+            results.exclude(
+                state=ResultState.PENDING
+            ).count()
+        )
+
+        abnormal = (
+            results.filter(
+                is_abnormal=True
+            ).count()
+        )
+
+        return {
+            "analysis": analysis,
+            "results": results,
+            "total": total,
+            "completed": completed,
+            "abnormal": abnormal,
+            "progress":
+                analysis.completion_percentage,
+        }
+
+    # =====================================================
+    # CONTEXT
+    # =====================================================
+
+    def get_context_data(
+        self,
+        **kwargs,
+    ):
+        ctx = super().get_context_data(
+            **kwargs
+        )
+
+        analyses = list(
+            self.get_queryset()
+        )
+
+        summary = defaultdict(int)
+        worksheet_groups = OrderedDict()
+
+        for analysis in analyses:
+
+            time_key = (
+                analysis.analysis_time.time
+            )
+
+            if time_key not in worksheet_groups:
+                worksheet_groups[time_key] = {
+                    "time":
+                        analysis.analysis_time,
+                    "tables":
+                        OrderedDict(),
+                    "total": 0,
+                    "completed": 0,
+                    "abnormal": 0,
+                    "progress": 0,
+                }
+
+            table = (
+                self.build_analysis_table(
+                    analysis
+                )
+            )
+
+            if not table:
+                continue
+
+            worksheet_groups[time_key][
+                "tables"
+            ][analysis.water_type] = {
+                "title":
+                    WATER_TITLES[
+                        analysis.water_type
+                    ],
+                **table,
+            }
+
+            worksheet_groups[time_key][
+                "total"
+            ] += table["total"]
+
+            worksheet_groups[time_key][
+                "completed"
+            ] += table["completed"]
+
+            worksheet_groups[time_key][
+                "abnormal"
+            ] += table["abnormal"]
+
+            summary["tables"] += 1
+            summary["results"] += table["total"]
+            summary["completed"] += (
+                table["completed"]
+            )
+            summary["abnormal"] += (
+                table["abnormal"]
+            )
+
+        final_groups = []
+
+        for group in worksheet_groups.values():
+
+            if group["total"]:
+                group["progress"] = round(
+                    (
+                        group["completed"]
+                        / group["total"]
+                    ) * 100,
+                    2,
+                )
+
+            ordered = []
+
+            for wt in WATER_ORDER:
+                if wt in group["tables"]:
+                    ordered.append(
+                        group["tables"][wt]
+                    )
+
+            group["tables"] = ordered
+            final_groups.append(group)
+
+        ctx.update(
+            {
+                "selected_date":
+                    self.get_selected_date(),
+                "summary":
+                    summary,
+                "worksheet_groups":
+                    final_groups,
+                "plant":
+                    self.request.user.treatment_plant,
+                "today":
+                    timezone.localdate(),
+                "now":
+                    timezone.localtime(),
+                "current_sampling_time":
+                    self.get_current_sampling_time(),
+            }
+        )
+
+        return ctx

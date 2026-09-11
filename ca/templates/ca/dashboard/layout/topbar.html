@@ -1,0 +1,38 @@
+<div class="ca-topbar-inner">
+    <div class="ca-breadcrumb-area">
+        {% include "ca/dashboard/layout/breadcrumb.html" %}
+    </div>
+
+    <div class="ca-topbar-actions">
+        <div class="ca-context-selector">
+            <span class="ca-context-label">Plant</span>
+            <select id="plant-selector" name="plant">
+                <option value="">All Plants</option>
+                {% for plant in treatment_plants %}
+                    <option value="{{ plant.pk }}">
+                        {{ plant }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="ca-context-selector">
+            <span class="ca-context-label">Shift</span>
+            <select id="shift-selector" name="shift">
+                <option value="">All Shifts</option>
+                <option value="morning">Morning</option>
+                <option value="afternoon">Afternoon</option>
+                <option value="night">Night</option>
+            </select>
+        </div>
+
+        <button
+            type="button"
+            class="ca-button ca-button-primary"
+            data-action="open-quick-actions"
+        >
+            <span class="ca-icon ca-icon-plus"></span>
+            New Action
+        </button>
+    </div>
+</div>

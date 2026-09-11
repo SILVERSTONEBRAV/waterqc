@@ -1,0 +1,33 @@
+<script>
+window.DASHBOARD_URLS = {
+    users: {
+        // List + Create
+        base: "{% url 'accounts:ajax_users' %}",
+        // Retrieve / Update / Delete for a specific user
+        detail: objId => "{% url 'accounts:ajax_user_detail' 0 %}".replace("/0/", `/${objId}/`),
+        // Export
+        export: "{% url 'accounts:ajax_export_users' %}"
+    },
+    sections: {
+        // List + Create
+        base: "{% url 'accounts:ajax_sections' %}",
+        // Retrieve / Update / Delete for a specific section
+        detail: objId => "{% url 'accounts:ajax_section_detail' 0 %}".replace("/0/", `/${objId}/`)
+    },
+    groups: {
+        // List + Create
+        base: "{% url 'accounts:ajax_groups' %}",
+        // Retrieve / Update / Delete for a specific group
+        detail: objId => "{% url 'accounts:ajax_group_detail' 0 %}".replace("/0/", `/${objId}/`)
+    },
+    dashboard: {
+        counts: "{% url 'accounts:ajax_dashboard_counts' %}"
+    },
+    exports: {
+        users: "{% url 'accounts:ajax_export_users' %}",
+        status: jobId =>
+            "{% url 'accounts:ajax_export_status' '00000000-0000-0000-0000-000000000000' %}"
+                .replace("00000000-0000-0000-0000-000000000000", jobId)
+    }
+};
+</script>

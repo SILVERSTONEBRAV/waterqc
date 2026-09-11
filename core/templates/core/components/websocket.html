@@ -1,0 +1,88 @@
+<script>
+
+(function(){
+
+let socket=null;
+
+let reconnectDelay=2000;
+
+function connect(){
+
+    socket=new WebSocket(APP.urls.websocket);
+
+    socket.onopen=function(){
+
+        Alpine.store("app").websocket=true;
+
+    };
+
+    socket.onclose=function(){
+
+        Alpine.store("app").websocket=false;
+
+        setTimeout(connect,reconnectDelay);
+
+    };
+
+    socket.onerror=function(){
+
+        socket.close();
+
+    };
+
+    socket.onmessage=function(event){
+
+        const data=JSON.parse(event.data);
+
+        switch(data.type){
+
+            case "analysis_created":
+
+                dispatchAppEvent(APP.events.ANALYSIS_CREATED,data);
+
+                dispatchAppEvent(APP.events.REFRESH);
+
+                break;
+
+            case "analysis_updated":
+
+                dispatchAppEvent(APP.events.ANALYSIS_UPDATED,data);
+
+                dispatchAppEvent(APP.events.REFRESH);
+
+                break;
+
+            case "result_created":
+
+                dispatchAppEvent(APP.events.RESULT_CREATED,data);
+
+                dispatchAppEvent(APP.events.REFRESH);
+
+                break;
+
+            case "result_updated":
+
+                dispatchAppEvent(APP.events.RESULT_UPDATED,data);
+
+                dispatchAppEvent(APP.events.REFRESH);
+
+                break;
+
+            case "result_confirmed":
+
+                dispatchAppEvent(APP.events.RESULT_CONFIRMED,data);
+
+                dispatchAppEvent(APP.events.REFRESH);
+
+                break;
+
+        }
+
+    };
+
+}
+
+connect();
+
+})();
+</script>

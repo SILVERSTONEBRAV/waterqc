@@ -1,0 +1,309 @@
+/* =========================================================
+   Global body & background
+   ========================================================= */
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #0f1622, #1c2b44);
+    color: #222;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+    transition: background 1s ease;
+}
+
+/* =========================================================
+   Floating error container
+   ========================================================= */
+#errorMessage {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #ff4444;
+    color: #fff;
+    padding: 0.6rem 1rem;
+    border-radius: 0.4rem;
+    font-size: 0.95rem;
+    display: none;
+    opacity: 0;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    z-index: 10;
+}
+
+#errorMessage.show {
+    display: block;
+    opacity: 1;
+    transform: translateX(-50%) translateY(-5px);
+    animation: shake 0.3s ease;
+}
+
+/* Slight shake animation on error */
+@keyframes shake {
+    0%, 100% { transform: translateX(-50%) translateY(-5px); }
+    25% { transform: translateX(-48%) translateY(-5px); }
+    75% { transform: translateX(-52%) translateY(-5px); }
+}
+
+/* =========================================================
+   Login container (card) — dynamic gradient
+   ========================================================= */
+.login-container {
+    position: relative;
+    background: #c4c0db; /* fallback */
+    color: #222;
+    border-radius: 1rem;
+    box-shadow: 0 12px 35px rgba(0,0,0,0.35);
+    width: 100%;
+    max-width: 400px;
+    padding: 2rem 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    transition: all 0.5s ease;
+    overflow: hidden;
+}
+
+/* Dynamic gradient animation */
+.login-container.dynamic-gradient {
+    background-size: 1000% 1000%;
+    animation: gradientShift 20s ease infinite;
+}
+
+@keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+/* =========================================================
+   Logo wrapper
+   ========================================================= */
+.logo-wrapper {
+    width: 120px;
+    height: 120px;
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 50%;
+    background: #ccc;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+    overflow: hidden;
+    transition: transform 0.4s ease, box-shadow 0.3s ease;
+}
+
+.logo-wrapper img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    transition: transform 0.3s ease;
+}
+
+.logo-wrapper:hover img {
+    transform: scale(1.08);
+}
+
+/* =========================================================
+   Company name
+   ========================================================= */
+.company-name {
+    font-size: 1.7rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: #004080;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.35);
+    transition: color 0.3s ease;
+}
+
+/* =========================================================
+   Verified username
+   ========================================================= */
+.verified-username {
+    width: 100%;
+    margin-bottom: 1rem;
+    font-weight: 600;
+    font-size: 1rem;
+    color: #0066cc;
+    text-align: center;
+    transition: all 0.3s ease;
+    opacity: 0;
+}
+
+/* Fade in for verified username */
+.verified-username.show {
+    opacity: 1;
+    transition: opacity 0.4s ease;
+}
+
+/* =========================================================
+   Form groups & inputs
+   ========================================================= */
+.form-group {
+    position: relative;
+    width: 100%;
+    margin-bottom: 1rem;
+}
+
+/* Left icons */
+.form-group i.left-icon {
+    position: absolute;
+    top: 50%;
+    left: 0.75rem;
+    transform: translateY(-50%);
+    color: #666;
+    pointer-events: none;
+    font-size: 1rem;
+}
+
+/* Input styling */
+input[type="text"],
+input[type="password"] {
+    width: 100%;
+    padding: 0.55rem 2.75rem 0.55rem 2.5rem;
+    border-radius: 0.5rem;
+    border: 1px solid #ccc;
+    outline: none;
+    font-size: 1rem;
+    background: #f3f3f3;
+    color: #222;
+    box-sizing: border-box;
+    transition: background 0.3s ease, border 0.3s ease, box-shadow 0.3s ease;
+}
+
+input:focus {
+    background: #fff;
+    border: 1px solid #004080;
+    box-shadow: 0 0 12px rgba(0, 64, 128, 0.35);
+}
+
+input::placeholder {
+    color: #888;
+}
+
+/* Password toggle */
+.toggle-password {
+    position: absolute;
+    top: 50%;
+    right: 0.75rem;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: #666;
+    font-size: 1rem;
+    z-index: 3;
+    transition: color 0.3s ease;
+}
+
+.toggle-password:hover {
+    color: #004080;
+}
+
+/* =========================================================
+   Buttons
+   ========================================================= */
+button {
+    width: 100%;
+    padding: 0.55rem 1rem;
+    border: none;
+    border-radius: 2rem;
+    background: linear-gradient(90deg, #004080, #00ccff);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: filter 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
+}
+
+button:hover:not(:disabled) {
+    filter: brightness(1.1);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.3);
+    transform: translateY(-1px);
+}
+
+button:disabled {
+    background: #999;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* Ripple effect */
+button span {
+    position: absolute;
+    border-radius: 50%;
+    transform: scale(0);
+    animation: ripple 0.6s linear;
+    background-color: rgba(255,255,255,0.3);
+}
+
+@keyframes ripple {
+    to { transform: scale(2.5); opacity: 0; }
+}
+
+/* =========================================================
+   Forgot password
+   ========================================================= */
+.forgot-password {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+}
+
+.forgot-password a {
+    color: #004080;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.forgot-password a:hover {
+    text-decoration: underline;
+    color: #0066cc;
+}
+
+/* =========================================================
+   Password strength bar
+   ========================================================= */
+#passwordStrengthContainer {
+    height: 6px;
+    width: 100%;
+    background: rgba(0,0,0,0.08);
+    border-radius: 3px;
+    margin-bottom: 1rem;
+    transition: all 0.3s ease;
+}
+
+#passwordStrengthBar {
+    height: 100%;
+    width: 0%;
+    background: #ff4444;
+    border-radius: 3px;
+    transition: width 0.3s ease, background 0.3s ease;
+}
+
+/* Gradient glow on strong password */
+#passwordStrengthBar.strong {
+    box-shadow: 0 0 6px rgba(0,255,136,0.5);
+}
+
+/* =========================================================
+   Responsive tweaks
+   ========================================================= */
+@media (max-width: 400px) {
+    .login-container {
+        padding: 1.5rem 1rem;
+    }
+
+    .logo-wrapper {
+        width: 100px;
+        height: 100px;
+    }
+
+    .company-name {
+        font-size: 1.3rem;
+    }
+}

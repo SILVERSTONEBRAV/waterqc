@@ -1,0 +1,23 @@
+#core/dashboard.html
+{% extends "t/base.html" %}
+
+{% block content %}
+<div class="grid grid-cols-4 gap-6">
+
+    {% for module in modules %}
+        <div class="col-span-4">
+            <h2 class="text-xl font-bold mb-4">{{ module.app|upper }}</h2>
+
+            <div class="grid grid-cols-4 gap-4">
+                {% for model in module.models %}
+                    <a href="{{ model.url }}" class="p-4 bg-white shadow rounded hover:shadow-lg transition">
+                        <i class="{{ model.icon }} text-2xl"></i>
+                        <div class="mt-2">{{ model.name }}</div>
+                    </a>
+                {% endfor %}
+            </div>
+        </div>
+    {% endfor %}
+
+</div>
+{% endblock %}

@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block title %}Chemical Analysis Processes{% endblock %}
+
+{% block content %}
+
+<div class="ca-page">
+    <div class="page-header">
+        <div>
+            <h1>Chemical Analysis Processes</h1>
+            <p>Monitor active and completed chemical analysis workflows.</p>
+        </div>
+    <div class="page-actions">
+        <a href="{% url 'ca:dashboard' %}" class="btn btn-secondary">
+            Dashboard
+        </a>
+        <a href="{% url 'ca:batch-list' %}" class="btn btn-secondary">
+            Batches
+        </a>
+        <a href="{% url 'ca:request-list' %}" class="btn btn-secondary">
+            Analysis Requests
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h2>Processes</h2>
+            <span>
+                {{ processes|length }}
+                process{{ processes|length|pluralize }}
+            </span>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Process</th>
+                    <th>Sample ID</th>
+                    <th>Chemical</th>
+                    <th>Supplier</th>
+                    <th>Status</th>
+                    <th>Analyst</th>
+                    <th>Progress</th>
+                    <th>Created</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for process in processes %}
+                <tr>
+                    <td>
+                        <strong>#{{ process.pk }}</strong>
+                    </td>
+
+                    <td>
+                        {% if process.batch %}
+                            <a href="{% url 'ca:batch-detail' process.batch.pk %}">
+                                {{ process.batch.sample_id|default:"—" }}
+                            </a>
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if process.batch %}
+                            {{ process.batch.chemical|default:"—" }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if process.batch %}
+                            {{ process.batch.supplier|default:"—" }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if process.status == "COMPLETED" %}
+                            <span class="badge badge-success">
+                                {{ process.get_status_display|default:process.status }}
+                            </span>
+                        {% elif process.status == "REJECTED" %}
+                            <span class="badge badge-danger">
+                                {{ process.get_status_display|default:process.status }}
+                            </span>
+                        {% elif process.status == "QA" or process.status == "APPROVED" %}
+                            <span class="badge badge-info">
+                                {{ process.get_status_display|default:process.status }}
+                            </span>
+                        {% else %}
+                            <span class="badge badge-warning">
+                                {{ process.get_status_display|default:process.status }}
+                            </span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if process.assigned_analyst %}
+                            {{ process.assigned_analyst.get_full_name|default:process.assigned_analyst.username }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {{ process.analysis_progress|default:"0" }}%
+                    </td>
+
+                    <td>
+                        {{ process.created_at|date:"d M Y H:i" }}
+                    </td>
+
+                    <td>
+                        <a
+                            href="{% url 'ca:process-detail' process.pk %}"
+                            class="btn btn-sm btn-primary"
+                        >
+                            View
+                        </a>
+
+                        {% if process.status == "ANALYSIS" %}
+                            <a
+                                href="{% url 'ca:process-action-form' process.pk %}"
+                                class="btn btn-sm btn-secondary"
+                            >
+                                Continue
+                            </a>
+                        {% elif process.status == "QA" %}
+                            <a
+                                href="{% url 'ca:process-action-form' process.pk %}"
+                                class="btn btn-sm btn-warning"
+                            >
+                                Review
+                            </a>
+                        {% endif %}
+                    </td>
+                </tr>
+
+                {% empty %}
+                <tr>
+                    <td colspan="9" class="empty-state">
+                        <strong>No chemical analysis processes found</strong>
+                        <p>
+                            Processes will appear here when chemical analysis
+                            workflows are initiated.
+                        </p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+</div>
+{% endblock %}

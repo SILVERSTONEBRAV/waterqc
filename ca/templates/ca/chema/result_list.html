@@ -1,0 +1,189 @@
+{% extends "ca/dashboard/layout/app.html" %}
+
+{% block title %}Chemical Analysis Results{% endblock %}
+
+{% block content %}
+
+<div class="ca-page">
+<div class="page-header">
+    <div>
+        <h1>Chemical Analysis Results</h1>
+        <p>Review recorded chemical analysis results and their evaluation status.</p>
+    </div>
+
+    <div class="page-actions">
+        <a href="{% url 'ca:dashboard' %}" class="btn btn-secondary">
+            Dashboard
+        </a>
+    </div>
+</div>
+
+<div class="card">
+
+    <div class="card-header">
+        <div>
+            <h2>Analysis Results</h2>
+            <span>
+                {{ results|length }}
+                result{{ results|length|pluralize }}
+            </span>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table">
+
+            <thead>
+                <tr>
+                    <th>Batch</th>
+                    <th>Sample ID</th>
+                    <th>Parameter</th>
+                    <th>Result</th>
+                    <th>Status</th>
+                    <th>Analyst</th>
+                    <th>Tested At</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% for result in results %}
+
+                <tr>
+
+                    <td>
+                        {% if result.batch %}
+                            {% if result.batch.pk %}
+                                <a href="{% url 'ca:batch-detail' result.batch.pk %}">
+                                    {{ result.batch.sample_id|default:result.batch }}
+                                </a>
+                            {% else %}
+                                {{ result.batch }}
+                            {% endif %}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if result.batch %}
+                            {{ result.batch.sample_id|default:"—" }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if result.parameter %}
+                            {{ result.parameter }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if result.value != None %}
+
+                            {{ result.value }}
+
+                            {% if result.parameter %}
+                                {% if result.parameter.unit %}
+                                    {{ result.parameter.unit }}
+                                {% elif result.unit %}
+                                    {{ result.unit }}
+                                {% endif %}
+                            {% elif result.unit %}
+                                {{ result.unit }}
+                            {% endif %}
+
+                        {% elif result.textual_result %}
+
+                            {{ result.textual_result }}
+
+                        {% else %}
+
+                            —
+
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if result.status == "PASS" %}
+                            <span class="badge badge-success">
+                                Pass
+                            </span>
+                        {% elif result.status == "FAIL" %}
+                            <span class="badge badge-danger">
+                                Fail
+                            </span>
+                        {% elif result.status == "NA" %}
+                            <span class="badge">
+                                N/A
+                            </span>
+                        {% elif result.status %}
+                            <span class="badge">
+                                {{ result.get_status_display|default:result.status }}
+                            </span>
+                        {% else %}
+                            <span class="badge badge-warning">
+                                Pending
+                            </span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if result.analyst %}
+                            {{ result.analyst.get_full_name|default:result.analyst.username }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if result.tested_at %}
+                            {{ result.tested_at|date:"d M Y H:i" }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if result.pk %}
+                            <a
+                                href="{% url 'ca:result-detail' result.pk %}"
+                                class="btn btn-sm btn-primary"
+                            >
+                                View
+                            </a>
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+
+                </tr>
+
+                {% empty %}
+
+                <tr>
+                    <td colspan="8" class="empty-state">
+                        <strong>No analysis results found</strong>
+                        <p>
+                            Results will appear here once chemical analysis
+                            tests have been recorded.
+                        </p>
+                    </td>
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+    </div>
+
+</div>
+
+</div>
+
+{% endblock %}

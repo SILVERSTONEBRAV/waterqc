@@ -1,0 +1,40 @@
+<!-- templates/microbiological_analysis/microbial_analysis_detail.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Microbial Analysis Detail</title>
+    <link rel="stylesheet" href="{% static 'styles.css' %}">
+</head>
+<body>
+    <h1>Microbial Analysis Detail</h1>
+    <table>
+        <tr>
+            <th>UUID</th>
+            <td>{{ analysis.uuid }}</td>
+        </tr>
+        <tr>
+            <th>Timestamp</th>
+            <td>{{ analysis.timestamp }}</td>
+        </tr>
+        <tr>
+            <th>Treatment Plant</th>
+            <td>{{ analysis.treatment_plant.name }}</td>
+        </tr>
+        <tr>
+            <th>Phase</th>
+            <td>{{ analysis.treatment_plant_phase.name }}</td>
+        </tr>
+        <tr>
+            <th>Method</th>
+            <td>{{ analysis.method.name }}</td>
+        </tr>
+        <tr>
+            <th>State</th>
+            <td>{{ analysis.state }}</td>
+        </tr>
+        <!-- Add more fields as needed -->
+    </table>
+</body>
+</html>

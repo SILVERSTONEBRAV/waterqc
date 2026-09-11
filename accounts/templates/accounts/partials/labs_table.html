@@ -1,0 +1,143 @@
+{% load static %}
+
+<div class="card shadow-sm border-0 rounded-4">
+
+    <div class="card-header bg-white border-bottom py-3">
+
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+
+            <div>
+                <h5 class="mb-1 fw-bold">
+                    <i class="fa fa-flask text-primary me-2"></i>
+                    Laboratories
+                </h5>
+
+                <small class="text-muted">
+                    Registered laboratories and testing facilities.
+                </small>
+            </div>
+
+            <div class="badge bg-primary fs-6">
+                {{ labs|length }} Laboratories
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="card-body">
+
+        {% if labs %}
+
+        <div class="row g-4">
+
+            {% for lab in labs %}
+
+            <div class="col-xl-4 col-lg-6">
+
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+
+                    <div class="card-body">
+
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+
+                            <div>
+
+                                <h5 class="fw-bold mb-1">
+                                    {{ lab }}
+                                </h5>
+
+                                {% if lab.code %}
+                                <small class="text-muted">
+                                    Code: {{ lab.code }}
+                                </small>
+                                {% endif %}
+
+                            </div>
+
+                            <span class="badge bg-success">
+                                Active
+                            </span>
+
+                        </div>
+
+                        <div class="small text-muted">
+
+                            {% if lab.location %}
+                            <div class="mb-2">
+                                <i class="fa fa-location-dot me-2"></i>
+                                {{ lab.location }}
+                            </div>
+                            {% endif %}
+
+                            {% if lab.manager %}
+                            <div class="mb-2">
+                                <i class="fa fa-user me-2"></i>
+                                {{ lab.manager }}
+                            </div>
+                            {% endif %}
+
+                            {% if lab.email %}
+                            <div class="mb-2">
+                                <i class="fa fa-envelope me-2"></i>
+                                {{ lab.email }}
+                            </div>
+                            {% endif %}
+
+                            {% if lab.phone %}
+                            <div class="mb-2">
+                                <i class="fa fa-phone me-2"></i>
+                                {{ lab.phone }}
+                            </div>
+                            {% endif %}
+
+                            {% if lab.created_at %}
+                            <div class="mb-2">
+                                <i class="fa fa-calendar me-2"></i>
+                                Created:
+                                {{ lab.created_at|date:"d M Y" }}
+                            </div>
+                            {% endif %}
+
+                            {% if lab.description %}
+                            <div class="mt-3">
+                                {{ lab.description|truncatechars:120 }}
+                            </div>
+                            {% endif %}
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            {% endfor %}
+
+        </div>
+
+        {% else %}
+
+        <div class="text-center py-5">
+
+            <i
+                class="fa fa-flask text-muted mb-3"
+                style="font-size:4rem;"
+            ></i>
+
+            <h4 class="text-muted">
+                No Laboratories Available
+            </h4>
+
+            <p class="text-muted mb-0">
+                No laboratory records have been configured.
+            </p>
+
+        </div>
+
+        {% endif %}
+
+    </div>
+
+</div>

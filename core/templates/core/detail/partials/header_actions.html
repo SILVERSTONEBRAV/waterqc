@@ -1,0 +1,68 @@
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+
+    <div>
+        <h5 class="mb-0 d-flex align-items-center gap-2">
+            {{ meta.verbose_name|title }}
+
+            <span class="badge bg-success">LIVE</span>
+
+            {% if object %}
+                <span class="badge bg-secondary">ID: {{ object.pk }}</span>
+            {% else %}
+                <span class="badge bg-warning text-dark">NEW</span>
+            {% endif %}
+        </h5>
+
+        <small class="text-muted">
+            {{ meta.app_label }} / {{ meta.model_name }}
+        </small>
+    </div>
+
+    <div class="d-flex gap-2 flex-wrap">
+
+        <button class="btn btn-sm btn-primary js-action"
+                data-action="create"
+                data-model="{{ meta.key }}">
+            ➕ Add
+        </button>
+
+        {% if object %}
+
+        <button class="btn btn-sm btn-outline-secondary js-action"
+                data-action="detail"
+                data-id="{{ object.pk }}"
+                data-model="{{ meta.key }}">
+            👁 View
+        </button>
+
+        <button class="btn btn-sm btn-outline-warning js-action"
+                data-action="update"
+                data-id="{{ object.pk }}"
+                data-model="{{ meta.key }}">
+            ✏ Edit
+        </button>
+
+        <button class="btn btn-sm btn-outline-danger js-action"
+                data-action="delete"
+                data-id="{{ object.pk }}"
+                data-model="{{ meta.key }}">
+            🗑 Delete
+        </button>
+
+        {% endif %}
+
+        <button class="btn btn-sm btn-dark js-action"
+                data-action="print">
+            🖨
+        </button>
+
+        {% if export_enabled %}
+        <button class="btn btn-sm btn-success js-action"
+                data-action="export"
+                data-id="{{ object.pk }}">
+            ⬇ Export
+        </button>
+        {% endif %}
+
+    </div>
+</div>
