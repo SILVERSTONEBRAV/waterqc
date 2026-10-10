@@ -1,10 +1,11 @@
-
+# ca/urls.py
 from __future__ import annotations
 
 from django.urls import path
-
 from viewflow.workflow.flow import FlowViewset
-
+from . dashboard2 import *
+from . dashboard3 import *
+from . dashboard import *
 from .chemical_flow import ChemicalAnalysisFlow
 from .views import (
     ChemicalAnalysisInputDetailView,
@@ -19,12 +20,13 @@ from .views import (
     ChemicalSpecificationFilterView,
     ChemicalSpecificationListView,
     ChecklistDetailView,
-    DashboardView,
     DownloadChemicalCoAView,
     MyChemicalTasksView,
     OverdueAnalysisView,
     PendingAnalysisView,
     PendingApprovalView,
+    PendingCoAApprovalView,
+    PendingQAReviewView,
     ProcessDetailView,
     ProcessJSONView,
     ProcessListView,
@@ -40,76 +42,31 @@ from .views import (
 
 app_name = "ca"
 
-workflow = FlowViewset(
-    ChemicalAnalysisFlow,
-)
+workflow = FlowViewset(ChemicalAnalysisFlow)
 
 urlpatterns = [
-    path(
-        "",
-        DashboardView.as_view(),
-        name="dashboard",
-    ),
-    path(
-        "dashboard/",
-        DashboardView.as_view(),
-        name="dashboard-view",
-    ),
-    path(
-        "batches/",
-        ChemicalBatchListView.as_view(),
-        name="batch-list",
-    ),
-    path(
-        "batches/add/",
-        ChemicalBatchCreateView.as_view(),
-        name="batch-create",
-    ),
-    path(
-        "batches/<int:pk>/",
-        ChemicalBatchDetailView.as_view(),
-        name="batch-detail",
-    ),
-    path(
-        "batches/<int:pk>/edit/",
-        ChemicalBatchUpdateView.as_view(),
-        name="batch-update",
-    ),
-    path(
-        "requests/",
-        ChemicalAnalysisRequestListView.as_view(),
-        name="request-list",
-    ),
-    path(
-        "requests/<int:pk>/",
-        ChemicalAnalysisRequestDetailView.as_view(),
-        name="request-detail",
-    ),
-    path(
-        "processes/",
-        ProcessListView.as_view(),
-        name="process-list",
-    ),
-    path(
-        "processes/<int:pk>/",
-        ProcessDetailView.as_view(),
-        name="process-detail",
-    ),
-    path(
-        "processes/<int:pk>/json/",
-        ProcessJSONView.as_view(),
-        name="process-json",
-    ),
-    path(
-        "processes/<int:pk>/statistics/",
-        ProcessStatisticsView.as_view(),
-        name="process-statistics",
-    ),
-    path(
-        "processes/<int:pk>/refresh/",
-        ProcessRefreshView.as_view(),
-        name="process-refresh",
-    ),
+    path("", DashboardView.as_view(), name="dashboard"),
+    path("dashboard/", DashboardView.as_view(), name="dashboard-view"),
+    path("dashboard2/", Dashboard2View.as_view(), name="dashboard2"),
+    path("dashboard3/", Dashboard3View.as_view(), name="dashboard3"),
+    path("batches/", ChemicalBatchListView.as_view(), name="batch-list"),
+    path("batches/add/", ChemicalBatchCreateView.as_view(), name="batch-create"),
+    path("batches/<int:pk>/", ChemicalBatchDetailView.as_view(), name="batch-detail"),
+    path("batches/<int:pk>/edit/", ChemicalBatchUpdateView.as_view(), name="batch-update"),
+
+    path("requests/", ChemicalAnalysisRequestListView.as_view(), name="request-list"),
+    path("requests/<int:pk>/", ChemicalAnalysisRequestDetailView.as_view(), name="request-detail"),
+    path("requests/<int:pk>/transition/", ChemicalAnalysisRequestDetailView.as_view(), name="request-transition"),
+
+    path("processes/", ProcessListView.as_view(), name="process-list"),
+    path("processes/<int:pk>/", ProcessDetailView.as_view(), name="process-detail"),
+    path("processes/<int:pk>/qa-review/", ProcessDetailView.as_view(), name="qa-review"),
+    path("processes/<int:pk>/json/", ProcessJSONView.as_view(), name="process-json"),
+    path("processes/<int:pk>/statistics/", ProcessStatisticsView.as_view(), name="process-statistics"),
+    path("processes/<int:pk>/refresh/", ProcessRefreshView.as_view(), name="process-refresh"),
+    path("processes/<int:pk>/action/", ProcessDetailView.as_view(), name="process-action-form"),
+    path("processes/<int:pk>/action/form/", ProcessDetailView.as_view(), name="process-action-form-alt"),
+
     path(
         "analysis/inputs/<int:pk>/",
         ChemicalAnalysisInputDetailView.as_view(),
@@ -120,6 +77,7 @@ urlpatterns = [
         RecalculateAnalysisInputView.as_view(),
         name="analysis-input-recalculate",
     ),
+
     path(
         "specifications/",
         ChemicalSpecificationListView.as_view(),
@@ -130,36 +88,19 @@ urlpatterns = [
         ChemicalSpecificationFilterView.as_view(),
         name="specification-filter",
     ),
-    path(
-        "results/",
-        ResultListView.as_view(),
-        name="result-list",
-    ),
-    path(
-        "results/<int:pk>/",
-        ResultDetailView.as_view(),
-        name="result-detail",
-    ),
-    path(
-        "checklists/<int:pk>/",
-        ChecklistDetailView.as_view(),
-        name="checklist-detail",
-    ),
+
+    path("results/", ResultListView.as_view(), name="result-list"),
+    path("results/<int:pk>/", ResultDetailView.as_view(), name="result-detail"),
+
+    path("checklists/<int:pk>/", ChecklistDetailView.as_view(), name="checklist-detail"),
     path(
         "checklists/<int:pk>/reopen/",
         ReopenChecklistView.as_view(),
         name="checklist-reopen",
     ),
-    path(
-        "coa/",
-        ChemicalCoAListView.as_view(),
-        name="coa-list",
-    ),
-    path(
-        "coa/<int:pk>/",
-        ChemicalCoADetailView.as_view(),
-        name="coa-detail",
-    ),
+
+    path("coa/", ChemicalCoAListView.as_view(), name="coa-list"),
+    path("coa/<int:pk>/", ChemicalCoADetailView.as_view(), name="coa-detail"),
     path(
         "coa/<int:pk>/regenerate/",
         RegenerateChemicalCoAView.as_view(),
@@ -175,16 +116,9 @@ urlpatterns = [
         DownloadChemicalCoAView.as_view(),
         name="coa-download",
     ),
-    path(
-        "tasks/",
-        MyChemicalTasksView.as_view(),
-        name="my-tasks",
-    ),
-    path(
-        "tasks/overdue/",
-        OverdueAnalysisView.as_view(),
-        name="overdue-analysis",
-    ),
+
+    path("tasks/", MyChemicalTasksView.as_view(), name="my-tasks"),
+    path("tasks/overdue/", OverdueAnalysisView.as_view(), name="overdue-analysis"),
     path(
         "tasks/pending-analysis/",
         PendingAnalysisView.as_view(),
@@ -196,8 +130,15 @@ urlpatterns = [
         name="pending-approval",
     ),
     path(
-        "workflow/",
-        workflow.urls,
+        "tasks/pending-qa/",
+        PendingQAReviewView.as_view(),
+        name="pending-qa",
     ),
-]
+    path(
+        "tasks/pending-coa-approval/",
+        PendingCoAApprovalView.as_view(),
+        name="pending-coa-approval",
+    ),
 
+    path("workflow/", workflow.urls),
+]

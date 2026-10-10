@@ -1,0 +1,79 @@
+.ca-dialog-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: var(--ca-z-overlay);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgb(2 8 23 / .48);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+        opacity var(--ca-transition),
+        visibility var(--ca-transition);
+}
+
+.ca-dialog-backdrop.is-open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.ca-dialog {
+    width: min(100%, 640px);
+    max-height: min(90vh, 820px);
+    overflow: auto;
+    border: 1px solid var(--ca-border);
+    border-radius: var(--ca-radius-xl);
+    background: var(--ca-surface);
+    box-shadow: var(--ca-shadow-lg);
+}
+
+.ca-dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 17px 19px;
+    border-bottom: 1px solid var(--ca-border);
+}
+
+.ca-dialog-title {
+    margin: 0;
+    color: var(--ca-text);
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.ca-dialog-body {
+    padding: 19px;
+}
+
+.ca-dialog-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 13px 19px;
+    border-top: 1px solid var(--ca-border);
+}
+
+.ca-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: var(--ca-z-modal);
+    width: min(480px, 94vw);
+    background: var(--ca-surface);
+    border-left: 1px solid var(--ca-border);
+    box-shadow: var(--ca-shadow-lg);
+    transform: translateX(105%);
+    transition: transform var(--ca-transition);
+}
+
+.ca-drawer.is-open {
+    transform: translateX(0);
+}

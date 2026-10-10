@@ -1,0 +1,1435 @@
+{% extends "ca/dashboard/layout/app.html" %}
+
+{% load static %}
+
+{% block title %}
+    {{ coa.title|default:"Chemical Analysis Certificate" }} · CoA
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'ca/css/pages/coa-detail.css' %}">
+{% endblock %}
+
+{% block content %}
+<div
+    class="coa-page"
+    id="coa-detail"
+    data-coa-id="{{ coa.pk }}"
+    data-approved="{{ is_approved|yesno:'true,false' }}"
+    data-locked="{{ is_locked|yesno:'true,false' }}"
+>
+    <div class="coa-shell">
+
+        <header class="coa-topline">
+            <nav class="coa-breadcrumb" aria-label="Certificate navigation">
+                <a href="{% url 'ca:dashboard' %}">
+                    Command Center
+                </a>
+
+                <span aria-hidden="true">/</span>
+
+                <span>Certificates</span>
+
+                <span aria-hidden="true">/</span>
+
+                <strong>
+                    {{ coa_identity.certificate_number }}
+                </strong>
+            </nav>
+
+            <div class="coa-live" aria-label="Controlled record">
+                <span class="coa-live-dot" aria-hidden="true"></span>
+                <span>Controlled Record</span>
+            </div>
+        </header>
+
+        <section class="coa-hero" aria-labelledby="coa-title">
+
+            <div class="coa-hero-content">
+
+                <div class="coa-kicker">
+                    <span class="coa-kicker-line" aria-hidden="true"></span>
+                    <span>Chemical Analysis</span>
+                    <span>·</span>
+                    <span>Certificate of Analysis</span>
+                </div>
+
+                <h1 id="coa-title" class="coa-title">
+                    {{ coa.title|default:"Chemical Analysis Certificate" }}
+                </h1>
+
+                <p class="coa-subtitle">
+                    Controlled analytical record providing laboratory
+                    traceability, conformity assessment, certificate metadata
+                    and electronic integrity controls.
+                </p>
+
+                <div class="coa-identity-strip">
+
+                    <div class="coa-identity-chip">
+                        <span>Sample</span>
+                        <strong>
+                            {{ coa_identity.sample_id|default:"—" }}
+                        </strong>
+                    </div>
+
+                    <div class="coa-identity-chip">
+                        <span>Certificate</span>
+                        <strong>
+                            {{ coa_identity.certificate_number }}
+                        </strong>
+                    </div>
+
+                    <div class="coa-identity-chip">
+                        <span>Chemical</span>
+                        <strong>
+                            {{ traceability.chemical|default:"—" }}
+                        </strong>
+                    </div>
+
+                    <div class="coa-identity-chip">
+                        <span>Plant</span>
+                        <strong>
+                            {{ traceability.treatment_plant|default:"—" }}
+                        </strong>
+                    </div>
+
+                    {% if traceability.chemical_code %}
+                        <div class="coa-identity-chip">
+                            <span>Code</span>
+                            <strong>
+                                {{ traceability.chemical_code }}
+                            </strong>
+                        </div>
+                    {% endif %}
+
+                </div>
+            </div>
+
+            <div class="coa-hero-side">
+
+                {% if is_approved %}
+                    <div
+                        class="coa-status approved"
+                        aria-label="Certificate approved"
+                    >
+                        <span class="coa-status-dot" aria-hidden="true"></span>
+                        Approved
+                    </div>
+
+                {% elif has_failed_results %}
+                    <div
+                        class="coa-status failed"
+                        aria-label="Analytical results contain failures"
+                    >
+                        <span class="coa-status-dot" aria-hidden="true"></span>
+                        Non-Conforming
+                    </div>
+
+                {% elif has_pending_results %}
+                    <div
+                        class="coa-status pending"
+                        aria-label="Analysis pending"
+                    >
+                        <span class="coa-status-dot" aria-hidden="true"></span>
+                        Analysis Pending
+                    </div>
+
+                {% elif is_locked %}
+                    <div
+                        class="coa-status locked"
+                        aria-label="Certificate locked"
+                    >
+                        <span class="coa-status-dot" aria-hidden="true"></span>
+                        Locked
+                    </div>
+
+                {% else %}
+                    <div
+                        class="coa-status"
+                        aria-label="Controlled draft"
+                    >
+                        <span class="coa-status-dot" aria-hidden="true"></span>
+                        Controlled Draft
+                    </div>
+                {% endif %}
+
+                <div class="coa-certificate">
+                    <span class="coa-certificate-label">
+                        Certificate ID
+                    </span>
+
+                    <span class="coa-certificate-value">
+                        {{ coa_identity.certificate_number }}
+                    </span>
+                </div>
+
+            </div>
+        </section>
+
+        <section
+            class="coa-commandbar"
+            aria-label="Certificate controls"
+        >
+
+            <div class="coa-actions">
+
+                <a
+                    href="{% url 'ca:dashboard' %}"
+                    class="coa-btn"
+                >
+                    Dashboard
+                </a>
+
+                {% if coa.pdf_file %}
+                    <a
+                        href="{{ coa.pdf_file.url }}"
+                        class="coa-btn coa-btn-primary"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        Open Certificate PDF
+                    </a>
+                {% endif %}
+
+                {% if can_regenerate %}
+                    <button
+                        type="button"
+                        class="coa-btn coa-btn-primary"
+                        id="coa-regenerate"
+                        data-url="{% url 'ca:coa-regenerate' coa.pk %}"
+                        aria-controls="coa-regeneration-status"
+                    >
+                        Regenerate Certificate
+                    </button>
+                {% endif %}
+
+            </div>
+
+            <div class="coa-actions-right">
+
+                {% if is_approved %}
+                    <span class="coa-status approved">
+                        <span class="coa-status-dot" aria-hidden="true"></span>
+                        Immutable Approved Record
+                    </span>
+
+                {% elif is_locked %}
+                    <span class="coa-status locked">
+                        <span class="coa-status-dot" aria-hidden="true"></span>
+                        Record Locked
+                    </span>
+                {% endif %}
+
+            </div>
+
+        </section>
+
+        <div
+            id="coa-regeneration-status"
+            class="coa-alert"
+            data-hidden="true"
+            role="status"
+            aria-live="polite"
+        >
+            <span class="coa-alert-icon" aria-hidden="true"></span>
+
+            <div class="coa-alert-content">
+                <h3 class="coa-alert-title">
+                    Certificate operation
+                </h3>
+
+                <p class="coa-alert-text"></p>
+            </div>
+        </div>
+
+        <div class="coa-layout">
+
+            <main class="coa-main">
+
+                <div class="coa-stack">
+
+                    <section
+                        class="coa-card"
+                        aria-labelledby="analytical-intelligence"
+                    >
+
+                        <div class="coa-card-head">
+
+                            <h2
+                                id="analytical-intelligence"
+                                class="coa-card-title"
+                            >
+                                <span
+                                    class="coa-card-title-mark"
+                                    aria-hidden="true"
+                                ></span>
+                                Analytical Intelligence
+                            </h2>
+
+                            <span class="coa-card-meta">
+                                {{ result_statistics.total|default:0 }}
+                                parameters
+                            </span>
+
+                        </div>
+
+                        <div class="coa-card-body">
+
+                            <div class="coa-metrics">
+
+                                <div class="coa-metric">
+                                    <div class="coa-metric-label">
+                                        Total
+                                    </div>
+
+                                    <div class="coa-metric-value">
+                                        {{ result_statistics.total|default:0 }}
+                                    </div>
+
+                                    <div class="coa-metric-sub">
+                                        Recorded parameters
+                                    </div>
+                                </div>
+
+                                <div class="coa-metric pass">
+                                    <div class="coa-metric-label">
+                                        Pass
+                                    </div>
+
+                                    <div class="coa-metric-value">
+                                        {{ result_statistics.pass|default:0 }}
+                                    </div>
+
+                                    <div class="coa-metric-sub">
+                                        Conforming
+                                    </div>
+                                </div>
+
+                                <div class="coa-metric fail">
+                                    <div class="coa-metric-label">
+                                        Fail
+                                    </div>
+
+                                    <div class="coa-metric-value">
+                                        {{ result_statistics.fail|default:0 }}
+                                    </div>
+
+                                    <div class="coa-metric-sub">
+                                        Non-conforming
+                                    </div>
+                                </div>
+
+                                <div class="coa-metric pending">
+                                    <div class="coa-metric-label">
+                                        Pending
+                                    </div>
+
+                                    <div class="coa-metric-value">
+                                        {{ result_statistics.pending|default:0 }}
+                                    </div>
+
+                                    <div class="coa-metric-sub">
+                                        Awaiting result
+                                    </div>
+                                </div>
+
+                                <div class="coa-metric">
+                                    <div class="coa-metric-label">
+                                        Pass Rate
+                                    </div>
+
+                                    <div class="coa-metric-value">
+                                        {{ result_statistics.pass_rate|default:0|floatformat:1 }}%
+                                    </div>
+
+                                    <div class="coa-metric-sub">
+                                        Applicable tests
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            <div class="coa-grid coa-intelligence-grid">
+
+                                <div class="coa-field">
+                                    <span class="coa-field-label">
+                                        Completion
+                                    </span>
+
+                                    <span class="coa-field-value">
+                                        {{ result_statistics.completion_rate|default:0|floatformat:1 }}%
+                                    </span>
+                                </div>
+
+                                <div class="coa-field">
+                                    <span class="coa-field-label">
+                                        Fail Rate
+                                    </span>
+
+                                    <span class="coa-field-value">
+                                        {{ result_statistics.fail_rate|default:0|floatformat:1 }}%
+                                    </span>
+                                </div>
+
+                                <div class="coa-field">
+                                    <span class="coa-field-label">
+                                        Analysis Status
+                                    </span>
+
+                                    <span class="coa-field-value">
+                                        {{ coa.analysis_status|default:"—" }}
+                                    </span>
+                                </div>
+
+                                <div class="coa-field">
+                                    <span class="coa-field-label">
+                                        Batch Status
+                                    </span>
+
+                                    <span class="coa-field-value">
+                                        {{ traceability.batch_status|default:"—" }}
+                                    </span>
+                                </div>
+
+                            </div>
+
+                        </div>
+                    </section>
+
+                    {% if has_failed_results %}
+                        <section
+                            class="coa-alert danger"
+                            aria-label="Analytical non-conformity"
+                        >
+                            <span
+                                class="coa-alert-icon"
+                                aria-hidden="true"
+                            ></span>
+
+                            <div class="coa-alert-content">
+                                <h3 class="coa-alert-title">
+                                    Analytical non-conformity detected
+                                </h3>
+
+                                <p class="coa-alert-text">
+                                    One or more recorded parameters have a
+                                    FAIL status. Certificate approval and
+                                    downstream utilization should follow the
+                                    configured laboratory workflow.
+                                </p>
+                            </div>
+                        </section>
+                    {% endif %}
+
+                    {% if has_pending_results %}
+                        <section
+                            class="coa-alert warning"
+                            aria-label="Incomplete analytical record"
+                        >
+                            <span
+                                class="coa-alert-icon"
+                                aria-hidden="true"
+                            ></span>
+
+                            <div class="coa-alert-content">
+                                <h3 class="coa-alert-title">
+                                    Analytical record is incomplete
+                                </h3>
+
+                                <p class="coa-alert-text">
+                                    Pending analytical results remain on this
+                                    certificate.
+                                </p>
+                            </div>
+                        </section>
+                    {% endif %}
+
+                    {% if has_na_results %}
+                        <section
+                            class="coa-alert"
+                            aria-label="Not applicable analytical results"
+                        >
+                            <span
+                                class="coa-alert-icon"
+                                aria-hidden="true"
+                            ></span>
+
+                            <div class="coa-alert-content">
+                                <h3 class="coa-alert-title">
+                                    Non-applicable parameters recorded
+                                </h3>
+
+                                <p class="coa-alert-text">
+                                    One or more analytical parameters are
+                                    marked N/A and are excluded from
+                                    applicable-test conformity calculations.
+                                </p>
+                            </div>
+                        </section>
+                    {% endif %}
+
+                    <section
+                        class="coa-card"
+                        aria-labelledby="analytical-results"
+                    >
+
+                        <div class="coa-card-head">
+
+                            <h2
+                                id="analytical-results"
+                                class="coa-card-title"
+                            >
+                                <span
+                                    class="coa-card-title-mark"
+                                    aria-hidden="true"
+                                ></span>
+                                Analytical Results
+                            </h2>
+
+                            <span class="coa-card-meta">
+                                {{ result_counts.pass|default:0 }} PASS
+                                ·
+                                {{ result_counts.fail|default:0 }} FAIL
+                                ·
+                                {{ result_counts.na|default:0 }} N/A
+                            </span>
+
+                        </div>
+
+                        <div class="coa-results-wrap">
+
+                            {% if results %}
+
+                                <table class="coa-results">
+
+                                    <caption class="sr-only">
+                                        Chemical analysis test results
+                                    </caption>
+
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">#</th>
+                                            <th scope="col">Parameter</th>
+                                            <th scope="col">Method</th>
+                                            <th scope="col">Specification</th>
+                                            <th scope="col">Result</th>
+                                            <th scope="col">Status</th>
+                                            <th scope="col">Analyst</th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody>
+
+                                        {% for result in results %}
+
+                                            <tr>
+
+                                                <td>
+                                                    {{ forloop.counter }}
+                                                </td>
+
+                                                <td>
+                                                    <div class="coa-parameter">
+                                                        {{ result.parameter.parameter_name|default:"—" }}
+                                                    </div>
+
+                                                    {% if result.parameter.unit %}
+                                                        <div class="coa-method">
+                                                            {{ result.parameter.unit }}
+                                                        </div>
+                                                    {% endif %}
+                                                </td>
+
+                                                <td>
+                                                    <span class="coa-method">
+                                                        {{ result.parameter.method|default:"—" }}
+                                                    </span>
+                                                </td>
+
+                                                <td>
+                                                    <span class="coa-method">
+
+                                                        {% if result.parameter.min_limit != None and result.parameter.max_limit != None %}
+                                                            {{ result.parameter.min_limit }}
+                                                            –
+                                                            {{ result.parameter.max_limit }}
+
+                                                        {% elif result.parameter.min_limit != None %}
+                                                            ≥ {{ result.parameter.min_limit }}
+
+                                                        {% elif result.parameter.max_limit != None %}
+                                                            ≤ {{ result.parameter.max_limit }}
+
+                                                        {% else %}
+                                                            Not specified
+                                                        {% endif %}
+
+                                                    </span>
+                                                </td>
+
+                                                <td>
+                                                    <span class="coa-result-value">
+
+                                                        {% if result.value != None %}
+                                                            {{ result.value }}
+
+                                                        {% elif result.textual_result %}
+                                                            {{ result.textual_result }}
+
+                                                        {% else %}
+                                                            —
+                                                        {% endif %}
+
+                                                    </span>
+                                                </td>
+
+                                                <td>
+
+                                                    {% if result.status == "PASS" %}
+
+                                                        <span class="coa-result-badge pass">
+                                                            PASS
+                                                        </span>
+
+                                                    {% elif result.status == "FAIL" %}
+
+                                                        <span class="coa-result-badge fail">
+                                                            FAIL
+                                                        </span>
+
+                                                    {% elif result.status == "NA" %}
+
+                                                        <span class="coa-result-badge na">
+                                                            N/A
+                                                        </span>
+
+                                                    {% else %}
+
+                                                        <span class="coa-result-badge pending">
+                                                            PENDING
+                                                        </span>
+
+                                                    {% endif %}
+
+                                                </td>
+
+                                                <td>
+
+                                                    {% if result.analyst %}
+
+                                                        {% if result.analyst.get_full_name %}
+                                                            {{ result.analyst.get_full_name }}
+                                                        {% else %}
+                                                            {{ result.analyst.username|default:"—" }}
+                                                        {% endif %}
+
+                                                    {% else %}
+                                                        —
+                                                    {% endif %}
+
+                                                </td>
+
+                                            </tr>
+
+                                        {% endfor %}
+
+                                    </tbody>
+
+                                </table>
+
+                            {% else %}
+
+                                <div class="coa-empty">
+                                    No analytical results are currently
+                                    recorded.
+                                </div>
+
+                            {% endif %}
+
+                        </div>
+                    </section>
+
+                    <section
+                        class="coa-card"
+                        aria-labelledby="certificate-metadata"
+                    >
+
+                        <div class="coa-card-head">
+
+                            <h2
+                                id="certificate-metadata"
+                                class="coa-card-title"
+                            >
+                                <span
+                                    class="coa-card-title-mark"
+                                    aria-hidden="true"
+                                ></span>
+                                Certificate Metadata
+                            </h2>
+
+                        </div>
+
+                        <div class="coa-card-body">
+
+                            <div class="coa-grid">
+
+                                <div class="coa-field">
+                                    <span class="coa-field-label">
+                                        Chemical
+                                    </span>
+
+                                    <span class="coa-field-value">
+                                        {{ coa.chemical_name|default:traceability.chemical|default:"—" }}
+                                    </span>
+                                </div>
+
+                                <div class="coa-field">
+                                    <span class="coa-field-label">
+                                        Chemical Code
+                                    </span>
+
+                                    <span class="coa-field-value mono">
+                                        {{ traceability.chemical_code|default:"—" }}
+                                    </span>
+                                </div>
+
+                                <div class="coa-field">
+                                    <span class="coa-field-label">
+                                        Grade
+                                    </span>
+
+                                    <span class="coa-field-value">
+                                        {{ traceability.chemical_grade|default:"—" }}
+                                    </span>
+                                </div>
+
+                                <div class="coa-field">
+                                    <span class="coa-field-label">
+                                        Supplier
+                                    </span>
+
+                                    <span class="coa-field-value">
+                                        {{ coa.supplier_name|default:traceability.supplier|default:"—" }}
+                                    </span>
+                                </div>
+
+                                <div class="coa-field">
+                                    <span class="coa-field-label">
+                                        Contract Number
+                                    </span>
+
+                                    <span class="coa-field-value mono">
+                                        {{ traceability.contract_number|default:"—" }}
+                                    </span>
+                                </div>
+
+                                <div class="coa-field">
+                                    <span class="coa-field-label">
+                                        Quantity
+                                    </span>
+
+                                    <span class="coa-field-value">
+                                        {{ coa.quantity|default:"—" }}
+                                    </span>
+                                </div>
+
+                                <div class="coa-field">
+                                    <span class="coa-field-label">
+                                        Treatment Plant
+                                    </span>
+
+                                    <span class="coa-field-value">
+                                        {{ coa.treatment_plant|default:traceability.treatment_plant|default:"—" }}
+                                    </span>
+                                </div>
+
+                                <div class="coa-field">
+                                    <span class="coa-field-label">
+                                        Delivery Note
+                                    </span>
+
+                                    <span class="coa-field-value mono">
+                                        {{ coa.delivery_note_number|default:"—" }}
+                                    </span>
+                                </div>
+
+                                <div class="coa-field">
+                                    <span class="coa-field-label">
+                                        Delivery Date
+                                    </span>
+
+                                    <span class="coa-field-value">
+                                        {{ coa.delivery_date|date:"d M Y"|default:"—" }}
+                                    </span>
+                                </div>
+
+                                <div class="coa-field">
+                                    <span class="coa-field-label">
+                                        Sampling Date
+                                    </span>
+
+                                    <span class="coa-field-value">
+                                        {{ coa.sampling_date|date:"d M Y"|default:"—" }}
+                                    </span>
+                                </div>
+
+                                <div class="coa-field">
+                                    <span class="coa-field-label">
+                                        Analysis Date
+                                    </span>
+
+                                    <span class="coa-field-value">
+                                        {{ coa.analysis_date|date:"d M Y"|default:"—" }}
+                                    </span>
+                                </div>
+
+                                <div class="coa-field">
+                                    <span class="coa-field-label">
+                                        Report Date
+                                    </span>
+
+                                    <span class="coa-field-value">
+                                        {{ coa.date_of_report|date:"d M Y"|default:"—" }}
+                                    </span>
+                                </div>
+
+                            </div>
+
+                        </div>
+                    </section>
+
+                    {% if coa.results_summary or coa.remarks %}
+
+                        <section
+                            class="coa-card"
+                            aria-labelledby="laboratory-interpretation"
+                        >
+
+                            <div class="coa-card-head">
+
+                                <h2
+                                    id="laboratory-interpretation"
+                                    class="coa-card-title"
+                                >
+                                    <span
+                                        class="coa-card-title-mark"
+                                        aria-hidden="true"
+                                    ></span>
+                                    Laboratory Interpretation
+                                </h2>
+
+                            </div>
+
+                            <div class="coa-card-body">
+
+                                {% if coa.results_summary %}
+
+                                    <div class="coa-alert success">
+
+                                        <span
+                                            class="coa-alert-icon"
+                                            aria-hidden="true"
+                                        ></span>
+
+                                        <div class="coa-alert-content">
+
+                                            <h3 class="coa-alert-title">
+                                                Results Summary
+                                            </h3>
+
+                                            <p class="coa-alert-text">
+                                                {{ coa.results_summary|linebreaksbr }}
+                                            </p>
+
+                                        </div>
+
+                                    </div>
+
+                                {% endif %}
+
+                                {% if coa.remarks %}
+
+                                    <div class="coa-alert">
+
+                                        <span
+                                            class="coa-alert-icon"
+                                            aria-hidden="true"
+                                        ></span>
+
+                                        <div class="coa-alert-content">
+
+                                            <h3 class="coa-alert-title">
+                                                Remarks
+                                            </h3>
+
+                                            <p class="coa-alert-text">
+                                                {{ coa.remarks|linebreaksbr }}
+                                            </p>
+
+                                        </div>
+
+                                    </div>
+
+                                {% endif %}
+
+                            </div>
+                        </section>
+
+                    {% endif %}
+
+                </div>
+            </main>
+
+            <aside class="coa-rail">
+
+                <section
+                    class="coa-card coa-sidebar-section"
+                    aria-labelledby="integrity-panel"
+                >
+
+                    <div class="coa-card-head">
+
+                        <h2
+                            id="integrity-panel"
+                            class="coa-card-title"
+                        >
+                            <span
+                                class="coa-card-title-mark"
+                                aria-hidden="true"
+                            ></span>
+                            Integrity
+                        </h2>
+
+                    </div>
+
+                    <div class="coa-card-body">
+
+                        <div class="coa-integrity">
+
+                            <div class="coa-integrity-state">
+
+                                <span
+                                    class="coa-integrity-orb"
+                                    aria-hidden="true"
+                                ></span>
+
+                                <div>
+
+                                    <div class="coa-integrity-label">
+                                        Verification
+                                    </div>
+
+                                    <div class="coa-integrity-value">
+                                        {{ integrity_status|default:"Not verified" }}
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                            <div class="coa-stat-row">
+                                <span>Generation</span>
+                                <strong>
+                                    {{ generation_status|default:"—" }}
+                                </strong>
+                            </div>
+
+                            <div class="coa-stat-row">
+                                <span>Locked</span>
+                                <strong>
+                                    {% if is_locked %}YES{% else %}NO{% endif %}
+                                </strong>
+                            </div>
+
+                            <div class="coa-stat-row">
+                                <span>Approved</span>
+                                <strong>
+                                    {% if is_approved %}YES{% else %}NO{% endif %}
+                                </strong>
+                            </div>
+
+                            <div class="coa-stat-row">
+                                <span>Complete</span>
+                                <strong>
+                                    {% if is_complete %}YES{% else %}NO{% endif %}
+                                </strong>
+                            </div>
+
+                        </div>
+
+                    </div>
+                </section>
+
+                <section
+                    class="coa-card coa-sidebar-section"
+                    aria-labelledby="traceability-panel"
+                >
+
+                    <div class="coa-card-head">
+
+                        <h2
+                            id="traceability-panel"
+                            class="coa-card-title"
+                        >
+                            <span
+                                class="coa-card-title-mark"
+                                aria-hidden="true"
+                            ></span>
+                            Traceability
+                        </h2>
+
+                    </div>
+
+                    <div class="coa-card-body">
+
+                        <div class="coa-timeline">
+
+                            <div class="coa-timeline-item">
+
+                                <span
+                                    class="coa-timeline-dot"
+                                    aria-hidden="true"
+                                ></span>
+
+                                <div>
+                                    <h3 class="coa-timeline-label">
+                                        Chemical Batch
+                                    </h3>
+
+                                    <div class="coa-timeline-value">
+                                        #{{ traceability.batch_id|default:"—" }}
+                                        ·
+                                        {{ traceability.batch_status|default:"—" }}
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            <div class="coa-timeline-item">
+
+                                <span
+                                    class="coa-timeline-dot"
+                                    aria-hidden="true"
+                                ></span>
+
+                                <div>
+                                    <h3 class="coa-timeline-label">
+                                        Sampling
+                                    </h3>
+
+                                    <div class="coa-timeline-value">
+                                        {% if coa.sampling_date %}
+                                            {{ coa.sampling_date|date:"d M Y" }}
+                                        {% else %}
+                                            Not recorded
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            <div class="coa-timeline-item">
+
+                                <span
+                                    class="coa-timeline-dot"
+                                    aria-hidden="true"
+                                ></span>
+
+                                <div>
+                                    <h3 class="coa-timeline-label">
+                                        Analysis
+                                    </h3>
+
+                                    <div class="coa-timeline-value">
+                                        {% if coa.analysis_date %}
+                                            {{ coa.analysis_date|date:"d M Y" }}
+                                        {% else %}
+                                            Not recorded
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            <div class="coa-timeline-item">
+
+                                <span
+                                    class="coa-timeline-dot"
+                                    aria-hidden="true"
+                                ></span>
+
+                                <div>
+                                    <h3 class="coa-timeline-label">
+                                        Certificate
+                                    </h3>
+
+                                    <div class="coa-timeline-value">
+                                        {% if coa.date_of_report %}
+                                            {{ coa.date_of_report|date:"d M Y" }}
+                                        {% else %}
+                                            Not issued
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            {% if coa.approved_by %}
+
+                                <div class="coa-timeline-item">
+
+                                    <span
+                                        class="coa-timeline-dot"
+                                        aria-hidden="true"
+                                    ></span>
+
+                                    <div>
+
+                                        <h3 class="coa-timeline-label">
+                                            Approval
+                                        </h3>
+
+                                        <div class="coa-timeline-value">
+
+                                            {% if coa.approved_by.get_full_name %}
+                                                {{ coa.approved_by.get_full_name }}
+                                            {% else %}
+                                                {{ coa.approved_by.username|default:"—" }}
+                                            {% endif %}
+
+                                            {% if coa.approved_on %}
+                                                ·
+                                                {{ coa.approved_on|date:"d M Y H:i" }}
+                                            {% endif %}
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+                            {% endif %}
+
+                        </div>
+
+                    </div>
+                </section>
+
+                <section
+                    class="coa-card coa-sidebar-section"
+                    aria-labelledby="completion-panel"
+                >
+
+                    <div class="coa-card-head">
+
+                        <h2
+                            id="completion-panel"
+                            class="coa-card-title"
+                        >
+                            <span
+                                class="coa-card-title-mark"
+                                aria-hidden="true"
+                            ></span>
+                            Completion
+                        </h2>
+
+                    </div>
+
+                    <div class="coa-card-body">
+
+                        <div class="coa-stat-row">
+                            <span>Applicable</span>
+
+                            <strong>
+                                {{ result_statistics.applicable|default:0 }}
+                            </strong>
+                        </div>
+
+                        <div class="coa-stat-row">
+                            <span>Completed</span>
+
+                            <strong>
+                                {{ result_statistics.completed|default:0 }}
+                            </strong>
+                        </div>
+
+                        <div class="coa-stat-row">
+                            <span>Completion Rate</span>
+
+                            <strong>
+                                {{ result_statistics.completion_rate|default:0|floatformat:1 }}%
+                            </strong>
+                        </div>
+
+                        <div
+                            class="coa-progress"
+                            role="progressbar"
+                            aria-label="Analysis completion"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                            aria-valuenow="{{ result_statistics.completion_rate|default:0 }}"
+                        >
+                            <span
+                                data-progress="{{ result_statistics.completion_rate|default:0 }}"
+                            ></span>
+                        </div>
+
+                    </div>
+                </section>
+
+                {% if missing_assets %}
+
+                    <section
+                        class="coa-card coa-sidebar-section"
+                        aria-labelledby="asset-control"
+                    >
+
+                        <div class="coa-card-head">
+
+                            <h2
+                                id="asset-control"
+                                class="coa-card-title"
+                            >
+                                <span
+                                    class="coa-card-title-mark"
+                                    aria-hidden="true"
+                                ></span>
+                                Asset Control
+                            </h2>
+
+                        </div>
+
+                        <div class="coa-card-body">
+
+                            {% for asset in missing_assets %}
+
+                                <div class="coa-alert warning">
+
+                                    <span
+                                        class="coa-alert-icon"
+                                        aria-hidden="true"
+                                    ></span>
+
+                                    <div class="coa-alert-content">
+
+                                        <p class="coa-alert-text">
+                                            {{ asset }}
+                                        </p>
+
+                                    </div>
+
+                                </div>
+
+                            {% endfor %}
+
+                        </div>
+                    </section>
+
+                {% endif %}
+
+                {% if verification_payload %}
+
+                    <section
+                        class="coa-card coa-sidebar-section"
+                        aria-labelledby="verification-payload"
+                    >
+
+                        <div class="coa-card-head">
+
+                            <h2
+                                id="verification-payload"
+                                class="coa-card-title"
+                            >
+                                <span
+                                    class="coa-card-title-mark"
+                                    aria-hidden="true"
+                                ></span>
+                                Verification Payload
+                            </h2>
+
+                        </div>
+
+                        <div class="coa-card-body">
+
+                            <details class="coa-verification-details">
+
+                                <summary>
+                                    Inspect canonical verification data
+                                </summary>
+
+                                <pre class="coa-code">{{ verification_payload|pprint }}</pre>
+
+                            </details>
+
+                        </div>
+
+                    </section>
+
+                {% endif %}
+
+                <div class="coa-footer-note">
+                    This interface represents the controlled electronic
+                    laboratory record. The generated PDF remains the formal
+                    certificate artifact. Approved certificates should be
+                    treated as immutable and verified against their stored
+                    integrity data.
+                </div>
+
+            </aside>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    "use strict";
+
+    const root = document.getElementById("coa-detail");
+    const regenerate = document.getElementById("coa-regenerate");
+    const operationStatus = document.getElementById(
+        "coa-regeneration-status"
+    );
+
+    if (!root) {
+        return;
+    }
+
+    document.querySelectorAll("[data-progress]").forEach(function (bar) {
+        const value = Number.parseFloat(bar.dataset.progress || "0");
+
+        bar.style.setProperty(
+            "--value",
+            Math.max(0, Math.min(100, value)) + "%"
+        );
+    });
+
+    if (!regenerate) {
+        return;
+    }
+
+    regenerate.addEventListener("click", async function () {
+        const confirmed = window.confirm(
+            "Regenerate this certificate? Existing generated assets will be rebuilt."
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        const url = regenerate.dataset.url;
+
+        if (!url) {
+            showStatus(
+                "danger",
+                "Certificate operation failed.",
+                "The regeneration endpoint is not configured."
+            );
+            return;
+        }
+
+        const originalText = regenerate.textContent;
+
+        regenerate.classList.add("is-loading");
+        regenerate.disabled = true;
+        regenerate.textContent = "Regenerating…";
+
+        showStatus(
+            "warning",
+            "Regenerating certificate",
+            "The certificate assets are being rebuilt. Please wait."
+        );
+
+        try {
+            const response = await fetch(url, {
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": getCookie("csrftoken"),
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Accept": "application/json"
+                },
+                credentials: "same-origin"
+            });
+
+            const data = await response.json().catch(function () {
+                return {};
+            });
+
+            if (!response.ok) {
+                throw new Error(
+                    data.error ||
+                    data.message ||
+                    "Certificate regeneration failed."
+                );
+            }
+
+            showStatus(
+                "success",
+                "Certificate regenerated",
+                "The certificate assets were successfully rebuilt. Refreshing the controlled record."
+            );
+
+            window.setTimeout(function () {
+                window.location.reload();
+            }, 500);
+
+        } catch (error) {
+            showStatus(
+                "danger",
+                "Certificate regeneration failed",
+                error.message ||
+                "An unexpected error occurred while regenerating the certificate."
+            );
+
+            regenerate.classList.remove("is-loading");
+            regenerate.disabled = false;
+            regenerate.textContent = originalText;
+        }
+    });
+
+    function showStatus(type, title, message) {
+        if (!operationStatus) {
+            return;
+        }
+
+        operationStatus.className = "coa-alert " + type;
+        operationStatus.removeAttribute("data-hidden");
+
+        const titleElement = operationStatus.querySelector(
+            ".coa-alert-title"
+        );
+
+        const textElement = operationStatus.querySelector(
+            ".coa-alert-text"
+        );
+
+        if (titleElement) {
+            titleElement.textContent = title;
+        }
+
+        if (textElement) {
+            textElement.textContent = message;
+        }
+    }
+
+    function getCookie(name) {
+        const cookies = document.cookie.split(";");
+
+        for (const cookie of cookies) {
+            const value = cookie.trim();
+
+            if (value.startsWith(name + "=")) {
+                return decodeURIComponent(
+                    value.substring(name.length + 1)
+                );
+            }
+        }
+
+        return "";
+    }
+})();
+</script>
+{% endblock %}

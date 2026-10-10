@@ -1,0 +1,120 @@
+.ca-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 36px;
+    max-width: 100%;
+    padding: 7px 13px;
+    border: 1px solid transparent;
+    border-radius: var(--ca-radius-md);
+    font-size: 13px;
+    font-weight: 650;
+    line-height: 1.25;
+    text-align: center;
+    text-decoration: none;
+    transition:
+        background-color var(--ca-transition-fast),
+        border-color var(--ca-transition-fast),
+        color var(--ca-transition-fast),
+        box-shadow var(--ca-transition-fast),
+        transform var(--ca-transition-fast);
+}
+
+.ca-button:hover {
+    transform: translateY(-1px);
+}
+
+.ca-button:active {
+    transform: translateY(0);
+}
+
+.ca-button-primary {
+    background: var(--ca-primary);
+    color: #fff;
+}
+
+.ca-button-primary:hover {
+    background: var(--ca-primary-hover);
+    color: #fff;
+}
+
+.ca-button-secondary {
+    border-color: var(--ca-border);
+    background: var(--ca-surface);
+    color: var(--ca-text);
+}
+
+.ca-button-secondary:hover {
+    border-color: var(--ca-border-strong);
+    background: var(--ca-surface-muted);
+}
+
+.ca-button-success {
+    background: var(--ca-success);
+    color: #fff;
+}
+
+.ca-button-warning {
+    background: var(--ca-warning);
+    color: #fff;
+}
+
+.ca-button-danger {
+    background: var(--ca-danger);
+    color: #fff;
+}
+
+.ca-button-ghost {
+    background: transparent;
+    color: var(--ca-text-soft);
+}
+
+.ca-button-ghost:hover {
+    background: var(--ca-surface-muted);
+    color: var(--ca-text);
+}
+
+.ca-button-sm {
+    min-height: 32px;
+    padding: 5px 10px;
+    font-size: 12px;
+}
+
+.ca-button-lg {
+    min-height: 42px;
+    padding: 9px 16px;
+    font-size: 14px;
+}
+
+.ca-button--primary,
+.ca-button-primary {
+    background: var(--ca-primary);
+    color: #fff;
+}
+
+.ca-button--primary:hover,
+.ca-button-primary:hover {
+    background: var(--ca-primary-hover);
+    color: #fff;
+}
+
+.ca-button--secondary,
+.ca-button-secondary {
+    border-color: var(--ca-border);
+    background: var(--ca-surface);
+    color: var(--ca-text);
+}
+
+.ca-button--secondary:hover,
+.ca-button-secondary:hover {
+    border-color: var(--ca-border-strong);
+    background: var(--ca-surface-muted);
+}
+
+.ca-button--sm,
+.ca-button-sm {
+    min-height: 32px;
+    padding: 5px 10px;
+    font-size: 12px;
+}

@@ -1,0 +1,41 @@
+.ca-card {
+    min-width: 0;
+    background: var(--ca-surface);
+    border: 1px solid var(--ca-border);
+    border-radius: var(--ca-radius-lg);
+    box-shadow: var(--ca-shadow-sm);
+}
+
+.ca-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--ca-border);
+}
+
+.ca-card-title {
+    min-width: 0;
+    margin: 0;
+    color: var(--ca-text);
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.35;
+}
+
+.ca-card-body {
+    min-width: 0;
+    padding: 18px;
+}
+
+.ca-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 0;
+    padding: 13px 18px;
+    border-top: 1px solid var(--ca-border);
+}

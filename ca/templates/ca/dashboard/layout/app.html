@@ -1,20 +1,37 @@
-
 {% extends "ca/dashboard/base.html" %}
 {% load static %}
 
+{% block title %}
+{% block page_title %}
+Chemical Analysis Management System
+{% endblock %}
+{% endblock %}
+
+{% block meta_description %}
+Chemical Analysis Management System — chemical batch management, laboratory analysis, quality assurance, workflow control and certificates of analysis.
+{% endblock %}
+
+{% block app_module %}
+chemical-analysis
+{% endblock %}
+
 {% block app_shell %}
+<a href="#ca-main" class="ca-skip-link">Skip to main content</a>
 
 <div
     id="app-shell"
-    class="ca-app-shell"
+    class="ca-app-shell is-sidebar-expanded"
+    data-app="chemical-analysis"
+    data-module="ca"
     data-dashboard-url="{% url 'ca:dashboard' %}"
-    data-dashboard-alt-url="{% url 'ca:dashboard' %}"
-    data-batches-url="{% url 'ca:batch-list' %}"
+    data-dashboard-alt-url="{% url 'ca:dashboard-view' %}"
+    data-dashboard2-url="{% url 'ca:dashboard2' %}"
+    data-dashboard3-url="{% url 'ca:dashboard3' %}"
+    data-dashboard-view="{{ request.resolver_match.url_name|default:'dashboard' }}"
     data-batch-create-url="{% url 'ca:batch-create' %}"
+    data-batches-url="{% url 'ca:batch-list' %}"
     data-requests-url="{% url 'ca:request-list' %}"
     data-processes-url="{% url 'ca:process-list' %}"
-    data-process-statistics-url="{{ dashboard_urls.process_statistics|default:'' }}"
-    data-process-refresh-url="{{ dashboard_urls.process_refresh|default:'' }}"
     data-results-url="{% url 'ca:result-list' %}"
     data-certificates-url="{% url 'ca:coa-list' %}"
     data-tasks-url="{% url 'ca:my-tasks' %}"
@@ -22,983 +39,142 @@
     data-pending-approval-url="{% url 'ca:pending-approval' %}"
     data-overdue-url="{% url 'ca:overdue-analysis' %}"
     data-specifications-url="{% url 'ca:specification-list' %}"
-    data-reports-url="{{ dashboard_urls.reports|default:'' }}"
-    data-analytics-url="{{ dashboard_urls.analytics|default:'' }}"
-    data-workflow-url="{{ dashboard_urls.workflow|default:'' }}"
-    data-search-url="{{ dashboard_urls.search|default:'' }}"
-    data-notifications-url="{{ dashboard_urls.notifications|default:'' }}"
-    data-dashboard-view="{{ dashboard_view|default:'dashboard' }}"
-    data-live-enabled="{% if live_updates_enabled|default:True %}true{% else %}false{% endif %}"
-    data-sidebar-state="collapsed"
+    data-live-enabled="true"
+    data-sidebar-state="expanded"
+    data-current-route="{{ request.resolver_match.url_name|default:'' }}"
+    data-current-path="{{ request.path|escape }}"
+    data-user-id="{% if request.user.is_authenticated %}{{ request.user.pk|default:'' }}{% endif %}"
+    data-username="{% if request.user.is_authenticated %}{{ request.user.get_username|escape }}{% endif %}"
+    data-user-full-name="{% if request.user.is_authenticated %}{{ request.user.get_full_name|escape }}{% endif %}"
     data-user-plant="{% if treatment_plant %}{{ treatment_plant.pk }}{% endif %}"
+    data-user-lab="{% if request.user.assigned_lab %}{{ request.user.assigned_lab.pk }}{% endif %}"
+    data-is-superuser="{% if request.user.is_superuser %}true{% else %}false{% endif %}"
+    data-is-staff="{% if request.user.is_staff %}true{% else %}false{% endif %}"
 >
-
-    <div class="ca-app-layout" id="ca-app-layout">
-
-        <header
-            class="ca-header"
-            id="ca-header"
-            role="banner"
-        >
-            <div class="ca-header-inner">
-
-                <div class="ca-brand-area">
-
-                    <button
-                        type="button"
-                        class="ca-sidebar-toggle"
-                        id="ca-sidebar-toggle"
-                        aria-controls="ca-sidebar"
-                        aria-expanded="false"
-                        aria-label="Toggle navigation"
-                    >
-                        <span class="ca-sidebar-toggle-line"></span>
-                        <span class="ca-sidebar-toggle-line"></span>
-                        <span class="ca-sidebar-toggle-line"></span>
-                    </button>
-
-                    <a
-                        href="{% url 'ca:dashboard' %}"
-                        class="ca-brand"
-                        aria-label="Chemical Analysis Command Center"
-                    >
-                        <span class="ca-brand-mark">
-                            CA
-                        </span>
-
-                        <span class="ca-brand-copy">
-                            <strong>Chemical Analysis</strong>
-                            <span>Command Center</span>
-                        </span>
-                    </a>
-
-                </div>
-
-
-                <nav
-                    class="ca-primary-tabs"
-                    id="ca-primary-tabs"
-                    aria-label="Application modules"
+    <div class="ca-app-layout">
+        <header id="ca-topbar" class="ca-topbar" role="banner">
+            <div class="ca-topbar-left">
+                <button
+                    type="button"
+                    class="ca-icon-button ca-sidebar-toggle-button"
+                    id="sidebar-toggle"
+                    aria-label="Toggle navigation"
+                    aria-controls="ca-sidebar"
+                    aria-expanded="true"
+                    title="Toggle navigation"
+                    data-action="toggle-sidebar"
                 >
+                    <span class="ca-icon-button__glyph" aria-hidden="true">☰</span>
+                </button>
 
+                <a href="{% url 'ca:dashboard' %}" class="ca-brand" aria-label="Chemical Analysis dashboard">
+                    <span class="ca-brand-mark" aria-hidden="true">CA</span>
+                    <span class="ca-brand-content">
+                        <span class="ca-brand-name">Chemical Analysis</span>
+                        <span class="ca-brand-module">Quality Assurance</span>
+                    </span>
+                </a>
+
+                <nav class="ca-dashboard-switcher" aria-label="Chemical Analysis dashboards">
                     <a
                         href="{% url 'ca:dashboard' %}"
-                        class="ca-primary-tab"
-                        data-module="dashboard"
-                        data-tab="dashboard"
+                        class="ca-dashboard-switcher__item{% if request.resolver_match.url_name == 'dashboard' or request.resolver_match.url_name == 'dashboard-view' %} is-active{% endif %}"
+                        {% if request.resolver_match.url_name == 'dashboard' or request.resolver_match.url_name == 'dashboard-view' %}aria-current="page"{% endif %}
                     >
-                        <span class="ca-primary-tab-label">
-                            Dashboard
-                        </span>
+                        <span>01</span>
+                        Command
                     </a>
-
-                    {% if dashboard_urls.analytics %}
                     <a
-                        href="{{ dashboard_urls.analytics }}"
-                        class="ca-primary-tab"
-                        data-module="analytics"
-                        data-tab="analytics"
+                        href="{% url 'ca:dashboard2' %}"
+                        class="ca-dashboard-switcher__item{% if request.resolver_match.url_name == 'dashboard2' %} is-active{% endif %}"
+                        {% if request.resolver_match.url_name == 'dashboard2' %}aria-current="page"{% endif %}
                     >
-                        <span class="ca-primary-tab-label">
-                            Analytics
-                        </span>
+                        <span>02</span>
+                        Operations
                     </a>
-                    {% endif %}
-
-                    {% if dashboard_urls.reports %}
                     <a
-                        href="{{ dashboard_urls.reports }}"
-                        class="ca-primary-tab"
-                        data-module="reports"
-                        data-tab="reports"
+                        href="{% url 'ca:dashboard3' %}"
+                        class="ca-dashboard-switcher__item{% if request.resolver_match.url_name == 'dashboard3' %} is-active{% endif %}"
+                        {% if request.resolver_match.url_name == 'dashboard3' %}aria-current="page"{% endif %}
                     >
-                        <span class="ca-primary-tab-label">
-                            Reports
-                        </span>
+                        <span>03</span>
+                        Analytics
                     </a>
-                    {% endif %}
-
-                    {% if permissions.view_workflow %}
-                    <a
-                        href="{{ dashboard_urls.workflow|default:'#' }}"
-                        class="ca-primary-tab"
-                        data-module="workflow"
-                        data-tab="workflow"
-                    >
-                        <span class="ca-primary-tab-label">
-                            Workflow
-                        </span>
-                    </a>
-                    {% endif %}
-
-                    {% if permissions.view_process %}
-                    <a
-                        href="{% url 'ca:process-list' %}"
-                        class="ca-primary-tab"
-                        data-module="processes"
-                        data-tab="processes"
-                    >
-                        <span class="ca-primary-tab-label">
-                            Processes
-                        </span>
-                    </a>
-                    {% endif %}
-
-                    {% if permissions.view_batch %}
-                    <a
-                        href="{% url 'ca:batch-list' %}"
-                        class="ca-primary-tab"
-                        data-module="batches"
-                        data-tab="batches"
-                    >
-                        <span class="ca-primary-tab-label">
-                            Batches
-                        </span>
-                    </a>
-                    {% endif %}
-
-                    {% if permissions.view_result %}
-                    <a
-                        href="{% url 'ca:result-list' %}"
-                        class="ca-primary-tab"
-                        data-module="results"
-                        data-tab="results"
-                    >
-                        <span class="ca-primary-tab-label">
-                            Results
-                        </span>
-                    </a>
-                    {% endif %}
-
-                    {% if permissions.view_coa %}
-                    <a
-                        href="{% url 'ca:coa-list' %}"
-                        class="ca-primary-tab"
-                        data-module="coa"
-                        data-tab="coa"
-                    >
-                        <span class="ca-primary-tab-label">
-                            CoA
-                        </span>
-                    </a>
-                    {% endif %}
-
                 </nav>
+            </div>
 
-
-                <div class="ca-header-actions">
-
-                    <button
-                        type="button"
-                        class="ca-header-action"
-                        id="ca-global-search"
-                        data-action="search"
-                        aria-label="Search chemical analysis"
-                    >
-                        <span class="ca-header-action-label">
-                            Search
-                        </span>
-
-                        <kbd>
-                            Ctrl K
-                        </kbd>
-                    </button>
-
-
-                    <button
-                        type="button"
-                        class="ca-header-action"
-                        id="ca-notifications"
-                        data-action="notifications"
-                        aria-label="Notifications"
-                    >
-                        <span
-                            class="ca-notification-indicator"
-                            id="ca-notification-indicator"
-                            hidden
-                        ></span>
-
-                        <span class="ca-header-action-label">
-                            Alerts
-                        </span>
-                    </button>
-
-
-                    <button
-                        type="button"
-                        class="ca-user-menu-trigger"
-                        id="ca-user-menu-trigger"
-                        aria-expanded="false"
-                        aria-controls="ca-user-menu"
-                    >
-                        <span class="ca-user-avatar">
-                            {{ request.user.username|default:"U"|slice:":1"|upper }}
-                        </span>
-
-                        <span class="ca-user-meta">
-
-                            <strong>
-                                {{ request.user.get_full_name|default:request.user.username }}
-                            </strong>
-
-                            {% if treatment_plant %}
-                            <span>
-                                {{ treatment_plant.name }}
-                            </span>
-                            {% else %}
-                            <span>
-                                System
-                            </span>
-                            {% endif %}
-
-                        </span>
-                    </button>
-
-
-                    <div
-                        class="ca-user-menu"
-                        id="ca-user-menu"
-                        hidden
-                    >
-
-                        <div class="ca-user-menu-header">
-
-                            <strong>
-                                {{ request.user.get_full_name|default:request.user.username }}
-                            </strong>
-
-                            <span>
-                                {{ request.user.username }}
-                            </span>
-
-                        </div>
-
-
-                        {% if treatment_plant %}
-                        <div class="ca-user-menu-context">
-
-                            <span>
-                                Current plant
-                            </span>
-
-                            <strong>
-                                {{ treatment_plant.name }}
-                            </strong>
-
-                        </div>
-                        {% elif request.user.is_superuser %}
-                        <div class="ca-user-menu-context">
-
-                            <span>
-                                Current scope
-                            </span>
-
-                            <strong>
-                                All Treatment Plants
-                            </strong>
-
-                        </div>
-                        {% endif %}
-
-
-                        {% if permissions.view_task %}
-                        <a href="{% url 'ca:my-tasks' %}">
-                            My Tasks
-                        </a>
-                        {% endif %}
-
-
-                        {% if permissions.view_workflow and dashboard_urls.workflow %}
-                        <a href="{{ dashboard_urls.workflow }}">
-                            Workflow
-                        </a>
-                        {% endif %}
-
-
-                        {% if request.user.is_staff %}
-                        <a href="{% url 'admin:index' %}">
-                            Administration
-                        </a>
-                        {% endif %}
-
-
-                        <a href="{% url 'logout' %}">
-                            Sign out
-                        </a>
-
-                    </div>
-
+            <div class="ca-topbar-right">
+                <div
+                    id="ca-live-status"
+                    class="ca-live-status"
+                    data-state="online"
+                    aria-live="polite"
+                    aria-label="Live updates enabled"
+                >
+                    <span class="ca-live-status__indicator" aria-hidden="true"></span>
+                    <span class="ca-live-status__text">Live</span>
                 </div>
 
+                {% if request.user.is_superuser or perms.ca.view_chemicalanalysisprocess %}
+                    <a
+                        href="{% url 'ca:my-tasks' %}"
+                        class="ca-topbar-link{% if request.resolver_match.url_name == 'my-tasks' %} is-active{% endif %}"
+                    >
+                        Tasks
+                    </a>
+                {% endif %}
+
+                {% if request.user.is_superuser or perms.ca.receive_chemical_batch %}
+                    <a href="{% url 'ca:batch-create' %}" class="ca-button ca-button--primary ca-button--sm">
+                        Receive Batch
+                    </a>
+                {% endif %}
+
+                <div class="ca-user-menu" id="ca-user-menu">
+                    <div class="ca-user-menu__identity">
+                        <span class="ca-user-menu__name">
+                            {% if request.user.get_full_name %}
+                                {{ request.user.get_full_name }}
+                            {% else %}
+                                {{ request.user.get_username }}
+                            {% endif %}
+                        </span>
+                        <span class="ca-user-menu__username">
+                            {{ request.user.get_username }}
+                        </span>
+                    </div>
+                </div>
             </div>
         </header>
 
+        <div class="ca-main-layout">
+            {% include "ca/dashboard/layout/sidebar.html" %}
 
-        <div class="ca-workspace" id="ca-workspace">
-
-            <aside
-                class="ca-sidebar"
-                id="ca-sidebar"
-                role="navigation"
-                aria-label="Chemical analysis navigation"
-            >
-
-                <div class="ca-sidebar-inner">
-
-                    <div class="ca-sidebar-context">
-
-                        <div class="ca-context-label">
-                            Treatment Plant
-                        </div>
-
-                        <div class="ca-context-value">
-
-                            {% if treatment_plant %}
-
-                            <strong>
-                                {{ treatment_plant.name }}
-                            </strong>
-
-                            {% if plant_has_phases %}
-                            <span>
-                                {{ plant_phases|length }}
-                                phase{{ plant_phases|length|pluralize }}
-                            </span>
-                            {% endif %}
-
-                            {% elif request.user.is_superuser %}
-
-                            <strong>
-                                All Treatment Plants
-                            </strong>
-
-                            <span>
-                                Superuser scope
-                            </span>
-
-                            {% else %}
-
-                            <strong>
-                                No plant assigned
-                            </strong>
-
-                            {% endif %}
-
-                        </div>
-
-                    </div>
-
-
-                    <nav
-                        class="ca-sidebar-navigation"
-                        aria-label="Module navigation"
-                    >
-
-                        <section class="ca-navigation-section">
-
-                            <div class="ca-navigation-section-title">
-                                Workspace
+            <div class="ca-content-wrapper">
+                <main id="ca-main" class="ca-main" tabindex="-1" role="main">
+                    <div class="ca-main__inner">
+                        <div class="ca-context-bar">
+                            <nav class="ca-breadcrumbs" aria-label="Breadcrumb">
+                                <a href="{% url 'ca:dashboard' %}">Chemical Analysis</a>
+                                {% block breadcrumbs %}{% endblock %}
+                            </nav>
+                            <div class="ca-page-actions">
+                                {% block page_actions %}{% endblock %}
                             </div>
-
-
-                            <a
-                                href="{% url 'ca:dashboard' %}"
-                                class="ca-navigation-item"
-                                data-navigation="dashboard"
-                            >
-                                <span class="ca-navigation-label">
-                                    Command Dashboard
-                                </span>
-                            </a>
-
-
-                            {% if dashboard_urls.analytics %}
-                            <a
-                                href="{{ dashboard_urls.analytics }}"
-                                class="ca-navigation-item"
-                                data-navigation="analytics"
-                            >
-                                <span class="ca-navigation-label">
-                                    Analytics
-                                </span>
-                            </a>
-                            {% endif %}
-
-
-                            {% if dashboard_urls.reports %}
-                            <a
-                                href="{{ dashboard_urls.reports }}"
-                                class="ca-navigation-item"
-                                data-navigation="reports"
-                            >
-                                <span class="ca-navigation-label">
-                                    Reports
-                                </span>
-                            </a>
-                            {% endif %}
-
-
-                            {% if permissions.view_task %}
-                            <a
-                                href="{% url 'ca:my-tasks' %}"
-                                class="ca-navigation-item"
-                                data-navigation="tasks"
-                            >
-                                <span class="ca-navigation-label">
-                                    My Tasks
-                                </span>
-
-                                {% if task_count %}
-                                <span class="ca-navigation-count">
-                                    {{ task_count }}
-                                </span>
-                                {% endif %}
-                            </a>
-                            {% endif %}
-
-
-                            {% if permissions.view_workflow and dashboard_urls.workflow %}
-                            <a
-                                href="{{ dashboard_urls.workflow }}"
-                                class="ca-navigation-item"
-                                data-navigation="workflow"
-                            >
-                                <span class="ca-navigation-label">
-                                    Workflow
-                                </span>
-                            </a>
-                            {% endif %}
-
-                        </section>
-
-
-                        <section class="ca-navigation-section">
-
-                            <div class="ca-navigation-section-title">
-                                Analysis Operations
-                            </div>
-
-
-                            {% if permissions.view_batch %}
-                            <a
-                                href="{% url 'ca:batch-list' %}"
-                                class="ca-navigation-item"
-                                data-navigation="batches"
-                            >
-                                <span class="ca-navigation-label">
-                                    Chemical Batches
-                                </span>
-
-                                {% if pending_batch_count %}
-                                <span class="ca-navigation-count">
-                                    {{ pending_batch_count }}
-                                </span>
-                                {% endif %}
-                            </a>
-                            {% endif %}
-
-
-                            {% if permissions.view_request %}
-                            <a
-                                href="{% url 'ca:request-list' %}"
-                                class="ca-navigation-item"
-                                data-navigation="requests"
-                            >
-                                <span class="ca-navigation-label">
-                                    Analysis Requests
-                                </span>
-
-                                {% if pending_request_count %}
-                                <span class="ca-navigation-count">
-                                    {{ pending_request_count }}
-                                </span>
-                                {% endif %}
-                            </a>
-                            {% endif %}
-
-
-                            {% if permissions.view_process %}
-                            <a
-                                href="{% url 'ca:process-list' %}"
-                                class="ca-navigation-item"
-                                data-navigation="processes"
-                            >
-                                <span class="ca-navigation-label">
-                                    Analysis Processes
-                                </span>
-
-                                {% if active_process_count %}
-                                <span class="ca-navigation-count">
-                                    {{ active_process_count }}
-                                </span>
-                                {% endif %}
-                            </a>
-                            {% endif %}
-
-
-                            {% if permissions.view_result %}
-                            <a
-                                href="{% url 'ca:result-list' %}"
-                                class="ca-navigation-item"
-                                data-navigation="results"
-                            >
-                                <span class="ca-navigation-label">
-                                    Test Results
-                                </span>
-                            </a>
-                            {% endif %}
-
-
-                            {% if permissions.view_coa %}
-                            <a
-                                href="{% url 'ca:coa-list' %}"
-                                class="ca-navigation-item"
-                                data-navigation="coa"
-                            >
-                                <span class="ca-navigation-label">
-                                    Certificates of Analysis
-                                </span>
-                            </a>
-                            {% endif %}
-
-                        </section>
-
-
-                        <section class="ca-navigation-section">
-
-                            <div class="ca-navigation-section-title">
-                                Control Queues
-                            </div>
-
-
-                            {% if permissions.start_analysis %}
-                            <a
-                                href="{% url 'ca:pending-analysis' %}"
-                                class="ca-navigation-item"
-                                data-navigation="pending-analysis"
-                            >
-                                <span class="ca-navigation-label">
-                                    Pending Analysis
-                                </span>
-
-                                {% if pending_analysis_count %}
-                                <span class="ca-navigation-count">
-                                    {{ pending_analysis_count }}
-                                </span>
-                                {% endif %}
-                            </a>
-                            {% endif %}
-
-
-                            {% if permissions.approve_batch %}
-                            <a
-                                href="{% url 'ca:pending-approval' %}"
-                                class="ca-navigation-item"
-                                data-navigation="pending-approval"
-                            >
-                                <span class="ca-navigation-label">
-                                    Batch Approval
-                                </span>
-
-                                {% if pending_approval_count %}
-                                <span class="ca-navigation-count">
-                                    {{ pending_approval_count }}
-                                </span>
-                                {% endif %}
-                            </a>
-                            {% endif %}
-
-
-                            {% if permissions.view_process %}
-                            <a
-                                href="{% url 'ca:process-list' %}?status=QA"
-                                class="ca-navigation-item"
-                                data-navigation="qa"
-                            >
-                                <span class="ca-navigation-label">
-                                    QA Review
-                                </span>
-
-                                {% if pending_qa_count %}
-                                <span class="ca-navigation-count">
-                                    {{ pending_qa_count }}
-                                </span>
-                                {% endif %}
-                            </a>
-                            {% endif %}
-
-
-                            {% if permissions.view_coa %}
-                            <a
-                                href="{% url 'ca:coa-list' %}"
-                                class="ca-navigation-item"
-                                data-navigation="coa-control"
-                            >
-                                <span class="ca-navigation-label">
-                                    CoA Control
-                                </span>
-
-                                {% if pending_coa_count %}
-                                <span class="ca-navigation-count">
-                                    {{ pending_coa_count }}
-                                </span>
-                                {% endif %}
-                            </a>
-                            {% endif %}
-
-
-                            {% if permissions.view_process %}
-                            <a
-                                href="{% url 'ca:overdue-analysis' %}"
-                                class="ca-navigation-item"
-                                data-navigation="overdue"
-                            >
-                                <span class="ca-navigation-label">
-                                    SLA Exceptions
-                                </span>
-
-                                {% if overdue_count %}
-                                <span class="ca-navigation-count ca-navigation-count-danger">
-                                    {{ overdue_count }}
-                                </span>
-                                {% endif %}
-                            </a>
-                            {% endif %}
-
-                        </section>
-
-
-                        {% if permissions.manage_workflow %}
-
-                        <section class="ca-navigation-section">
-
-                            <div class="ca-navigation-section-title">
-                                Administration
-                            </div>
-
-
-                            <a
-                                href="{% url 'ca:specification-list' %}"
-                                class="ca-navigation-item"
-                                data-navigation="specifications"
-                            >
-                                <span class="ca-navigation-label">
-                                    Specifications
-                                </span>
-                            </a>
-
-
-                            {% if permissions.complete_checklist or permissions.reopen_checklist %}
-                            <a
-                                href="{% url 'ca:process-list' %}?stage=checklist"
-                                class="ca-navigation-item"
-                                data-navigation="checklists"
-                            >
-                                <span class="ca-navigation-label">
-                                    Receiving Checklists
-                                </span>
-                            </a>
-                            {% endif %}
-
-                        </section>
-
-                        {% endif %}
-
-                    </nav>
-
-
-                    <div class="ca-sidebar-footer">
-
-                        <div
-                            class="ca-live-status"
-                            id="ca-live-status"
-                            data-status="connecting"
-                        >
-                            <span class="ca-live-status-indicator"></span>
-
-                            <span class="ca-live-status-copy">
-
-                                <strong id="ca-live-status-label">
-                                    Connecting
-                                </strong>
-
-                                <small>
-                                    Live workspace
-                                </small>
-
-                            </span>
                         </div>
 
+                        {% block module_tabs %}{% endblock %}
 
-                        <div class="ca-sidebar-version">
-                            Chemical Analysis Command Center
-                        </div>
-
+                        <section class="ca-page">
+                            {% block page_header %}{% endblock %}
+                            {% block content %}{% endblock %}
+                        </section>
                     </div>
-
-                </div>
-
-            </aside>
-
-
-            <div class="ca-main-area" id="ca-main-area">
-
-                <div
-                    class="ca-module-tabs"
-                    id="ca-module-tabs"
-                    role="tablist"
-                    aria-label="Dashboard views"
-                >
-
-                    <div class="ca-module-tab-group">
-
-                        <a
-                            href="{% url 'ca:dashboard' %}"
-                            class="ca-module-tab"
-                            data-view="dashboard"
-                            role="tab"
-                        >
-                            <span>
-                                Command Center
-                            </span>
-                        </a>
-
-
-                        <a
-                            href="{% url 'ca:dashboard' %}?view=bdashboard"
-                            class="ca-module-tab"
-                            data-view="bdashboard"
-                            role="tab"
-                        >
-                            <span>
-                                BDashboard
-                            </span>
-                        </a>
-
-
-                        {% if dashboard_urls.analytics %}
-                        <a
-                            href="{{ dashboard_urls.analytics }}"
-                            class="ca-module-tab"
-                            data-view="analytics"
-                            role="tab"
-                        >
-                            <span>
-                                Analytics
-                            </span>
-                        </a>
-                        {% endif %}
-
-
-                        {% if dashboard_urls.reports %}
-                        <a
-                            href="{{ dashboard_urls.reports }}"
-                            class="ca-module-tab"
-                            data-view="reports"
-                            role="tab"
-                        >
-                            <span>
-                                Reports
-                            </span>
-                        </a>
-                        {% endif %}
-
-                    </div>
-
-
-                    <div class="ca-module-tab-actions">
-
-                        <button
-                            type="button"
-                            class="ca-module-action"
-                            data-action="refresh"
-                            aria-label="Refresh workspace"
-                        >
-                            Refresh
-                        </button>
-
-
-                        {% if permissions.export %}
-                        <button
-                            type="button"
-                            class="ca-module-action"
-                            data-action="export"
-                            aria-label="Export current view"
-                        >
-                            Export
-                        </button>
-                        {% endif %}
-
-                    </div>
-
-                </div>
-
-
-                <div
-                    class="ca-context-bar"
-                    id="ca-context-bar"
-                >
-
-                    <div class="ca-breadcrumbs">
-
-                        {% block breadcrumbs %}
-
-                        <a href="{% url 'ca:dashboard' %}">
-                            Chemical Analysis
-                        </a>
-
-                        <span>
-                            /
-                        </span>
-
-                        <strong>
-                            {% block page_label %}Command Center{% endblock %}
-                        </strong>
-
-                        {% endblock %}
-
-                    </div>
-
-
-                    <div class="ca-context-controls">
-
-                        {% if treatment_plant %}
-                        <div class="ca-context-chip">
-
-                            <span>
-                                Plant
-                            </span>
-
-                            <strong>
-                                {{ treatment_plant.name }}
-                            </strong>
-
-                        </div>
-                        {% elif request.user.is_superuser %}
-                        <div class="ca-context-chip">
-
-                            <span>
-                                Scope
-                            </span>
-
-                            <strong>
-                                All Treatment Plants
-                            </strong>
-
-                        </div>
-                        {% endif %}
-
-
-                        {% block page_controls %}{% endblock %}
-
-                    </div>
-
-                </div>
-
-
-                <div
-                    class="ca-content-wrapper"
-                    id="ca-content-wrapper"
-                >
-
-                    <main
-                        class="ca-main-content"
-                        id="ca-main-content"
-                        role="main"
-                        tabindex="-1"
-                        data-content-region
-                        hx-history="true"
-                    >
-                        {% block content %}{% endblock %}
-                    </main>
-
-                </div>
-
-
-                <div
-                    class="ca-live-region"
-                    id="ca-live-region"
-                    aria-live="polite"
-                    aria-atomic="true"
-                ></div>
-
+                </main>
             </div>
-
         </div>
 
-
-        <footer
-            class="ca-footer"
-            id="ca-footer"
-            role="contentinfo"
-        >
-
-            <div class="ca-footer-inner">
-
-                <div class="ca-footer-primary">
-
-                    <span>
-                        NCWSC Quality Assurance Directorate
-                    </span>
-
-                    <span>
-                        Chemical Analysis Management System
-                    </span>
-
-                </div>
-
-
-                <div class="ca-footer-secondary">
-
-                    {% if treatment_plant %}
-                    <span>
-                        {{ treatment_plant.name }}
-                    </span>
-                    {% endif %}
-
-                    <span>
-                        {{ now|date:"Y" }}
-                    </span>
-
-                </div>
-
-            </div>
-
-        </footer>
-
+        <div id="ca-sidebar-backdrop" class="ca-sidebar-backdrop" aria-hidden="true"></div>
     </div>
-
 </div>
-
 {% endblock %}
-
-
-{% block layout_js %}
-
-<script
-    src="{% static 'ca/js/layout/navigation.js' %}"
-    defer
-></script>
-
-<script
-    src="{% static 'ca/js/layout/sidebar.js' %}"
-    defer
-></script>
-
-<script
-    src="{% static 'ca/js/layout/topbar.js' %}"
-    defer
-></script>
-
-<script
-    src="{% static 'ca/js/layout/tabs.js' %}"
-    defer
-></script>
-
-<script
-    src="{% static 'ca/js/layout/live.js' %}"
-    defer
-></script>
-
-{% endblock %}
-

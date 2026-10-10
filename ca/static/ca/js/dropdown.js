@@ -12,11 +12,11 @@
     // GET HELPERS
     // ===============================
     function getSidebar() {
-        return document.querySelector(".sidebar");
+        return document.getElementById("ca-sidebar") || document.querySelector(".ca-sidebar") || document.querySelector(".sidebar");
     }
 
     function getMenuItems() {
-        return document.querySelectorAll(".sidebar-item.has-children");
+        return document.querySelectorAll(".sidebar-item.has-children, .ca-sidebar-item.has-children");
     }
 
     // ===============================

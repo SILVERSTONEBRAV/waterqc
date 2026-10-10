@@ -7,11 +7,10 @@
 
 {% block header %}
     {% include "accounts/partials/header.html" %}
-<link rel="stylesheet" href="{% static 'ca/css/dashboard.css' %}">
-
 {% endblock %}
 
 {% block extra_styles %}
+    <link rel="stylesheet" href="{% static 'ca/css/dashboard.css' %}">
 {% endblock %}
 
 {% block sidebar %}
@@ -27,4 +26,6 @@
 {% endblock %}
 
 {% block extra_scripts %}
+    <script src="{% static 'ca/js/sidebar.js' %}"></script>
+    <script src="{% static 'ca/js/dropdown.js' %}"></script>
 {% endblock %}

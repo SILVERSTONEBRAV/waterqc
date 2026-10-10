@@ -1,0 +1,72 @@
+.ca-surface {
+    background: var(--ca-surface);
+    border: 1px solid var(--ca-border);
+    border-radius: var(--ca-radius-lg);
+    box-shadow: var(--ca-shadow-sm);
+}
+
+.ca-divider {
+    width: 100%;
+    height: 1px;
+    background: var(--ca-border);
+}
+
+.ca-muted {
+    color: var(--ca-text-muted);
+}
+
+.ca-soft {
+    color: var(--ca-text-soft);
+}
+
+.ca-truncate {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ca-sr-only,
+.sr-only {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
+.ca-flex {
+    display: flex;
+}
+
+.ca-grid {
+    display: grid;
+}
+
+.ca-items-center {
+    align-items: center;
+}
+
+.ca-justify-between {
+    justify-content: space-between;
+}
+
+.ca-gap-1 {
+    gap: 4px;
+}
+
+.ca-gap-2 {
+    gap: 8px;
+}
+
+.ca-gap-3 {
+    gap: 12px;
+}
+
+.ca-gap-4 {
+    gap: 16px;
+}

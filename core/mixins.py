@@ -947,10 +947,7 @@ class WanjalaMixin(LoginRequiredMixin):
 
     # ------------------- JSON FORM SUPPORT ------------------- #
     def get_json_data(self):
-        """
-        Parse JSON payload from request if Content-Type is application/json.
-        Returns a dict suitable for form initialization or update.
-        """
+
         if self.request.content_type == "application/json":
             try:
                 return json.loads(self.request.body.decode("utf-8"))
@@ -959,10 +956,7 @@ class WanjalaMixin(LoginRequiredMixin):
         return {}
 
     def get_form_kwargs(self):
-        """
-        Override form kwargs to inject JSON data if present.
-        Supports standard POST forms and JSON payloads seamlessly.
-        """
+
         kwargs = super().get_form_kwargs()
         if self.request.method in ["POST", "PUT", "PATCH"]:
             json_data = self.get_json_data()

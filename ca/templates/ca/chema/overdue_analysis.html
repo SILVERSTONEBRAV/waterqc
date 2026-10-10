@@ -4,130 +4,1256 @@
 
 {% block content %}
 
-<div class="page-header">
-    <div>
-        <h1>Overdue Analyses</h1>
-        <p>Chemical analysis processes that have exceeded their required completion time.</p>
-    </div>
-</div>
+<div
+    class="ca-page ca-overdue-page"
+    id="ca-overdue-analyses"
+    data-page="overdue-analyses"
+>
 
-<div class="card">
-    <div class="card-header">
-        <div>
-            <h2>Overdue Analysis Queue</h2>
-            <span>
-                {{ processes|length }}
-                overdue analysis{{ processes|length|pluralize }}
-            </span>
+    <header class="ca-command-header page-header">
+
+        <div class="ca-command-heading">
+
+            <div class="ca-page-kicker">
+                CHEMICAL ANALYSIS · SLA CONTROL
+            </div>
+
+            <div class="ca-command-title-row">
+
+                <h1>Overdue Analyses</h1>
+
+                {% if processes %}
+                    <span class="ca-status-chip ca-status-danger">
+                        SLA Attention
+                    </span>
+                {% else %}
+                    <span class="ca-status-chip ca-status-clear">
+                        SLA Clear
+                    </span>
+                {% endif %}
+
+            </div>
+
+            <p>
+                Chemical analysis processes that have exceeded their
+                required completion window and require operational review.
+            </p>
+
         </div>
-    </div>
 
-```
-{% if processes %}
-    <div class="table-responsive">
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Batch</th>
-                    <th>Request</th>
-                    <th>Sample</th>
-                    <th>Analyst</th>
-                    <th>Status</th>
-                    <th>Deadline</th>
-                    <th>Overdue</th>
-                    <th></th>
-                </tr>
-            </thead>
 
-            <tbody>
-                {% for process in processes %}
-                <tr>
-                    <td>
-                        {% if process.batch %}
-                            <strong>{{ process.batch }}</strong>
-                        {% else %}
-                            —
-                        {% endif %}
-                    </td>
+        <div class="page-actions ca-command-actions">
 
-                    <td>
-                        {% if process.analysis_request %}
-                            {{ process.analysis_request }}
-                        {% else %}
-                            —
-                        {% endif %}
-                    </td>
+            <a
+                href="{% url 'ca:dashboard' %}"
+                class="btn btn-secondary"
+            >
+                Dashboard
+            </a>
 
-                    <td>
-                        {% if process.batch and process.batch.sample_id %}
-                            {{ process.batch.sample_id }}
-                        {% else %}
-                            —
-                        {% endif %}
-                    </td>
+            <a
+                href="{% url 'ca:my-tasks' %}"
+                class="btn btn-secondary"
+            >
+                My Tasks
+            </a>
 
-                    <td>
-                        {% if process.assigned_analyst %}
-                            {{ process.assigned_analyst }}
-                        {% else %}
-                            Unassigned
-                        {% endif %}
-                    </td>
+            <a
+                href="/ca/workflow/"
+                class="btn btn-primary"
+            >
+                Open Workflow
+            </a>
 
-                    <td>
-                        {% if process.workflow_status %}
-                            <span class="badge badge-warning">
-                                {{ process.get_workflow_status_display }}
-                            </span>
-                        {% else %}
-                            <span class="badge badge-warning">
-                                Overdue
-                            </span>
-                        {% endif %}
-                    </td>
+        </div>
 
-                    <td>
-                        {% if process.analysis_request.requested_at %}
-                            {{ process.analysis_request.requested_at|date:"d M Y H:i" }}
-                        {% elif process.created_at %}
-                            {{ process.created_at|date:"d M Y H:i" }}
-                        {% else %}
-                            —
-                        {% endif %}
-                    </td>
+    </header>
 
-                    <td>
-                        {% if process.is_overdue %}
-                            <span class="badge badge-danger">
-                                Overdue
-                            </span>
-                        {% else %}
-                            <span class="badge badge-warning">
-                                Attention
-                            </span>
-                        {% endif %}
-                    </td>
 
-                    <td>
-                        <a
-                            href="{% url 'ca:process-detail' process.pk %}"
-                            class="btn btn-primary"
-                        >
-                            View
-                        </a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-{% else %}
-    <div class="empty-state">
-        <h3>No overdue analyses</h3>
-        <p>All chemical analysis processes are currently within their required completion time.</p>
-    </div>
-{% endif %}
-```
+    <section
+        class="ca-task-command-strip"
+        aria-label="Overdue analysis context"
+    >
+
+        <div class="ca-task-context">
+
+            <span class="ca-context-label">
+                Queue
+            </span>
+
+            <strong>
+                Overdue Analysis
+            </strong>
+
+        </div>
+
+
+        <div class="ca-task-context">
+
+            <span class="ca-context-label">
+                Scope
+            </span>
+
+            <strong>
+                Current authorised workflow scope
+            </strong>
+
+        </div>
+
+
+        <div class="ca-task-context">
+
+            <span class="ca-context-label">
+                Exception state
+            </span>
+
+            <strong>
+                {% if processes %}
+                    {{ processes|length }}
+                    active exception{{ processes|length|pluralize }}
+                {% else %}
+                    No overdue processes
+                {% endif %}
+            </strong>
+
+        </div>
+
+
+        <div class="ca-task-context ca-task-context-action">
+
+            <a
+                href="{% url 'ca:overdue-analysis' %}"
+                class="btn btn-sm btn-secondary"
+            >
+                Refresh Queue
+            </a>
+
+        </div>
+
+    </section>
+
+
+    <section
+        class="stats-grid ca-task-kpis"
+        aria-label="Overdue analysis metrics"
+    >
+
+        <article class="card ca-kpi-card ca-kpi-overdue">
+
+            <div class="card-body">
+
+                <div class="ca-kpi-topline">
+
+                    <span class="stat-label">
+                        Overdue Processes
+                    </span>
+
+                    <span class="ca-kpi-code">
+                        SLA
+                    </span>
+
+                </div>
+
+                <div class="stat-value">
+                    {{ processes|length|default:0 }}
+                </div>
+
+                <div class="ca-kpi-caption">
+                    Analysis processes beyond deadline
+                </div>
+
+            </div>
+
+        </article>
+
+
+        <article class="card ca-kpi-card">
+
+            <div class="card-body">
+
+                <div class="ca-kpi-topline">
+
+                    <span class="stat-label">
+                        Assigned Analysts
+                    </span>
+
+                    <span class="ca-kpi-code">
+                        OWN
+                    </span>
+
+                </div>
+
+                <div
+                    class="stat-value"
+                    data-derived-analysts
+                >
+                    —
+                </div>
+
+                <div class="ca-kpi-caption">
+                    Analysts represented in this queue
+                </div>
+
+            </div>
+
+        </article>
+
+
+        <article class="card ca-kpi-card">
+
+            <div class="card-body">
+
+                <div class="ca-kpi-topline">
+
+                    <span class="stat-label">
+                        Active Stages
+                    </span>
+
+                    <span class="ca-kpi-code">
+                        FLOW
+                    </span>
+
+                </div>
+
+                <div
+                    class="stat-value"
+                    data-derived-stages
+                >
+                    —
+                </div>
+
+                <div class="ca-kpi-caption">
+                    Workflow stages represented
+                </div>
+
+            </div>
+
+        </article>
+
+
+        <article class="card ca-kpi-card ca-kpi-critical">
+
+            <div class="card-body">
+
+                <div class="ca-kpi-topline">
+
+                    <span class="stat-label">
+                        Priority
+                    </span>
+
+                    <span class="ca-kpi-code">
+                        P1
+                    </span>
+
+                </div>
+
+                <div class="stat-value">
+
+                    {% if processes %}
+                        HIGH
+                    {% else %}
+                        CLEAR
+                    {% endif %}
+
+                </div>
+
+                <div class="ca-kpi-caption">
+                    Operational SLA exception level
+                </div>
+
+            </div>
+
+        </article>
+
+    </section>
+
+
+    <section class="ca-task-intelligence-grid">
+
+        <article class="card">
+
+            <div class="card-header">
+
+                <div>
+
+                    <div class="ca-section-kicker">
+                        SLA TELEMETRY
+                    </div>
+
+                    <h2>Exception Profile</h2>
+
+                    <p>
+                        Current overdue workload requiring intervention.
+                    </p>
+
+                </div>
+
+            </div>
+
+            <div class="card-body">
+
+                <div class="ca-sla-list">
+
+                    <div class="ca-sla-row">
+
+                        <span class="ca-sla-indicator ca-sla-critical"></span>
+
+                        <div class="ca-sla-content">
+
+                            <strong>
+                                Overdue analysis
+                            </strong>
+
+                            <small>
+                                Processes beyond the required completion window
+                            </small>
+
+                        </div>
+
+                        <strong>
+                            {{ processes|length|default:0 }}
+                        </strong>
+
+                    </div>
+
+
+                    <div class="ca-sla-row">
+
+                        <span class="ca-sla-indicator ca-sla-warning"></span>
+
+                        <div class="ca-sla-content">
+
+                            <strong>
+                                Workflow review
+                            </strong>
+
+                            <small>
+                                Investigate current workflow ownership and stage
+                            </small>
+
+                        </div>
+
+                        <strong>
+                            REVIEW
+                        </strong>
+
+                    </div>
+
+
+                    <div class="ca-sla-row">
+
+                        <span class="ca-sla-indicator ca-sla-info"></span>
+
+                        <div class="ca-sla-content">
+
+                            <strong>
+                                Process traceability
+                            </strong>
+
+                            <small>
+                                Open individual process records for investigation
+                            </small>
+
+                        </div>
+
+                        <strong>
+                            TRACE
+                        </strong>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </article>
+
+
+        <article class="card">
+
+            <div class="card-header">
+
+                <div>
+
+                    <div class="ca-section-kicker">
+                        RESPONSE CONTROL
+                    </div>
+
+                    <h2>Operational Actions</h2>
+
+                    <p>
+                        Routes for resolving or reviewing SLA exceptions.
+                    </p>
+
+                </div>
+
+            </div>
+
+            <div class="card-body">
+
+                <div class="ca-action-grid">
+
+                    <a
+                        href="{% url 'ca:my-tasks' %}"
+                        class="ca-action-tile"
+                    >
+
+                        <span class="ca-action-code">
+                            OWN
+                        </span>
+
+                        <span class="ca-action-content">
+
+                            <strong>
+                                My Tasks
+                            </strong>
+
+                            <small>
+                                Review personally assigned work
+                            </small>
+
+                        </span>
+
+                    </a>
+
+
+                    <a
+                        href="{% url 'ca:pending-analysis' %}"
+                        class="ca-action-tile"
+                    >
+
+                        <span class="ca-action-code">
+                            ANA
+                        </span>
+
+                        <span class="ca-action-content">
+
+                            <strong>
+                                Analysis Queue
+                            </strong>
+
+                            <small>
+                                Review pending analytical work
+                            </small>
+
+                        </span>
+
+                    </a>
+
+
+                    <a
+                        href="/ca/workflow/"
+                        class="ca-action-tile"
+                    >
+
+                        <span class="ca-action-code">
+                            WF
+                        </span>
+
+                        <span class="ca-action-content">
+
+                            <strong>
+                                Workflow
+                            </strong>
+
+                            <small>
+                                Open Viewflow workflow control
+                            </small>
+
+                        </span>
+
+                    </a>
+
+
+                    <a
+                        href="{% url 'ca:process-list' %}"
+                        class="ca-action-tile ca-action-danger"
+                    >
+
+                        <span class="ca-action-code">
+                            PROC
+                        </span>
+
+                        <span class="ca-action-content">
+
+                            <strong>
+                                Process Registry
+                            </strong>
+
+                            <small>
+                                Browse chemical analysis processes
+                            </small>
+
+                        </span>
+
+                    </a>
+
+                </div>
+
+            </div>
+
+        </article>
+
+    </section>
+
+
+    <section class="card ca-task-table-card">
+
+        <div class="card-header ca-task-table-header">
+
+            <div>
+
+                <div class="ca-section-kicker">
+                    SLA EXCEPTION QUEUE
+                </div>
+
+                <h2>Overdue Analysis Queue</h2>
+
+                <p>
+                    Active chemical analysis processes requiring deadline
+                    review and operational intervention.
+                </p>
+
+            </div>
+
+
+            <div class="ca-table-toolbar">
+
+                <label
+                    class="ca-search-control"
+                    for="overdue-search"
+                >
+
+                    <span class="sr-only">
+                        Search overdue analyses
+                    </span>
+
+                    <input
+                        id="overdue-search"
+                        type="search"
+                        class="form-control"
+                        placeholder="Search batch, sample, analyst or status..."
+                        autocomplete="off"
+                        data-overdue-search
+                    >
+
+                </label>
+
+
+                <select
+                    id="overdue-status-filter"
+                    class="form-control"
+                    data-overdue-filter
+                    aria-label="Filter overdue analyses by status"
+                >
+
+                    <option value="all">
+                        All stages
+                    </option>
+
+                    <option value="ANALYSIS">
+                        Analysis
+                    </option>
+
+                    <option value="QA">
+                        QA
+                    </option>
+
+                    <option value="RETEST">
+                        Retest
+                    </option>
+
+                    <option value="CAPA">
+                        CAPA
+                    </option>
+
+                    <option value="APPROVED">
+                        Approved
+                    </option>
+
+                </select>
+
+            </div>
+
+        </div>
+
+
+        <div class="ca-table-meta">
+
+            <div class="ca-table-result-count">
+
+                Showing
+                <strong data-overdue-visible-count>
+                    {{ processes|length|default:0 }}
+                </strong>
+                overdue process{{ processes|length|pluralize }}
+
+            </div>
+
+
+            <div class="ca-table-state">
+
+                {% if processes %}
+
+                    <span
+                        class="ca-live-dot ca-live-dot-danger"
+                        aria-hidden="true"
+                    ></span>
+
+                    SLA exceptions detected
+
+                {% else %}
+
+                    <span
+                        class="ca-live-dot"
+                        aria-hidden="true"
+                    ></span>
+
+                    Queue clear
+
+                {% endif %}
+
+            </div>
+
+        </div>
+
+
+        {% if processes %}
+
+            <div class="table-responsive">
+
+                <table
+                    class="table ca-task-table ca-overdue-table"
+                    id="overdue-analysis-table"
+                >
+
+                    <thead>
+
+                        <tr>
+
+                            <th scope="col">
+                                Batch
+                            </th>
+
+                            <th scope="col">
+                                Request
+                            </th>
+
+                            <th scope="col">
+                                Sample
+                            </th>
+
+                            <th scope="col">
+                                Analyst
+                            </th>
+
+                            <th scope="col">
+                                Stage
+                            </th>
+
+                            <th scope="col">
+                                Deadline
+                            </th>
+
+                            <th scope="col">
+                                SLA
+                            </th>
+
+                            <th scope="col">
+                                Action
+                            </th>
+
+                        </tr>
+
+                    </thead>
+
+
+                    <tbody>
+
+                        {% for process in processes %}
+
+                            <tr
+                                class="ca-task-row ca-overdue-row"
+                                data-overdue-row
+                                data-status="{{ process.workflow_status|default:'' }}"
+                                data-search="{{ process.batch|default:'' }} {{ process.analysis_request|default:'' }} {{ process.batch.sample_id|default:'' }} {{ process.assigned_analyst|default:'' }} {{ process.workflow_status|default:'' }}"
+                            >
+
+                                <td>
+
+                                    <div class="ca-table-primary">
+
+                                        <a
+                                            href="{% url 'ca:process-detail' process.pk %}"
+                                            class="ca-entity-link"
+                                        >
+
+                                            {% if process.batch %}
+                                                {{ process.batch }}
+                                            {% else %}
+                                                Process {{ process.pk }}
+                                            {% endif %}
+
+                                        </a>
+
+                                    </div>
+
+                                </td>
+
+
+                                <td>
+
+                                    {% if process.analysis_request %}
+
+                                        <div class="ca-table-primary">
+                                            {{ process.analysis_request }}
+                                        </div>
+
+                                    {% else %}
+
+                                        <span class="ca-muted">
+                                            No request record
+                                        </span>
+
+                                    {% endif %}
+
+                                </td>
+
+
+                                <td>
+
+                                    {% if process.batch and process.batch.sample_id %}
+
+                                        <span class="ca-mono">
+                                            {{ process.batch.sample_id }}
+                                        </span>
+
+                                    {% else %}
+
+                                        <span class="ca-muted">
+                                            —
+                                        </span>
+
+                                    {% endif %}
+
+                                </td>
+
+
+                                <td>
+
+                                    {% if process.assigned_analyst %}
+
+                                        <div class="ca-table-primary">
+                                            {{ process.assigned_analyst }}
+                                        </div>
+
+                                    {% else %}
+
+                                        <span class="ca-unassigned">
+                                            Unassigned
+                                        </span>
+
+                                    {% endif %}
+
+                                </td>
+
+
+                                <td>
+
+                                    {% if process.workflow_status %}
+
+                                        <span class="ca-stage-badge">
+                                            {{ process.get_workflow_status_display }}
+                                        </span>
+
+                                    {% else %}
+
+                                        <span class="ca-stage-badge">
+                                            Analysis
+                                        </span>
+
+                                    {% endif %}
+
+                                </td>
+
+
+                                <td>
+
+                                    {% if process.analysis_request.requested_at %}
+
+                                        <time
+                                            datetime="{{ process.analysis_request.requested_at|date:'c' }}"
+                                            class="ca-deadline ca-deadline-overdue"
+                                        >
+                                            {{ process.analysis_request.requested_at|date:"d M Y H:i" }}
+                                        </time>
+
+                                    {% elif process.created_at %}
+
+                                        <time
+                                            datetime="{{ process.created_at|date:'c' }}"
+                                            class="ca-deadline ca-deadline-overdue"
+                                        >
+                                            {{ process.created_at|date:"d M Y H:i" }}
+                                        </time>
+
+                                    {% else %}
+
+                                        <span class="ca-muted">
+                                            —
+                                        </span>
+
+                                    {% endif %}
+
+                                </td>
+
+
+                                <td>
+
+                                    {% if process.is_overdue %}
+
+                                        <span class="badge badge-danger">
+                                            OVERDUE
+                                        </span>
+
+                                    {% else %}
+
+                                        <span class="badge badge-warning">
+                                            ATTENTION
+                                        </span>
+
+                                    {% endif %}
+
+                                </td>
+
+
+                                <td>
+
+                                    <div class="ca-row-actions">
+
+                                        <a
+                                            href="{% url 'ca:process-detail' process.pk %}"
+                                            class="btn btn-sm btn-primary"
+                                        >
+                                            View
+                                        </a>
+
+                                        <a
+                                            href="/ca/workflow/"
+                                            class="btn btn-sm btn-secondary"
+                                        >
+                                            Workflow
+                                        </a>
+
+                                    </div>
+
+                                </td>
+
+                            </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        {% else %}
+
+            <div class="ca-empty-state">
+
+                <div class="ca-empty-state-code">
+                    SLA CLEAR
+                </div>
+
+                <h3>
+                    No overdue analyses
+                </h3>
+
+                <p>
+                    All chemical analysis processes currently visible
+                    to this queue are within their required completion
+                    window.
+                </p>
+
+                <div class="page-actions">
+
+                    <a
+                        href="{% url 'ca:dashboard' %}"
+                        class="btn btn-primary"
+                    >
+                        Return to Dashboard
+                    </a>
+
+                    <a
+                        href="{% url 'ca:my-tasks' %}"
+                        class="btn btn-secondary"
+                    >
+                        View My Tasks
+                    </a>
+
+                </div>
+
+            </div>
+
+        {% endif %}
+
+    </section>
+
+
+    <section class="ca-task-bottom-grid">
+
+        <article class="card">
+
+            <div class="card-header">
+
+                <div>
+
+                    <div class="ca-section-kicker">
+                        TRACEABILITY
+                    </div>
+
+                    <h2>Process Investigation</h2>
+
+                    <p>
+                        Use the process registry to investigate the complete
+                        lifecycle of an overdue analysis.
+                    </p>
+
+                </div>
+
+            </div>
+
+            <div class="card-body">
+
+                <div class="ca-investigation-list">
+
+                    <div class="ca-investigation-step">
+
+                        <span class="ca-investigation-code">
+                            01
+                        </span>
+
+                        <div>
+                            <strong>
+                                Identify process owner
+                            </strong>
+
+                            <small>
+                                Confirm the assigned analyst or workflow role.
+                            </small>
+                        </div>
+
+                    </div>
+
+
+                    <div class="ca-investigation-step">
+
+                        <span class="ca-investigation-code">
+                            02
+                        </span>
+
+                        <div>
+                            <strong>
+                                Inspect process state
+                            </strong>
+
+                            <small>
+                                Review the current workflow stage and process
+                                record.
+                            </small>
+                        </div>
+
+                    </div>
+
+
+                    <div class="ca-investigation-step">
+
+                        <span class="ca-investigation-code">
+                            03
+                        </span>
+
+                        <div>
+                            <strong>
+                                Continue through Viewflow
+                            </strong>
+
+                            <small>
+                                Execute the appropriate authorised workflow
+                                action.
+                            </small>
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <div class="page-actions">
+
+                    <a
+                        href="{% url 'ca:process-list' %}"
+                        class="btn btn-secondary"
+                    >
+                        Process Registry
+                    </a>
+
+                    <a
+                        href="/ca/workflow/"
+                        class="btn btn-primary"
+                    >
+                        Open Workflow
+                    </a>
+
+                </div>
+
+            </div>
+
+        </article>
+
+
+        <article class="card">
+
+            <div class="card-header">
+
+                <div>
+
+                    <div class="ca-section-kicker">
+                        WORKFLOW ROUTE
+                    </div>
+
+                    <h2>Chemical Analysis Lifecycle</h2>
+
+                    <p>
+                        Operational progression of the analysis workflow.
+                    </p>
+
+                </div>
+
+            </div>
+
+            <div class="card-body">
+
+                <div class="ca-workflow-route">
+
+                    <div class="ca-route-stage">
+                        <span>Receive</span>
+                    </div>
+
+                    <span class="ca-route-line"></span>
+
+                    <div class="ca-route-stage">
+                        <span>Analysis</span>
+                    </div>
+
+                    <span class="ca-route-line"></span>
+
+                    <div class="ca-route-stage ca-route-alert">
+                        <span>QA</span>
+                    </div>
+
+                    <span class="ca-route-line"></span>
+
+                    <div class="ca-route-stage">
+                        <span>Approval</span>
+                    </div>
+
+                </div>
+
+
+                <div class="page-actions">
+
+                    <a
+                        href="/ca/workflow/"
+                        class="btn btn-primary"
+                    >
+                        Enter Viewflow
+                    </a>
+
+                </div>
+
+            </div>
+
+        </article>
+
+    </section>
 
 </div>
+
+
+<script>
+(function () {
+    "use strict";
+
+    const root = document.getElementById("ca-overdue-analyses");
+
+    if (!root) {
+        return;
+    }
+
+    const searchInput = root.querySelector(
+        "[data-overdue-search]"
+    );
+
+    const statusFilter = root.querySelector(
+        "[data-overdue-filter]"
+    );
+
+    const rows = Array.from(
+        root.querySelectorAll("[data-overdue-row]")
+    );
+
+    const visibleCount = root.querySelector(
+        "[data-overdue-visible-count]"
+    );
+
+    const analystOutput = root.querySelector(
+        "[data-derived-analysts]"
+    );
+
+    const stageOutput = root.querySelector(
+        "[data-derived-stages]"
+    );
+
+
+    function normalize(value) {
+        return String(value || "")
+            .trim()
+            .toLowerCase();
+    }
+
+
+    function updateDerivedMetrics() {
+
+        const analysts = new Set();
+        const stages = new Set();
+
+        rows.forEach(function (row) {
+
+            const search = normalize(
+                row.dataset.search
+            );
+
+            const status = normalize(
+                row.dataset.status
+            );
+
+            if (search) {
+                const fragments = search
+                    .split(/\s+/)
+                    .filter(Boolean);
+
+                if (fragments.length) {
+                    analysts.add(
+                        fragments.slice(-1)[0]
+                    );
+                }
+            }
+
+            if (status) {
+                stages.add(status);
+            }
+
+        });
+
+
+        if (analystOutput) {
+            analystOutput.textContent =
+                analysts.size || "—";
+        }
+
+        if (stageOutput) {
+            stageOutput.textContent =
+                stages.size || "—";
+        }
+
+    }
+
+
+    function applyFilters() {
+
+        const query = normalize(
+            searchInput
+                ? searchInput.value
+                : ""
+        );
+
+        const selectedStatus =
+            statusFilter
+                ? normalize(statusFilter.value)
+                : "all";
+
+        let visible = 0;
+
+
+        rows.forEach(function (row) {
+
+            const searchText = normalize(
+                row.dataset.search
+            );
+
+            const status = normalize(
+                row.dataset.status
+            );
+
+
+            const matchesSearch =
+                !query ||
+                searchText.includes(query);
+
+
+            const matchesStatus =
+                selectedStatus === "all" ||
+                status === selectedStatus;
+
+
+            const shouldShow =
+                matchesSearch &&
+                matchesStatus;
+
+
+            row.hidden = !shouldShow;
+
+
+            if (shouldShow) {
+                visible += 1;
+            }
+
+        });
+
+
+        if (visibleCount) {
+            visibleCount.textContent = visible;
+        }
+
+    }
+
+
+    if (searchInput) {
+
+        searchInput.addEventListener(
+            "input",
+            applyFilters
+        );
+
+    }
+
+
+    if (statusFilter) {
+
+        statusFilter.addEventListener(
+            "change",
+            applyFilters
+        );
+
+    }
+
+
+    updateDerivedMetrics();
+    applyFilters();
+
+})();
+</script>
+
 {% endblock %}

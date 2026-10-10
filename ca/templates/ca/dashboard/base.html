@@ -1,62 +1,144 @@
-
 {% load static %}
 
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+
+<html
+    lang="en"
+    data-theme="light"
+    data-app="chemical-analysis"
+>
 <head>
     <meta charset="utf-8">
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+>
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1"
-    >
+<meta
+    name="application-name"
+    content="Chemical Analysis Management System"
+>
 
-    <meta
-        name="application-name"
-        content="Chemical Analysis Management System"
-    >
+<meta
+    name="theme-color"
+    content="#2563eb"
+>
 
-    <meta
-        name="theme-color"
-        content="#2563eb"
-    >
+<meta
+    name="description"
+    content="{% block meta_description %}Chemical Analysis Management System{% endblock %}"
+>
 
-    <meta
-        name="description"
-        content="{% block meta_description %}Chemical Analysis Management System{% endblock %}"
-    >
+<meta
+    name="robots"
+    content="noindex,nofollow"
+>
 
-    <title>{% block title %}Chemical Analysis Management System{% endblock %}</title>
+<meta
+    name="referrer"
+    content="same-origin"
+>
 
-    {% block meta %}{% endblock %}
-    {% block preload %}{% endblock %}
-    {% block fonts %}{% endblock %}
+<title>
+    {% block title %}
+        Chemical Analysis Management System
+    {% endblock %}
+</title>
 
-    <link rel="stylesheet" href="{% static 'ca/css/base/reset.css' %}">
-    <link rel="stylesheet" href="{% static 'ca/css/base/tokens.css' %}">
-    <link rel="stylesheet" href="{% static 'ca/css/base/base.css' %}">
+{% block meta %}{% endblock %}
+{% block preload %}{% endblock %}
+{% block fonts %}{% endblock %}
 
-    <link rel="stylesheet" href="{% static 'ca/css/layout/app.css' %}">
-    <link rel="stylesheet" href="{% static 'ca/css/layout/layout.css' %}">
-    <link rel="stylesheet" href="{% static 'ca/css/layout/sidebar.css' %}">
-    <link rel="stylesheet" href="{% static 'ca/css/layout/topbar.css' %}">
-    <link rel="stylesheet" href="{% static 'ca/css/layout/responsive.css' %}">
+<link
+    rel="stylesheet"
+    href="{% static 'ca/css/base/reset.css' %}"
+>
 
-    <link rel="stylesheet" href="{% static 'ca/css/components/components.css' %}">
-    <link rel="stylesheet" href="{% static 'ca/css/components/buttons.css' %}">
-    <link rel="stylesheet" href="{% static 'ca/css/components/cards.css' %}">
-    <link rel="stylesheet" href="{% static 'ca/css/components/forms.css' %}">
-    <link rel="stylesheet" href="{% static 'ca/css/components/tables.css' %}">
-    <link rel="stylesheet" href="{% static 'ca/css/components/badges.css' %}">
-    <link rel="stylesheet" href="{% static 'ca/css/components/alerts.css' %}">
+<link
+    rel="stylesheet"
+    href="{% static 'ca/css/base/tokens.css' %}"
+>
 
-    <link rel="stylesheet" href="{% static 'ca/css/navigation/navigation.css' %}">
-    <link rel="stylesheet" href="{% static 'ca/css/dialogs/dialogs.css' %}">
+<link
+    rel="stylesheet"
+    href="{% static 'ca/css/base/base.css' %}"
+>
 
-    {% block vendor_css %}{% endblock %}
-    {% block page_css %}{% endblock %}
-    {% block extra_css %}{% endblock %}
-    {% block head %}{% endblock %}
+<link
+    rel="stylesheet"
+    href="{% static 'ca/css/layout/app.css' %}"
+>
+
+<link
+    rel="stylesheet"
+    href="{% static 'ca/css/layout/layout.css' %}"
+>
+
+<link
+    rel="stylesheet"
+    href="{% static 'ca/css/layout/sidebar.css' %}"
+>
+
+<link
+    rel="stylesheet"
+    href="{% static 'ca/css/layout/topbar.css' %}"
+>
+
+<link
+    rel="stylesheet"
+    href="{% static 'ca/css/layout/responsive.css' %}"
+>
+
+<link
+    rel="stylesheet"
+    href="{% static 'ca/css/components/components.css' %}"
+>
+
+<link
+    rel="stylesheet"
+    href="{% static 'ca/css/components/buttons.css' %}"
+>
+
+<link
+    rel="stylesheet"
+    href="{% static 'ca/css/components/cards.css' %}"
+>
+
+<link
+    rel="stylesheet"
+    href="{% static 'ca/css/components/forms.css' %}"
+>
+
+<link
+    rel="stylesheet"
+    href="{% static 'ca/css/components/tables.css' %}"
+>
+
+<link
+    rel="stylesheet"
+    href="{% static 'ca/css/components/badges.css' %}"
+>
+
+<link
+    rel="stylesheet"
+    href="{% static 'ca/css/components/alerts.css' %}"
+>
+
+<link
+    rel="stylesheet"
+    href="{% static 'ca/css/navigation/navigation.css' %}"
+>
+
+<link
+    rel="stylesheet"
+    href="{% static 'ca/css/dialogs/dialogs.css' %}"
+>
+
+{% block vendor_css %}{% endblock %}
+{% block page_css %}{% endblock %}
+{% block extra_css %}{% endblock %}
+{% block head %}{% endblock %}
+
 </head>
 
 <body
@@ -65,84 +147,442 @@
     data-module="{% block app_module %}dashboard{% endblock %}"
     data-authenticated="{% if request.user.is_authenticated %}true{% else %}false{% endif %}"
     data-user-id="{% if request.user.is_authenticated %}{{ request.user.pk|default:'' }}{% endif %}"
-    data-username="{% if request.user.is_authenticated %}{{ request.user.username|default:'' }}{% endif %}"
+    data-username="{% if request.user.is_authenticated %}{{ request.user.get_username|escape }}{% endif %}"
 >
-    {% block app_shell %}{% endblock %}
 
-    {% include "ca/dashboard/navigation/command_palette.html" %}
-    {% include "ca/dashboard/navigation/search_overlay.html" %}
-    {% include "ca/dashboard/layout/notifications.html" %}
+{% block app_shell %}{% endblock %}
 
-    {% include "ca/dashboard/dialogs/modal.html" %}
-    {% include "ca/dashboard/dialogs/drawer.html" %}
-    {% include "ca/dashboard/dialogs/toast.html" %}
-    {% include "ca/dashboard/dialogs/loading.html" %}
+{% include "ca/dashboard/navigation/command_palette.html" %}
+{% include "ca/dashboard/navigation/search_overlay.html" %}
+{% include "ca/dashboard/layout/notifications.html" %}
 
-    <script>
-        (() => {
-            const shell = document.getElementById("app-shell");
+{% include "ca/dashboard/dialogs/modal.html" %}
+{% include "ca/dashboard/dialogs/drawer.html" %}
+{% include "ca/dashboard/dialogs/toast.html" %}
+{% include "ca/dashboard/dialogs/loading.html" %}
 
-            window.CA = window.CA || {};
+<div
+    id="ca-live-region"
+    class="sr-only"
+    aria-live="polite"
+    aria-atomic="true"
+></div>
 
-            const body = document.body;
-            const data = shell ? shell.dataset : {};
+<script>
+    (() => {
+        "use strict";
 
-            window.CA.config = {
-                app: body.dataset.app || "chemical-analysis",
-                module: body.dataset.module || "dashboard",
-                authenticated: body.dataset.authenticated === "true",
+        const html = document.documentElement;
+        const body = document.body;
+        const shell = document.getElementById("app-shell");
 
-                user: {
-                    id: body.dataset.userId || null,
-                    username: body.dataset.username || null
-                },
+        window.CA = window.CA || {};
 
-                urls: {
-                    dashboard: data.dashboardUrl || "",
-                    dashboardAlt: data.dashboardAltUrl || "",
+        const existing =
+            window.CA.config || {};
 
-                    batches: data.batchesUrl || "",
-                    requests: data.requestsUrl || "",
-                    processes: data.processesUrl || "",
-                    results: data.resultsUrl || "",
-                    certificates: data.certificatesUrl || "",
+        const shellData =
+            shell ? shell.dataset : {};
 
-                    tasks: data.tasksUrl || "",
-                    pendingAnalysis: data.pendingAnalysisUrl || "",
-                    pendingApproval: data.pendingApprovalUrl || "",
-                    overdue: data.overdueUrl || "",
+        const parseBoolean = (
+            value,
+            fallback = false
+        ) => {
+            if (
+                value === undefined ||
+                value === null ||
+                value === ""
+            ) {
+                return fallback;
+            }
 
-                    reports: data.reportsUrl || "",
-                    analytics: data.analyticsUrl || "",
+            if (
+                value === true ||
+                value === "true"
+            ) {
+                return true;
+            }
 
-                    workflow: data.workflowUrl || "",
+            if (
+                value === false ||
+                value === "false"
+            ) {
+                return false;
+            }
 
-                    search: data.searchUrl || "",
-                    notifications: data.notificationsUrl || ""
-                },
+            return fallback;
+        };
 
-                dashboard: {
-                    view: data.dashboardView || "dashboard",
-                    liveEnabled: data.liveEnabled !== "false",
-                    sidebarState: data.sidebarState || "collapsed"
-                },
+        const sidebarStates = [
+            "expanded",
+            "collapsed",
+            "mobile-open",
+            "mobile-closed"
+        ];
 
-                csrf: "{{ csrf_token|escapejs }}"
-            };
+        const storedSidebarState = (() => {
+            try {
+                return localStorage.getItem(
+                    "ca.sidebar.state"
+                );
+            } catch (error) {
+                return null;
+            }
         })();
-    </script>
 
-    <script
-        src="{% static 'ca/js/core/app.js' %}"
-        defer
-    ></script>
+        const requestedSidebarState =
+            shellData.sidebarState ||
+            storedSidebarState ||
+            existing.dashboard?.sidebarState ||
+            "expanded";
 
-    {% block vendor_js %}{% endblock %}
-    {% block layout_js %}{% endblock %}
-    {% block page_js %}{% endblock %}
-    {% block extra_js %}{% endblock %}
-    {% block scripts %}{% endblock %}
-    {% block body_scripts %}{% endblock %}
+        const sidebarState =
+            sidebarStates.includes(
+                requestedSidebarState
+            )
+                ? requestedSidebarState
+                : "expanded";
+
+        const authenticated =
+            body.dataset.authenticated === "true";
+
+        const user = {
+            ...(existing.user || {}),
+
+            id:
+                shellData.userId ||
+                body.dataset.userId ||
+                existing.user?.id ||
+                null,
+
+            username:
+                shellData.username ||
+                body.dataset.username ||
+                existing.user?.username ||
+                null,
+
+            fullName:
+                shellData.userFullName ||
+                existing.user?.fullName ||
+                null,
+
+            plant:
+                shellData.userPlant ||
+                existing.user?.plant ||
+                null,
+
+            lab:
+                shellData.userLab ||
+                existing.user?.lab ||
+                null,
+
+            superuser:
+                parseBoolean(
+                    shellData.isSuperuser,
+                    existing.user?.superuser === true
+                ),
+
+            staff:
+                parseBoolean(
+                    shellData.isStaff,
+                    existing.user?.staff === true
+                )
+        };
+
+        const urls = {
+            ...(existing.urls || {})
+        };
+
+        const permissions = {
+            ...(existing.permissions || {})
+        };
+
+        const context = {
+            ...(existing.context || {})
+        };
+
+        const dashboard = {
+            ...(existing.dashboard || {}),
+
+            view:
+                shellData.dashboardView ||
+                existing.dashboard?.view ||
+                "dashboard",
+
+            liveEnabled:
+                parseBoolean(
+                    shellData.liveEnabled,
+                    existing.dashboard?.liveEnabled !== false
+                ),
+
+            sidebarState
+        };
+
+        const features = {
+            ...(existing.features || {}),
+
+            commandPalette:
+                existing.features?.commandPalette !== false,
+
+            globalSearch:
+                existing.features?.globalSearch === true,
+
+            notifications:
+                existing.features?.notifications === true,
+
+            liveUpdates:
+                existing.features?.liveUpdates !== false,
+
+            responsiveSidebar:
+                existing.features?.responsiveSidebar !== false,
+
+            persistentSidebar:
+                existing.features?.persistentSidebar === false
+                    ? false
+                    : true,
+
+            hoverSidebar:
+                existing.features?.hoverSidebar === true,
+
+            workflowNavigation:
+                existing.features?.workflowNavigation === true
+        };
+
+        window.CA.config = {
+            ...existing,
+
+            app:
+                shellData.app ||
+                body.dataset.app ||
+                existing.app ||
+                "chemical-analysis",
+
+            module:
+                shellData.module ||
+                body.dataset.module ||
+                existing.module ||
+                "dashboard",
+
+            authenticated,
+
+            user,
+
+            urls,
+
+            permissions,
+
+            context,
+
+            dashboard,
+
+            features,
+
+            csrf:
+                existing.csrf ||
+                "{{ csrf_token|escapejs }}"
+        };
+
+        window.CA.shell = {
+            ...(window.CA.shell || {}),
+
+            element: shell,
+
+            sidebar:
+                document.getElementById(
+                    "ca-sidebar"
+                ),
+
+            backdrop:
+                document.getElementById(
+                    "ca-sidebar-backdrop"
+                ),
+
+            route:
+                shellData.currentRoute ||
+                context.currentRoute ||
+                "",
+
+            path:
+                shellData.currentPath ||
+                context.currentPath ||
+                "",
+
+            getUrl(name) {
+                return (
+                    window.CA.config?.urls?.[name] ||
+                    ""
+                );
+            },
+
+            hasPermission(name) {
+                return Boolean(
+                    window.CA.config
+                        ?.permissions
+                        ?.[name]
+                );
+            },
+
+            isAuthenticated() {
+                return Boolean(
+                    window.CA.config?.authenticated
+                );
+            },
+
+            isSuperuser() {
+                return Boolean(
+                    window.CA.config
+                        ?.user
+                        ?.superuser
+                );
+            },
+
+            isStaff() {
+                return Boolean(
+                    window.CA.config
+                        ?.user
+                        ?.staff
+                );
+            },
+
+            getPlant() {
+                return (
+                    window.CA.config
+                        ?.context
+                        ?.treatmentPlant ||
+                    null
+                );
+            },
+
+            getLab() {
+                return (
+                    window.CA.config
+                        ?.context
+                        ?.laboratory ||
+                    null
+                );
+            },
+
+            getSidebarState() {
+                return (
+                    window.CA.config
+                        ?.dashboard
+                        ?.sidebarState ||
+                    "expanded"
+                );
+            },
+
+            setSidebarState(state) {
+                if (
+                    !sidebarStates.includes(state)
+                ) {
+                    return;
+                }
+
+                window.CA.config.dashboard =
+                    window.CA.config.dashboard || {};
+
+                window.CA.config.dashboard
+                    .sidebarState = state;
+
+                html.dataset.caSidebarState =
+                    state;
+
+                body.dataset.sidebarState =
+                    state;
+
+                if (shell) {
+                    shell.dataset.sidebarState =
+                        state;
+                }
+
+                const sidebar =
+                    document.getElementById(
+                        "ca-sidebar"
+                    );
+
+                if (sidebar) {
+                    sidebar.dataset.state =
+                        state;
+                }
+
+                const toggle =
+                    document.getElementById(
+                        "sidebar-toggle"
+                    );
+
+                if (toggle) {
+                    toggle.setAttribute(
+                        "aria-expanded",
+                        (
+                            state === "expanded" ||
+                            state === "mobile-open"
+                        )
+                            ? "true"
+                            : "false"
+                    );
+                }
+
+                try {
+                    localStorage.setItem(
+                        "ca.sidebar.state",
+                        state
+                    );
+                } catch (error) {
+                }
+            }
+        };
+
+        html.dataset.caReady = "true";
+        html.dataset.caSidebarState =
+            sidebarState;
+
+        body.dataset.caReady = "true";
+        body.dataset.sidebarState =
+            sidebarState;
+
+        if (shell) {
+            shell.dataset.sidebarState =
+                sidebarState;
+        }
+
+        const sidebar =
+            document.getElementById(
+                "ca-sidebar"
+            );
+
+        if (sidebar) {
+            sidebar.dataset.state =
+                sidebarState;
+        }
+
+        window.CA.shell.setSidebarState(
+            sidebarState
+        );
+    })();
+</script>
+
+<script
+    src="{% static 'ca/js/core/app.js' %}"
+    defer
+></script>
+
+{% block vendor_js %}{% endblock %}
+{% block layout_js %}{% endblock %}
+{% block extra_js %}{% endblock %}
+{% block page_js %}{% endblock %}
+{% block scripts %}{% endblock %}
+{% block body_scripts %}{% endblock %}
+
+<noscript>
+    <div
+        class="ca-alert ca-alert--warning"
+        role="alert"
+    >
+        JavaScript is disabled. Some Chemical Analysis
+        workflow, live-update, search, navigation and
+        asynchronous features may not function correctly.
+    </div>
+</noscript>
+
 </body>
 </html>
-

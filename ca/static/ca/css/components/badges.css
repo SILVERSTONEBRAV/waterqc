@@ -1,0 +1,43 @@
+.ca-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    max-width: 100%;
+    padding: 4px 8px;
+    border: 1px solid transparent;
+    border-radius: var(--ca-radius-pill);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.ca-badge-primary {
+    background: var(--ca-primary-soft);
+    color: var(--ca-primary);
+}
+
+.ca-badge-success {
+    background: var(--ca-success-soft);
+    color: var(--ca-success);
+}
+
+.ca-badge-warning {
+    background: var(--ca-warning-soft);
+    color: var(--ca-warning);
+}
+
+.ca-badge-danger {
+    background: var(--ca-danger-soft);
+    color: var(--ca-danger);
+}
+
+.ca-badge-info {
+    background: var(--ca-info-soft);
+    color: var(--ca-info);
+}
+
+.ca-badge-neutral {
+    background: var(--ca-surface-muted);
+    color: var(--ca-text-muted);
+}

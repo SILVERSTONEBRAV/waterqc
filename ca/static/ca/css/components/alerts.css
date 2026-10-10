@@ -1,0 +1,37 @@
+.ca-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    min-width: 0;
+    padding: 12px 14px;
+    border: 1px solid var(--ca-border);
+    border-radius: var(--ca-radius-md);
+    background: var(--ca-surface);
+    color: var(--ca-text-soft);
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.ca-alert-success {
+    border-color: rgb(22 163 74 / .20);
+    background: var(--ca-success-soft);
+    color: var(--ca-success);
+}
+
+.ca-alert-warning {
+    border-color: rgb(217 119 6 / .20);
+    background: var(--ca-warning-soft);
+    color: var(--ca-warning);
+}
+
+.ca-alert-danger {
+    border-color: rgb(220 38 38 / .20);
+    background: var(--ca-danger-soft);
+    color: var(--ca-danger);
+}
+
+.ca-alert-info {
+    border-color: rgb(2 132 199 / .20);
+    background: var(--ca-info-soft);
+    color: var(--ca-info);
+}

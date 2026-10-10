@@ -1,0 +1,471 @@
+.ca-intelligence {
+    --grid: #dfe4ea;
+    --surface: #ffffff;
+    --surface-alt: #f6f8fa;
+    --text: #18202a;
+    --muted: #687382;
+    --border: #d8dee6;
+    --positive: #237a57;
+    --negative: #b53a3a;
+    --warning: #a66a00;
+    --info: #2868a6;
+    display: grid;
+    gap: 14px;
+    padding: 0;
+    color: var(--text);
+}
+
+.ai-toolbar {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+    padding: 14px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+}
+
+.ai-title {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.ai-subtitle {
+    margin: 3px 0 0;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.ai-actions,
+.ai-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+
+.ai-filters {
+    padding: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface-alt);
+}
+
+.ai-filter {
+    min-width: 115px;
+    height: 34px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    padding: 0 9px;
+    font-size: 12px;
+}
+
+.ai-filter-wide {
+    min-width: 180px;
+}
+
+.ai-btn {
+    height: 34px;
+    padding: 0 11px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.ai-btn:hover {
+    background: var(--surface-alt);
+}
+
+.ai-btn-primary {
+    background: var(--text);
+    border-color: var(--text);
+    color: #fff;
+}
+
+.ai-export-menu {
+    position: relative;
+}
+
+.ai-export-list {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
+    z-index: 100;
+    min-width: 150px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    box-shadow: 0 8px 24px rgba(0,0,0,.12);
+}
+
+.ai-export-menu:hover .ai-export-list {
+    display: block;
+}
+
+.ai-export-list a {
+    display: block;
+    padding: 9px 11px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 12px;
+}
+
+.ai-export-list a:hover {
+    background: var(--surface-alt);
+}
+
+.ai-status {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 11px;
+}
+
+.ai-status-item {
+    display: inline-flex;
+    gap: 5px;
+    align-items: center;
+}
+
+.ai-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--positive);
+}
+
+.ai-grid-kpi {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(130px, 1fr));
+    gap: 8px;
+}
+
+.ai-kpi {
+    min-height: 96px;
+    padding: 11px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+}
+
+.ai-kpi-label {
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.ai-kpi-value {
+    margin-top: 8px;
+    font-size: 25px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.ai-kpi-meta {
+    margin-top: 7px;
+    color: var(--muted);
+    font-size: 10px;
+}
+
+.ai-kpi-positive {
+    border-left: 3px solid var(--positive);
+}
+
+.ai-kpi-warning {
+    border-left: 3px solid var(--warning);
+}
+
+.ai-kpi-negative {
+    border-left: 3px solid var(--negative);
+}
+
+.ai-kpi-info {
+    border-left: 3px solid var(--info);
+}
+
+.ai-section {
+    border: 1px solid var(--border);
+    background: var(--surface);
+}
+
+.ai-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.ai-section-title {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.ai-section-note {
+    color: var(--muted);
+    font-size: 10px;
+}
+
+.ai-section-body {
+    padding: 10px;
+}
+
+.ai-chart-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.ai-chart {
+    min-width: 0;
+    min-height: 320px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+}
+
+.ai-chart-sm {
+    min-height: 270px;
+}
+
+.ai-span-3 { grid-column: span 3; }
+.ai-span-4 { grid-column: span 4; }
+.ai-span-5 { grid-column: span 5; }
+.ai-span-6 { grid-column: span 6; }
+.ai-span-7 { grid-column: span 7; }
+.ai-span-8 { grid-column: span 8; }
+.ai-span-9 { grid-column: span 9; }
+.ai-span-12 { grid-column: span 12; }
+
+.ai-table-wrap {
+    overflow: auto;
+    max-height: 460px;
+}
+
+.ai-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+}
+
+.ai-table th,
+.ai-table td {
+    padding: 7px 8px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    text-align: left;
+}
+
+.ai-table th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--surface-alt);
+    font-weight: 700;
+}
+
+.ai-table td.num,
+.ai-table th.num {
+    text-align: right;
+}
+
+.ai-table tr:hover td {
+    background: var(--surface-alt);
+}
+
+.ai-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border: 1px solid var(--border);
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.ai-badge-danger {
+    border-color: #e4baba;
+    color: var(--negative);
+}
+
+.ai-badge-warning {
+    border-color: #e7d09b;
+    color: var(--warning);
+}
+
+.ai-badge-success {
+    border-color: #afd4c3;
+    color: var(--positive);
+}
+
+.ai-badge-info {
+    border-color: #b8cfe6;
+    color: var(--info);
+}
+
+.ai-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(110px, 1fr));
+    gap: 7px;
+}
+
+.ai-stat {
+    padding: 9px;
+    border: 1px solid var(--border);
+    background: var(--surface-alt);
+}
+
+.ai-stat-label {
+    color: var(--muted);
+    font-size: 9px;
+    text-transform: uppercase;
+}
+
+.ai-stat-value {
+    margin-top: 4px;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.ai-drill {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.ai-drill-card {
+    min-height: 170px;
+    border: 1px solid var(--border);
+    padding: 10px;
+    background: var(--surface-alt);
+}
+
+.ai-drill-card h4 {
+    margin: 0 0 7px;
+    font-size: 11px;
+}
+
+.ai-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.ai-list li {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 10px;
+}
+
+.ai-list li:last-child {
+    border-bottom: 0;
+}
+
+.ai-risk-high {
+    color: var(--negative);
+    font-weight: 700;
+}
+
+.ai-risk-medium {
+    color: var(--warning);
+    font-weight: 700;
+}
+
+.ai-risk-low {
+    color: var(--positive);
+    font-weight: 700;
+}
+
+.ai-loading {
+    display: flex;
+    min-height: 220px;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.ai-empty {
+    padding: 35px;
+    color: var(--muted);
+    text-align: center;
+    font-size: 12px;
+}
+
+.ai-hidden {
+    display: none !important;
+}
+
+.ai-pagination {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+    justify-content: flex-end;
+    margin-top: 8px;
+}
+
+.ai-page-btn {
+    min-width: 28px;
+    height: 28px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    cursor: pointer;
+    font-size: 10px;
+}
+
+@media (max-width: 1200px) {
+    .ai-grid-kpi {
+        grid-template-columns: repeat(3, minmax(130px, 1fr));
+    }
+
+    .ai-span-3,
+    .ai-span-4,
+    .ai-span-5 {
+        grid-column: span 6;
+    }
+}
+
+@media (max-width: 760px) {
+    .ai-toolbar {
+        grid-template-columns: 1fr;
+    }
+
+    .ai-grid-kpi {
+        grid-template-columns: repeat(2, minmax(120px, 1fr));
+    }
+
+    .ai-chart-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .ai-span-3,
+    .ai-span-4,
+    .ai-span-5,
+    .ai-span-6,
+    .ai-span-7,
+    .ai-span-8,
+    .ai-span-9,
+    .ai-span-12 {
+        grid-column: span 1;
+    }
+
+    .ai-drill {
+        grid-template-columns: 1fr;
+    }
+
+    .ai-stat-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}

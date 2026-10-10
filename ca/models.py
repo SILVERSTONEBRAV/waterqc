@@ -1,27 +1,29 @@
 # ca/models.py
 from __future__ import annotations
+
 import ast
 import hashlib
 import json
 import math
-import uuid
 import secrets
+import uuid
 from datetime import timedelta
-from django_countries.fields import CountryField
-from viewflow.workflow.models import Process
+from decimal import Decimal
+
 from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import Max, Q
-from django.conf import settings
-from django.core.exceptions import ValidationError
-from django.db import models
-from django.db.models import Q
-from viewflow.workflow.models import Process
 from django.utils import timezone
+from django_countries.fields import CountryField
+from viewflow.workflow.models import Process
+
 from CompanyInfo.models import CompanyInfo
 from t.models import TreatmentPlant
-from .utils.coa_pdf import generate_qr_code, generate_coa_pdf
-from .events import batch_status_changed, request_status_changed, checklist_completed
+
+from .events import batch_status_changed, checklist_completed, request_status_changed
+from .utils.coa_pdf import generate_coa_pdf, generate_qr_code
 
 def today_date():
     return timezone.now().date()
@@ -97,21 +99,55 @@ class Chemical(models.Model):
     code = models.CharField(max_length=25, unique=True, help_text="Short code for the chemical, e.g. ALUM, CL, POLY")
     description = models.TextField(blank=True)
     grade = models.CharField(max_length=100, blank=True)
-    weight_tolerance = models.DecimalField(
-        max_digits=12,
-        decimal_places=3,
-        editable=False,
-    )
-
-    # Optional hydrometer correction formula (e.g. "(reading * 1.05 + 2)")
     hydrometer_formula = models.TextField(
         blank=True,
         help_text="Python formula using 'reading' as the input variable. Example: (reading * 1.05 + 2)"
     )
 
     def clean(self):
+        super().clean()
         if self.hydrometer_formula:
-            validate_formula_expression(self.hydrometer_formula, allow_math_attr=True)
+            formula = self.hydrometer_formula.strip()
+            validate_formula_expression(formula, allow_math_attr=True)
+            tree = ast.parse(formula, mode="eval")
+            unknown_names = sorted({
+                node.id
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Name)
+                and node.id not in {"reading", "math"}
+            })
+            if unknown_names:
+                raise ValidationError(
+                    "The hydrometer formula references undefined variable(s): "
+                    + ", ".join(unknown_names)
+                )
+
+    def calculate_hydrometer_value(self, reading):
+        if reading is None:
+            raise ValidationError("A hydrometer reading is required.")
+        try:
+            value = float(reading)
+        except (TypeError, ValueError) as exc:
+            raise ValidationError("Hydrometer reading must be numeric.") from exc
+        if not math.isfinite(value):
+            raise ValidationError("Hydrometer reading must be finite.")
+        if not self.hydrometer_formula:
+            return value
+        formula = self.hydrometer_formula.strip()
+        self.clean()
+        result = safe_eval_formula(formula, {"reading": value, "math": math})
+        if isinstance(result, bool):
+            raise ValidationError("The hydrometer formula must return a numeric value.")
+        try:
+            result = float(result)
+        except (TypeError, ValueError) as exc:
+            raise ValidationError("The hydrometer formula must return a numeric value.") from exc
+        if not math.isfinite(result):
+            raise ValidationError("The hydrometer formula produced a non-finite result.")
+        return result
+
+    def apply_hydrometer_formula(self, reading):
+        return self.calculate_hydrometer_value(reading)
 
     def __str__(self):
         return f"{self.code} - {self.name}"
@@ -272,6 +308,20 @@ class ChemicalBatch(models.Model):
         Status.RETURNED: [],
     }
 
+    def clean(self):
+        super().clean()
+        errors = {}
+        if self.quantity_received is None or self.quantity_received <= 0:
+            errors["quantity_received"] = "Quantity received must be greater than zero."
+        elif not math.isfinite(float(self.quantity_received)):
+            errors["quantity_received"] = "Quantity received must be finite."
+        if self.package_count is not None and self.package_count < 1:
+            errors["package_count"] = "Package count must be at least one."
+        if self.treatment_plant_id is None:
+            errors["treatment_plant"] = "A treatment plant is required."
+        if errors:
+            raise ValidationError(errors)
+
     # -------------------------
     # Auto-generate sample_id
     # -------------------------
@@ -316,8 +366,12 @@ class ChemicalBatch(models.Model):
             raise ValidationError(f"Invalid transition: {self.status} → {target_status}")
 
         if target_status == self.Status.APPROVED:
-            if hasattr(self, "test_results") and self.test_results.filter(status="NA").exists():
-                raise ValidationError("Cannot approve: pending test results exist.")
+            if hasattr(self, "test_results"):
+                results = self.test_results.all()
+                if results.filter(Q(status__isnull=True) | Q(status="")).exists():
+                    raise ValidationError("Cannot approve: pending test results exist.")
+                if results.filter(status=BatchTestResult.Status.FAIL).exists():
+                    raise ValidationError("Cannot approve: one or more test results failed.")
 
         old_status = self.status
         self.status = target_status
@@ -438,11 +492,36 @@ class ChemicalAnalysisRequest(models.Model):
         auto_now=True,
     )
 
+    ASSIGNMENT_TIMEOUT_MINUTES = 30
+
+    assignment_due_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=(
+            "Time after which the system may automatically assign "
+            "the scheduled chemical-analysis analysts if no manual "
+            "assignment has been made."
+        ),
+    )
+
+    auto_assigned_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+
+    manual_assigned_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+
     assigned_analysts = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         related_name="assigned_requests",
         blank=True,
-        editable=False,
+        editable=True,
     )
 
     request_transitions = {
@@ -563,6 +642,21 @@ class ChemicalAnalysisRequest(models.Model):
         return self.assigned_analysts.exists()
 
     @property
+    def assignment_pending(self):
+        return (
+            self.status == self.Status.PENDING
+            and not self.has_assigned_analysts
+        )
+
+    @property
+    def assignment_overdue(self):
+        return (
+            self.assignment_pending
+            and self.assignment_due_at is not None
+            and timezone.now() >= self.assignment_due_at
+        )
+
+    @property
     def latest_checklist(self):
         return (
             self.checklists
@@ -576,6 +670,11 @@ class ChemicalAnalysisRequest(models.Model):
         )
 
     def get_current_assigned_analysts(self):
+        """Return analysts currently scheduled for this task.
+
+        This method only discovers the roster. It never changes the
+        request's manual assignments.
+        """
         if not self.batch_id:
             return get_user_model().objects.none()
 
@@ -586,16 +685,10 @@ class ChemicalAnalysisRequest(models.Model):
         current_time = now.time()
 
         plant_id = self.batch.treatment_plant_id
-
         if not plant_id:
             return get_user_model().objects.none()
 
-        section_id = getattr(
-            self.batch,
-            "section_id",
-            None,
-        )
-
+        section_id = getattr(self.batch, "section_id", None)
         if not section_id:
             return get_user_model().objects.none()
 
@@ -609,10 +702,7 @@ class ChemicalAnalysisRequest(models.Model):
                 week__start_date__lte=current_date,
                 week__end_date__gte=current_date,
             )
-            .order_by(
-                "-week__start_date",
-                "-created_at",
-            )
+            .order_by("-week__start_date", "-created_at")
             .first()
         )
 
@@ -631,10 +721,7 @@ class ChemicalAnalysisRequest(models.Model):
                 shift__start_time__lte=current_time,
                 shift__end_time__gt=current_time,
             )
-            .values_list(
-                "user_id",
-                flat=True,
-            )
+            .values_list("user_id", flat=True)
             .distinct()
         )
 
@@ -646,30 +733,152 @@ class ChemicalAnalysisRequest(models.Model):
                 assigned_treatment_plant_id=plant_id,
                 section_id=section_id,
             )
-            .order_by(
-                "last_name",
-                "first_name",
-                "username",
-            )
+            .order_by("last_name", "first_name", "username")
         )
+
+    def assign_analysts(self, users, *, assigned_by=None, manual=True):
+        """Assign analysts explicitly without allowing later auto-assignment
+        to overwrite the selection.
+        """
+        users = list(users or [])
+
+        if not users:
+            raise ValidationError(
+                "At least one active analyst must be assigned."
+            )
+
+        user_ids = []
+        User = get_user_model()
+
+        for user in users:
+            user_id = getattr(user, "pk", user)
+            if not user_id:
+                raise ValidationError("Every analyst must be a valid user.")
+
+            user_obj = (
+                user
+                if getattr(user, "pk", None)
+                else User.objects.filter(pk=user_id).first()
+            )
+
+            if user_obj is None:
+                raise ValidationError(
+                    f"Analyst {user_id} could not be found."
+                )
+
+            if not user_obj.is_active:
+                raise ValidationError(
+                    f"{user_obj.get_username()} is inactive and cannot be assigned."
+                )
+
+            if (
+                self.batch_id
+                and self.batch.treatment_plant_id
+                and getattr(user_obj, "assigned_treatment_plant_id", None)
+                != self.batch.treatment_plant_id
+            ):
+                raise ValidationError(
+                    f"{user_obj.get_username()} is not assigned to the "
+                    "treatment plant for this chemical batch."
+                )
+
+            user_ids.append(user_obj.pk)
+
+        now = timezone.now()
+        self.assigned_analysts.set(sorted(set(user_ids)))
+
+        if manual:
+            self.manual_assigned_at = now
+            self.auto_assigned_at = None
+            type(self).objects.filter(pk=self.pk).update(
+                manual_assigned_at=now,
+                auto_assigned_at=None,
+                updated_at=now,
+            )
+
+        return self.assigned_analysts.all()
+
+    def clear_analyst_assignments(self, *, allow_reassignment=False):
+        if self.status != self.Status.PENDING and not allow_reassignment:
+            raise ValidationError(
+                "Analysts can only be cleared while the request is pending."
+            )
+
+        self.assigned_analysts.clear()
+
+        now = timezone.now()
+        type(self).objects.filter(pk=self.pk).update(
+            manual_assigned_at=None,
+            auto_assigned_at=None,
+            updated_at=now,
+        )
+
+        self.manual_assigned_at = None
+        self.auto_assigned_at = None
+        return self
+
+    def auto_assign_analysts_if_due(self, *, now=None):
+        """Automatically assign the scheduled analysts after 30 minutes.
+
+        Manual assignments always take precedence. The method is idempotent
+        and safe to call repeatedly from a periodic Celery task.
+        """
+        if not self.pk:
+            return get_user_model().objects.none()
+
+        now = now or timezone.now()
+
+        with transaction.atomic():
+            request = (
+                type(self).objects
+                .select_for_update()
+                .get(pk=self.pk)
+            )
+
+            if request.status != type(self).Status.PENDING:
+                return request.assigned_analysts.all()
+
+            if request.assigned_analysts.exists():
+                return request.assigned_analysts.all()
+
+            if (
+                request.assignment_due_at is None
+                or now < request.assignment_due_at
+            ):
+                return request.assigned_analysts.all()
+
+            analysts = request.get_current_assigned_analysts()
+
+            if not analysts.exists():
+                return request.assigned_analysts.all()
+
+            request.assigned_analysts.set(
+                analysts.values_list("pk", flat=True)
+            )
+
+            request.auto_assigned_at = now
+            request.save(
+                update_fields=[
+                    "auto_assigned_at",
+                    "updated_at",
+                ]
+            )
+
+            return request.assigned_analysts.all()
 
     def populate_assigned_analysts(self):
-        if not self.pk:
-            return
+        """Backward-compatible entry point.
 
-        analysts = self.get_current_assigned_analysts()
-
-        self.assigned_analysts.set(
-            analysts.values_list("pk", flat=True)
-        )
+        It intentionally performs no immediate assignment. Automatic
+        assignment is only permitted once the 30-minute deadline expires.
+        """
+        return self.auto_assign_analysts_if_due()
 
     def is_assigned_analyst(self, user):
         if user is None or not getattr(user, "is_active", False):
             return False
 
-        return self.assigned_analysts.filter(
-            pk=user.pk,
-        ).exists()
+        return self.assigned_analysts.filter(pk=user.pk).exists()
 
     def clean(self):
         super().clean()
@@ -714,15 +923,13 @@ class ChemicalAnalysisRequest(models.Model):
                     "The staff member receiving the analysis request "
                     "must be active."
                 )
-            elif self.pk:
-                if not self.assigned_analysts.filter(
-                    pk=self.received_by_id
-                ).exists():
-                    errors["received_by"] = (
-                        "The staff member receiving the chemical "
-                        "analysis request must be one of the analysts "
-                        "assigned to perform chemical analysis."
-                    )
+            elif self.pk and not self.assigned_analysts.filter(
+                pk=self.received_by_id
+            ).exists():
+                errors["received_by"] = (
+                    "The staff member receiving the chemical analysis "
+                    "request must be one of the assigned analysts."
+                )
 
         if (
             self.status in (
@@ -764,6 +971,16 @@ class ChemicalAnalysisRequest(models.Model):
                 )
 
         if (
+            self.assignment_due_at
+            and self.created_at
+            and self.assignment_due_at < self.created_at
+        ):
+            errors["assignment_due_at"] = (
+                "The analyst-assignment deadline cannot be earlier "
+                "than the request creation time."
+            )
+
+        if (
             self.analysis_started_at
             and self.analysis_deadline
             and self.analysis_deadline < self.analysis_started_at
@@ -792,25 +1009,27 @@ class ChemicalAnalysisRequest(models.Model):
                 self.delivery_date
                 or timezone.now().date()
             )
-
             self.request_id = (
                 f"REQ-"
                 f"{delivery_date.strftime('%Y%m%d')}-"
                 f"{uuid.uuid4().hex[:8].upper()}"
             )
 
+        if self.assignment_due_at is None:
+            self.assignment_due_at = (
+                timezone.now()
+                + timedelta(minutes=self.ASSIGNMENT_TIMEOUT_MINUTES)
+            )
+
         super().save(*args, **kwargs)
 
-        self.populate_assigned_analysts()
-
-        if self.received_by_id:
+        if self.received_by_id and self.pk:
             if not self.assigned_analysts.filter(
                 pk=self.received_by_id
             ).exists():
                 raise ValidationError(
                     "The staff member receiving the chemical analysis "
-                    "request must be one of the currently assigned "
-                    "chemical analysts."
+                    "request must be one of the assigned analysts."
                 )
 
     def can_transition_to(self, target_status):
@@ -830,8 +1049,6 @@ class ChemicalAnalysisRequest(models.Model):
             raise ValidationError(
                 "Cannot start analysis without an analysis location."
             )
-
-        self.populate_assigned_analysts()
 
         if not self.assigned_analysts.exists():
             raise ValidationError(
@@ -865,8 +1082,6 @@ class ChemicalAnalysisRequest(models.Model):
                 "Cannot complete an analysis request that "
                 "has not been started."
             )
-
-        self.populate_assigned_analysts()
 
         if not self.assigned_analysts.exists():
             raise ValidationError(
@@ -950,8 +1165,6 @@ class ChemicalAnalysisRequest(models.Model):
                 )
                 .get(pk=self.pk)
             )
-
-            request.populate_assigned_analysts()
 
             old_status = request.status
 
@@ -1312,625 +1525,681 @@ class ChemicalAnalysisRequest(models.Model):
             f"{chemical_name} ({sample_id})"
         )
 
+class ChecklistForWaterTreatmentChemicalAnalysis(models.Model):
+    class Grade(models.TextChoices):
+        STANDARD = "STANDARD", "Standard"
+        PREMIUM = "PREMIUM", "Premium"
+        NA = "NA", "Not Applicable"
 
-from decimal import Decimal
+    chemical_analysis_request = models.ForeignKey(
+        "ChemicalAnalysisRequest",
+        on_delete=models.CASCADE,
+        related_name="checklists",
+        db_index=True,
+    )
 
-from django.conf import settings
-from django.core.exceptions import ValidationError
-from django.db import models, transaction
-from django.utils import timezone
-
-
-class SystematicRandomSampling(models.Model):
-    STATUS_CHOICES = [
-        ("PENDING", "Pending"),
-        ("SAMPLED", "Sampled"),
-        ("COUNTER_CHECK", "Counter-Check"),
-        ("QA_REVIEW", "QA Review"),
-        ("COMPLETED", "Completed"),
-    ]
-
-    batch = models.OneToOneField(
-        "ca.ChemicalBatch",
+    chemical = models.ForeignKey(
+        "Chemical",
         on_delete=models.PROTECT,
-        related_name="systematic_random_sampling",
+        related_name="chemical_analysis_checklists",
     )
 
-    analysis_process = models.OneToOneField(
-        "ca.ChemicalAnalysisProcess",
-        on_delete=models.PROTECT,
-        related_name="systematic_random_sampling",
+    manufacturer_name_indicated = models.BooleanField(
+        default=False,
     )
 
-    sample_count = models.PositiveIntegerField(
-        editable=False,
+    chemical_name_on_label = models.BooleanField(
+        default=False,
     )
 
-    sampling_interval = models.PositiveIntegerField(
-        editable=False,
+    min_mass_indicated = models.BooleanField(
+        default=False,
     )
 
-    random_start = models.PositiveIntegerField(
-        editable=False,
+    grade = models.CharField(
+        max_length=20,
+        choices=Grade.choices,
+        default=Grade.NA,
     )
 
-    measured_average_weight = models.DecimalField(
+    manufacture_date = models.DateField()
+
+    expiry_date = models.DateField()
+
+    storage_conditions = models.CharField(
+        max_length=255,
+    )
+
+    net_weight = models.DecimalField(
         max_digits=12,
         decimal_places=3,
-        editable=False,
-        null=True,
+    )
+
+    country_of_origin = CountryField(
+        default="KE",
+    )
+
+    handling_instructions = models.TextField(
         blank=True,
     )
 
-    average_weight_difference = models.DecimalField(
-        max_digits=12,
-        decimal_places=3,
-        editable=False,
-        null=True,
-        blank=True,
-    )
-
-    sampling_passed = models.BooleanField(
-        null=True,
-        blank=True,
-        editable=False,
-    )
-
-    qa_required = models.BooleanField(
+    is_oxidizing = models.BooleanField(
         default=False,
-        editable=False,
     )
 
-    qa_approved = models.BooleanField(
+    is_corrosive = models.BooleanField(
         default=False,
-        editable=False,
     )
 
-    qa_approved_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,
-        related_name="sampling_qa_approvals",
-        null=True,
-        blank=True,
-        editable=False,
+    may_cause_fire = models.BooleanField(
+        default=False,
     )
 
-    qa_approved_at = models.DateTimeField(
-        null=True,
-        blank=True,
-        editable=False,
+    contact_with_acids_liberates_toxic_gas = models.BooleanField(
+        default=False,
+    )
+
+    causes_burns = models.BooleanField(
+        default=False,
+    )
+
+    keep_out_of_reach_of_children = models.BooleanField(
+        default=False,
+    )
+
+    contact_with_eyes_action = models.BooleanField(
+        default=False,
+    )
+
+    fire_action_requires_respiratory_equipment = models.BooleanField(
+        default=False,
     )
 
     sampled_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,
-        related_name="systematic_sampling_performed",
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        editable=False,
+        related_name="chemical_checklists_sampled",
     )
 
-    sampled_at = models.DateTimeField(
-        null=True,
-        blank=True,
-        editable=False,
-    )
-
-    counter_checked_by = models.ForeignKey(
+    requested_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,
-        related_name="systematic_sampling_counter_checked",
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        editable=False,
-    )
-
-    counter_checked_at = models.DateTimeField(
-        null=True,
-        blank=True,
-        editable=False,
-    )
-
-    status = models.CharField(
-        max_length=20,
-        choices=STATUS_CHOICES,
-        default="PENDING",
-        editable=False,
-    )
-
-    verification_notes = models.TextField(
-        blank=True,
+        related_name="chemical_checklists_requested",
     )
 
     created_at = models.DateTimeField(
         auto_now_add=True,
-        editable=False,
     )
 
     updated_at = models.DateTimeField(
         auto_now=True,
-        editable=False,
+    )
+
+    completed = models.BooleanField(
+        default=False,
+        db_index=True,
+    )
+
+    completed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    completed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="completed_chemical_checklists",
     )
 
     class Meta:
         ordering = ["-created_at"]
-        permissions = [
-            (
-                "perform_systematic_random_sampling",
-                "Can perform systematic random sampling",
-            ),
-            (
-                "counter_check_systematic_sampling",
-                "Can counter-check systematic random sampling",
-            ),
-            (
-                "approve_sampling_weight_deviation",
-                "Can approve sampling weight deviation",
-            ),
-        ]
-
-    def __str__(self):
-        return f"{self.batch} — {self.sample_count} samples"
-
-    @property
-    def package_count(self):
-        return self.batch.package_count
-
-    @property
-    def sampling_percentage(self):
-        return Decimal("10")
-
-    @property
-    def weight_tolerance(self):
-        return self.batch.chemical.weight_tolerance
-
-    @property
-    def declared_net_weight(self):
-        checklist = self.get_completed_checklist()
-
-        if not checklist or checklist.net_weight is None:
-            return None
-
-        return Decimal(str(checklist.net_weight))
-
-    @property
-    def minimum_acceptable_weight(self):
-        declared_weight = self.declared_net_weight
-
-        if declared_weight is None:
-            return None
-
-        return declared_weight - self.weight_tolerance
-
-    @property
-    def analysis_allowed(self):
-        return self.status == "COMPLETED"
-
-    def get_completed_checklist(self):
-        request = getattr(
-            self.analysis_process,
-            "request",
-            None,
-        )
-
-        if request is None:
-            request = getattr(
-                self.analysis_process,
-                "chemical_analysis_request",
-                None,
-            )
-
-        if request is None:
-            return None
-
-        return (
-            request.checklists
-            .filter(completed=True)
-            .order_by("-completed_at", "-pk")
-            .first()
-        )
-
-    def calculate_results(self):
-        samples = list(
-            self.samples.filter(
-                measured_weight__isnull=False,
-            )
-        )
-
-        if not samples:
-            self.measured_average_weight = None
-            self.average_weight_difference = None
-            self.sampling_passed = None
-            self.qa_required = False
-            return
-
-        total_weight = sum(
-            (
-                sample.measured_weight
-                for sample in samples
-            ),
-            Decimal("0"),
-        )
-
-        average_weight = (
-            total_weight / Decimal(len(samples))
-        )
-
-        declared_weight = self.declared_net_weight
-
-        if declared_weight is None:
-            self.measured_average_weight = average_weight
-            self.average_weight_difference = None
-            self.sampling_passed = None
-            self.qa_required = False
-            return
-
-        average_difference = (
-            average_weight - declared_weight
-        )
-
-        tolerance = self.weight_tolerance
-
-        self.measured_average_weight = average_weight
-        self.average_weight_difference = average_difference
-
-        if average_weight >= declared_weight:
-            self.sampling_passed = True
-            self.qa_required = False
-            return
-
-        deficiency = (
-            declared_weight - average_weight
-        )
-
-        if deficiency <= tolerance:
-            self.sampling_passed = True
-            self.qa_required = False
-        else:
-            self.sampling_passed = False
-            self.qa_required = True
-
-    def generate_sampling_plan(self):
-        import math
-        import random
-
-        population = self.batch.package_count
-
-        if not population:
-            raise ValidationError(
-                "The chemical batch must have a package count before sampling."
-            )
-
-        sample_count = max(
-            1,
-            math.ceil(population * 0.10),
-        )
-
-        sampling_interval = max(
-            1,
-            population // sample_count,
-        )
-
-        random_start = random.randint(
-            1,
-            sampling_interval,
-        )
-
-        package_numbers = [
-            random_start + (
-                index * sampling_interval
-            )
-            for index in range(sample_count)
-        ]
-
-        if package_numbers[-1] > population:
-            raise ValidationError(
-                "The generated systematic sampling plan exceeds "
-                "the available package population."
-            )
-
-        self.sample_count = sample_count
-        self.sampling_interval = sampling_interval
-        self.random_start = random_start
-
-        return package_numbers
-
-    @transaction.atomic
-    def create_samples(self):
-        checklist = self.get_completed_checklist()
-
-        if checklist is None:
-            raise ValidationError(
-                "A completed receiving checklist is required before "
-                "systematic random sampling can be generated."
-            )
-
-        if checklist.net_weight is None:
-            raise ValidationError(
-                "The receiving checklist must contain a declared net weight."
-            )
-
-        package_numbers = self.generate_sampling_plan()
-
-        self.samples.all().delete()
-
-        declared_net_weight = Decimal(
-            str(checklist.net_weight)
-        )
-
-        SystematicRandomSample.objects.bulk_create(
-            [
-                SystematicRandomSample(
-                    sampling=self,
-                    package_number=package_number,
-                    declared_net_weight=declared_net_weight,
-                )
-                for package_number in package_numbers
-            ]
-        )
-
-        self.status = "PENDING"
-
-        self.save(
-            update_fields=[
-                "sample_count",
-                "sampling_interval",
-                "random_start",
-                "status",
-                "updated_at",
-            ]
-        )
-
-        return self.samples.all()
-
-    def mark_sampled(self, user):
-        if self.status != "PENDING":
-            raise ValidationError(
-                "This sampling record is not awaiting sampling."
-            )
-
-        if not self.samples.exists():
-            raise ValidationError(
-                "Sampling packages have not been generated."
-            )
-
-        if self.samples.filter(
-            measured_weight__isnull=True
-        ).exists():
-            raise ValidationError(
-                "All selected packages must have measured weights "
-                "before sampling can be completed."
-            )
-
-        self.calculate_results()
-
-        if self.sampling_passed is None:
-            raise ValidationError(
-                "Sampling results could not be evaluated."
-            )
-
-        self.sampled_by = user
-        self.sampled_at = timezone.now()
-
-        self.status = (
-            "COUNTER_CHECK"
-            if self.sampling_passed
-            else "QA_REVIEW"
-        )
-
-        self.save(
-            update_fields=[
-                "measured_average_weight",
-                "average_weight_difference",
-                "sampling_passed",
-                "qa_required",
-                "sampled_by",
-                "sampled_at",
-                "status",
-                "updated_at",
-            ]
-        )
-
-    def counter_check(self, user, notes=""):
-        if self.status != "COUNTER_CHECK":
-            raise ValidationError(
-                "This sampling record is not awaiting counter-check."
-            )
-
-        self.counter_checked_by = user
-        self.counter_checked_at = timezone.now()
-
-        if notes:
-            self.verification_notes = notes
-
-        self.status = "COMPLETED"
-
-        self.save(
-            update_fields=[
-                "counter_checked_by",
-                "counter_checked_at",
-                "verification_notes",
-                "status",
-                "updated_at",
-            ]
-        )
-
-    def approve_weight_deviation(self, user, notes=""):
-        if self.status != "QA_REVIEW":
-            raise ValidationError(
-                "This sampling record is not awaiting QA review."
-            )
-
-        if not self.qa_required:
-            raise ValidationError(
-                "QA approval is not required because the average "
-                "sample weight is within the allowable tolerance."
-            )
-
-        self.qa_approved = True
-        self.qa_approved_by = user
-        self.qa_approved_at = timezone.now()
-
-        if notes:
-            self.verification_notes = notes
-
-        self.status = "COMPLETED"
-
-        self.save(
-            update_fields=[
-                "qa_approved",
-                "qa_approved_by",
-                "qa_approved_at",
-                "verification_notes",
-                "status",
-                "updated_at",
-            ]
-        )
-
-    def clean(self):
-        super().clean()
-
-        if self.batch_id and self.analysis_process_id:
-            if self.analysis_process.batch_id != self.batch_id:
-                raise ValidationError(
-                    {
-                        "analysis_process": (
-                            "The analysis process must belong to the same "
-                            "chemical batch."
-                        )
-                    }
-                )
-
-        if self.sample_count and self.package_count:
-            if self.sample_count > self.package_count:
-                raise ValidationError(
-                    {
-                        "sample_count": (
-                            "Sample count cannot exceed the package count."
-                        )
-                    }
-                )
-
-        if self.qa_approved and not self.qa_approved_by:
-            raise ValidationError(
-                {
-                    "qa_approved_by": (
-                        "A QA approver is required when sampling "
-                        "weight deviation is approved."
-                    )
-                }
-            )
-
-    def save(self, *args, **kwargs):
-        if self.pk:
-            self.calculate_results()
-
-        self.full_clean()
-
-        super().save(*args, **kwargs)
-
-
-class SystematicRandomSample(models.Model):
-    sampling = models.ForeignKey(
-        SystematicRandomSampling,
-        on_delete=models.PROTECT,
-        related_name="samples",
-    )
-
-    package_number = models.PositiveIntegerField(
-        editable=False,
-    )
-
-    declared_net_weight = models.DecimalField(
-        max_digits=12,
-        decimal_places=3,
-        editable=False,
-    )
-
-    measured_weight = models.DecimalField(
-        max_digits=12,
-        decimal_places=3,
-        null=True,
-        blank=True,
-    )
-
-    weight_difference = models.DecimalField(
-        max_digits=12,
-        decimal_places=3,
-        null=True,
-        blank=True,
-        editable=False,
-    )
-
-    class Meta:
-        ordering = ["package_number"]
-        constraints = [
-            models.UniqueConstraint(
+        indexes = [
+            models.Index(
                 fields=[
-                    "sampling",
-                    "package_number",
+                    "chemical_analysis_request",
+                    "-created_at",
                 ],
-                name="unique_sampling_package",
+                name="ca_check_req_created_idx",
+            ),
+            models.Index(
+                fields=[
+                    "completed",
+                    "-created_at",
+                ],
+                name="ca_check_completed_idx",
+            ),
+            models.Index(
+                fields=[
+                    "chemical",
+                    "-created_at",
+                ],
+                name="ca_check_chemical_created_idx",
+            ),
+            models.Index(
+                fields=[
+                    "expiry_date",
+                    "completed",
+                ],
+                name="ca_check_expiry_completed_idx",
             ),
         ]
 
-    def __str__(self):
+    @property
+    def batch(self):
+        request = self.chemical_analysis_request
+
+        if request is None or not request.batch_id:
+            return None
+
+        return request.batch
+
+    @property
+    def sample_id(self):
+        batch = self.batch
+        return batch.sample_id if batch else None
+
+    @property
+    def batch_number(self):
+        batch = self.batch
+        return batch.batch_number if batch else None
+
+    @property
+    def treatment_plant(self):
+        batch = self.batch
+        return batch.treatment_plant if batch else None
+
+    @property
+    def analysis_status(self):
+        request = self.chemical_analysis_request
+        return request.status if request else None
+
+    @property
+    def is_expired(self) -> bool:
+        if not self.expiry_date:
+            return False
+
+        return self.expiry_date < timezone.localdate()
+
+    @property
+    def is_valid_at_receipt(self):
+        if not self.manufacture_date or not self.expiry_date:
+            return False
+
         return (
-            f"{self.sampling.batch} — "
-            f"Package {self.package_number}"
+            self.manufacture_date <= self.expiry_date
+            and self.expiry_date >= timezone.localdate()
         )
+
+    @property
+    def is_completed(self):
+        return self.completed
+
+    @property
+    def completion_status(self):
+        return "COMPLETED" if self.completed else "PENDING"
+
+    @property
+    def days_until_expiry(self):
+        if not self.expiry_date:
+            return None
+
+        return (
+            self.expiry_date - timezone.localdate()
+        ).days
+
+    @property
+    def expiry_status(self):
+        if not self.expiry_date:
+            return "UNKNOWN"
+
+        if self.expiry_date < timezone.localdate():
+            return "EXPIRED"
+
+        if self.expiry_date == timezone.localdate():
+            return "EXPIRES_TODAY"
+
+        days = self.days_until_expiry
+
+        if days is not None and days <= 30:
+            return "EXPIRING_SOON"
+
+        return "VALID"
+
+    def _get_request(self):
+        if not self.chemical_analysis_request_id:
+            return None
+
+        try:
+            return (
+                ChemicalAnalysisRequest.objects
+                .select_related(
+                    "batch",
+                    "batch__chemical",
+                    "batch__treatment_plant",
+                    "location",
+                    "location__treatment_plant",
+                )
+                .get(
+                    pk=self.chemical_analysis_request_id
+                )
+            )
+        except ChemicalAnalysisRequest.DoesNotExist:
+            return None
+
+    def _get_batch(self, request=None):
+        request = request or self._get_request()
+
+        if request is None or not request.batch_id:
+            return None
+
+        return request.batch
 
     def clean(self):
         super().clean()
 
-        if self.sampling_id and self.package_number:
-            if self.package_number > self.sampling.package_count:
-                raise ValidationError(
-                    {
-                        "package_number": (
-                            "Package number cannot exceed the batch "
-                            "package count."
-                        )
-                    }
+        errors = {}
+
+        request = self._get_request()
+        batch = self._get_batch(request)
+
+        if not self.chemical_analysis_request_id:
+            errors["chemical_analysis_request"] = (
+                "An analysis request is required."
+            )
+        elif request is None:
+            errors["chemical_analysis_request"] = (
+                "The selected analysis request could not be found."
+            )
+
+        if request is not None and not request.batch_id:
+            errors["chemical_analysis_request"] = (
+                "The analysis request must have an associated "
+                "chemical batch."
+            )
+
+        if request is not None and batch is None:
+            errors["chemical_analysis_request"] = (
+                "The associated chemical batch could not be found."
+            )
+
+        if not self.chemical_id:
+            errors["chemical"] = "A chemical is required."
+
+        if batch is not None:
+            if (
+                self.chemical_id
+                and batch.chemical_id
+                and self.chemical_id != batch.chemical_id
+            ):
+                errors["chemical"] = (
+                    "The checklist chemical must match the "
+                    "chemical associated with the batch."
                 )
 
-        if self.measured_weight is not None:
-            if self.measured_weight < 0:
-                raise ValidationError(
-                    {
-                        "measured_weight": (
-                            "Measured weight cannot be negative."
-                        )
-                    }
+            if (
+                request is not None
+                and request.location_id
+                and batch.treatment_plant_id
+                and request.location
+                and request.location.treatment_plant_id
+                and (
+                    request.location.treatment_plant_id
+                    != batch.treatment_plant_id
+                )
+            ):
+                errors["chemical_analysis_request"] = (
+                    "The checklist request location must belong "
+                    "to the same treatment plant as the batch."
                 )
 
-    def save(self, *args, **kwargs):
-        if self.measured_weight is not None:
-            self.weight_difference = (
-                self.measured_weight
-                - self.declared_net_weight
+        if (
+            self.manufacture_date
+            and self.expiry_date
+            and self.expiry_date < self.manufacture_date
+        ):
+            errors["expiry_date"] = (
+                "The expiry date cannot be earlier than "
+                "the manufacture date."
+            )
+
+        if (
+            self.net_weight is None
+            or self.net_weight <= Decimal("0")
+        ):
+            errors["net_weight"] = (
+                "Net weight must be greater than zero."
+            )
+
+        if (
+            not isinstance(self.storage_conditions, str)
+            or not self.storage_conditions.strip()
+        ):
+            errors["storage_conditions"] = (
+                "Storage conditions are required."
+            )
+
+        if self.completed:
+            if not self.completed_at:
+                errors["completed_at"] = (
+                    "A completion time is required for "
+                    "a completed checklist."
+                )
+
+            if not self.completed_by_id:
+                errors["completed_by"] = (
+                    "A completing user is required for "
+                    "a completed checklist."
+                )
+        else:
+            if self.completed_at:
+                errors["completed_at"] = (
+                    "An incomplete checklist cannot have "
+                    "a completion time."
+                )
+
+            if self.completed_by_id:
+                errors["completed_by"] = (
+                    "An incomplete checklist cannot have "
+                    "a completing user."
+                )
+
+        if errors:
+            raise ValidationError(errors)
+
+    def validate_completion_requirements(
+        self,
+        request=None,
+        batch=None,
+    ):
+        errors = {}
+
+        request = request or self._get_request()
+
+        if request is None:
+            errors["chemical_analysis_request"] = (
+                "The associated analysis request could not be found."
             )
         else:
-            self.weight_difference = None
+            if not request.batch_id:
+                errors["chemical_analysis_request"] = (
+                    "The analysis request must have an associated "
+                    "chemical batch."
+                )
+
+            if (
+                request.status
+                == ChemicalAnalysisRequest.Status.COMPLETED
+            ):
+                errors["chemical_analysis_request"] = (
+                    "A checklist cannot be completed after the "
+                    "analysis request has already been completed."
+                )
+
+        batch = batch or self._get_batch(request)
+
+        if batch is None:
+            errors["chemical_analysis_request"] = (
+                "The analysis request must have an associated "
+                "chemical batch."
+            )
+
+        if not self.chemical_id:
+            errors["chemical"] = (
+                "A chemical is required before completing "
+                "the checklist."
+            )
+
+        if batch is not None:
+            if (
+                batch.chemical_id
+                and self.chemical_id
+                and batch.chemical_id != self.chemical_id
+            ):
+                errors["chemical"] = (
+                    "The checklist chemical must match "
+                    "the batch chemical."
+                )
+
+        if (
+            self.manufacture_date
+            and self.expiry_date
+            and self.expiry_date < self.manufacture_date
+        ):
+            errors["expiry_date"] = (
+                "The expiry date cannot be earlier than "
+                "the manufacture date."
+            )
+
+        if (
+            self.expiry_date
+            and self.expiry_date < timezone.localdate()
+        ):
+            errors["expiry_date"] = (
+                "The chemical batch has expired."
+            )
+
+        if (
+            self.net_weight is None
+            or self.net_weight <= Decimal("0")
+        ):
+            errors["net_weight"] = (
+                "Net weight must be greater than zero."
+            )
+
+        if (
+            not isinstance(self.storage_conditions, str)
+            or not self.storage_conditions.strip()
+        ):
+            errors["storage_conditions"] = (
+                "Storage conditions are required."
+            )
+
+        if self.sampled_by_id is None:
+            errors["sampled_by"] = (
+                "A user who sampled the chemical is required."
+            )
+
+        if self.requested_by_id is None:
+            errors["requested_by"] = (
+                "The user who requested the analysis is required."
+            )
+
+        if errors:
+            raise ValidationError(errors)
+
+    def mark_completed(self, performed_by=None):
+        if self.completed:
+            raise ValidationError(
+                "Checklist is already marked as completed."
+            )
+
+        if performed_by is None:
+            raise ValidationError(
+                "A user is required to complete the checklist."
+            )
+
+        if not getattr(
+            performed_by,
+            "is_authenticated",
+            False,
+        ):
+            raise ValidationError(
+                "The completing user must be authenticated."
+            )
+
+        if not getattr(
+            performed_by,
+            "is_active",
+            False,
+        ):
+            raise ValidationError(
+                "An inactive user cannot complete a checklist."
+            )
+
+        with transaction.atomic():
+            checklist = (
+                type(self).objects
+                .select_for_update()
+                .select_related(
+                    "chemical_analysis_request",
+                    "chemical_analysis_request__batch",
+                    "chemical_analysis_request__location",
+                    "chemical",
+                )
+                .get(pk=self.pk)
+            )
+
+            if checklist.completed:
+                raise ValidationError(
+                    "Checklist is already marked as completed."
+                )
+
+            request = checklist.chemical_analysis_request
+            batch = checklist._get_batch(request)
+
+            checklist.validate_completion_requirements(
+                request=request,
+                batch=batch,
+            )
+
+            now = timezone.now()
+
+            checklist.completed = True
+            checklist.completed_at = now
+            checklist.completed_by = performed_by
+
+            checklist.full_clean()
+
+            type(self).objects.filter(
+                pk=checklist.pk,
+            ).update(
+                completed=True,
+                completed_at=now,
+                completed_by_id=performed_by.pk,
+                updated_at=now,
+            )
+
+            checklist_id = checklist.pk
+
+            transaction.on_commit(
+                lambda checklist_id=checklist_id: (
+                    checklist_completed.send(
+                        sender=type(self),
+                        instance=type(self).objects.get(
+                            pk=checklist_id,
+                        ),
+                        old_status="PENDING",
+                        new_status="COMPLETED",
+                        performed_by=performed_by,
+                    )
+                )
+            )
+
+        self.completed = True
+        self.completed_at = now
+        self.completed_by_id = performed_by.pk
+
+        return self
+
+    def reopen(self, performed_by=None):
+        if not self.completed:
+            raise ValidationError(
+                "Checklist is not completed."
+            )
+
+        if performed_by is None:
+            raise ValidationError(
+                "A user is required to reopen the checklist."
+            )
+
+        if not getattr(
+            performed_by,
+            "is_authenticated",
+            False,
+        ):
+            raise ValidationError(
+                "The reopening user must be authenticated."
+            )
+
+        if not getattr(
+            performed_by,
+            "is_active",
+            False,
+        ):
+            raise ValidationError(
+                "An inactive user cannot reopen a checklist."
+            )
+
+        with transaction.atomic():
+            checklist = (
+                type(self).objects
+                .select_for_update()
+                .get(pk=self.pk)
+            )
+
+            if not checklist.completed:
+                raise ValidationError(
+                    "Checklist is already open."
+                )
+
+            now = timezone.now()
+
+            type(self).objects.filter(
+                pk=checklist.pk,
+            ).update(
+                completed=False,
+                completed_at=None,
+                completed_by_id=None,
+                updated_at=now,
+            )
+
+        self.completed = False
+        self.completed_at = None
+        self.completed_by_id = None
+
+        return self
+
+    def save(self, *args, **kwargs):
+        if self.completed:
+            if not self.completed_at:
+                self.completed_at = timezone.now()
+
+            if not self.completed_by_id:
+                raise ValidationError(
+                    "A completed checklist must have "
+                    "a completing user."
+                )
+        else:
+            self.completed_at = None
+            self.completed_by_id = None
 
         self.full_clean()
 
-        super().save(*args, **kwargs)
+        return super().save(
+            *args,
+            **kwargs,
+        )
 
-        if self.sampling_id:
-            sampling = self.sampling
+    def __str__(self):
+        chemical_name = (
+            self.chemical.name
+            if self.chemical_id
+            else "Unknown Chemical"
+        )
 
-            sampling.calculate_results()
+        batch_number = self.batch_number or "N/A"
 
-            sampling.save(
-                update_fields=[
-                    "measured_average_weight",
-                    "average_weight_difference",
-                    "sampling_passed",
-                    "qa_required",
-                    "updated_at",
-                ]
-            )
+        return (
+            f"Checklist - {chemical_name} "
+            f"({batch_number})"
+        )
+
 class ChemicalAnalysisProcess(Process):
     class WorkflowStatus(models.TextChoices):
         CREATED = "CREATED", "Created"
@@ -1938,10 +2207,6 @@ class ChemicalAnalysisProcess(Process):
         REQUESTED = "REQUESTED", "Requested"
         ASSIGNED = "ASSIGNED", "Assigned"
         CHECKLIST = "CHECKLIST", "Checklist"
-        SYSTEMATIC_RANDOM_SAMPLING = (
-            "SYSTEMATIC_RANDOM_SAMPLING",
-            "Systematic Random Sampling",
-        )
         ANALYSIS = "ANALYSIS", "Analysis"
         RETEST = "RETEST", "Retest"
         QA = "QA", "Quality Assurance"
@@ -1959,10 +2224,10 @@ class ChemicalAnalysisProcess(Process):
 
     analysis_request = models.OneToOneField(
         "ChemicalAnalysisRequest",
-        on_delete=models.CASCADE,
-        related_name="analysis_process",
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
+        related_name="analysis_process",
     )
 
     initiated_by = models.ForeignKey(
@@ -2027,6 +2292,11 @@ class ChemicalAnalysisProcess(Process):
         blank=True,
     )
 
+    rejected_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
     completed_at = models.DateTimeField(
         null=True,
         blank=True,
@@ -2046,173 +2316,76 @@ class ChemicalAnalysisProcess(Process):
 
     class Meta:
         ordering = ["-created_at"]
-
         permissions = [
-            (
-                "receive_chemical_batch",
-                "Can receive chemical batches",
-            ),
-            (
-                "create_analysis_request",
-                "Can create chemical analysis requests",
-            ),
-            (
-                "complete_receiving_checklist",
-                "Can complete receiving checklists",
-            ),
-            (
-                "perform_systematic_random_sampling",
-                "Can perform systematic random sampling",
-            ),
-            (
-                "counter_check_systematic_sampling",
-                "Can counter-check systematic random sampling",
-            ),
-            (
-                "approve_sampling_weight_deviation",
-                "Can approve sampling weight deviation",
-            ),
-            (
-                "start_chemical_analysis",
-                "Can start chemical analysis",
-            ),
-            (
-                "record_chemical_result",
-                "Can record chemical test results",
-            ),
-            (
-                "complete_chemical_analysis",
-                "Can complete chemical analysis",
-            ),
-            (
-                "perform_chemical_retest",
-                "Can perform chemical retests",
-            ),
-            (
-                "review_chemical_analysis",
-                "Can review chemical analysis",
-            ),
-            (
-                "verify_chemical_coa",
-                "Can verify chemical CoA",
-            ),
-            (
-                "approve_chemical_coa",
-                "Can generate and approve chemical CoA",
-            ),
-            (
-                "approve_chemical_batch",
-                "Can approve chemical batches",
-            ),
-            (
-                "reject_chemical_batch",
-                "Can reject chemical batches",
-            ),
-            (
-                "utilize_chemical_batch",
-                "Can utilize chemical batches",
-            ),
-            (
-                "return_chemical_batch",
-                "Can return chemical batches",
-            ),
-            (
-                "reopen_chemical_checklist",
-                "Can reopen chemical checklists",
-            ),
+            ("receive_chemical_batch", "Can receive chemical batches"),
+            ("create_analysis_request", "Can create chemical analysis requests"),
+            ("complete_receiving_checklist", "Can complete receiving checklists"),
+            ("start_chemical_analysis", "Can start chemical analysis"),
+            ("record_chemical_result", "Can record chemical test results"),
+            ("complete_chemical_analysis", "Can complete chemical analysis"),
+            ("perform_chemical_retest", "Can perform chemical retests"),
+            ("review_chemical_analysis", "Can review chemical analysis"),
+            ("verify_chemical_coa", "Can verify chemical CoA"),
+            ("approve_chemical_coa", "Can generate and approve chemical CoA"),
+            ("approve_chemical_batch", "Can approve chemical batches"),
+            ("reject_chemical_batch", "Can reject chemical batches"),
+            ("utilize_chemical_batch", "Can utilize chemical batches"),
+            ("return_chemical_batch", "Can return chemical batches"),
+            ("reopen_chemical_checklist", "Can reopen chemical checklists"),
         ]
-
         indexes = [
+
             models.Index(
-                fields=[
-                    "assigned_analyst",
-                    "analysis_started_at",
-                ],
+                fields=["assigned_analyst", "analysis_started_at"],
                 name="ca_proc_analyst_start_idx",
             ),
             models.Index(
-                fields=[
-                    "qa_officer",
-                    "qa_reviewed_at",
-                ],
+                fields=["qa_officer", "qa_reviewed_at"],
                 name="ca_proc_qa_review_idx",
             ),
             models.Index(
-                fields=[
-                    "approver",
-                    "approved_at",
-                ],
+                fields=["approver", "approved_at"],
                 name="ca_proc_approver_idx",
             ),
             models.Index(
-                fields=[
-                    "analysis_started_at",
-                    "analysis_completed_at",
-                ],
+                fields=["analysis_started_at", "analysis_completed_at"],
                 name="ca_proc_analysis_period_idx",
             ),
             models.Index(
                 fields=["completed_at"],
                 name="ca_proc_completed_idx",
             ),
-            models.Index(
-                fields=["created_at"],
-                name="ca_proc_created_idx",
-            ),
         ]
 
     @property
     def chemical(self):
-        if not self.batch_id:
-            return None
-        return self.batch.chemical
+        return self.batch.chemical if self.batch_id else None
 
     @property
     def supplier(self):
-        if not self.batch_id:
-            return None
-        return self.batch.supplier
+        return self.batch.supplier if self.batch_id else None
 
     @property
     def treatment_plant(self):
-        if not self.batch_id:
-            return None
-        return self.batch.treatment_plant
+        return self.batch.treatment_plant if self.batch_id else None
 
     @property
     def sample_id(self):
-        if not self.batch_id:
-            return None
-        return self.batch.sample_id
+        return self.batch.sample_id if self.batch_id else None
 
     @property
     def batch_number(self):
-        if not self.batch_id:
-            return None
-        return self.batch.batch_number
+        return self.batch.batch_number if self.batch_id else None
 
     @property
     def test_results(self):
         if not self.batch_id:
             return BatchTestResult.objects.none()
+
         return self.batch.test_results.all()
 
-    @property
-    def systematic_random_sampling(self):
-        if not self.batch_id:
-            return None
-
-        return getattr(
-            self.batch,
-            "systematic_random_sampling",
-            None,
-        )
-
     def required_specifications(self):
-        if (
-            not self.batch_id
-            or not self.batch.chemical_id
-        ):
+        if not self.batch_id or not self.batch.chemical_id:
             return ChemicalSpecification.objects.none()
 
         return (
@@ -2226,9 +2399,7 @@ class ChemicalAnalysisProcess(Process):
                 "chemical",
                 "method",
             )
-            .prefetch_related(
-                "remarks",
-            )
+            .prefetch_related("remarks")
             .order_by(
                 "parameter_name",
                 "version",
@@ -2243,8 +2414,47 @@ class ChemicalAnalysisProcess(Process):
         return (
             self.batch.test_results
             .filter(
-                Q(status__isnull=True)
-                | Q(status=""),
+                Q(status__isnull=True) | Q(status="")
+            )
+            .select_related(
+                "parameter",
+                "parameter__chemical",
+            )
+            .order_by(
+                "parameter__parameter_name",
+                "id",
+            )
+        )
+
+    @property
+    def completed_tests(self):
+        if not self.batch_id:
+            return BatchTestResult.objects.none()
+
+        return (
+            self.batch.test_results
+            .exclude(
+                Q(status__isnull=True) | Q(status="")
+            )
+            .select_related(
+                "parameter",
+                "parameter__chemical",
+            )
+            .order_by(
+                "parameter__parameter_name",
+                "id",
+            )
+        )
+
+    @property
+    def failed_tests(self):
+        if not self.batch_id:
+            return BatchTestResult.objects.none()
+
+        return (
+            self.batch.test_results
+            .filter(
+                status=BatchTestResult.Status.FAIL
             )
             .select_related(
                 "parameter",
@@ -2265,26 +2475,6 @@ class ChemicalAnalysisProcess(Process):
         return self.pending_tests.first()
 
     @property
-    def failed_tests(self):
-        if not self.batch_id:
-            return BatchTestResult.objects.none()
-
-        return (
-            self.batch.test_results
-            .filter(
-                status=BatchTestResult.Status.FAIL,
-            )
-            .select_related(
-                "parameter",
-                "parameter__chemical",
-            )
-            .order_by(
-                "parameter__parameter_name",
-                "id",
-            )
-        )
-
-    @property
     def pending_inputs(self):
         if not self.batch_id:
             return ChemicalAnalysisInput.objects.none()
@@ -2292,36 +2482,15 @@ class ChemicalAnalysisProcess(Process):
         return (
             ChemicalAnalysisInput.objects
             .filter(
-                test_result__batch_id=self.batch_id,
+                test_result__batch_id=self.batch_id
             )
             .filter(
                 Q(calculated_value__isnull=True)
-                | Q(inputs={}),
+                | Q(inputs={})
             )
             .select_related(
                 "test_result",
                 "test_result__parameter",
-            )
-        )
-
-    @property
-    def completed_tests(self):
-        if not self.batch_id:
-            return BatchTestResult.objects.none()
-
-        return (
-            self.batch.test_results
-            .exclude(
-                Q(status__isnull=True)
-                | Q(status=""),
-            )
-            .select_related(
-                "parameter",
-                "parameter__chemical",
-            )
-            .order_by(
-                "parameter__parameter_name",
-                "id",
             )
         )
 
@@ -2331,9 +2500,6 @@ class ChemicalAnalysisProcess(Process):
 
     @property
     def completed_test_count(self):
-        if not self.batch_id:
-            return 0
-
         required_ids = self.required_specifications().values_list(
             "pk",
             flat=True,
@@ -2345,11 +2511,10 @@ class ChemicalAnalysisProcess(Process):
         return (
             self.batch.test_results
             .filter(
-                parameter_id__in=required_ids,
+                parameter_id__in=required_ids
             )
             .exclude(
-                Q(status__isnull=True)
-                | Q(status=""),
+                Q(status__isnull=True) | Q(status="")
             )
             .values("parameter_id")
             .distinct()
@@ -2361,28 +2526,22 @@ class ChemicalAnalysisProcess(Process):
         if not self.batch_id:
             return 0
 
-        return (
-            self.batch.test_results
-            .filter(
-                status=BatchTestResult.Status.PASS,
-            )
-            .count()
-        )
+        return self.batch.test_results.filter(
+            status=BatchTestResult.Status.PASS
+        ).count()
 
     @property
     def analysis_progress(self):
         required = self.required_test_count
 
-        if required <= 0:
+        if required == 0:
             return 100
 
         return round(
             min(
                 self.completed_test_count,
                 required,
-            )
-            / required
-            * 100,
+            ) / required * 100,
             2,
         )
 
@@ -2399,8 +2558,7 @@ class ChemicalAnalysisProcess(Process):
         completed_ids = (
             self.batch.test_results
             .exclude(
-                Q(status__isnull=True)
-                | Q(status=""),
+                Q(status__isnull=True) | Q(status="")
             )
             .values_list(
                 "parameter_id",
@@ -2409,51 +2567,29 @@ class ChemicalAnalysisProcess(Process):
         )
 
         return not required.exclude(
-            pk__in=completed_ids,
+            pk__in=completed_ids
         ).exists()
 
     @property
     def is_overdue(self):
-        if not self.analysis_request_id:
-            return False
-
-        return self.analysis_request.is_overdue
-
-    @property
-    def sampling_complete(self):
-        sampling = self.systematic_random_sampling
-
-        if sampling is None:
-            return False
-
-        return sampling.status == "COMPLETED"
-
-    @property
-    def sampling_qa_required(self):
-        sampling = self.systematic_random_sampling
-
-        if sampling is None:
-            return False
-
-        return sampling.qa_required
-
-    @property
-    def sampling_qa_approved(self):
-        sampling = self.systematic_random_sampling
-
-        if sampling is None:
-            return False
-
-        return sampling.qa_approved
+        return bool(
+            self.analysis_request_id
+            and self.analysis_request.is_overdue
+        )
 
     @property
     def analysis_ready(self):
-        sampling = self.systematic_random_sampling
-
-        if sampling is None:
+        if not self.analysis_request_id:
             return False
 
-        return sampling.analysis_allowed
+        checklist = (
+            self.analysis_request.checklists
+            .filter(completed=True)
+            .order_by("-completed_at", "-pk")
+            .first()
+        )
+
+        return bool(checklist)
 
     @property
     def assigned_analysts(self):
@@ -2467,19 +2603,16 @@ class ChemicalAnalysisProcess(Process):
         return self.assigned_analysts.exists()
 
     def is_authorized_analyst(self, user):
-        if user is None:
-            return False
-
-        if not self.analysis_request_id:
-            return False
-
-        return self.analysis_request.is_assigned_analyst(user)
+        return bool(
+            user
+            and getattr(user, "is_active", False)
+            and self.analysis_request_id
+            and self.analysis_request.is_assigned_analyst(user)
+        )
 
     def refresh_assigned_analysts(self):
         if not self.analysis_request_id:
             return get_user_model().objects.none()
-
-        self.analysis_request.populate_assigned_analysts()
 
         return self.analysis_request.assigned_analysts.all()
 
@@ -2491,37 +2624,34 @@ class ChemicalAnalysisProcess(Process):
     ):
         if not self.batch_id:
             raise ValidationError(
-                "An analysis batch is required.",
+                "An analysis batch is required."
             )
 
         if parameter is None:
             raise ValidationError(
-                "An analysis parameter is required.",
+                "An analysis parameter is required."
             )
 
         if parameter.chemical_id != self.batch.chemical_id:
             raise ValidationError(
                 "The analysis parameter does not belong "
-                "to the batch chemical.",
+                "to the batch chemical."
             )
 
         if analyst is not None and not self.is_authorized_analyst(
             analyst
         ):
             raise ValidationError(
-                "The analyst recording the result must be one of "
-                "the analysts currently assigned to perform "
-                "chemical analysis.",
+                "The analyst recording the result must be "
+                "assigned to this analysis."
             )
 
-        result, created = (
-            BatchTestResult.objects.get_or_create(
-                batch=self.batch,
-                parameter=parameter,
-                defaults={
-                    "analyst": analyst,
-                },
-            )
+        result, created = BatchTestResult.objects.get_or_create(
+            batch=self.batch,
+            parameter=parameter,
+            defaults={
+                "analyst": analyst,
+            },
         )
 
         if (
@@ -2531,82 +2661,58 @@ class ChemicalAnalysisProcess(Process):
         ):
             result.analyst = analyst
             result.save(
-                update_fields=["analyst"],
+                update_fields=["analyst"]
             )
 
         return result
 
-    def move_to_systematic_random_sampling(self):
+    def move_to_analysis(self):
+        """Advance directly from completed checklist to analysis.
+
+        There is deliberately no random/systematic sampling stage in the
+        chemical-analysis workflow.
+        """
         if self.status != self.WorkflowStatus.CHECKLIST:
             raise ValidationError(
-                "Systematic random sampling cannot be started "
-                f"from status {self.status}.",
+                f"Analysis cannot start from status {self.status}."
             )
 
-        if not self.batch_id:
+        if not self.batch_id or not self.analysis_request_id:
             raise ValidationError(
-                "A chemical batch is required.",
+                "A chemical batch and analysis request are required."
             )
 
-        if not self.analysis_request_id:
+        if not self.has_assigned_analysts:
             raise ValidationError(
-                "A chemical analysis request is required.",
-            )
-
-        analysts = self.refresh_assigned_analysts()
-
-        if not analysts.exists():
-            raise ValidationError(
-                "No analyst is currently assigned to perform "
-                "Water Treatment Chemical Analysis for this "
-                "treatment plant, section, date, and shift.",
+                "At least one analyst must be assigned before analysis."
             )
 
         checklist = (
             self.analysis_request.checklists
-            .filter(
-                completed=True,
-            )
-            .order_by(
-                "-completed_at",
-                "-pk",
-            )
+            .filter(completed=True)
+            .order_by("-completed_at", "-pk")
             .first()
         )
 
         if checklist is None:
             raise ValidationError(
-                "A completed receiving checklist is required "
-                "before systematic random sampling can begin.",
+                "A completed receiving checklist is required."
             )
 
-        if checklist.net_weight is None:
-            raise ValidationError(
-                "The completed receiving checklist must contain "
-                "the declared net weight.",
-            )
-
-        if not self.batch.package_count:
-            raise ValidationError(
-                "The chemical batch must have a package count "
-                "before systematic random sampling can begin.",
-            )
-
-        self.status = (
-            self.WorkflowStatus.SYSTEMATIC_RANDOM_SAMPLING
-        )
-
+        now = timezone.now()
         self.checklist_completed_at = (
             self.checklist_completed_at
-            or timezone.now()
+            or checklist.completed_at
+            or now
         )
+        self.status = self.WorkflowStatus.ANALYSIS
 
         self.save(
             update_fields=[
                 "status",
                 "checklist_completed_at",
                 "updated_at",
-            ],
+            ]
         )
 
         return self
@@ -2615,86 +2721,40 @@ class ChemicalAnalysisProcess(Process):
         self,
         performed_by=None,
     ):
-        if self.status != (
-            self.WorkflowStatus.SYSTEMATIC_RANDOM_SAMPLING
+        if self.status != self.WorkflowStatus.ANALYSIS:
+            raise ValidationError(
+                "Analysis can only be started from the analysis stage."
+            )
+
+        if not self.analysis_ready:
+            raise ValidationError(
+                "A completed receiving checklist is required before analysis."
+            )
+
+        if (
+            performed_by is None
+            or not self.is_authorized_analyst(performed_by)
         ):
             raise ValidationError(
-                "Analysis can only be started from "
-                f"{self.WorkflowStatus.SYSTEMATIC_RANDOM_SAMPLING}.",
-            )
-
-        if not self.batch_id:
-            raise ValidationError(
-                "A chemical batch is required.",
-            )
-
-        if not self.analysis_request_id:
-            raise ValidationError(
-                "A chemical analysis request is required.",
-            )
-
-        analysts = self.refresh_assigned_analysts()
-
-        if not analysts.exists():
-            raise ValidationError(
-                "No analyst is currently assigned to perform "
-                "Water Treatment Chemical Analysis.",
-            )
-
-        sampling = self.systematic_random_sampling
-
-        if sampling is None:
-            raise ValidationError(
-                "Systematic random sampling is required "
-                "before analysis can begin.",
-            )
-
-        if sampling.status != "COMPLETED":
-            raise ValidationError(
-                "Systematic random sampling must be completed "
-                "before analysis can begin.",
-            )
-
-        if sampling.qa_required and not sampling.qa_approved:
-            raise ValidationError(
-                "QA approval is required before analysis can begin.",
-            )
-
-        if not sampling.analysis_allowed:
-            raise ValidationError(
-                "The batch is not cleared for chemical analysis.",
-            )
-
-        if performed_by is None:
-            raise ValidationError(
-                "The analyst starting the chemical analysis is required.",
-            )
-
-        if not self.is_authorized_analyst(performed_by):
-            raise ValidationError(
-                "Only an analyst currently assigned to "
-                "Water Treatment Chemical Analysis can start "
-                "this chemical analysis.",
+                "Only an assigned analyst can start this analysis."
             )
 
         request = self.analysis_request
 
-        if (
-            request.status
-            == ChemicalAnalysisRequest.Status.PENDING
+        if request.status == (
+            ChemicalAnalysisRequest.Status.PENDING
         ):
             request.start_analysis(
-                performed_by=performed_by,
+                performed_by=performed_by
             )
 
         now = timezone.now()
 
         self.status = self.WorkflowStatus.ANALYSIS
+        self.started_at = self.started_at or now
         self.analysis_started_at = (
-            self.analysis_started_at or now
-        )
-        self.started_at = (
-            self.started_at or now
+            self.analysis_started_at
+            or now
         )
         self.assigned_analyst = performed_by
 
@@ -2705,7 +2765,7 @@ class ChemicalAnalysisProcess(Process):
                 "analysis_started_at",
                 "assigned_analyst",
                 "updated_at",
-            ],
+            ]
         )
 
         return self
@@ -2716,36 +2776,35 @@ class ChemicalAnalysisProcess(Process):
     ):
         if self.status != self.WorkflowStatus.ANALYSIS:
             raise ValidationError(
-                "Analysis can only be completed from "
-                f"status {self.WorkflowStatus.ANALYSIS}.",
+                "Chemical analysis is not currently in progress."
             )
 
         if performed_by is not None:
-            if not self.is_authorized_analyst(performed_by):
+            if not self.is_authorized_analyst(
+                performed_by
+            ):
                 raise ValidationError(
-                    "Only an analyst currently assigned to "
-                    "Water Treatment Chemical Analysis can complete "
-                    "the chemical analysis.",
+                    "Only an assigned analyst can "
+                    "complete the analysis."
                 )
 
             if (
                 self.assigned_analyst_id
-                and self.assigned_analyst_id != performed_by.pk
+                and self.assigned_analyst_id
+                != performed_by.pk
             ):
                 raise ValidationError(
-                    "The chemical analysis must be completed by "
-                    "the analyst who started the analysis.",
+                    "The analysis must be completed by "
+                    "the analyst who started it."
                 )
 
-        if not self.is_analysis_complete:
+        if (
+            not self.is_analysis_complete
+            or self.has_pending_tests
+        ):
             raise ValidationError(
-                "Analysis cannot be completed while required "
-                "test results are outstanding.",
-            )
-
-        if self.has_pending_tests:
-            raise ValidationError(
-                "All analytical test results must be finalized.",
+                "All required analytical results "
+                "must be finalized."
             )
 
         now = timezone.now()
@@ -2756,12 +2815,11 @@ class ChemicalAnalysisProcess(Process):
         if self.analysis_request_id:
             request = self.analysis_request
 
-            if (
-                request.status
-                == ChemicalAnalysisRequest.Status.IN_PROGRESS
+            if request.status == (
+                ChemicalAnalysisRequest.Status.IN_PROGRESS
             ):
                 request.mark_completed(
-                    performed_by=performed_by,
+                    performed_by=performed_by
                 )
 
         self.save(
@@ -2769,55 +2827,58 @@ class ChemicalAnalysisProcess(Process):
                 "status",
                 "analysis_completed_at",
                 "updated_at",
-            ],
+            ]
         )
 
         return self
 
-    def mark_approved(
-        self,
-        approved_by,
-    ):
+    def mark_approved(self, approved_by):
         if self.status != self.WorkflowStatus.QA:
             raise ValidationError(
-                "The chemical analysis process can only be approved "
-                f"from status {self.WorkflowStatus.QA}.",
+                "Chemical analysis must be in QA before approval."
             )
 
         if approved_by is None:
             raise ValidationError(
-                "An approving user is required.",
+                "An approving user is required."
             )
 
         if not self.analysis_completed_at:
             raise ValidationError(
-                "Chemical analysis must be completed "
-                "before approval.",
+                "Chemical analysis must be completed before approval."
             )
 
-        if not self.batch_id:
+        if (
+            self.has_pending_tests
+            or self.failed_tests.exists()
+        ):
             raise ValidationError(
-                "A chemical batch is required before approval.",
+                "Pending or failed analytical results prevent approval."
             )
 
         now = timezone.now()
 
         self.qa_officer = (
-            self.qa_officer or approved_by
+            self.qa_officer
+            or approved_by
         )
+
         self.qa_reviewed_at = (
-            self.qa_reviewed_at or now
+            self.qa_reviewed_at
+            or now
         )
+
         self.approver = approved_by
         self.approved_at = now
         self.status = self.WorkflowStatus.APPROVED
 
         self.batch.status = self.batch.Status.APPROVED
+
         self.batch.save(
             update_fields=[
                 "status",
                 "updated_at",
-            ],
+            ]
         )
 
         self.save(
@@ -2828,7 +2889,45 @@ class ChemicalAnalysisProcess(Process):
                 "approver",
                 "approved_at",
                 "updated_at",
-            ],
+            ]
+        )
+
+        return self
+
+    def mark_rejected(self):
+        allowed_statuses = {
+            self.WorkflowStatus.QA,
+            self.WorkflowStatus.RETEST,
+            self.WorkflowStatus.RECEIVED,
+            self.WorkflowStatus.CHECKLIST,
+            self.WorkflowStatus.ANALYSIS,
+        }
+
+        if self.status not in allowed_statuses:
+            raise ValidationError(
+                f"Chemical process cannot be rejected "
+                f"from {self.status}."
+            )
+
+        self.status = self.WorkflowStatus.REJECTED
+        self.rejected_at = timezone.now()
+
+        if self.batch_id:
+            self.batch.status = self.batch.Status.REJECTED
+
+            self.batch.save(
+                update_fields=[
+                    "status",
+                    "updated_at",
+                ]
+            )
+
+        self.save(
+            update_fields=[
+                "status",
+                "rejected_at",
+                "updated_at",
+            ]
         )
 
         return self
@@ -2837,46 +2936,46 @@ class ChemicalAnalysisProcess(Process):
         self,
         disposition,
     ):
-        normalized = str(
-            disposition or "",
+        disposition = str(
+            disposition or ""
         ).strip().upper()
 
-        if normalized not in {
+        valid_dispositions = {
             self.WorkflowStatus.UTILIZED,
             self.WorkflowStatus.RETURNED,
-        }:
+        }
+
+        if disposition not in valid_dispositions:
             raise ValidationError(
-                "Invalid batch disposition.",
+                "Invalid batch disposition."
             )
 
         if self.status != self.WorkflowStatus.APPROVED:
             raise ValidationError(
-                "Batch disposition can only occur after "
-                "the chemical process has been approved.",
+                "Batch disposition requires an approved "
+                "chemical analysis."
             )
 
         if not self.batch_id:
             raise ValidationError(
-                "A chemical batch is required.",
+                "A chemical batch is required."
             )
 
-        now = timezone.now()
+        self.status = disposition
+        self.batch.status = disposition
 
-        self.status = normalized
-
-        self.batch.status = normalized
         self.batch.save(
             update_fields=[
                 "status",
                 "updated_at",
-            ],
+            ]
         )
 
         self.save(
             update_fields=[
                 "status",
                 "updated_at",
-            ],
+            ]
         )
 
         return self
@@ -2887,8 +2986,8 @@ class ChemicalAnalysisProcess(Process):
             self.WorkflowStatus.RETURNED,
         }:
             raise ValidationError(
-                "The chemical analysis process can only be completed "
-                "after batch disposition.",
+                "The process can only be completed "
+                "after batch disposition."
             )
 
         self.status = self.WorkflowStatus.COMPLETED
@@ -2899,7 +2998,7 @@ class ChemicalAnalysisProcess(Process):
                 "status",
                 "completed_at",
                 "updated_at",
-            ],
+            ]
         )
 
         return self
@@ -2914,71 +3013,70 @@ class ChemicalAnalysisProcess(Process):
                 "A chemical batch is required."
             )
 
-        if self.analysis_request_id and self.batch_id:
-            if (
-                self.analysis_request.batch_id
-                and self.analysis_request.batch_id != self.batch_id
-            ):
-                errors["analysis_request"] = (
-                    "The analysis request must belong to "
-                    "the same chemical batch."
-                )
+        if (
+            self.analysis_request_id
+            and self.batch_id
+            and self.analysis_request.batch_id
+            != self.batch_id
+        ):
+            errors["analysis_request"] = (
+                "The analysis request must belong "
+                "to this chemical batch."
+            )
 
-        if self.assigned_analyst_id and self.analysis_request_id:
-            if not self.analysis_request.assigned_analysts.filter(
-                pk=self.assigned_analyst_id,
-            ).exists():
-                errors["assigned_analyst"] = (
-                    "The analyst performing the chemical analysis "
-                    "must be one of the analysts assigned to "
-                    "the analysis request."
-                )
+        if (
+            self.assigned_analyst_id
+            and self.analysis_request_id
+            and not self.analysis_request.assigned_analysts.filter(
+                pk=self.assigned_analyst_id
+            ).exists()
+        ):
+            errors["assigned_analyst"] = (
+                "The assigned analyst must belong "
+                "to the analysis request."
+            )
 
         if (
             self.status == self.WorkflowStatus.ANALYSIS
             and not self.analysis_started_at
         ):
             errors["analysis_started_at"] = (
-                "Analysis start time is required when "
-                "the process is in analysis."
+                "Analysis start time is required."
             )
 
         if (
-            self.status == self.WorkflowStatus.RETEST
+            self.status in {
+                self.WorkflowStatus.RETEST,
+                self.WorkflowStatus.QA,
+            }
             and not self.analysis_completed_at
         ):
             errors["analysis_completed_at"] = (
-                "The original chemical analysis must be completed "
-                "before a retest can occur."
-            )
-
-        if (
-            self.status == self.WorkflowStatus.QA
-            and not self.analysis_completed_at
-        ):
-            errors["analysis_completed_at"] = (
-                "Analysis completion time is required "
-                "before QA review."
+                "Original analysis must be completed first."
             )
 
         if self.status == self.WorkflowStatus.APPROVED:
-            if not self.approved_at:
-                errors["approved_at"] = (
-                    "Approval time is required."
-                )
-
             if not self.approver_id:
                 errors["approver"] = (
                     "An approver is required."
                 )
 
-        if (
-            self.status == self.WorkflowStatus.COMPLETED
-            and not self.completed_at
-        ):
-            errors["completed_at"] = (
-                "Completion time is required."
-            )
+            if not self.approved_at:
+                errors["approved_at"] = (
+                    "Approval time is required."
+                )
+
+        if self.status == self.WorkflowStatus.REJECTED:
+            if not self.rejected_at:
+                errors["rejected_at"] = (
+                    "Rejection time is required."
+                )
+
+        if self.status == self.WorkflowStatus.COMPLETED:
+            if not self.completed_at:
+                errors["completed_at"] = (
+                    "Completion time is required."
+                )
 
         if errors:
             raise ValidationError(errors)
@@ -2999,18 +3097,27 @@ class ChemicalAnalysisProcess(Process):
             self.approved_at = now
 
         if (
+            self.status == self.WorkflowStatus.REJECTED
+            and not self.rejected_at
+        ):
+            self.rejected_at = now
+
+        if (
             self.status == self.WorkflowStatus.COMPLETED
             and not self.completed_at
         ):
             self.completed_at = now
 
-        self.full_clean()
+        self.clean()
 
-        return super().save(*args, **kwargs)
+        return super().save(
+            *args,
+            **kwargs,
+        )
 
     def __str__(self):
         return (
-            "Chemical Analysis Process - "
+            f"Chemical Analysis Process - "
             f"{self.sample_id or self.batch_id or 'N/A'} "
             f"[{self.status}]"
         )
@@ -3027,10 +3134,46 @@ class BatchTestResult(models.Model):
     value = models.FloatField(null=True, blank=True)
     textual_result = models.CharField(max_length=100, blank=True)
 
-    status = models.CharField(max_length=10, choices=Status.choices)
+    status = models.CharField(
+        max_length=10,
+        choices=Status.choices,
+        null=True,
+        blank=True,
+        db_index=True,
+    )
     tested_at = models.DateTimeField(default=timezone.now)
     analyst = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name="performed_tests",limit_choices_to={ "groups__name__in": ["Laboratory Assistant","Laboratory Technician",] },)
     auto_remark = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["parameter__parameter_name", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["batch", "parameter"],
+                name="ca_unique_batch_parameter_result",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["batch", "status"], name="ca_result_batch_status_idx"),
+            models.Index(fields=["analyst", "tested_at"], name="ca_result_analyst_tested_idx"),
+        ]
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        if not self.batch_id:
+            errors["batch"] = "A chemical batch is required."
+        if not self.parameter_id:
+            errors["parameter"] = "An analytical parameter is required."
+        if self.parameter_id and self.batch_id:
+            parameter = self.parameter
+            if parameter.chemical_id != self.batch.chemical_id:
+                errors["parameter"] = "The parameter must belong to the batch chemical."
+            if self.value is not None and not math.isfinite(float(self.value)):
+                errors["value"] = "The analytical value must be finite."
+        if errors:
+            raise ValidationError(errors)
+
     def save(self, *args, **kwargs):
         # Optimize to single query: directly use .first()
         if self.parameter_id:
@@ -3042,10 +3185,11 @@ class BatchTestResult(models.Model):
                     self.auto_remark = remark.on_fail
                 else:
                     self.auto_remark = "Not applicable."
+        self.full_clean()
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"Test Result - {self.parameter} ({self.status})"
+        return f"Test Result - {self.parameter} ({self.status or 'Pending'})"
 
 class ChemicalAnalysisInput(models.Model):
     test_result = models.OneToOneField(
@@ -3479,6 +3623,10 @@ class ChemicalAnalysisInput(models.Model):
             *args,
             **kwargs,
         )
+
+
+
+
 class ChemicalCoA(models.Model):
     batch = models.OneToOneField(
         "ChemicalBatch",
@@ -4880,696 +5028,3 @@ class ChemicalCoA(models.Model):
 
 
 
-
-class ChecklistForWaterTreatmentChemicalAnalysis(models.Model):
-    class Grade(models.TextChoices):
-        STANDARD = "STANDARD", "Standard"
-        PREMIUM = "PREMIUM", "Premium"
-        NA = "NA", "Not Applicable"
-
-    chemical_analysis_request = models.ForeignKey(
-        "ChemicalAnalysisRequest",
-        on_delete=models.CASCADE,
-        related_name="checklists",
-        db_index=True,
-    )
-
-    chemical = models.ForeignKey(
-        "Chemical",
-        on_delete=models.PROTECT,
-        related_name="chemical_analysis_checklists",
-    )
-
-    manufacturer_name_indicated = models.BooleanField(
-        default=False,
-    )
-
-    chemical_name_on_label = models.BooleanField(
-        default=False,
-    )
-
-    min_mass_indicated = models.BooleanField(
-        default=False,
-    )
-
-    grade = models.CharField(
-        max_length=20,
-        choices=Grade.choices,
-        default=Grade.NA,
-    )
-
-    manufacture_date = models.DateField()
-
-    expiry_date = models.DateField()
-
-    storage_conditions = models.CharField(
-        max_length=255,
-    )
-
-    net_weight = models.FloatField()
-
-    country_of_origin = CountryField(
-        default="KE",
-    )
-
-    handling_instructions = models.TextField(
-        blank=True,
-    )
-
-    is_oxidizing = models.BooleanField(
-        default=False,
-    )
-
-    is_corrosive = models.BooleanField(
-        default=False,
-    )
-
-    may_cause_fire = models.BooleanField(
-        default=False,
-    )
-
-    contact_with_acids_liberates_toxic_gas = models.BooleanField(
-        default=False,
-    )
-
-    causes_burns = models.BooleanField(
-        default=False,
-    )
-
-    keep_out_of_reach_of_children = models.BooleanField(
-        default=False,
-    )
-
-    contact_with_eyes_action = models.BooleanField(
-        default=False,
-    )
-
-    fire_action_requires_respiratory_equipment = models.BooleanField(
-        default=False,
-    )
-
-    sampled_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="chemical_checklists_sampled",
-    )
-
-    requested_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="chemical_checklists_requested",
-    )
-
-    created_at = models.DateTimeField(
-        auto_now_add=True,
-    )
-
-    updated_at = models.DateTimeField(
-        auto_now=True,
-    )
-
-    completed = models.BooleanField(
-        default=False,
-        db_index=True,
-    )
-
-    completed_at = models.DateTimeField(
-        null=True,
-        blank=True,
-    )
-
-    completed_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="completed_chemical_checklists",
-    )
-
-    class Meta:
-        ordering = ["-created_at"]
-        indexes = [
-            models.Index(
-                fields=[
-                    "chemical_analysis_request",
-                    "-created_at",
-                ],
-                name="ca_check_req_created_idx",
-            ),
-            models.Index(
-                fields=[
-                    "completed",
-                    "-created_at",
-                ],
-                name="ca_check_completed_idx",
-            ),
-            models.Index(
-                fields=[
-                    "chemical",
-                    "-created_at",
-                ],
-                name="ca_check_chemical_created_idx",
-            ),
-            models.Index(
-                fields=[
-                    "expiry_date",
-                    "completed",
-                ],
-                name="ca_check_expiry_completed_idx",
-            ),
-        ]
-
-    @property
-    def batch(self):
-        request = self.chemical_analysis_request
-
-        if request is None or not request.batch_id:
-            return None
-
-        return request.batch
-
-    @property
-    def sample_id(self):
-        batch = self.batch
-        return batch.sample_id if batch else None
-
-    @property
-    def batch_number(self):
-        batch = self.batch
-        return batch.batch_number if batch else None
-
-    @property
-    def treatment_plant(self):
-        batch = self.batch
-        return batch.treatment_plant if batch else None
-
-    @property
-    def analysis_status(self):
-        request = self.chemical_analysis_request
-        return request.status if request else None
-
-    @property
-    def is_expired(self) -> bool:
-        if not self.expiry_date:
-            return False
-
-        return self.expiry_date < timezone.localdate()
-
-    @property
-    def is_valid_at_receipt(self):
-        if not self.manufacture_date or not self.expiry_date:
-            return False
-
-        return (
-            self.manufacture_date
-            <= self.expiry_date
-            and self.expiry_date >= timezone.localdate()
-        )
-
-    @property
-    def is_completed(self):
-        return self.completed
-
-    @property
-    def completion_status(self):
-        return (
-            "COMPLETED"
-            if self.completed
-            else "PENDING"
-        )
-
-    @property
-    def days_until_expiry(self):
-        if not self.expiry_date:
-            return None
-
-        return (
-            self.expiry_date
-            - timezone.localdate()
-        ).days
-
-    @property
-    def expiry_status(self):
-        if not self.expiry_date:
-            return "UNKNOWN"
-
-        if self.expiry_date < timezone.localdate():
-            return "EXPIRED"
-
-        if self.expiry_date == timezone.localdate():
-            return "EXPIRES_TODAY"
-
-        days = self.days_until_expiry
-
-        if days is not None and days <= 30:
-            return "EXPIRING_SOON"
-
-        return "VALID"
-
-    def _get_request(self):
-        if not self.chemical_analysis_request_id:
-            return None
-
-        try:
-            return (
-                ChemicalAnalysisRequest.objects
-                .select_related(
-                    "batch",
-                    "batch__chemical",
-                    "batch__treatment_plant",
-                    "location",
-                    "location__treatment_plant",
-                )
-                .get(
-                    pk=self.chemical_analysis_request_id
-                )
-            )
-        except ChemicalAnalysisRequest.DoesNotExist:
-            return None
-
-    def _get_batch(self, request=None):
-        request = request or self._get_request()
-
-        if request is None or not request.batch_id:
-            return None
-
-        return request.batch
-
-    def clean(self):
-        super().clean()
-
-        errors = {}
-
-        request = self._get_request()
-        batch = self._get_batch(request)
-
-        if not self.chemical_analysis_request_id:
-            errors["chemical_analysis_request"] = (
-                "An analysis request is required."
-            )
-        elif request is None:
-            errors["chemical_analysis_request"] = (
-                "The selected analysis request could not be found."
-            )
-
-        if request is not None:
-            if not request.batch_id:
-                errors["chemical_analysis_request"] = (
-                    "The analysis request must have an associated "
-                    "chemical batch."
-                )
-
-        if request is not None and batch is None:
-            errors["chemical_analysis_request"] = (
-                "The associated chemical batch could not be found."
-            )
-
-        if not self.chemical_id:
-            errors["chemical"] = (
-                "A chemical is required."
-            )
-
-        if batch is not None:
-            if (
-                self.chemical_id
-                and batch.chemical_id
-                and self.chemical_id != batch.chemical_id
-            ):
-                errors["chemical"] = (
-                    "The checklist chemical must match the "
-                    "chemical associated with the batch."
-                )
-
-            if (
-                request is not None
-                and request.location_id
-                and batch.treatment_plant_id
-                and request.location
-                and request.location.treatment_plant_id
-                and (
-                    request.location.treatment_plant_id
-                    != batch.treatment_plant_id
-                )
-            ):
-                errors["chemical_analysis_request"] = (
-                    "The checklist request location must belong "
-                    "to the same treatment plant as the batch."
-                )
-
-        if (
-            self.manufacture_date
-            and self.expiry_date
-            and self.expiry_date < self.manufacture_date
-        ):
-            errors["expiry_date"] = (
-                "The expiry date cannot be earlier than "
-                "the manufacture date."
-            )
-
-        if (
-            self.net_weight is None
-            or self.net_weight <= 0
-        ):
-            errors["net_weight"] = (
-                "Net weight must be greater than zero."
-            )
-
-        if (
-            not isinstance(
-                self.storage_conditions,
-                str,
-            )
-            or not self.storage_conditions.strip()
-        ):
-            errors["storage_conditions"] = (
-                "Storage conditions are required."
-            )
-
-        if self.completed:
-            if not self.completed_at:
-                errors["completed_at"] = (
-                    "A completion time is required for "
-                    "a completed checklist."
-                )
-
-            if not self.completed_by_id:
-                errors["completed_by"] = (
-                    "A completing user is required for "
-                    "a completed checklist."
-                )
-
-        else:
-            if self.completed_at:
-                errors["completed_at"] = (
-                    "An incomplete checklist cannot have "
-                    "a completion time."
-                )
-
-            if self.completed_by_id:
-                errors["completed_by"] = (
-                    "An incomplete checklist cannot have "
-                    "a completing user."
-                )
-
-        if errors:
-            raise ValidationError(errors)
-
-    def validate_completion_requirements(
-        self,
-        request=None,
-        batch=None,
-    ):
-        errors = {}
-
-        request = request or self._get_request()
-
-        if request is None:
-            errors["chemical_analysis_request"] = (
-                "The associated analysis request could not be found."
-            )
-        else:
-            if not request.batch_id:
-                errors["chemical_analysis_request"] = (
-                    "The analysis request must have an associated "
-                    "chemical batch."
-                )
-
-            if (
-                request.status
-                == ChemicalAnalysisRequest.Status.COMPLETED
-            ):
-                errors["chemical_analysis_request"] = (
-                    "A checklist cannot be completed after the "
-                    "analysis request has already been completed."
-                )
-
-        batch = batch or self._get_batch(request)
-
-        if batch is None:
-            errors["chemical_analysis_request"] = (
-                "The analysis request must have an associated "
-                "chemical batch."
-            )
-
-        if not self.chemical_id:
-            errors["chemical"] = (
-                "A chemical is required before completing "
-                "the checklist."
-            )
-
-        if batch is not None:
-            if (
-                batch.chemical_id
-                and self.chemical_id
-                and batch.chemical_id != self.chemical_id
-            ):
-                errors["chemical"] = (
-                    "The checklist chemical must match "
-                    "the batch chemical."
-                )
-
-        if (
-            self.manufacture_date
-            and self.expiry_date
-            and self.expiry_date < self.manufacture_date
-        ):
-            errors["expiry_date"] = (
-                "The expiry date cannot be earlier than "
-                "the manufacture date."
-            )
-
-        if (
-            self.expiry_date
-            and self.expiry_date < timezone.localdate()
-        ):
-            errors["expiry_date"] = (
-                "The chemical batch has expired."
-            )
-
-        if (
-            self.net_weight is None
-            or self.net_weight <= 0
-        ):
-            errors["net_weight"] = (
-                "Net weight must be greater than zero."
-            )
-
-        if (
-            not isinstance(
-                self.storage_conditions,
-                str,
-            )
-            or not self.storage_conditions.strip()
-        ):
-            errors["storage_conditions"] = (
-                "Storage conditions are required."
-            )
-
-        if self.sampled_by_id is None:
-            errors["sampled_by"] = (
-                "A user who sampled the chemical is required."
-            )
-
-        if self.requested_by_id is None:
-            errors["requested_by"] = (
-                "The user who requested the analysis is required."
-            )
-
-        if errors:
-            raise ValidationError(errors)
-
-    def mark_completed(self, performed_by=None):
-        if self.completed:
-            raise ValidationError(
-                "Checklist is already marked as completed."
-            )
-
-        if performed_by is None:
-            raise ValidationError(
-                "A user is required to complete the checklist."
-            )
-
-        if not getattr(
-            performed_by,
-            "is_authenticated",
-            False,
-        ):
-            raise ValidationError(
-                "The completing user must be authenticated."
-            )
-
-        if not getattr(
-            performed_by,
-            "is_active",
-            False,
-        ):
-            raise ValidationError(
-                "An inactive user cannot complete a checklist."
-            )
-
-        with transaction.atomic():
-            checklist = (
-                type(self).objects
-                .select_for_update()
-                .select_related(
-                    "chemical_analysis_request",
-                    "chemical_analysis_request__batch",
-                    "chemical_analysis_request__location",
-                    "chemical",
-                )
-                .get(pk=self.pk)
-            )
-
-            if checklist.completed:
-                raise ValidationError(
-                    "Checklist is already marked as completed."
-                )
-
-            request = checklist.chemical_analysis_request
-            batch = checklist._get_batch(request)
-
-            checklist.validate_completion_requirements(
-                request=request,
-                batch=batch,
-            )
-
-            now = timezone.now()
-
-            checklist.completed = True
-            checklist.completed_at = now
-            checklist.completed_by = performed_by
-
-            checklist.full_clean(
-                exclude=None,
-            )
-
-            type(self).objects.filter(
-                pk=checklist.pk,
-            ).update(
-                completed=True,
-                completed_at=now,
-                completed_by_id=performed_by.pk,
-                updated_at=now,
-            )
-
-            checklist_id = checklist.pk
-
-            transaction.on_commit(
-                lambda checklist_id=checklist_id: (
-                    checklist_completed.send(
-                        sender=type(self),
-                        instance=type(self).objects.get(
-                            pk=checklist_id,
-                        ),
-                        old_status="PENDING",
-                        new_status="COMPLETED",
-                        performed_by=performed_by,
-                    )
-                )
-            )
-
-        self.completed = True
-        self.completed_at = now
-        self.completed_by_id = performed_by.pk
-
-        return self
-
-    def reopen(self, performed_by=None):
-        if not self.completed:
-            raise ValidationError(
-                "Checklist is not completed."
-            )
-
-        if performed_by is None:
-            raise ValidationError(
-                "A user is required to reopen the checklist."
-            )
-
-        if not getattr(
-            performed_by,
-            "is_authenticated",
-            False,
-        ):
-            raise ValidationError(
-                "The reopening user must be authenticated."
-            )
-
-        if not getattr(
-            performed_by,
-            "is_active",
-            False,
-        ):
-            raise ValidationError(
-                "An inactive user cannot reopen a checklist."
-            )
-
-        with transaction.atomic():
-            checklist = (
-                type(self).objects
-                .select_for_update()
-                .get(pk=self.pk)
-            )
-
-            if not checklist.completed:
-                raise ValidationError(
-                    "Checklist is already open."
-                )
-
-            now = timezone.now()
-
-            type(self).objects.filter(
-                pk=checklist.pk,
-            ).update(
-                completed=False,
-                completed_at=None,
-                completed_by_id=None,
-                updated_at=now,
-            )
-
-        self.completed = False
-        self.completed_at = None
-        self.completed_by_id = None
-
-        return self
-
-    def save(self, *args, **kwargs):
-        if self.completed:
-            if not self.completed_at:
-                self.completed_at = timezone.now()
-
-            if not self.completed_by_id:
-                raise ValidationError(
-                    "A completed checklist must have "
-                    "a completing user."
-                )
-        else:
-            self.completed_at = None
-            self.completed_by_id = None
-
-        self.full_clean()
-
-        return super().save(
-            *args,
-            **kwargs,
-        )
-
-    def __str__(self):
-        chemical_name = (
-            self.chemical.name
-            if self.chemical_id
-            else "Unknown Chemical"
-        )
-
-        batch_number = (
-            self.batch_number
-            or "N/A"
-        )
-
-        return (
-            f"Checklist - {chemical_name} "
-            f"({batch_number})"
-        )

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from datetime import timedelta
-
+from django import forms
 from django.contrib import admin, messages
-from django.contrib.auth import get_user_model
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.contrib.admin import SimpleListFilter
+from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Count
+from django.db.models import Count, Exists, OuterRef, Q
+from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import format_html
@@ -26,193 +26,161 @@ from .models import (
     ChecklistForWaterTreatmentChemicalAnalysis,
     PackagingStatus,
     Supplier,
-    SystematicRandomSample,
-    SystematicRandomSampling,
 )
 
 
-User = get_user_model()
-
-
 class PlantScopedAdminMixin:
-    plant_lookup = None
+    plant_field = "treatment_plant"
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
 
-        if request.user.is_superuser:
+        user = request.user
+
+        if getattr(user, "is_superuser", False):
             return qs
 
-        plant_id = getattr(
-            request.user,
-            "assigned_treatment_plant_id",
-            None,
-        )
+        plant_id = getattr(user, "assigned_treatment_plant_id", None)
 
         if not plant_id:
             return qs.none()
 
-        if not self.plant_lookup:
-            return qs
+        field = self.plant_field
 
-        return qs.filter(
-            **{
-                self.plant_lookup: plant_id,
-            }
-        )
+        if field == "treatment_plant":
+            return qs.filter(treatment_plant_id=plant_id)
 
+        if field == "batch__treatment_plant":
+            return qs.filter(batch__treatment_plant_id=plant_id)
 
-class WorkflowAdminMixin:
-    workflow_fields = (
-        "status",
-        "created_at",
-        "updated_at",
-    )
-
-    def get_readonly_fields(self, request, obj=None):
-        fields = list(
-            super().get_readonly_fields(
-                request,
-                obj,
-            )
-        )
-
-        model_fields = {
-            field.name
-            for field in self.model._meta.fields
-        }
-
-        for field in self.workflow_fields:
-            if field in model_fields and field not in fields:
-                fields.append(field)
-
-        return tuple(fields)
-
-    def _permission_required(
-        self,
-        request,
-        permission: str,
-    ):
-        if not request.user.has_perm(permission):
-            raise PermissionDenied(
-                f"Missing required permission: {permission}"
+        if field == "chemical_analysis_request__batch__treatment_plant":
+            return qs.filter(
+                chemical_analysis_request__batch__treatment_plant_id=plant_id
             )
 
-    def _run_action(
-        self,
-        request,
-        queryset,
-        permission,
-        operation,
-        success_message,
-        failure_message,
-    ):
-        self._permission_required(
-            request,
-            permission,
-        )
+        return qs
 
-        success = 0
-        failed = 0
 
-        for obj in queryset:
-            try:
-                with transaction.atomic():
-                    operation(obj)
-                success += 1
-            except (
-                ValidationError,
-                PermissionDenied,
-            ) as exc:
-                failed += 1
-                self.message_user(
-                    request,
-                    f"{failure_message} {obj}: {exc}",
-                    level=messages.ERROR,
+class PlantFilter(SimpleListFilter):
+    title = "Treatment Plant"
+    parameter_name = "treatment_plant"
+
+    def lookups(self, request, model_admin):
+        field = getattr(model_admin, "plant_filter_field", "treatment_plant")
+
+        model = model_admin.model
+        qs = model_admin.get_queryset(request)
+
+        try:
+            values = (
+                qs.exclude(**{f"{field}__isnull": True})
+                .values_list(
+                    f"{field}__pk",
+                    f"{field}__name",
                 )
-            except Exception as exc:
-                failed += 1
-                self.message_user(
-                    request,
-                    f"{failure_message} {obj}: {exc}",
-                    level=messages.ERROR,
-                )
-
-        if success:
-            self.message_user(
-                request,
-                success_message.format(
-                    count=success,
-                ),
-                level=messages.SUCCESS,
+                .distinct()
+                .order_by(f"{field}__name")
             )
+        except Exception:
+            return []
 
-        if failed:
-            self.message_user(
-                request,
-                f"{failed} operation(s) failed.",
-                level=messages.WARNING,
-            )
+        return [(pk, name) for pk, name in values]
+
+    def queryset(self, request, queryset):
+        if not self.value():
+            return queryset
+
+        field = getattr(
+            self.model_admin,
+            "plant_filter_field",
+            "treatment_plant",
+        )
+
+        return queryset.filter(
+            **{f"{field}_id": self.value()}
+        )
 
 
-class DateRangeFilter(admin.SimpleListFilter):
-    title = "age"
-    parameter_name = "age"
+class CompletionFilter(SimpleListFilter):
+    title = "Completion"
+    parameter_name = "completion"
 
     def lookups(self, request, model_admin):
         return (
-            ("today", "Today"),
-            ("7", "Last 7 days"),
-            ("30", "Last 30 days"),
-            ("90", "Last 90 days"),
-            ("older", "Older than 90 days"),
+            ("complete", "Complete"),
+            ("pending", "Pending"),
         )
 
     def queryset(self, request, queryset):
-        value = self.value()
-
-        if not value:
-            return queryset
-
-        now = timezone.now()
-
-        if value == "today":
-            start = now.replace(
-                hour=0,
-                minute=0,
-                second=0,
-                microsecond=0,
-            )
+        if self.value() == "complete":
             return queryset.filter(
-                created_at__gte=start,
+                Q(status=BatchTestResult.Status.PASS)
+                | Q(status=BatchTestResult.Status.FAIL)
+                | Q(status=BatchTestResult.Status.NA)
             )
 
-        if value in {"7", "30", "90"}:
-            start = now - timedelta(
-                days=int(value),
-            )
+        if self.value() == "pending":
             return queryset.filter(
-                created_at__gte=start,
-            )
-
-        if value == "older":
-            return queryset.filter(
-                created_at__lt=now - timedelta(days=90),
+                Q(status__isnull=True)
+                | Q(status="")
             )
 
         return queryset
 
 
-class OverdueRequestFilter(admin.SimpleListFilter):
-    title = "SLA"
-    parameter_name = "sla"
+class AssignmentFilter(SimpleListFilter):
+    title = "Analyst Assignment"
+    parameter_name = "assignment"
+
+    def lookups(self, request, model_admin):
+        return (
+            ("assigned", "Assigned"),
+            ("unassigned", "Unassigned"),
+            ("auto", "Automatically Assigned"),
+            ("manual", "Manually Assigned"),
+            ("overdue", "Assignment Overdue"),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == "assigned":
+            return queryset.filter(
+                assigned_analysts__isnull=False
+            ).distinct()
+
+        if self.value() == "unassigned":
+            return queryset.filter(
+                assigned_analysts__isnull=True
+            )
+
+        if self.value() == "auto":
+            return queryset.filter(
+                auto_assigned_at__isnull=False
+            )
+
+        if self.value() == "manual":
+            return queryset.filter(
+                manual_assigned_at__isnull=False
+            )
+
+        if self.value() == "overdue":
+            return queryset.filter(
+                assignment_due_at__lt=timezone.now(),
+                assigned_analysts__isnull=True,
+                status=ChemicalAnalysisRequest.Status.PENDING,
+            )
+
+        return queryset
+
+
+class RequestDeadlineFilter(SimpleListFilter):
+    title = "Analysis Deadline"
+    parameter_name = "deadline"
 
     def lookups(self, request, model_admin):
         return (
             ("overdue", "Overdue"),
-            ("due_soon", "Due within 2 hours"),
-            ("on_track", "On track"),
-            ("completed", "Completed"),
+            ("due_today", "Due Today"),
+            ("future", "Future"),
         )
 
     def queryset(self, request, queryset):
@@ -221,269 +189,160 @@ class OverdueRequestFilter(admin.SimpleListFilter):
         if self.value() == "overdue":
             return queryset.filter(
                 analysis_deadline__lt=now,
-            ).exclude(
-                status=ChemicalAnalysisRequest.Status.COMPLETED,
+                status=ChemicalAnalysisRequest.Status.IN_PROGRESS,
             )
 
-        if self.value() == "due_soon":
+        if self.value() == "due_today":
+            today = timezone.localdate()
             return queryset.filter(
-                analysis_deadline__gte=now,
-                analysis_deadline__lte=now + timedelta(hours=2),
-            ).exclude(
-                status=ChemicalAnalysisRequest.Status.COMPLETED,
+                analysis_deadline__date=today
             )
 
-        if self.value() == "on_track":
+        if self.value() == "future":
             return queryset.filter(
-                analysis_deadline__gt=now + timedelta(hours=2),
-            ).exclude(
-                status=ChemicalAnalysisRequest.Status.COMPLETED,
-            )
-
-        if self.value() == "completed":
-            return queryset.filter(
-                status=ChemicalAnalysisRequest.Status.COMPLETED,
+                analysis_deadline__gt=now
             )
 
         return queryset
 
 
-class ExpiryFilter(admin.SimpleListFilter):
-    title = "expiry"
-    parameter_name = "expiry"
+class BatchQualityFilter(SimpleListFilter):
+    title = "Quality"
+    parameter_name = "quality"
 
     def lookups(self, request, model_admin):
         return (
-            ("expired", "Expired"),
-            ("today", "Expires today"),
-            ("soon", "Within 30 days"),
-            ("valid", "Valid"),
+            ("failed", "Has Failed Results"),
+            ("pending", "Has Pending Results"),
+            ("passed", "All Results Passed"),
+            ("na", "Has Not Applicable Results"),
         )
 
     def queryset(self, request, queryset):
-        today = timezone.localdate()
-
-        if self.value() == "expired":
+        if self.value() == "failed":
             return queryset.filter(
-                expiry_date__lt=today,
-            )
+                test_results__status=BatchTestResult.Status.FAIL
+            ).distinct()
 
-        if self.value() == "today":
+        if self.value() == "pending":
             return queryset.filter(
-                expiry_date=today,
-            )
+                Q(test_results__status__isnull=True)
+                | Q(test_results__status="")
+            ).distinct()
 
-        if self.value() == "soon":
-            return queryset.filter(
-                expiry_date__gt=today,
-                expiry_date__lte=today + timedelta(days=30),
-            )
+        if self.value() == "passed":
+            return queryset.exclude(
+                test_results__status=BatchTestResult.Status.FAIL
+            ).exclude(
+                Q(test_results__status__isnull=True)
+                | Q(test_results__status="")
+            ).distinct()
 
-        if self.value() == "valid":
+        if self.value() == "na":
             return queryset.filter(
-                expiry_date__gt=today + timedelta(days=30),
-            )
+                test_results__status=BatchTestResult.Status.NA
+            ).distinct()
 
         return queryset
 
 
-class SamplingOutcomeFilter(admin.SimpleListFilter):
-    title = "sampling outcome"
-    parameter_name = "sampling_outcome"
-
-    def lookups(self, request, model_admin):
-        return (
-            ("pending", "Pending"),
-            ("passed", "Passed"),
-            ("qa", "QA required"),
-            ("approved", "QA approved"),
-        )
-
-    def queryset(self, request, queryset):
-        value = self.value()
-
-        if value == "pending":
-            return queryset.filter(
-                status=SystematicRandomSampling.Status.PENDING,
-            )
-
-        if value == "passed":
-            return queryset.filter(
-                sampling_passed=True,
-                qa_required=False,
-            )
-
-        if value == "qa":
-            return queryset.filter(
-                qa_required=True,
-                qa_approved=False,
-            )
-
-        if value == "approved":
-            return queryset.filter(
-                qa_approved=True,
-            )
-
-        return queryset
-
-
-class IntegrityFilter(admin.SimpleListFilter):
-    title = "integrity"
-    parameter_name = "integrity"
+class ApprovalFilter(SimpleListFilter):
+    title = "Approval"
+    parameter_name = "approval"
 
     def lookups(self, request, model_admin):
         return (
             ("approved", "Approved"),
-            ("unverified", "Unverified"),
-            ("valid", "Valid"),
-            ("invalid", "Invalid"),
-            ("unapproved", "Unapproved"),
+            ("unapproved", "Not Approved"),
+            ("verified", "Integrity Verified"),
+            ("invalid", "Integrity Invalid"),
         )
 
     def queryset(self, request, queryset):
-        value = self.value()
-
-        if value == "approved":
+        if self.value() == "approved":
             return queryset.filter(
                 approved_by__isnull=False,
                 approved_on__isnull=False,
             )
 
-        if value == "unapproved":
+        if self.value() == "unapproved":
             return queryset.filter(
-                approved_by__isnull=True,
+                Q(approved_by__isnull=True)
+                | Q(approved_on__isnull=True)
             )
 
-        if value == "unverified":
-            return queryset.filter(
+        if self.value() == "verified":
+            return queryset.exclude(
+                verified_hash=""
+            ).filter(
                 approved_by__isnull=False,
-                verified_hash="",
+                approved_on__isnull=False,
             )
 
-        if value == "valid":
-            return queryset.filter(
+        if self.value() == "invalid":
+            candidates = queryset.exclude(
+                verified_hash=""
+            ).filter(
                 approved_by__isnull=False,
-            ).exclude(
-                verified_hash="",
+                approved_on__isnull=False,
             )
 
-        if value == "invalid":
-            return queryset.filter(
-                approved_by__isnull=False,
-                verified_hash="",
-            )
+            invalid_ids = []
+
+            for coa in candidates.iterator():
+                if not coa.verify_integrity():
+                    invalid_ids.append(coa.pk)
+
+            return queryset.filter(pk__in=invalid_ids)
 
         return queryset
 
 
-class ChemicalSpecificationRemarkInline(admin.TabularInline):
-    model = ChemicalSpecificationRemark
-    extra = 0
-    fields = (
-        "on_pass",
-        "on_fail",
-    )
+class StatusBadgeMixin:
+    status_colors = {}
 
+    def status_badge(self, obj):
+        value = getattr(obj, "status", None) or "UNKNOWN"
+        label = getattr(obj, "get_status_display", lambda: value)()
 
-class ChemicalSpecificationInline(admin.TabularInline):
-    model = ChemicalSpecification
-    extra = 0
-    show_change_link = True
-    autocomplete_fields = (
-        "method",
-        "treatment_plant",
-    )
-    fields = (
-        "parameter_name",
-        "unit",
-        "method",
-        "min_limit",
-        "max_limit",
-        "is_required",
-        "version",
-        "treatment_plant",
-    )
+        return format_html(
+            '<span style="display:inline-block;padding:3px 9px;'
+            'border-radius:999px;font-weight:600;'
+            'background:#f1f5f9;color:#0f172a;">{}</span>',
+            label,
+        )
 
-
-class BatchTestResultInline(admin.TabularInline):
-    model = BatchTestResult
-    extra = 0
-    show_change_link = True
-    autocomplete_fields = (
-        "parameter",
-        "analyst",
-    )
-    readonly_fields = (
-        "tested_at",
-        "auto_remark",
-    )
-    fields = (
-        "parameter",
-        "value",
-        "textual_result",
-        "status",
-        "analyst",
-        "tested_at",
-        "auto_remark",
-    )
-
-
-class SystematicRandomSampleInline(admin.TabularInline):
-    model = SystematicRandomSample
-    extra = 0
-    can_delete = False
-    fields = (
-        "package_number",
-        "declared_net_weight",
-        "measured_weight",
-        "weight_difference",
-    )
-    readonly_fields = (
-        "package_number",
-        "declared_net_weight",
-        "weight_difference",
-    )
-
-
-@admin.register(Chemical)
+    status_badge.short_description = "Status"
 class ChemicalAdmin(admin.ModelAdmin):
     list_display = (
         "code",
         "name",
         "grade",
-        "weight_tolerance_display",
         "specification_count",
         "batch_count",
-        "formula_status",
+        "hydrometer_enabled",
     )
-
     search_fields = (
         "name",
         "code",
         "description",
         "grade",
     )
-
     list_filter = (
         "grade",
-        DateRangeFilter,
     )
-
     ordering = (
-        "name",
         "code",
+        "name",
     )
-
     list_per_page = 50
-
-    inlines = (
-        ChemicalSpecificationInline,
-    )
-
+    save_on_top = True
+    list_select_related = False
     readonly_fields = (
-        "weight_tolerance",
+        "hydrometer_enabled",
+        "specification_count",
+        "batch_count",
     )
-
     fieldsets = (
         (
             "Chemical Identity",
@@ -491,21 +350,51 @@ class ChemicalAdmin(admin.ModelAdmin):
                 "fields": (
                     "name",
                     "code",
-                    "description",
                     "grade",
+                    "description",
                 )
             },
         ),
         (
-            "Analytical Configuration",
+            "Hydrometer Calculation",
             {
                 "fields": (
                     "hydrometer_formula",
-                    "weight_tolerance",
-                )
+                    "hydrometer_enabled",
+                ),
+                "description": (
+                    "The hydrometer formula is evaluated using the "
+                    "validated reading variable and approved math "
+                    "functions only."
+                ),
+            },
+        ),
+        (
+            "Operational Statistics",
+            {
+                "fields": (
+                    "specification_count",
+                    "batch_count",
+                ),
+                "classes": ("collapse",),
             },
         ),
     )
+
+    @admin.display(boolean=True, description="Hydrometer Formula")
+    def hydrometer_enabled(self, obj):
+        return bool(
+            obj.hydrometer_formula
+            and obj.hydrometer_formula.strip()
+        )
+
+    @admin.display(description="Specifications")
+    def specification_count(self, obj):
+        return getattr(obj, "_specification_count", 0)
+
+    @admin.display(description="Batches")
+    def batch_count(self, obj):
+        return getattr(obj, "_batch_count", 0)
 
     def get_queryset(self, request):
         return (
@@ -517,77 +406,37 @@ class ChemicalAdmin(admin.ModelAdmin):
                     distinct=True,
                 ),
                 _batch_count=Count(
-                    "chemical_batches",
+                    "chemicalbatch",
                     distinct=True,
                 ),
             )
         )
 
-    @admin.display(
-        description="Tolerance",
-        ordering="weight_tolerance",
-    )
-    def weight_tolerance_display(self, obj):
-        if obj.weight_tolerance is None:
-            return "—"
-        return f"{obj.weight_tolerance:g}"
-
-    @admin.display(
-        description="Specifications",
-        ordering="_specification_count",
-    )
-    def specification_count(self, obj):
-        return obj._specification_count
-
-    @admin.display(
-        description="Batches",
-        ordering="_batch_count",
-    )
-    def batch_count(self, obj):
-        return obj._batch_count
-
-    @admin.display(description="Formula")
-    def formula_status(self, obj):
-        if not obj.hydrometer_formula:
-            return format_html(
-                '<span style="color:#777;">Not configured</span>'
-            )
-
-        try:
-            obj.clean()
-        except ValidationError:
-            return format_html(
-                '<strong style="color:#b42318;">Invalid</strong>'
-            )
-
-        return format_html(
-            '<strong style="color:#027a48;">Valid</strong>'
-        )
+    def save_model(self, request, obj, form, change):
+        obj.full_clean()
+        super().save_model(request, obj, form, change)
 
 
-@admin.register(Supplier)
 class SupplierAdmin(admin.ModelAdmin):
     list_display = (
         "name",
         "contract_number",
-        "contract_status",
+        "contact_info",
+        "contract_document_status",
         "batch_count",
     )
-
     search_fields = (
         "name",
         "contract_number",
         "contact_info",
     )
-
-    ordering = (
-        "name",
-    )
-
+    list_filter = ()
+    ordering = ("name",)
     list_per_page = 50
-
+    save_on_top = True
     readonly_fields = (
         "batch_count",
+        "contract_document_status",
     )
 
     fieldsets = (
@@ -597,12 +446,44 @@ class SupplierAdmin(admin.ModelAdmin):
                 "fields": (
                     "name",
                     "contract_number",
-                    "contract_document",
                     "contact_info",
                 )
             },
         ),
+        (
+            "Contract Documentation",
+            {
+                "fields": (
+                    "contract_document",
+                    "contract_document_status",
+                )
+            },
+        ),
+        (
+            "Operational Usage",
+            {
+                "fields": (
+                    "batch_count",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
     )
+
+    @admin.display(description="Contract Document")
+    def contract_document_status(self, obj):
+        if not obj.contract_document:
+            return format_html(
+                '<span style="color:#b91c1c;font-weight:600;">Missing</span>'
+            )
+
+        return format_html(
+            '<span style="color:#15803d;font-weight:600;">Available</span>'
+        )
+
+    @admin.display(description="Chemical Batches")
+    def batch_count(self, obj):
+        return getattr(obj, "_batch_count", 0)
 
     def get_queryset(self, request):
         return (
@@ -616,57 +497,40 @@ class SupplierAdmin(admin.ModelAdmin):
             )
         )
 
-    @admin.display(description="Batches")
-    def batch_count(self, obj):
-        return obj._batch_count
 
-    @admin.display(description="Contract")
-    def contract_status(self, obj):
-        if obj.contract_document:
-            return format_html(
-                '<strong style="color:#027a48;">Attached</strong>'
-            )
-
-        return format_html(
-            '<strong style="color:#b42318;">Missing</strong>'
-        )
-
-
-@admin.register(ChemicalLocation)
-class ChemicalLocationAdmin(
-    PlantScopedAdminMixin,
-    admin.ModelAdmin,
-):
-    plant_lookup = "treatment_plant_id"
+class ChemicalLocationAdmin(PlantScopedAdminMixin, admin.ModelAdmin):
+    plant_field = "treatment_plant"
+    plant_filter_field = "treatment_plant"
 
     list_display = (
         "name",
         "treatment_plant",
         "request_count",
     )
-
     search_fields = (
         "name",
         "treatment_plant__name",
     )
-
     list_filter = (
-        "treatment_plant",
+        PlantFilter,
     )
-
     autocomplete_fields = (
         "treatment_plant",
     )
-
+    ordering = (
+        "treatment_plant__name",
+        "name",
+    )
     list_per_page = 50
+
+    @admin.display(description="Analysis Requests")
+    def request_count(self, obj):
+        return getattr(obj, "_request_count", 0)
 
     def get_queryset(self, request):
         return (
             super()
             .get_queryset(request)
-            .select_related(
-                "treatment_plant",
-            )
             .annotate(
                 _request_count=Count(
                     "analysis_requests",
@@ -675,148 +539,105 @@ class ChemicalLocationAdmin(
             )
         )
 
-    @admin.display(description="Requests")
-    def request_count(self, obj):
-        return obj._request_count
-
-
-@admin.register(ChemicalSpecification)
-class ChemicalSpecificationAdmin(
-    PlantScopedAdminMixin,
-    admin.ModelAdmin,
-):
-    plant_lookup = "treatment_plant_id"
+class ChemicalSpecificationAdmin(PlantScopedAdminMixin, admin.ModelAdmin):
+    plant_field = "treatment_plant"
+    plant_filter_field = "treatment_plant"
 
     list_display = (
         "chemical",
         "parameter_name",
         "unit",
-        "limits_display",
-        "required_badge",
-        "version",
-        "treatment_plant",
-        "created_at",
-    )
-
-    search_fields = (
-        "parameter_name",
-        "unit",
-        "chemical__name",
-        "chemical__code",
-        "treatment_plant__name",
-    )
-
-    list_filter = (
+        "limit_range",
         "is_required",
         "version",
+        "method",
         "treatment_plant",
-        "chemical",
     )
-
+    search_fields = (
+        "chemical__name",
+        "chemical__code",
+        "parameter_name",
+        "unit",
+        "method__name",
+    )
+    list_filter = (
+        PlantFilter,
+        "is_required",
+        "version",
+        "unit",
+    )
     autocomplete_fields = (
         "chemical",
         "method",
         "treatment_plant",
     )
-
-    readonly_fields = (
-        "created_at",
+    ordering = (
+        "chemical__name",
+        "parameter_name",
+        "-version",
     )
-
-    inlines = (
-        ChemicalSpecificationRemarkInline,
-    )
-
     list_per_page = 50
+    save_on_top = True
 
-    @admin.display(description="Limits")
-    def limits_display(self, obj):
-        minimum = (
-            "—"
-            if obj.min_limit is None
-            else str(obj.min_limit)
-        )
-        maximum = (
-            "—"
-            if obj.max_limit is None
-            else str(obj.max_limit)
-        )
+    @admin.display(description="Specification Range")
+    def limit_range(self, obj):
+        minimum = obj.min_limit
+        maximum = obj.max_limit
 
-        return f"{minimum} → {maximum}"
+        if minimum is None and maximum is None:
+            return "No limit"
 
-    @admin.display(description="Required")
-    def required_badge(self, obj):
-        if obj.is_required:
-            return format_html(
-                '<strong style="color:#027a48;">YES</strong>'
-            )
+        if minimum is None:
+            return format_html("≤ {}", maximum)
 
-        return format_html(
-            '<span style="color:#777;">NO</span>'
-        )
+        if maximum is None:
+            return format_html("≥ {}", minimum)
+
+        return format_html("{} – {}", minimum, maximum)
 
 
-@admin.register(ChemicalSpecificationRemark)
-class ChemicalSpecificationRemarkAdmin(
-    PlantScopedAdminMixin,
-    admin.ModelAdmin,
-):
-    plant_lookup = "specification__treatment_plant_id"
-
+class ChemicalSpecificationRemarkAdmin(admin.ModelAdmin):
     list_display = (
         "specification",
-        "chemical",
-        "treatment_plant",
+        "on_pass_preview",
+        "on_fail_preview",
     )
-
     search_fields = (
         "specification__parameter_name",
         "specification__chemical__name",
-        "specification__chemical__code",
         "on_pass",
         "on_fail",
     )
-
     autocomplete_fields = (
         "specification",
     )
+    list_per_page = 50
 
-    def get_queryset(self, request):
-        return (
-            super()
-            .get_queryset(request)
-            .select_related(
-                "specification",
-                "specification__chemical",
-                "specification__treatment_plant",
-            )
-        )
+    @admin.display(description="Pass Remark")
+    def on_pass_preview(self, obj):
+        return (obj.on_pass or "")[:100]
 
-    @admin.display(description="Chemical")
-    def chemical(self, obj):
-        return obj.specification.chemical
-
-    @admin.display(description="Treatment plant")
-    def treatment_plant(self, obj):
-        return obj.specification.treatment_plant
+    @admin.display(description="Fail Remark")
+    def on_fail_preview(self, obj):
+        return (obj.on_fail or "")[:100]
 
 
-@admin.register(PackagingStatus)
 class PackagingStatusAdmin(admin.ModelAdmin):
     list_display = (
         "name",
         "description",
         "coa_count",
     )
-
     search_fields = (
         "name",
         "description",
     )
+    ordering = ("name",)
+    list_per_page = 50
 
-    ordering = (
-        "name",
-    )
+    @admin.display(description="CoAs")
+    def coa_count(self, obj):
+        return getattr(obj, "_coa_count", 0)
 
     def get_queryset(self, request):
         return (
@@ -830,85 +651,55 @@ class PackagingStatusAdmin(admin.ModelAdmin):
             )
         )
 
-    @admin.display(description="CoAs")
-    def coa_count(self, obj):
-        return obj._coa_count
 
-
-@admin.register(ChemicalCertApprover)
 class ChemicalCertApproverAdmin(admin.ModelAdmin):
     list_display = (
         "user",
         "signature_status",
         "stamp_status",
     )
-
     search_fields = (
         "user__username",
         "user__first_name",
         "user__last_name",
         "user__email",
     )
-
     autocomplete_fields = (
         "user",
     )
-
-    readonly_fields = (
-        "user",
-    )
-
-    fieldsets = (
-        (
-            "Approver",
-            {
-                "fields": (
-                    "user",
-                    "signature",
-                    "rubber_stamp",
-                )
-            },
-        ),
-    )
+    list_per_page = 50
 
     @admin.display(description="Signature")
     def signature_status(self, obj):
-        return (
-            "Available"
-            if obj.signature
-            else "Missing"
-        )
+        return bool(obj.signature)
 
-    @admin.display(description="Rubber stamp")
+    @admin.display(description="Rubber Stamp")
     def stamp_status(self, obj):
-        return (
-            "Available"
-            if obj.rubber_stamp
-            else "Missing"
-        )
+        return bool(obj.rubber_stamp)
 
 
-@admin.register(ChemicalBatch)
 class ChemicalBatchAdmin(
     PlantScopedAdminMixin,
-    WorkflowAdminMixin,
+    StatusBadgeMixin,
     admin.ModelAdmin,
 ):
-    plant_lookup = "treatment_plant_id"
+    plant_field = "treatment_plant"
+    plant_filter_field = "treatment_plant"
 
     list_display = (
-        "sample_link",
+        "sample_identifier",
         "batch_number",
         "chemical",
         "supplier",
         "treatment_plant",
-        "quantity_display",
-        "status_badge",
-        "analysis_state",
-        "coa_state",
         "received_date",
+        "quantity_received",
+        "package_count",
+        "status_badge",
+        "quality_indicator",
+        "analysis_indicator",
+        "coa_indicator",
     )
-
     search_fields = (
         "sample_id",
         "batch_number",
@@ -918,84 +709,97 @@ class ChemicalBatchAdmin(
         "supplier__name",
         "treatment_plant__name",
     )
-
     list_filter = (
+        PlantFilter,
         "status",
-        "chemical",
-        "supplier",
-        "treatment_plant",
-        DateRangeFilter,
+        BatchQualityFilter,
+        "received_date",
     )
-
+    date_hierarchy = "received_date"
     autocomplete_fields = (
         "chemical",
         "supplier",
         "treatment_plant",
         "received_by",
     )
-
     readonly_fields = (
         "sample_id",
         "received_date",
         "created_at",
         "updated_at",
-        "coa_generated",
+        "analysis_request_link",
+        "analysis_process_link",
+        "coa_link",
+        "test_result_count",
+        "quality_summary",
     )
-
-    inlines = (
-        BatchTestResultInline,
+    ordering = (
+        "-received_date",
+        "-created_at",
     )
-
+    list_per_page = 50
+    save_on_top = True
     actions = (
-        "transition_to_approved",
         "transition_to_rejected",
+        "transition_to_approved",
         "transition_to_utilized",
         "transition_to_returned",
     )
 
-    list_select_related = (
-        "chemical",
-        "supplier",
-        "treatment_plant",
-        "received_by",
-    )
-
-    list_per_page = 50
-
     fieldsets = (
         (
-            "Workflow Identity",
+            "Batch Identification",
             {
                 "fields": (
                     "sample_id",
-                    "status",
-                    "coa_generated",
+                    "batch_number",
+                    "delivery_note_number",
                 )
             },
         ),
         (
-            "Delivery",
+            "Chemical & Supplier",
             {
                 "fields": (
-                    "batch_number",
-                    "delivery_note_number",
                     "chemical",
                     "supplier",
                     "treatment_plant",
-                    "received_date",
-                    "received_by",
-                    "quantity_received",
-                    "unit",
-                    "package_count",
                 )
             },
         ),
         (
-            "Notes",
+            "Receipt",
             {
                 "fields": (
+                    "received_date",
+                    "quantity_received",
+                    "unit",
+                    "package_count",
+                    "received_by",
+                    "status",
                     "remarks",
                 )
+            },
+        ),
+        (
+            "Workflow",
+            {
+                "fields": (
+                    "analysis_request_link",
+                    "analysis_process_link",
+                    "coa_link",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            "Quality Overview",
+            {
+                "fields": (
+                    "test_result_count",
+                    "quality_summary",
+                ),
+                "classes": ("collapse",),
             },
         ),
         (
@@ -1004,166 +808,242 @@ class ChemicalBatchAdmin(
                 "fields": (
                     "created_at",
                     "updated_at",
-                )
+                ),
+                "classes": ("collapse",),
             },
         ),
     )
 
     @admin.display(description="Sample ID")
-    def sample_link(self, obj):
-        url = reverse(
-            "admin:ca_chemicalbatch_change",
-            args=[obj.pk],
-        )
-
+    def sample_identifier(self, obj):
         return format_html(
-            '<a href="{}"><strong>{}</strong></a>',
-            url,
+            '<strong>{}</strong>',
             obj.sample_id,
         )
 
-    @admin.display(description="Quantity")
-    def quantity_display(self, obj):
-        return f"{obj.quantity_received:g} {obj.unit}"
+    @admin.display(description="Quality")
+    def quality_indicator(self, obj):
+        failed = obj.test_results.filter(
+            status=BatchTestResult.Status.FAIL
+        ).exists()
 
-    @admin.display(description="Status", ordering="status")
-    def status_badge(self, obj):
-        palette = {
-            "RECEIVED": "#175cd3",
-            "ANALYSED": "#026aa2",
-            "APPROVED": "#027a48",
-            "REJECTED": "#b42318",
-            "UTILIZED": "#344054",
-            "RETURNED": "#93370d",
-        }
+        pending = obj.test_results.filter(
+            Q(status__isnull=True)
+            | Q(status="")
+        ).exists()
 
-        color = palette.get(
-            obj.status,
-            "#475467",
-        )
+        if failed:
+            return format_html(
+                '<span style="color:#b91c1c;font-weight:700;">FAILED</span>'
+            )
 
-        return format_html(
-            '<strong style="color:{};">{}</strong>',
-            color,
-            obj.get_status_display(),
-        )
+        if pending:
+            return format_html(
+                '<span style="color:#b45309;font-weight:700;">PENDING</span>'
+            )
+
+        if obj.test_results.exists():
+            return format_html(
+                '<span style="color:#15803d;font-weight:700;">PASSED</span>'
+            )
+
+        return "No results"
 
     @admin.display(description="Analysis")
-    def analysis_state(self, obj):
-        process = getattr(
-            obj,
-            "analysis_process",
-            None,
-        )
+    def analysis_indicator(self, obj):
+        request = getattr(obj, "analysis_request", None)
 
-        if process is None:
-            return "Not started"
+        if request is None:
+            return "Not requested"
 
-        return process.get_status_display()
+        return request.get_status_display()
 
     @admin.display(description="CoA")
-    def coa_state(self, obj):
-        coa = getattr(
-            obj,
-            "coa",
-            None,
-        )
+    def coa_indicator(self, obj):
+        coa = getattr(obj, "coa", None)
 
         if coa is None:
             return "Not generated"
 
         if coa.is_approved:
-            return "Approved"
-
-        return coa.generation_status
-
-    @admin.action(description="Approve selected batches")
-    def transition_to_approved(self, request, queryset):
-        self._run_action(
-            request,
-            queryset,
-            "ca.approve_chemical_batch",
-            lambda obj: obj.transition_to(
-                ChemicalBatch.Status.APPROVED,
-                performed_by=request.user,
-            ),
-            "{} batch(es) approved.",
-            "Could not approve",
-        )
-
-    @admin.action(description="Reject selected batches")
-    def transition_to_rejected(self, request, queryset):
-        self._run_action(
-            request,
-            queryset,
-            "ca.reject_chemical_batch",
-            lambda obj: obj.transition_to(
-                ChemicalBatch.Status.REJECTED,
-                performed_by=request.user,
-            ),
-            "{} batch(es) rejected.",
-            "Could not reject",
-        )
-
-    @admin.action(description="Utilize selected batches")
-    def transition_to_utilized(self, request, queryset):
-        self._run_action(
-            request,
-            queryset,
-            "ca.utilize_chemical_batch",
-            lambda obj: obj.transition_to(
-                ChemicalBatch.Status.UTILIZED,
-                performed_by=request.user,
-            ),
-            "{} batch(es) utilized.",
-            "Could not utilize",
-        )
-
-    @admin.action(description="Return selected batches")
-    def transition_to_returned(self, request, queryset):
-        self._run_action(
-            request,
-            queryset,
-            "ca.return_chemical_batch",
-            lambda obj: obj.transition_to(
-                ChemicalBatch.Status.RETURNED,
-                performed_by=request.user,
-            ),
-            "{} batch(es) returned.",
-            "Could not return",
-        )
-
-    def get_queryset(self, request):
-        return (
-            super()
-            .get_queryset(request)
-            .prefetch_related(
-                "test_results",
+            return format_html(
+                '<span style="color:#15803d;font-weight:700;">APPROVED</span>'
             )
+
+        if coa.can_generate():
+            return format_html(
+                '<span style="color:#b45309;font-weight:700;">READY</span>'
+            )
+
+        return "Not ready"
+
+    @admin.display(description="Test Results")
+    def test_result_count(self, obj):
+        return obj.test_results.count()
+
+    @admin.display(description="Quality Summary")
+    def quality_summary(self, obj):
+        total = obj.test_results.count()
+        passed = obj.test_results.filter(
+            status=BatchTestResult.Status.PASS
+        ).count()
+        failed = obj.test_results.filter(
+            status=BatchTestResult.Status.FAIL
+        ).count()
+        na = obj.test_results.filter(
+            status=BatchTestResult.Status.NA
+        ).count()
+        pending = obj.test_results.filter(
+            Q(status__isnull=True)
+            | Q(status="")
+        ).count()
+
+        return (
+            f"Total: {total} | "
+            f"Pass: {passed} | "
+            f"Fail: {failed} | "
+            f"N/A: {na} | "
+            f"Pending: {pending}"
+        )
+
+    @admin.display(description="Analysis Request")
+    def analysis_request_link(self, obj):
+        request = getattr(obj, "analysis_request", None)
+
+        if request is None:
+            return "—"
+
+        url = reverse(
+            "admin:ca_chemicalanalysisrequest_change",
+            args=[request.pk],
+        )
+
+        return format_html(
+            '<a href="{}">{}</a>',
+            url,
+            request.request_id,
+        )
+
+    @admin.display(description="Analysis Process")
+    def analysis_process_link(self, obj):
+        process = getattr(obj, "analysis_process", None)
+
+        if process is None:
+            return "—"
+
+        url = reverse(
+            "admin:ca_chemicalanalysisprocess_change",
+            args=[process.pk],
+        )
+
+        return format_html(
+            '<a href="{}">Process #{}</a>',
+            url,
+            process.pk,
+        )
+
+    @admin.display(description="Certificate of Analysis")
+    def coa_link(self, obj):
+        coa = getattr(obj, "coa", None)
+
+        if coa is None:
+            return "—"
+
+        url = reverse(
+            "admin:ca_chemicalcoa_change",
+            args=[coa.pk],
+        )
+
+        return format_html(
+            '<a href="{}">CoA #{}</a>',
+            url,
+            coa.pk,
+        )
+
+    def _transition_selected(self, request, queryset, target):
+        success = 0
+        failures = []
+
+        for batch in queryset:
+            try:
+                batch.transition_to(
+                    target,
+                    performed_by=request.user,
+                )
+                success += 1
+            except ValidationError as exc:
+                failures.append(
+                    f"{batch.sample_id}: {exc}"
+                )
+
+        if success:
+            self.message_user(
+                request,
+                f"{success} batch(es) transitioned to "
+                f"{target}.",
+                messages.SUCCESS,
+            )
+
+        for failure in failures[:10]:
+            self.message_user(
+                request,
+                failure,
+                messages.ERROR,
+            )
+
+    @admin.action(description="Transition selected batches to Rejected")
+    def transition_to_rejected(self, request, queryset):
+        self._transition_selected(
+            request,
+            queryset,
+            ChemicalBatch.Status.REJECTED,
+        )
+
+    @admin.action(description="Transition selected batches to Approved")
+    def transition_to_approved(self, request, queryset):
+        self._transition_selected(
+            request,
+            queryset,
+            ChemicalBatch.Status.APPROVED,
+        )
+
+    @admin.action(description="Transition selected batches to Utilized")
+    def transition_to_utilized(self, request, queryset):
+        self._transition_selected(
+            request,
+            queryset,
+            ChemicalBatch.Status.UTILIZED,
+        )
+
+    @admin.action(description="Transition selected batches to Returned")
+    def transition_to_returned(self, request, queryset):
+        self._transition_selected(
+            request,
+            queryset,
+            ChemicalBatch.Status.RETURNED,
         )
 
 
-@admin.register(ChemicalAnalysisRequest)
 class ChemicalAnalysisRequestAdmin(
     PlantScopedAdminMixin,
-    WorkflowAdminMixin,
+    StatusBadgeMixin,
     admin.ModelAdmin,
 ):
-    plant_lookup = "batch__treatment_plant_id"
+    plant_field = "batch__treatment_plant"
+    plant_filter_field = "batch__treatment_plant"
 
     list_display = (
-        "request_link",
-        "sample_id_display",
+        "request_identifier",
+        "batch_sample",
         "chemical",
         "treatment_plant",
         "status_badge",
+        "assignment_status",
         "analyst_count",
-        "analyst_assignment_status",
-        "sla_status",
+        "deadline_status",
         "analysis_started_at",
         "completed_at",
     )
-
     search_fields = (
         "request_id",
         "batch__sample_id",
@@ -1172,87 +1052,97 @@ class ChemicalAnalysisRequestAdmin(
         "batch__chemical__code",
         "location__name",
         "requested_by__username",
-        "assigned_analysts__username",
+        "requested_by__first_name",
+        "requested_by__last_name",
+        "received_by__username",
     )
-
     list_filter = (
+        PlantFilter,
         "status",
-        "batch__chemical",
-        "batch__supplier",
-        "batch__treatment_plant",
-        OverdueRequestFilter,
-        DateRangeFilter,
+        AssignmentFilter,
+        RequestDeadlineFilter,
+        "created_at",
     )
-
+    date_hierarchy = "created_at"
     autocomplete_fields = (
         "batch",
         "requested_by",
         "received_by",
-        "completed_by",
         "location",
+        "assigned_analysts",
+        "completed_by",
     )
-
+    filter_horizontal = (
+        "assigned_analysts",
+    )
     readonly_fields = (
         "request_id",
-        "assigned_analysts_display",
+        "created_at",
+        "updated_at",
+        "assignment_due_at",
+        "auto_assigned_at",
+        "manual_assigned_at",
         "analysis_started_at",
         "analysis_deadline",
         "completed_at",
-        "created_at",
-        "updated_at",
+        "assigned_analyst_count_display",
+        "assignment_status_display",
+        "workflow_links",
+        "checklist_link",
+        "result_summary",
     )
-
+    ordering = (
+        "status",
+        "assignment_due_at",
+        "-created_at",
+    )
+    list_per_page = 50
+    save_on_top = True
     actions = (
+        "run_due_auto_assignment",
         "start_selected_requests",
         "complete_selected_requests",
-        "refresh_selected_analyst_assignments",
-    )
-
-    list_select_related = (
-        "batch",
-        "batch__chemical",
-        "batch__supplier",
-        "batch__treatment_plant",
-        "location",
-        "requested_by",
-        "received_by",
-        "completed_by",
     )
 
     fieldsets = (
         (
-            "Request",
+            "Request Identity",
             {
                 "fields": (
                     "request_id",
                     "batch",
-                    "status",
+                    "location",
+                    "delivery_date",
                 )
             },
         ),
         (
-            "Receipt",
+            "Request Origin",
             {
                 "fields": (
                     "requested_by",
                     "received_by",
-                    "delivery_date",
-                    "location",
                 )
             },
         ),
         (
-            "Current Analyst Assignment",
+            "Assignment",
             {
                 "fields": (
-                    "assigned_analysts_display",
+                    "assigned_analysts",
+                    "assigned_analyst_count_display",
+                    "assignment_status_display",
+                    "assignment_due_at",
+                    "manual_assigned_at",
+                    "auto_assigned_at",
                 )
             },
         ),
         (
-            "SLA",
+            "Analysis Lifecycle",
             {
                 "fields": (
+                    "status",
                     "analysis_started_at",
                     "analysis_deadline",
                     "completed_at",
@@ -1261,119 +1151,105 @@ class ChemicalAnalysisRequestAdmin(
             },
         ),
         (
+            "Workflow Navigation",
+            {
+                "fields": (
+                    "workflow_links",
+                    "checklist_link",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            "Results",
+            {
+                "fields": (
+                    "result_summary",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
             "Audit",
             {
                 "fields": (
                     "created_at",
                     "updated_at",
-                )
+                ),
+                "classes": ("collapse",),
             },
         ),
     )
 
-    @admin.display(description="Request ID")
-    def request_link(self, obj):
-        url = reverse(
-            "admin:ca_chemicalanalysisrequest_change",
-            args=[obj.pk],
-        )
-
+    @admin.display(description="Request")
+    def request_identifier(self, obj):
         return format_html(
-            '<a href="{}"><strong>{}</strong></a>',
-            url,
+            '<strong>{}</strong>',
             obj.request_id,
         )
 
     @admin.display(description="Sample")
-    def sample_id_display(self, obj):
+    def batch_sample(self, obj):
         return obj.sample_id or "—"
 
-    @admin.display(description="Plant")
+    @admin.display(description="Chemical")
+    def chemical(self, obj):
+        return getattr(
+            obj.chemical,
+            "name",
+            "—",
+        )
+
+    @admin.display(description="Treatment Plant")
     def treatment_plant(self, obj):
-        return obj.treatment_plant or "—"
+        return getattr(
+            obj.treatment_plant,
+            "name",
+            "—",
+        )
 
     @admin.display(description="Analysts")
     def analyst_count(self, obj):
-        return obj.assigned_analyst_count
+        return obj.assigned_analysts.count()
 
     @admin.display(description="Assignment")
-    def analyst_assignment_status(self, obj):
-        count = obj.assigned_analyst_count
-
-        if count:
-            return format_html(
-                '<strong style="color:#027a48;">{} active analyst(s)</strong>',
-                count,
-            )
-
-        return format_html(
-            '<strong style="color:#b42318;">No current assignment</strong>'
-        )
-
-    @admin.display(description="Assigned analysts")
-    def assigned_analysts_display(self, obj):
-        analysts = list(
-            obj.assigned_analysts.filter(
-                is_active=True,
-            ).order_by(
-                "first_name",
-                "last_name",
-                "username",
-            )
-        )
-
-        if not analysts:
-            return format_html(
-                '<strong style="color:#b42318;">'
-                "No analysts currently assigned through weekly duty tasks"
-                "</strong>"
-            )
-
-        return format_html(
-            "<br>".join(
-                "{} — {}".format(
-                    analyst.get_full_name() or analyst.username,
-                    analyst.username,
+    def assignment_status(self, obj):
+        if obj.has_assigned_analysts:
+            if obj.auto_assigned_at:
+                return format_html(
+                    '<span style="color:#0369a1;font-weight:700;">AUTO</span>'
                 )
-                for analyst in analysts
-            )
-        )
 
-    @admin.display(description="Status")
-    def status_badge(self, obj):
-        colors = {
-            "PENDING": "#175cd3",
-            "IN_PROGRESS": "#b54708",
-            "COMPLETED": "#027a48",
-        }
+            if obj.manual_assigned_at:
+                return format_html(
+                    '<span style="color:#15803d;font-weight:700;">MANUAL</span>'
+                )
 
-        color = colors.get(
-            obj.status,
-            "#475467",
-        )
+            return "ASSIGNED"
 
-        return format_html(
-            '<strong style="color:{};">{}</strong>',
-            color,
-            obj.get_status_display(),
-        )
-
-    @admin.display(description="SLA")
-    def sla_status(self, obj):
-        if obj.completed:
+        if obj.assignment_overdue:
             return format_html(
-                '<strong style="color:#027a48;">COMPLETED</strong>'
+                '<span style="color:#b91c1c;font-weight:700;">OVERDUE</span>'
             )
 
+        if obj.assignment_pending:
+            return format_html(
+                '<span style="color:#b45309;font-weight:700;">PENDING</span>'
+            )
+
+        return "—"
+
+    @admin.display(description="Deadline")
+    def deadline_status(self, obj):
         if obj.is_overdue:
             return format_html(
-                '<strong style="color:#b42318;">OVERDUE</strong>'
+                '<span style="color:#b91c1c;font-weight:700;">OVERDUE</span>'
             )
 
         remaining = obj.time_remaining
 
         if remaining is None:
-            return "No deadline"
+            return "—"
 
         total_seconds = int(
             remaining.total_seconds()
@@ -1385,554 +1261,332 @@ class ChemicalAnalysisRequestAdmin(
         )
         minutes = remainder // 60
 
-        if hours < 2:
-            return format_html(
-                '<strong style="color:#b54708;">{}h {}m</strong>',
-                hours,
-                minutes,
-            )
-
-        return f"{hours}h {minutes}m"
-
-    @admin.action(description="Start selected analyses")
-    def start_selected_requests(self, request, queryset):
-        self._run_action(
-            request,
-            queryset,
-            "ca.start_chemical_analysis",
-            lambda obj: obj.start_analysis(
-                performed_by=request.user,
-            ),
-            "{} request(s) started.",
-            "Could not start",
-        )
-
-    @admin.action(description="Complete selected analyses")
-    def complete_selected_requests(self, request, queryset):
-        self._run_action(
-            request,
-            queryset,
-            "ca.complete_chemical_analysis",
-            lambda obj: obj.mark_completed(
-                performed_by=request.user,
-            ),
-            "{} request(s) completed.",
-            "Could not complete",
-        )
-
-    @admin.action(
-        description="Refresh weekly-task analyst assignments"
-    )
-    def refresh_selected_analyst_assignments(
-        self,
-        request,
-        queryset,
-    ):
-        self._permission_required(
-            request,
-            "ca.start_chemical_analysis",
-        )
-
-        success = 0
-        failed = 0
-
-        for obj in queryset:
-            try:
-                with transaction.atomic():
-                    obj.populate_assigned_analysts()
-
-                success += 1
-            except (
-                ValidationError,
-                PermissionDenied,
-            ) as exc:
-                failed += 1
-                self.message_user(
-                    request,
-                    f"{obj}: {exc}",
-                    level=messages.ERROR,
-                )
-            except Exception as exc:
-                failed += 1
-                self.message_user(
-                    request,
-                    f"{obj}: {exc}",
-                    level=messages.ERROR,
-                )
-
-        if success:
-            self.message_user(
-                request,
-                f"{success} request(s) refreshed from weekly duty assignments.",
-                level=messages.SUCCESS,
-            )
-
-        if failed:
-            self.message_user(
-                request,
-                f"{failed} assignment refresh operation(s) failed.",
-                level=messages.WARNING,
-            )
-
-
-@admin.register(SystematicRandomSampling)
-class SystematicRandomSamplingAdmin(
-    PlantScopedAdminMixin,
-    WorkflowAdminMixin,
-    admin.ModelAdmin,
-):
-    plant_lookup = "batch__treatment_plant_id"
-
-    list_display = (
-        "batch_link",
-        "sample_count",
-        "sampling_interval",
-        "random_start",
-        "average_weight",
-        "weight_difference_display",
-        "pass_badge",
-        "qa_badge",
-        "status_badge",
-        "sampled_by",
-        "sampled_at",
-    )
-
-    search_fields = (
-        "batch__sample_id",
-        "batch__batch_number",
-        "batch__chemical__name",
-        "batch__chemical__code",
-        "sampled_by__username",
-        "counter_checked_by__username",
-        "qa_approved_by__username",
-    )
-
-    list_filter = (
-        "status",
-        SamplingOutcomeFilter,
-        "qa_required",
-        "qa_approved",
-        "batch__chemical",
-        "batch__treatment_plant",
-    )
-
-    autocomplete_fields = (
-        "batch",
-        "analysis_process",
-        "sampled_by",
-        "counter_checked_by",
-        "qa_approved_by",
-    )
-
-    readonly_fields = (
-        "sample_count",
-        "sampling_interval",
-        "random_start",
-        "measured_average_weight",
-        "average_weight_difference",
-        "sampling_passed",
-        "qa_required",
-        "qa_approved",
-        "qa_approved_by",
-        "qa_approved_at",
-        "sampled_by",
-        "sampled_at",
-        "counter_checked_by",
-        "counter_checked_at",
-        "status",
-        "created_at",
-        "updated_at",
-    )
-
-    inlines = (
-        SystematicRandomSampleInline,
-    )
-
-    actions = (
-        "generate_sampling_plans",
-        "mark_selected_as_sampled",
-        "counter_check_selected",
-        "approve_selected_deviations",
-    )
-
-    list_select_related = (
-        "batch",
-        "batch__chemical",
-        "batch__treatment_plant",
-        "analysis_process",
-        "sampled_by",
-        "counter_checked_by",
-        "qa_approved_by",
-    )
-
-    fieldsets = (
-        (
-            "Sampling Identity",
-            {
-                "fields": (
-                    "batch",
-                    "analysis_process",
-                    "status",
-                )
-            },
-        ),
-        (
-            "Sampling Plan",
-            {
-                "fields": (
-                    "sample_count",
-                    "sampling_interval",
-                    "random_start",
-                )
-            },
-        ),
-        (
-            "Weight Verification",
-            {
-                "fields": (
-                    "measured_average_weight",
-                    "average_weight_difference",
-                    "sampling_passed",
-                    "qa_required",
-                    "qa_approved",
-                )
-            },
-        ),
-        (
-            "QA",
-            {
-                "fields": (
-                    "qa_approved_by",
-                    "qa_approved_at",
-                    "verification_notes",
-                )
-            },
-        ),
-        (
-            "Execution",
-            {
-                "fields": (
-                    "sampled_by",
-                    "sampled_at",
-                    "counter_checked_by",
-                    "counter_checked_at",
-                )
-            },
-        ),
-        (
-            "Audit",
-            {
-                "fields": (
-                    "created_at",
-                    "updated_at",
-                )
-            },
-        ),
-    )
-
-    @admin.display(description="Batch")
-    def batch_link(self, obj):
-        url = reverse(
-            "admin:ca_chemicalbatch_change",
-            args=[obj.batch_id],
-        )
-
         return format_html(
-            '<a href="{}"><strong>{}</strong></a>',
-            url,
+            '<span style="font-weight:600;">{}h {}m</span>',
+            hours,
+            minutes,
+        )
+
+    @admin.display(description="Assigned Analysts")
+    def assigned_analyst_count_display(self, obj):
+        return obj.assigned_analyst_count
+
+    @admin.display(description="Assignment State")
+    def assignment_status_display(self, obj):
+        return self.assignment_status(obj)
+
+    @admin.display(description="Workflow")
+    def workflow_links(self, obj):
+        links = []
+
+        process = getattr(
             obj.batch,
+            "analysis_process",
+            None,
         )
 
-    @admin.display(description="Average")
-    def average_weight(self, obj):
-        if obj.measured_average_weight is None:
-            return "—"
-
-        return f"{obj.measured_average_weight:g}"
-
-    @admin.display(description="Difference")
-    def weight_difference_display(self, obj):
-        if obj.average_weight_difference is None:
-            return "—"
-
-        return f"{obj.average_weight_difference:g}"
-
-    @admin.display(description="Sampling")
-    def pass_badge(self, obj):
-        if obj.sampling_passed is True:
-            return format_html(
-                '<strong style="color:#027a48;">PASS</strong>'
+        if process:
+            url = reverse(
+                "admin:ca_chemicalanalysisprocess_change",
+                args=[process.pk],
+            )
+            links.append(
+                format_html(
+                    '<a href="{}">Analysis Process</a>',
+                    url,
+                )
             )
 
-        if obj.sampling_passed is False:
-            return format_html(
-                '<strong style="color:#b42318;">FAIL</strong>'
+        coa = getattr(
+            obj.batch,
+            "coa",
+            None,
+        )
+
+        if coa:
+            url = reverse(
+                "admin:ca_chemicalcoa_change",
+                args=[coa.pk],
+            )
+            links.append(
+                format_html(
+                    '<a href="{}">Certificate of Analysis</a>',
+                    url,
+                )
             )
 
-        return "Pending"
+        return format_html(" | ".join(str(link) for link in links)) or "—"
 
-    @admin.display(description="QA")
-    def qa_badge(self, obj):
-        if obj.qa_approved:
-            return format_html(
-                '<strong style="color:#027a48;">APPROVED</strong>'
-            )
+    @admin.display(description="Checklist")
+    def checklist_link(self, obj):
+        checklist = (
+            obj.checklists
+            .order_by("-created_at")
+            .first()
+        )
 
-        if obj.qa_required:
-            return format_html(
-                '<strong style="color:#b54708;">REQUIRED</strong>'
-            )
+        if not checklist:
+            return "No checklist"
 
-        return "Not required"
-
-    @admin.display(description="Status")
-    def status_badge(self, obj):
-        colors = {
-            "PENDING": "#175cd3",
-            "SAMPLED": "#026aa2",
-            "COUNTER_CHECK": "#b54708",
-            "QA_REVIEW": "#93370d",
-            "COMPLETED": "#027a48",
-        }
+        url = reverse(
+            "admin:ca_checklistforwater treatmentchemicalanalysis_change".replace(
+                " ",
+                "",
+            ),
+            args=[checklist.pk],
+        )
 
         return format_html(
-            '<strong style="color:{};">{}</strong>',
-            colors.get(obj.status, "#475467"),
-            obj.get_status_display(),
+            '<a href="{}">Checklist #{}</a>',
+            url,
+            checklist.pk,
         )
 
-    @admin.action(description="Generate sampling plans")
-    def generate_sampling_plans(self, request, queryset):
-        self._run_action(
+    @admin.display(description="Results")
+    def result_summary(self, obj):
+        if not obj.batch_id:
+            return "No batch"
+
+        results = obj.batch.test_results.all()
+
+        total = results.count()
+        passed = results.filter(
+            status=BatchTestResult.Status.PASS
+        ).count()
+        failed = results.filter(
+            status=BatchTestResult.Status.FAIL
+        ).count()
+        na = results.filter(
+            status=BatchTestResult.Status.NA
+        ).count()
+        pending = results.filter(
+            Q(status__isnull=True)
+            | Q(status="")
+        ).count()
+
+        return (
+            f"Total {total} | Pass {passed} | "
+            f"Fail {failed} | N/A {na} | Pending {pending}"
+        )
+
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .select_related(
+                "batch",
+                "batch__chemical",
+                "batch__supplier",
+                "batch__treatment_plant",
+                "location",
+                "location__treatment_plant",
+                "requested_by",
+                "received_by",
+                "completed_by",
+            )
+            .prefetch_related(
+                "assigned_analysts",
+            )
+        )
+
+    @admin.action(description="Run automatic assignment for due requests")
+    def run_due_auto_assignment(self, request, queryset):
+        assigned = 0
+        skipped = 0
+
+        for analysis_request in queryset:
+            try:
+                users = analysis_request.auto_assign_analysts_if_due()
+
+                if users:
+                    assigned += 1
+                else:
+                    skipped += 1
+            except ValidationError as exc:
+                self.message_user(
+                    request,
+                    f"{analysis_request.request_id}: {exc}",
+                    messages.ERROR,
+                )
+
+        self.message_user(
             request,
-            queryset,
-            "ca.perform_systematic_random_sampling",
-            lambda obj: obj.generate_sampling_plan(),
-            "{} sampling plan(s) generated.",
-            "Could not generate sampling plan",
+            f"Automatic assignment completed. "
+            f"Assigned: {assigned}; skipped: {skipped}.",
+            messages.SUCCESS,
         )
 
-    @admin.action(description="Mark selected samples as sampled")
-    def mark_selected_as_sampled(self, request, queryset):
-        self._run_action(
+    @admin.action(description="Start selected analysis requests")
+    def start_selected_requests(self, request, queryset):
+        started = 0
+
+        for analysis_request in queryset:
+            try:
+                analysis_request.start_analysis(
+                    performed_by=request.user
+                )
+                started += 1
+            except ValidationError as exc:
+                self.message_user(
+                    request,
+                    f"{analysis_request.request_id}: {exc}",
+                    messages.ERROR,
+                )
+
+        self.message_user(
             request,
-            queryset,
-            "ca.perform_systematic_random_sampling",
-            lambda obj: obj.mark_sampled(
-                performed_by=request.user,
-            ),
-            "{} sampling record(s) marked sampled.",
-            "Could not mark sampled",
+            f"{started} request(s) started.",
+            messages.SUCCESS,
         )
 
-    @admin.action(description="Counter-check selected sampling records")
-    def counter_check_selected(self, request, queryset):
-        self._run_action(
+    @admin.action(description="Complete selected analysis requests")
+    def complete_selected_requests(self, request, queryset):
+        completed = 0
+
+        for analysis_request in queryset:
+            try:
+                analysis_request.mark_completed(
+                    performed_by=request.user
+                )
+                completed += 1
+            except ValidationError as exc:
+                self.message_user(
+                    request,
+                    f"{analysis_request.request_id}: {exc}",
+                    messages.ERROR,
+                )
+
+        self.message_user(
             request,
-            queryset,
-            "ca.counter_check_systematic_sampling",
-            lambda obj: obj.counter_check(
-                performed_by=request.user,
-            ),
-            "{} sampling record(s) counter-checked.",
-            "Could not counter-check",
-        )
-
-    @admin.action(description="Approve selected sampling deviations")
-    def approve_selected_deviations(self, request, queryset):
-        self._run_action(
-            request,
-            queryset,
-            "ca.approve_sampling_weight_deviation",
-            lambda obj: obj.approve_weight_deviation(
-                performed_by=request.user,
-            ),
-            "{} sampling deviation(s) approved.",
-            "Could not approve sampling deviation",
+            f"{completed} request(s) completed.",
+            messages.SUCCESS,
         )
 
 
-@admin.register(SystematicRandomSample)
-class SystematicRandomSampleAdmin(
+class ChecklistAdmin(
     PlantScopedAdminMixin,
     admin.ModelAdmin,
 ):
-    plant_lookup = "sampling__batch__treatment_plant_id"
+    plant_field = "chemical_analysis_request__batch__treatment_plant"
+    plant_filter_field = (
+        "chemical_analysis_request__batch__treatment_plant"
+    )
 
     list_display = (
-        "sampling",
-        "package_number",
-        "declared_net_weight",
-        "measured_weight",
-        "weight_difference",
-    )
-
-    search_fields = (
-        "sampling__batch__sample_id",
-        "sampling__batch__batch_number",
-        "sampling__batch__chemical__name",
-    )
-
-    list_filter = (
-        "sampling__status",
-        "sampling__qa_required",
-        "sampling__qa_approved",
-    )
-
-    autocomplete_fields = (
-        "sampling",
-    )
-
-    readonly_fields = (
-        "package_number",
-        "declared_net_weight",
-        "weight_difference",
-    )
-
-    list_select_related = (
-        "sampling",
-        "sampling__batch",
-        "sampling__batch__chemical",
-        "sampling__batch__treatment_plant",
-    )
-
-
-@admin.register(ChemicalAnalysisProcess)
-class ChemicalAnalysisProcessAdmin(
-    PlantScopedAdminMixin,
-    WorkflowAdminMixin,
-    admin.ModelAdmin,
-):
-    plant_lookup = "batch__treatment_plant_id"
-
-    list_display = (
-        "process_link",
-        "sample_id_display",
+        "checklist_identifier",
         "chemical",
+        "batch_number",
         "treatment_plant",
-        "workflow_stage",
-        "analysis_progress_display",
-        "performed_by_display",
-        "qa_officer",
-        "approver",
-        "overdue_badge",
+        "grade",
+        "completed_badge",
+        "expiry_status_display",
+        "sampled_by",
+        "completed_by",
         "created_at",
     )
-
     search_fields = (
-        "batch__sample_id",
-        "batch__batch_number",
-        "batch__chemical__name",
-        "batch__chemical__code",
-        "assigned_analyst__username",
-        "assigned_analyst__first_name",
-        "assigned_analyst__last_name",
-        "qa_officer__username",
-        "approver__username",
+        "chemical__name",
+        "chemical__code",
+        "chemical_analysis_request__request_id",
+        "chemical_analysis_request__batch__sample_id",
+        "chemical_analysis_request__batch__batch_number",
+        "chemical_analysis_request__batch__supplier__name",
     )
-
     list_filter = (
-        "status",
-        "batch__chemical",
-        "batch__treatment_plant",
-        "assigned_analyst",
-        "qa_officer",
-        "approver",
-        DateRangeFilter,
+        PlantFilter,
+        "completed",
+        "grade",
+        "created_at",
     )
-
+    date_hierarchy = "created_at"
     autocomplete_fields = (
-        "batch",
-        "analysis_request",
-        "initiated_by",
-        "assigned_analyst",
-        "qa_officer",
-        "approver",
+        "chemical_analysis_request",
+        "chemical",
+        "sampled_by",
+        "requested_by",
+        "completed_by",
     )
-
     readonly_fields = (
-        "batch",
-        "analysis_request",
-        "status",
-        "initiated_by",
-        "assigned_analyst",
-        "qa_officer",
-        "approver",
-        "started_at",
-        "checklist_completed_at",
-        "analysis_started_at",
-        "analysis_completed_at",
-        "qa_reviewed_at",
-        "approved_at",
-        "completed_at",
-        "rework_count",
         "created_at",
         "updated_at",
-        "progress_bar",
-        "current_assigned_analysts_display",
+        "completed_at",
+        "completion_status",
+        "expiry_status_display",
+        "request_context",
     )
-
+    ordering = (
+        "-created_at",
+    )
+    list_per_page = 50
+    save_on_top = True
     actions = (
-        "start_selected_analysis",
-        "complete_selected_analysis",
-        "approve_selected_analysis",
-    )
-
-    list_select_related = (
-        "batch",
-        "batch__chemical",
-        "batch__supplier",
-        "batch__treatment_plant",
-        "analysis_request",
-        "initiated_by",
-        "assigned_analyst",
-        "qa_officer",
-        "approver",
+        "complete_checklists",
     )
 
     fieldsets = (
+        (
+            "Request",
+            {
+                "fields": (
+                    "chemical_analysis_request",
+                    "chemical",
+                    "request_context",
+                )
+            },
+        ),
+        (
+            "Product Identification",
+            {
+                "fields": (
+                    "label",
+                    "manufacturer",
+                    "grade",
+                    "net_weight",
+                    "country_of_origin",
+                )
+            },
+        ),
+        (
+            "Dates",
+            {
+                "fields": (
+                    "manufacture_date",
+                    "expiry_date",
+                    "expiry_status_display",
+                )
+            },
+        ),
+        (
+            "Storage & Handling",
+            {
+                "fields": (
+                    "storage_conditions",
+                    "handling_instructions",
+                    "minimum_mass_requirement_met",
+                )
+            },
+        ),
+        (
+            "Safety",
+            {
+                "fields": (
+                    "hazardous",
+                    "flammable",
+                    "corrosive",
+                    "toxic",
+                )
+            },
+        ),
         (
             "Workflow",
             {
                 "fields": (
-                    "batch",
-                    "analysis_request",
-                    "status",
-                    "progress_bar",
-                )
-            },
-        ),
-        (
-            "Analyst Assignment",
-            {
-                "fields": (
-                    "current_assigned_analysts_display",
-                    "assigned_analyst",
-                )
-            },
-        ),
-        (
-            "Execution and Approval",
-            {
-                "fields": (
-                    "initiated_by",
-                    "qa_officer",
-                    "approver",
-                )
-            },
-        ),
-        (
-            "Lifecycle",
-            {
-                "fields": (
-                    "started_at",
-                    "checklist_completed_at",
-                    "analysis_started_at",
-                    "analysis_completed_at",
-                    "qa_reviewed_at",
-                    "approved_at",
+                    "sampled_by",
+                    "requested_by",
+                    "completed",
+                    "completed_by",
                     "completed_at",
-                    "rework_count",
+                    "completion_status",
                 )
             },
         ),
@@ -1942,279 +1596,184 @@ class ChemicalAnalysisProcessAdmin(
                 "fields": (
                     "created_at",
                     "updated_at",
-                )
+                ),
+                "classes": ("collapse",),
             },
         ),
     )
 
-    @admin.display(description="Process")
-    def process_link(self, obj):
-        url = reverse(
-            "admin:ca_chemicalanalysisprocess_change",
-            args=[obj.pk],
-        )
-
+    @admin.display(description="Checklist")
+    def checklist_identifier(self, obj):
         return format_html(
-            '<a href="{}"><strong>Process #{}</strong></a>',
-            url,
+            "<strong>Checklist #{}</strong>",
+            obj.pk,
         )
 
-    @admin.display(description="Sample")
-    def sample_id_display(self, obj):
-        return obj.sample_id or "—"
+    @admin.display(description="Chemical")
+    def chemical(self, obj):
+        return getattr(
+            obj.chemical,
+            "name",
+            "—",
+        )
 
-    @admin.display(description="Plant")
+    @admin.display(description="Batch")
+    def batch_number(self, obj):
+        return getattr(
+            obj.batch,
+            "batch_number",
+            "—",
+        )
+
+    @admin.display(description="Treatment Plant")
     def treatment_plant(self, obj):
-        return obj.treatment_plant or "—"
-
-    @admin.display(description="Stage")
-    def workflow_stage(self, obj):
-        colors = {
-            "CREATED": "#667085",
-            "RECEIVED": "#175cd3",
-            "REQUESTED": "#175cd3",
-            "CHECKLIST": "#7f56d9",
-            "SYSTEMATIC_RANDOM_SAMPLING": "#6941c6",
-            "ANALYSIS": "#b54708",
-            "RETEST": "#93370d",
-            "QA": "#c11574",
-            "APPROVED": "#027a48",
-            "REJECTED": "#b42318",
-            "UTILIZED": "#344054",
-            "RETURNED": "#93370d",
-            "COMPLETED": "#027a48",
-        }
-
-        return format_html(
-            '<strong style="color:{};">{}</strong>',
-            colors.get(obj.status, "#475467"),
-            obj.get_status_display(),
+        return getattr(
+            obj.treatment_plant,
+            "name",
+            "—",
         )
 
-    @admin.display(description="Progress")
-    def analysis_progress_display(self, obj):
-        progress = obj.analysis_progress
-
-        if progress is None:
-            return "—"
-
-        try:
-            percentage = float(progress)
-        except (
-            TypeError,
-            ValueError,
-        ):
-            return str(progress)
-
-        percentage = max(
-            0,
-            min(100, percentage),
-        )
-
-        return format_html(
-            '<div style="min-width:120px;">'
-            '<div style="font-size:11px;margin-bottom:3px;">{}%</div>'
-            '<div style="height:7px;background:#eaecf0;border-radius:5px;">'
-            '<div style="height:7px;width:{}%;background:#175cd3;border-radius:5px;"></div>'
-            "</div>"
-            "</div>",
-            int(percentage),
-            int(percentage),
-        )
-
-    @admin.display(description="Performed by")
-    def performed_by_display(self, obj):
-        analyst = obj.assigned_analyst
-
-        if analyst is None:
+    @admin.display(description="Completed")
+    def completed_badge(self, obj):
+        if obj.completed:
             return format_html(
-                '<span style="color:#667085;">Not started</span>'
+                '<span style="color:#15803d;font-weight:700;">COMPLETE</span>'
             )
 
         return format_html(
-            "{} ({})",
-            analyst.get_full_name() or analyst.username,
-            analyst.username,
+            '<span style="color:#b45309;font-weight:700;">PENDING</span>'
         )
 
-    @admin.display(description="Current analysts")
-    def current_assigned_analysts_display(self, obj):
-        if not obj.analysis_request_id:
-            return format_html(
-                '<span style="color:#667085;">No analysis request</span>'
-            )
+    @admin.display(description="Expiry")
+    def expiry_status_display(self, obj):
+        return obj.expiry_status
 
-        analysts = obj.analysis_request.assigned_analysts.filter(
-            is_active=True,
-        ).order_by(
-            "first_name",
-            "last_name",
-            "username",
-        )
-
-        if not analysts.exists():
-            return format_html(
-                '<strong style="color:#b42318;">'
-                "No analysts currently assigned through weekly duty tasks"
-                "</strong>"
-            )
+    @admin.display(description="Request Context")
+    def request_context(self, obj):
+        request = obj.chemical_analysis_request
 
         return format_html(
-            "<br>".join(
-                "{} — {}".format(
-                    analyst.get_full_name() or analyst.username,
-                    analyst.username,
+            "Request: {}<br>Sample: {}<br>Batch: {}",
+            request.request_id,
+            request.sample_id or "—",
+            request.batch_number or "—",
+        )
+
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .select_related(
+                "chemical",
+                "chemical_analysis_request",
+                "chemical_analysis_request__batch",
+                "chemical_analysis_request__batch__treatment_plant",
+                "chemical_analysis_request__batch__chemical",
+                "sampled_by",
+                "requested_by",
+                "completed_by",
+            )
+        )
+
+    @admin.action(description="Complete selected checklists")
+    def complete_checklists(self, request, queryset):
+        completed = 0
+
+        for checklist in queryset:
+            try:
+                checklist.mark_completed(
+                    performed_by=request.user
                 )
-                for analyst in analysts
-            )
-        )
+                completed += 1
+            except ValidationError as exc:
+                self.message_user(
+                    request,
+                    f"Checklist #{checklist.pk}: {exc}",
+                    messages.ERROR,
+                )
 
-    @admin.display(description="Overdue")
-    def overdue_badge(self, obj):
-        if obj.is_overdue:
-            return format_html(
-                '<strong style="color:#b42318;">OVERDUE</strong>'
-            )
-
-        return format_html(
-            '<strong style="color:#027a48;">ON TRACK</strong>'
-        )
-
-    @admin.action(description="Start selected chemical analyses")
-    def start_selected_analysis(self, request, queryset):
-        self._run_action(
+        self.message_user(
             request,
-            queryset,
-            "ca.start_chemical_analysis",
-            lambda obj: obj.mark_analysis_started(
-                performed_by=request.user,
-            ),
-            "{} analysis process(es) started.",
-            "Could not start analysis",
-        )
-
-    @admin.action(description="Complete selected chemical analyses")
-    def complete_selected_analysis(self, request, queryset):
-        self._run_action(
-            request,
-            queryset,
-            "ca.complete_chemical_analysis",
-            lambda obj: obj.mark_analysis_completed(
-                performed_by=request.user,
-            ),
-            "{} analysis process(es) completed.",
-            "Could not complete analysis",
-        )
-
-    @admin.action(description="Approve selected analysis processes")
-    def approve_selected_analysis(self, request, queryset):
-        self._run_action(
-            request,
-            queryset,
-            "ca.approve_chemical_batch",
-            lambda obj: obj.mark_approved(
-                approved_by=request.user,
-            ),
-            "{} analysis process(es) approved.",
-            "Could not approve analysis",
-        )
-
-    @admin.display(description="Progress")
-    def progress_bar(self, obj):
-        progress = obj.analysis_progress
-
-        try:
-            percentage = float(progress)
-        except (
-            TypeError,
-            ValueError,
-        ):
-            percentage = 0
-
-        percentage = max(
-            0,
-            min(100, percentage),
-        )
-
-        return format_html(
-            '<div style="max-width:500px;">'
-            "<strong>{}%</strong>"
-            '<div style="height:10px;background:#eaecf0;'
-            'border-radius:6px;margin-top:5px;">'
-            '<div style="height:10px;width:{}%;'
-            'background:#175cd3;border-radius:6px;"></div>'
-            "</div>"
-            "</div>",
-            int(percentage),
-            int(percentage),
+            f"{completed} checklist(s) completed.",
+            messages.SUCCESS,
         )
 
 
-@admin.register(BatchTestResult)
 class BatchTestResultAdmin(
     PlantScopedAdminMixin,
     admin.ModelAdmin,
 ):
-    plant_lookup = "batch__treatment_plant_id"
+    plant_field = "batch__treatment_plant"
+    plant_filter_field = "batch__treatment_plant"
 
     list_display = (
-        "batch",
+        "batch_sample",
+        "chemical",
         "parameter",
         "value_display",
+        "textual_result",
         "status_badge",
         "analyst",
         "tested_at",
         "input_status",
     )
-
     search_fields = (
         "batch__sample_id",
         "batch__batch_number",
         "batch__chemical__name",
+        "batch__chemical__code",
         "parameter__parameter_name",
         "analyst__username",
+        "analyst__first_name",
+        "analyst__last_name",
         "textual_result",
+        "auto_remark",
     )
-
     list_filter = (
+        PlantFilter,
         "status",
-        "parameter__chemical",
-        "analyst",
-        "batch__treatment_plant",
-        DateRangeFilter,
+        CompletionFilter,
+        "tested_at",
     )
-
+    date_hierarchy = "tested_at"
     autocomplete_fields = (
         "batch",
         "parameter",
         "analyst",
     )
-
     readonly_fields = (
         "tested_at",
         "auto_remark",
+        "input_link",
+        "batch_context",
     )
-
-    list_select_related = (
-        "batch",
-        "batch__chemical",
-        "batch__treatment_plant",
-        "parameter",
-        "parameter__chemical",
-        "parameter__method",
-        "analyst",
+    ordering = (
+        "batch__sample_id",
+        "parameter__parameter_name",
+        "id",
     )
+    list_per_page = 100
+    save_on_top = True
 
     fieldsets = (
         (
-            "Result",
+            "Test",
             {
                 "fields": (
                     "batch",
                     "parameter",
+                    "batch_context",
+                )
+            },
+        ),
+        (
+            "Result",
+            {
+                "fields": (
                     "value",
                     "textual_result",
                     "status",
+                    "auto_remark",
                 )
             },
         ),
@@ -2224,225 +1783,593 @@ class BatchTestResultAdmin(
                 "fields": (
                     "analyst",
                     "tested_at",
-                    "auto_remark",
+                    "input_link",
                 )
             },
         ),
     )
+
+    @admin.display(description="Sample")
+    def batch_sample(self, obj):
+        return obj.batch.sample_id
+
+    @admin.display(description="Chemical")
+    def chemical(self, obj):
+        return obj.batch.chemical.name
 
     @admin.display(description="Value")
     def value_display(self, obj):
         if obj.value is not None:
             return obj.value
 
-        if obj.textual_result:
-            return obj.textual_result
-
-        return "—"
+        return obj.textual_result or "—"
 
     @admin.display(description="Status")
     def status_badge(self, obj):
-        colors = {
-            BatchTestResult.Status.PASS: "#027a48",
-            BatchTestResult.Status.FAIL: "#b42318",
-            BatchTestResult.Status.NA: "#667085",
-        }
+        status = obj.status
 
-        label = (
-            obj.get_status_display()
-            if obj.status
-            else "Pending"
-        )
-
-        return format_html(
-            '<strong style="color:{};">{}</strong>',
-            colors.get(
-                obj.status,
-                "#b54708",
-            ),
-            label,
-        )
-
-    @admin.display(description="Method inputs")
-    def input_status(self, obj):
-        if hasattr(obj, "inputs"):
+        if status == BatchTestResult.Status.PASS:
             return format_html(
-                '<strong style="color:#027a48;">Present</strong>'
+                '<span style="color:#15803d;font-weight:700;">PASS</span>'
+            )
+
+        if status == BatchTestResult.Status.FAIL:
+            return format_html(
+                '<span style="color:#b91c1c;font-weight:700;">FAIL</span>'
+            )
+
+        if status == BatchTestResult.Status.NA:
+            return format_html(
+                '<span style="color:#475569;font-weight:700;">N/A</span>'
             )
 
         return format_html(
-            '<span style="color:#667085;">None</span>'
+            '<span style="color:#b45309;font-weight:700;">PENDING</span>'
+        )
+
+    @admin.display(description="Analysis Inputs")
+    def input_status(self, obj):
+        try:
+            inputs = obj.inputs
+        except ChemicalAnalysisInput.DoesNotExist:
+            return format_html(
+                '<span style="color:#b45309;font-weight:700;">MISSING</span>'
+            )
+
+        if inputs.calculated_value is not None:
+            return format_html(
+                '<span style="color:#15803d;font-weight:700;">CALCULATED</span>'
+            )
+
+        return "Recorded"
+
+    @admin.display(description="Input Record")
+    def input_link(self, obj):
+        try:
+            input_record = obj.inputs
+        except ChemicalAnalysisInput.DoesNotExist:
+            return "No input record"
+
+        url = reverse(
+            "admin:ca_chemicalanalysisinput_change",
+            args=[input_record.pk],
+        )
+
+        return format_html(
+            '<a href="{}">Open analysis inputs</a>',
+            url,
+        )
+
+    @admin.display(description="Batch Context")
+    def batch_context(self, obj):
+        return format_html(
+            "Sample: {}<br>Batch: {}<br>Chemical: {}<br>Plant: {}",
+            obj.batch.sample_id,
+            obj.batch.batch_number,
+            obj.batch.chemical.name,
+            getattr(
+                obj.batch.treatment_plant,
+                "name",
+                "—",
+            ),
+        )
+
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .select_related(
+                "batch",
+                "batch__chemical",
+                "batch__treatment_plant",
+                "parameter",
+                "parameter__chemical",
+                "parameter__method",
+                "analyst",
+            )
+            .prefetch_related(
+                "parameter__remarks",
+            )
         )
 
 
-@admin.register(ChemicalAnalysisInput)
 class ChemicalAnalysisInputAdmin(
     PlantScopedAdminMixin,
     admin.ModelAdmin,
 ):
-    plant_lookup = "test_result__batch__treatment_plant_id"
+    plant_field = "test_result__batch__treatment_plant"
+    plant_filter_field = "test_result__batch__treatment_plant"
 
     list_display = (
-        "test_result",
-        "test_parameter_display",
-        "analysis_method_display",
+        "test_result_identifier",
+        "chemical",
+        "parameter",
+        "method",
         "calculated_value",
-        "input_count",
-        "test_result_status",
+        "input_completeness",
     )
-
     search_fields = (
         "test_result__batch__sample_id",
+        "test_result__batch__batch_number",
+        "test_result__batch__chemical__name",
         "test_result__parameter__parameter_name",
-        "test_result__parameter__chemical__name",
+        "test_result__analyst__username",
     )
-
     list_filter = (
-        "test_result__status",
-        "test_result__parameter__chemical",
-        "test_result__batch__treatment_plant",
+        PlantFilter,
     )
-
     autocomplete_fields = (
         "test_result",
     )
-
     readonly_fields = (
+        "test_parameter",
+        "analysis_method",
+        "required_input_fields",
+        "formula",
+        "rounding_precision",
         "calculated_value",
-        "required_fields_display",
-        "formula_display",
-        "rounding_precision_display",
     )
+    ordering = (
+        "-pk",
+    )
+    list_per_page = 100
 
     fieldsets = (
         (
-            "Test",
+            "Test Result",
             {
                 "fields": (
                     "test_result",
-                    "required_fields_display",
-                    "formula_display",
-                    "rounding_precision_display",
+                    "test_parameter",
+                    "analysis_method",
                 )
             },
         ),
         (
-            "Analytical Inputs",
+            "Required Inputs",
             {
                 "fields": (
+                    "required_input_fields",
                     "inputs",
+                )
+            },
+        ),
+        (
+            "Calculation",
+            {
+                "fields": (
+                    "formula",
+                    "rounding_precision",
                     "calculated_value",
                 )
             },
         ),
     )
 
-    list_select_related = (
-        "test_result",
-        "test_result__batch",
-        "test_result__parameter",
-        "test_result__parameter__chemical",
-        "test_result__parameter__method",
-    )
+    @admin.display(description="Test Result")
+    def test_result_identifier(self, obj):
+        return f"Result #{obj.test_result_id}"
 
-    @admin.display(description="Parameter")
-    def test_parameter_display(self, obj):
-        return obj.test_parameter or "—"
+    @admin.display(description="Chemical")
+    def chemical(self, obj):
+        parameter = obj.test_parameter
 
-    @admin.display(description="Method")
-    def analysis_method_display(self, obj):
-        return obj.analysis_method or "—"
-
-    @admin.display(description="Inputs")
-    def input_count(self, obj):
-        if not isinstance(obj.inputs, dict):
-            return 0
-
-        return len(obj.inputs)
-
-    @admin.display(description="Result")
-    def test_result_status(self, obj):
-        result = obj.test_result
-
-        if not result:
+        if parameter is None:
             return "—"
 
-        return (
-            result.get_status_display()
-            if result.status
-            else "Pending"
+        return getattr(
+            parameter.chemical,
+            "name",
+            "—",
         )
 
-    @admin.display(description="Required fields")
-    def required_fields_display(self, obj):
-        fields = obj.required_input_fields
+    @admin.display(description="Parameter")
+    def parameter(self, obj):
+        parameter = obj.test_parameter
 
-        return (
-            ", ".join(fields)
-            if fields
-            else "None"
+        if parameter is None:
+            return "—"
+
+        return parameter.parameter_name
+
+    @admin.display(description="Method")
+    def method(self, obj):
+        method = obj.analysis_method
+
+        if method is None:
+            return "—"
+
+        return str(method)
+
+    @admin.display(description="Input Completeness")
+    def input_completeness(self, obj):
+        try:
+            required = obj.required_input_fields
+            supplied = obj.inputs or {}
+        except ValidationError:
+            return format_html(
+                '<span style="color:#b91c1c;font-weight:700;">INVALID</span>'
+            )
+
+        missing = [
+            field
+            for field in required
+            if field not in supplied
+        ]
+
+        if missing:
+            return format_html(
+                '<span style="color:#b45309;font-weight:700;">{} MISSING</span>',
+                len(missing),
+            )
+
+        return format_html(
+            '<span style="color:#15803d;font-weight:700;">COMPLETE</span>'
         )
 
-    @admin.display(description="Formula")
-    def formula_display(self, obj):
-        return obj.formula or "None"
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .select_related(
+                "test_result",
+                "test_result__batch",
+                "test_result__batch__chemical",
+                "test_result__batch__treatment_plant",
+                "test_result__parameter",
+                "test_result__parameter__chemical",
+                "test_result__parameter__method",
+            )
+        )
 
-    @admin.display(description="Precision")
-    def rounding_precision_display(self, obj):
-        precision = obj.rounding_precision
+    def save_model(self, request, obj, form, change):
+        obj.recalculate()
+        super().save_model(request, obj, form, change)
+
+
+class ChemicalAnalysisProcessAdmin(
+    PlantScopedAdminMixin,
+    StatusBadgeMixin,
+    admin.ModelAdmin,
+):
+    plant_field = "batch__treatment_plant"
+    plant_filter_field = "batch__treatment_plant"
+
+    list_display = (
+        "process_identifier",
+        "sample_id_display",
+        "chemical",
+        "treatment_plant",
+        "status_badge",
+        "assigned_analyst_display",
+        "progress_display",
+        "analysis_state",
+        "qa_state",
+        "approval_state",
+        "started_at",
+    )
+    search_fields = (
+        "batch__sample_id",
+        "batch__batch_number",
+        "batch__chemical__name",
+        "batch__chemical__code",
+        "initiated_by__username",
+        "assigned_analyst__username",
+        "qa_officer__username",
+        "approver__username",
+    )
+    list_filter = (
+        PlantFilter,
+        "status",
+        "started_at",
+        "qa_reviewed_at",
+        "approved_at",
+    )
+    date_hierarchy = "started_at"
+    autocomplete_fields = (
+        "batch",
+        "analysis_request",
+        "initiated_by",
+        "assigned_analyst",
+        "qa_officer",
+        "approver",
+    )
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+        "started_at",
+        "checklist_completed_at",
+        "analysis_started_at",
+        "analysis_completed_at",
+        "qa_reviewed_at",
+        "approved_at",
+        "rejected_at",
+        "completed_at",
+        "progress_display",
+        "test_statistics",
+        "workflow_summary",
+    )
+    ordering = (
+        "status",
+        "-started_at",
+        "-created_at",
+    )
+    list_per_page = 50
+    save_on_top = True
+
+    fieldsets = (
+        (
+            "Process",
+            {
+                "fields": (
+                    "batch",
+                    "analysis_request",
+                    "status",
+                    "rework_count",
+                )
+            },
+        ),
+        (
+            "Personnel",
+            {
+                "fields": (
+                    "initiated_by",
+                    "assigned_analyst",
+                    "qa_officer",
+                    "approver",
+                )
+            },
+        ),
+        (
+            "Workflow Timeline",
+            {
+                "fields": (
+                    "started_at",
+                    "checklist_completed_at",
+                    "analysis_started_at",
+                    "analysis_completed_at",
+                    "qa_reviewed_at",
+                    "approved_at",
+                    "rejected_at",
+                    "completed_at",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            "Quality Control",
+            {
+                "fields": (
+                    "progress_display",
+                    "test_statistics",
+                    "workflow_summary",
+                ),
+            },
+        ),
+        (
+            "Audit",
+            {
+                "fields": (
+                    "created_at",
+                    "updated_at",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+    )
+
+    @admin.display(description="Process")
+    def process_identifier(self, obj):
+        return format_html(
+            "<strong>Process #{}</strong>",
+            obj.pk,
+        )
+
+    @admin.display(description="Sample")
+    def sample_id_display(self, obj):
+        return obj.sample_id or "—"
+
+    @admin.display(description="Chemical")
+    def chemical(self, obj):
+        return getattr(
+            obj.chemical,
+            "name",
+            "—",
+        )
+
+    @admin.display(description="Treatment Plant")
+    def treatment_plant(self, obj):
+        return getattr(
+            obj.treatment_plant,
+            "name",
+            "—",
+        )
+
+    @admin.display(description="Analyst")
+    def assigned_analyst_display(self, obj):
+        analysts = obj.assigned_analysts
+
+        if not analysts:
+            return "Unassigned"
+
+        return ", ".join(
+            str(user)
+            for user in analysts[:5]
+        )
+
+    @admin.display(description="Progress")
+    def progress_display(self, obj):
+        try:
+            return f"{obj.analysis_progress}%"
+        except Exception:
+            return "—"
+
+    @admin.display(description="Analysis")
+    def analysis_state(self, obj):
+        if obj.is_analysis_complete:
+            return format_html(
+                '<span style="color:#15803d;font-weight:700;">COMPLETE</span>'
+            )
+
+        if obj.analysis_ready:
+            return format_html(
+                '<span style="color:#b45309;font-weight:700;">READY</span>'
+            )
+
+        return "Pending"
+
+    @admin.display(description="QA")
+    def qa_state(self, obj):
+        if obj.status == obj.WorkflowStatus.QA:
+            return format_html(
+                '<span style="color:#b45309;font-weight:700;">REVIEW REQUIRED</span>'
+            )
+
+        if obj.qa_reviewed_at:
+            return "Reviewed"
+
+        return "—"
+
+    @admin.display(description="Approval")
+    def approval_state(self, obj):
+        if obj.status == obj.WorkflowStatus.APPROVED:
+            return format_html(
+                '<span style="color:#15803d;font-weight:700;">APPROVED</span>'
+            )
+
+        if obj.status == obj.WorkflowStatus.REJECTED:
+            return format_html(
+                '<span style="color:#b91c1c;font-weight:700;">REJECTED</span>'
+            )
+
+        return "Pending"
+
+    @admin.display(description="Test Statistics")
+    def test_statistics(self, obj):
+        total = obj.test_results.count()
+        passed = obj.test_results.filter(
+            status=BatchTestResult.Status.PASS
+        ).count()
+        failed = obj.test_results.filter(
+            status=BatchTestResult.Status.FAIL
+        ).count()
+        na = obj.test_results.filter(
+            status=BatchTestResult.Status.NA
+        ).count()
+        pending = obj.test_results.filter(
+            Q(status__isnull=True)
+            | Q(status="")
+        ).count()
 
         return (
-            str(precision)
-            if precision is not None
-            else "Default"
+            f"Total: {total} | Pass: {passed} | "
+            f"Fail: {failed} | N/A: {na} | Pending: {pending}"
+        )
+
+    @admin.display(description="Workflow Summary")
+    def workflow_summary(self, obj):
+        stages = [
+            ("Checklist", obj.checklist_completed_at),
+            ("Analysis", obj.analysis_started_at),
+            ("Analysis Complete", obj.analysis_completed_at),
+            ("QA Review", obj.qa_reviewed_at),
+            ("Approval", obj.approved_at),
+            ("Completion", obj.completed_at),
+        ]
+
+        completed = sum(
+            bool(timestamp)
+            for _, timestamp in stages
+        )
+
+        return format_html(
+            "{} of {} workflow milestones recorded.",
+            completed,
+            len(stages),
+        )
+
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .select_related(
+                "batch",
+                "batch__chemical",
+                "batch__supplier",
+                "batch__treatment_plant",
+                "analysis_request",
+                "initiated_by",
+                "assigned_analyst",
+                "qa_officer",
+                "approver",
+            )
         )
 
 
-@admin.register(ChemicalCoA)
 class ChemicalCoAAdmin(
     PlantScopedAdminMixin,
     admin.ModelAdmin,
 ):
-    plant_lookup = "batch__treatment_plant_id"
+    plant_field = "batch__treatment_plant"
+    plant_filter_field = "batch__treatment_plant"
 
     list_display = (
-        "coa_link",
+        "coa_identifier",
+        "sample_id_display",
         "chemical_name",
         "supplier_name",
-        "treatment_plant_display",
-        "generation_badge",
+        "treatment_plant",
+        "analysis_date",
         "approval_badge",
+        "generation_status_display",
         "integrity_badge",
         "date_of_report",
-        "approved_on",
     )
-
     search_fields = (
         "chemical_name",
         "supplier_name",
+        "delivery_note_number",
         "batch__sample_id",
         "batch__batch_number",
-        "delivery_note_number",
-        "verified_hash",
+        "batch__chemical__name",
+        "batch__supplier__name",
         "approved_by__username",
+        "approved_by__first_name",
+        "approved_by__last_name",
+        "verified_hash",
     )
-
     list_filter = (
-        IntegrityFilter,
-        "packaging_status",
-        "approved_by",
-        "batch__chemical",
-        "batch__supplier",
-        "batch__treatment_plant",
-        DateRangeFilter,
+        PlantFilter,
+        ApprovalFilter,
+        "analysis_date",
+        "date_of_report",
     )
-
+    date_hierarchy = "date_of_report"
     autocomplete_fields = (
         "batch",
         "packaging_status",
         "approved_by",
     )
-
     readonly_fields = (
         "chemical_name",
         "supplier_name",
@@ -2452,32 +2379,28 @@ class ChemicalCoAAdmin(
         "delivery_note_number",
         "sampling_date",
         "analysis_date",
-        "approved_by",
-        "approved_on",
         "date_of_report",
         "updated_at",
         "verified_hash",
-        "sample_id_display",
-        "integrity_display",
-        "generation_display",
-        "result_statistics_display",
+        "sample_id",
+        "treatment_plant",
+        "generation_status_display",
+        "integrity_badge",
+        "result_statistics",
+        "missing_assets_display",
+        "analysis_request_link",
     )
-
+    ordering = (
+        "-date_of_report",
+    )
+    list_per_page = 50
+    save_on_top = True
     actions = (
         "prepare_selected_coas",
         "approve_selected_coas",
         "verify_selected_coas",
         "revoke_selected_approvals",
-        "regenerate_selected_content",
-    )
-
-    list_select_related = (
-        "batch",
-        "batch__chemical",
-        "batch__supplier",
-        "batch__treatment_plant",
-        "packaging_status",
-        "approved_by",
+        "refresh_selected_hashes",
     )
 
     fieldsets = (
@@ -2486,24 +2409,22 @@ class ChemicalCoAAdmin(
             {
                 "fields": (
                     "batch",
-                    "sample_id_display",
+                    "sample_id",
                     "title",
                 )
             },
         ),
         (
-            "Report Content",
+            "Certificate Header",
             {
                 "fields": (
                     "coa_header",
                     "coa_footer",
-                    "results_summary",
-                    "remarks",
                 )
             },
         ),
         (
-            "Generated Data",
+            "Delivery",
             {
                 "fields": (
                     "chemical_name",
@@ -2513,32 +2434,43 @@ class ChemicalCoAAdmin(
                     "delivery_date",
                     "delivery_note_number",
                     "packaging_status",
-                    "sampling_date",
-                    "analysis_date",
                 )
             },
         ),
         (
-            "Assets",
+            "Analysis",
+            {
+                "fields": (
+                    "sampling_date",
+                    "analysis_date",
+                    "analysis_request_link",
+                    "result_statistics",
+                    "results_summary",
+                    "remarks",
+                )
+            },
+        ),
+        (
+            "Approval & Integrity",
+            {
+                "fields": (
+                    "approved_by",
+                    "approved_on",
+                    "verified_hash",
+                    "integrity_badge",
+                )
+            },
+        ),
+        (
+            "Generated Assets",
             {
                 "fields": (
                     "footer_image",
                     "watermark",
                     "qr_code",
                     "pdf_file",
-                )
-            },
-        ),
-        (
-            "Verification",
-            {
-                "fields": (
-                    "generation_display",
-                    "result_statistics_display",
-                    "approved_by",
-                    "approved_on",
-                    "verified_hash",
-                    "integrity_display",
+                    "missing_assets_display",
+                    "generation_status_display",
                 )
             },
         ),
@@ -2548,492 +2480,409 @@ class ChemicalCoAAdmin(
                 "fields": (
                     "date_of_report",
                     "updated_at",
-                )
+                ),
+                "classes": ("collapse",),
             },
         ),
     )
 
     @admin.display(description="CoA")
-    def coa_link(self, obj):
-        url = reverse(
-            "admin:ca_chemicalcoa_change",
-            args=[obj.pk],
+    def coa_identifier(self, obj):
+        return format_html(
+            "<strong>CoA #{}</strong>",
+            obj.pk,
         )
 
-        return format_html(
-            '<a href="{}"><strong>COA #{}</strong></a>',
-            url,
-        )
+    @admin.display(description="Sample")
+    def sample_id_display(self, obj):
+        return obj.sample_id or "—"
 
-    @admin.display(description="Plant")
-    def treatment_plant_display(self, obj):
-        return obj.treatment_plant or "—"
-
-    @admin.display(description="Generation")
-    def generation_badge(self, obj):
-        status = obj.generation_status
-
-        if status in {
-            "APPROVED",
-            "READY",
-        }:
-            color = "#027a48"
-        elif status in {
-            "PENDING_PDF",
-            "PENDING_QR",
-            "PENDING_WATERMARK",
-        }:
-            color = "#b54708"
-        else:
-            color = "#b42318"
-
-        return format_html(
-            '<strong style="color:{};">{}</strong>',
-            color,
-            status,
+    @admin.display(description="Treatment Plant")
+    def treatment_plant(self, obj):
+        return getattr(
+            obj.treatment_plant,
+            "name",
+            "—",
         )
 
     @admin.display(description="Approval")
     def approval_badge(self, obj):
         if obj.is_approved:
             return format_html(
-                '<strong style="color:#027a48;">APPROVED</strong>'
+                '<span style="color:#15803d;font-weight:700;">APPROVED</span>'
             )
 
         return format_html(
-            '<strong style="color:#b54708;">PENDING</strong>'
+            '<span style="color:#b45309;font-weight:700;">UNAPPROVED</span>'
         )
+
+    @admin.display(description="Generation")
+    def generation_status_display(self, obj):
+        return obj.generation_status
 
     @admin.display(description="Integrity")
     def integrity_badge(self, obj):
         status = obj.integrity_status
 
-        colors = {
-            "VALID": "#027a48",
-            "UNVERIFIED": "#b54708",
-            "UNAPPROVED": "#667085",
-            "INVALID": "#b42318",
-        }
+        if status == "VALID":
+            return format_html(
+                '<span style="color:#15803d;font-weight:700;">VALID</span>'
+            )
+
+        if status == "INVALID":
+            return format_html(
+                '<span style="color:#b91c1c;font-weight:700;">INVALID</span>'
+            )
 
         return format_html(
-            '<strong style="color:{};">{}</strong>',
-            colors.get(
-                status,
-                "#475467",
-            ),
+            '<span style="color:#b45309;font-weight:700;">{}</span>',
             status,
         )
 
-    @admin.display(description="Sample")
-    def sample_id_display(self, obj):
-        return obj.sample_id or "—"
-
-    @admin.display(description="Integrity")
-    def integrity_display(self, obj):
-        return obj.integrity_status
-
-    @admin.display(description="Generation")
-    def generation_display(self, obj):
-        return obj.generation_status
-
-    @admin.display(description="Statistics")
-    def result_statistics_display(self, obj):
+    @admin.display(description="Result Statistics")
+    def result_statistics(self, obj):
         statistics = obj.get_result_statistics()
 
-        return format_html(
-            "Total: {} | Pass: {} | Fail: {} | "
-            "N/A: {} | Pending: {} | Pass rate: {}%",
-            statistics["total"],
-            statistics["pass"],
-            statistics["fail"],
-            statistics["na"],
-            statistics["pending"],
-            statistics["pass_rate"],
+        return (
+            f"Total: {statistics['total']} | "
+            f"Pass: {statistics['pass']} | "
+            f"Fail: {statistics['fail']} | "
+            f"N/A: {statistics['na']} | "
+            f"Pending: {statistics['pending']} | "
+            f"Pass Rate: {statistics['pass_rate']}%"
         )
 
-    @admin.action(description="Prepare selected CoAs")
+    @admin.display(description="Missing Assets")
+    def missing_assets_display(self, obj):
+        missing = obj.missing_assets
+
+        if not missing:
+            return format_html(
+                '<span style="color:#15803d;font-weight:700;">COMPLETE</span>'
+            )
+
+        return ", ".join(missing)
+
+    @admin.display(description="Analysis Request")
+    def analysis_request_link(self, obj):
+        request = obj.analysis_request
+
+        if request is None:
+            return "—"
+
+        url = reverse(
+            "admin:ca_chemicalanalysisrequest_change",
+            args=[request.pk],
+        )
+
+        return format_html(
+            '<a href="{}">{}</a>',
+            url,
+            request.request_id,
+        )
+
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .select_related(
+                "batch",
+                "batch__chemical",
+                "batch__supplier",
+                "batch__treatment_plant",
+                "packaging_status",
+                "approved_by",
+            )
+        )
+
+    @admin.action(description="Prepare selected CoAs for generation")
     def prepare_selected_coas(self, request, queryset):
-        self._run_action(
+        prepared = 0
+
+        for coa in queryset:
+            try:
+                coa.prepare_for_generation()
+                coa.save(
+                    populate=False,
+                    regenerate_watermark=False,
+                    regenerate_hash=False,
+                )
+                prepared += 1
+            except ValidationError as exc:
+                self.message_user(
+                    request,
+                    f"CoA #{coa.pk}: {exc}",
+                    messages.ERROR,
+                )
+
+        self.message_user(
             request,
-            queryset,
-            "ca.generate_chemical_coa",
-            lambda obj: obj.prepare_for_generation(),
-            "{} CoA(s) prepared.",
-            "Could not prepare CoA",
+            f"{prepared} CoA(s) prepared.",
+            messages.SUCCESS,
         )
 
     @admin.action(description="Approve selected CoAs")
     def approve_selected_coas(self, request, queryset):
-        self._run_action(
-            request,
-            queryset,
-            "ca.approve_chemical_coa",
-            lambda obj: obj.approve(
-                approved_by=request.user,
-            ),
-            "{} CoA(s) approved.",
-            "Could not approve CoA",
-        )
+        approved = 0
 
-    @admin.action(description="Verify selected CoAs")
-    def verify_selected_coas(self, request, queryset):
-        self._permission_required(
-            request,
-            "ca.verify_chemical_coa",
-        )
-
-        success = 0
-
-        for obj in queryset:
+        for coa in queryset:
             try:
-                if not obj.is_approved:
-                    raise ValidationError(
-                        "Only approved CoAs can be verified."
-                    )
-
-                if obj.verify_integrity():
-                    success += 1
-                else:
-                    self.message_user(
-                        request,
-                        f"Integrity verification failed for CoA #{obj.pk}.",
-                        level=messages.ERROR,
-                    )
+                coa.approve(
+                    approved_by=request.user
+                )
+                approved += 1
             except ValidationError as exc:
                 self.message_user(
                     request,
-                    f"CoA #{obj.pk}: {exc}",
-                    level=messages.ERROR,
+                    f"CoA #{coa.pk}: {exc}",
+                    messages.ERROR,
                 )
 
-        if success:
-            self.message_user(
-                request,
-                f"{success} CoA(s) passed integrity verification.",
-                level=messages.SUCCESS,
-            )
+        self.message_user(
+            request,
+            f"{approved} CoA(s) approved.",
+            messages.SUCCESS,
+        )
+
+    @admin.action(description="Verify selected CoA integrity")
+    def verify_selected_coas(self, request, queryset):
+        valid = 0
+        invalid = 0
+
+        for coa in queryset:
+            if coa.verify_integrity():
+                valid += 1
+            else:
+                invalid += 1
+
+        self.message_user(
+            request,
+            f"Integrity verification completed. "
+            f"Valid: {valid}; Invalid/Unverified: {invalid}.",
+            messages.SUCCESS,
+        )
 
     @admin.action(description="Revoke selected CoA approvals")
     def revoke_selected_approvals(self, request, queryset):
-        self._permission_required(
-            request,
-            "ca.approve_chemical_coa",
-        )
+        revoked = 0
 
-        success = 0
-
-        for obj in queryset:
+        for coa in queryset:
             try:
-                with transaction.atomic():
-                    obj.revoke_approval()
-                success += 1
+                coa.revoke_approval()
+                revoked += 1
             except ValidationError as exc:
                 self.message_user(
                     request,
-                    f"CoA #{obj.pk}: {exc}",
-                    level=messages.ERROR,
+                    f"CoA #{coa.pk}: {exc}",
+                    messages.ERROR,
                 )
 
-        if success:
-            self.message_user(
-                request,
-                f"{success} CoA approval(s) revoked.",
-                level=messages.SUCCESS,
-            )
-
-    @admin.action(description="Regenerate selected CoA content")
-    def regenerate_selected_content(self, request, queryset):
-        self._run_action(
+        self.message_user(
             request,
-            queryset,
-            "ca.generate_chemical_coa",
-            lambda obj: obj.regenerate_content(),
-            "{} CoA(s) regenerated.",
-            "Could not regenerate CoA",
+            f"{revoked} CoA approval(s) revoked.",
+            messages.SUCCESS,
+        )
+
+    @admin.action(description="Refresh verification hashes")
+    def refresh_selected_hashes(self, request, queryset):
+        refreshed = 0
+
+        for coa in queryset:
+            try:
+                coa.refresh_hash()
+                refreshed += 1
+            except ValidationError as exc:
+                self.message_user(
+                    request,
+                    f"CoA #{coa.pk}: {exc}",
+                    messages.ERROR,
+                )
+
+        self.message_user(
+            request,
+            f"{refreshed} verification hash(es) refreshed.",
+            messages.SUCCESS,
         )
 
 
-@admin.register(
-    ChecklistForWaterTreatmentChemicalAnalysis
-)
-class ChecklistForWaterTreatmentChemicalAnalysisAdmin(
-    PlantScopedAdminMixin,
-    WorkflowAdminMixin,
-    admin.ModelAdmin,
+class ChemicalAdminForm(forms.ModelForm):
+    class Meta:
+        model = Chemical
+        fields = "__all__"
+
+    def clean_hydrometer_formula(self):
+        value = self.cleaned_data.get(
+            "hydrometer_formula"
+        )
+
+        if value:
+            value = value.strip()
+
+        return value
+
+
+class ChemicalAnalysisRequestAdminForm(forms.ModelForm):
+    class Meta:
+        model = ChemicalAnalysisRequest
+        fields = "__all__"
+
+    def clean_assigned_analysts(self):
+        users = self.cleaned_data.get(
+            "assigned_analysts"
+        )
+
+        batch = self.instance.batch
+
+        if not batch or not batch.treatment_plant_id:
+            return users
+
+        invalid = users.exclude(
+            assigned_treatment_plant_id=batch.treatment_plant_id
+        )
+
+        if invalid.exists():
+            names = ", ".join(
+                str(user)
+                for user in invalid[:10]
+            )
+
+            raise ValidationError(
+                f"The following analysts are not assigned to "
+                f"the batch treatment plant: {names}"
+            )
+
+        return users
+
+
+ChemicalAdmin.form = ChemicalAdminForm
+ChemicalAnalysisRequestAdmin.form = ChemicalAnalysisRequestAdminForm
+
+
+class ChemicalCoAAdminForm(forms.ModelForm):
+    class Meta:
+        model = ChemicalCoA
+        fields = "__all__"
+
+    def clean(self):
+        cleaned_data = super().clean()
+
+        if self.instance.pk and self.instance.is_approved:
+            protected = {
+                "title",
+                "coa_header",
+                "coa_footer",
+                "footer_image",
+                "watermark",
+                "qr_code",
+                "pdf_file",
+                "chemical_name",
+                "supplier_name",
+                "quantity",
+                "delivered_to",
+                "delivery_date",
+                "delivery_note_number",
+                "packaging_status",
+                "sampling_date",
+                "analysis_date",
+                "results_summary",
+                "remarks",
+            }
+
+            changed = {
+                field
+                for field in protected
+                if field in self.changed_data
+            }
+
+            if changed:
+                raise ValidationError(
+                    "Approved CoA content is immutable. "
+                    "Revoke approval before modifying certificate content."
+                )
+
+        return cleaned_data
+
+
+ChemicalCoAAdmin.form = ChemicalCoAAdminForm
+
+
+@admin.register(Chemical)
+class RegisteredChemicalAdmin(ChemicalAdmin):
+    pass
+
+
+@admin.register(Supplier)
+class RegisteredSupplierAdmin(SupplierAdmin):
+    pass
+
+
+@admin.register(ChemicalLocation)
+class RegisteredChemicalLocationAdmin(ChemicalLocationAdmin):
+    pass
+
+
+@admin.register(ChemicalSpecification)
+class RegisteredChemicalSpecificationAdmin(
+    ChemicalSpecificationAdmin
 ):
-    plant_lookup = (
-        "chemical_analysis_request__batch__treatment_plant_id"
-    )
+    pass
 
-    list_display = (
-        "checklist_link",
-        "sample_id_display",
-        "chemical",
-        "treatment_plant_display",
-        "grade",
-        "net_weight_display",
-        "expiry_badge",
-        "completion_badge",
-        "sampled_by",
-        "completed_by",
-        "created_at",
-    )
 
-    search_fields = (
-        "chemical__name",
-        "chemical__code",
-        "chemical_analysis_request__request_id",
-        "chemical_analysis_request__batch__sample_id",
-        "chemical_analysis_request__batch__batch_number",
-        "sampled_by__username",
-        "requested_by__username",
-        "completed_by__username",
-        "storage_conditions",
-        "country_of_origin",
-    )
+@admin.register(ChemicalSpecificationRemark)
+class RegisteredChemicalSpecificationRemarkAdmin(
+    ChemicalSpecificationRemarkAdmin
+):
+    pass
 
-    list_filter = (
-        "completed",
-        "grade",
-        ExpiryFilter,
-        "chemical",
-        "chemical_analysis_request__batch__treatment_plant",
-        DateRangeFilter,
-    )
 
-    autocomplete_fields = (
-        "chemical_analysis_request",
-        "chemical",
-        "sampled_by",
-        "requested_by",
-        "completed_by",
-    )
+@admin.register(PackagingStatus)
+class RegisteredPackagingStatusAdmin(PackagingStatusAdmin):
+    pass
 
-    readonly_fields = (
-        "completed_at",
-        "completed_by",
-        "created_at",
-        "updated_at",
-        "sample_id_display",
-        "batch_number_display",
-        "treatment_plant_display",
-        "analysis_status_display",
-        "expiry_status_display",
-        "days_until_expiry_display",
-    )
 
-    actions = (
-        "complete_selected_checklists",
-        "reopen_selected_checklists",
-    )
+@admin.register(ChemicalCertApprover)
+class RegisteredChemicalCertApproverAdmin(
+    ChemicalCertApproverAdmin
+):
+    pass
 
-    list_select_related = (
-        "chemical",
-        "chemical_analysis_request",
-        "chemical_analysis_request__batch",
-        "chemical_analysis_request__batch__treatment_plant",
-        "sampled_by",
-        "requested_by",
-        "completed_by",
-    )
 
-    fieldsets = (
-        (
-            "Workflow Context",
-            {
-                "fields": (
-                    "chemical_analysis_request",
-                    "sample_id_display",
-                    "batch_number_display",
-                    "treatment_plant_display",
-                    "analysis_status_display",
-                )
-            },
-        ),
-        (
-            "Chemical Verification",
-            {
-                "fields": (
-                    "chemical",
-                    "manufacturer_name_indicated",
-                    "chemical_name_on_label",
-                    "min_mass_indicated",
-                    "grade",
-                    "manufacture_date",
-                    "expiry_date",
-                    "expiry_status_display",
-                    "days_until_expiry_display",
-                )
-            },
-        ),
-        (
-            "Receipt Conditions",
-            {
-                "fields": (
-                    "storage_conditions",
-                    "net_weight",
-                    "country_of_origin",
-                    "handling_instructions",
-                )
-            },
-        ),
-        (
-            "Hazard Assessment",
-            {
-                "fields": (
-                    "is_oxidizing",
-                    "is_corrosive",
-                    "may_cause_fire",
-                    "contact_with_acids_liberates_toxic_gas",
-                    "causes_burns",
-                    "keep_out_of_reach_of_children",
-                    "contact_with_eyes_action",
-                    "fire_action_requires_respiratory_equipment",
-                )
-            },
-        ),
-        (
-            "Personnel",
-            {
-                "fields": (
-                    "sampled_by",
-                    "requested_by",
-                )
-            },
-        ),
-        (
-            "Completion",
-            {
-                "fields": (
-                    "completed",
-                    "completed_at",
-                    "completed_by",
-                )
-            },
-        ),
-        (
-            "Audit",
-            {
-                "fields": (
-                    "created_at",
-                    "updated_at",
-                )
-            },
-        ),
-    )
+@admin.register(ChemicalBatch)
+class RegisteredChemicalBatchAdmin(ChemicalBatchAdmin):
+    pass
 
-    @admin.display(description="Checklist")
-    def checklist_link(self, obj):
-        url = reverse(
-            "admin:ca_checklistforwatertreatmentchemicalanalysis_change",
-            args=[obj.pk],
-        )
 
-        return format_html(
-            '<a href="{}"><strong>Checklist #{}</strong></a>',
-            url,
-        )
+@admin.register(ChemicalAnalysisRequest)
+class RegisteredChemicalAnalysisRequestAdmin(
+    ChemicalAnalysisRequestAdmin
+):
+    pass
 
-    @admin.display(description="Sample")
-    def sample_id_display(self, obj):
-        return obj.sample_id or "—"
 
-    @admin.display(description="Batch")
-    def batch_number_display(self, obj):
-        return obj.batch_number or "—"
+@admin.register(ChecklistForWaterTreatmentChemicalAnalysis)
+class RegisteredChecklistAdmin(ChecklistAdmin):
+    pass
 
-    @admin.display(description="Plant")
-    def treatment_plant_display(self, obj):
-        return obj.treatment_plant or "—"
 
-    @admin.display(description="Analysis")
-    def analysis_status_display(self, obj):
-        status = obj.analysis_status
+@admin.register(BatchTestResult)
+class RegisteredBatchTestResultAdmin(BatchTestResultAdmin):
+    pass
 
-        if not status:
-            return "—"
 
-        return status
+@admin.register(ChemicalAnalysisInput)
+class RegisteredChemicalAnalysisInputAdmin(
+    ChemicalAnalysisInputAdmin
+):
+    pass
 
-    @admin.display(description="Weight")
-    def net_weight_display(self, obj):
-        return f"{obj.net_weight:g}"
 
-    @admin.display(description="Expiry")
-    def expiry_badge(self, obj):
-        status = obj.expiry_status
+@admin.register(ChemicalAnalysisProcess)
+class RegisteredChemicalAnalysisProcessAdmin(
+    ChemicalAnalysisProcessAdmin
+):
+    pass
 
-        colors = {
-            "VALID": "#027a48",
-            "EXPIRING_SOON": "#b54708",
-            "EXPIRES_TODAY": "#b42318",
-            "EXPIRED": "#b42318",
-            "UNKNOWN": "#667085",
-        }
 
-        return format_html(
-            '<strong style="color:{};">{}</strong>',
-            colors.get(
-                status,
-                "#475467",
-            ),
-            status.replace("_", " "),
-        )
-
-    @admin.display(description="Completion")
-    def completion_badge(self, obj):
-        if obj.completed:
-            return format_html(
-                '<strong style="color:#027a48;">COMPLETED</strong>'
-            )
-
-        return format_html(
-            '<strong style="color:#b54708;">PENDING</strong>'
-        )
-
-    @admin.display(description="Expiry")
-    def expiry_status_display(self, obj):
-        return obj.expiry_status
-
-    @admin.display(description="Days to expiry")
-    def days_until_expiry_display(self, obj):
-        days = obj.days_until_expiry
-
-        if days is None:
-            return "—"
-
-        return days
-
-    @admin.action(description="Complete selected checklists")
-    def complete_selected_checklists(
-        self,
-        request,
-        queryset,
-    ):
-        self._run_action(
-            request,
-            queryset,
-            "ca.complete_receiving_checklist",
-            lambda obj: obj.mark_completed(
-                performed_by=request.user,
-            ),
-            "{} checklist(s) completed.",
-            "Could not complete checklist",
-        )
-
-    @admin.action(description="Reopen selected checklists")
-    def reopen_selected_checklists(
-        self,
-        request,
-        queryset,
-    ):
-        self._run_action(
-            request,
-            queryset,
-            "ca.reopen_chemical_checklist",
-            lambda obj: obj.reopen(
-                performed_by=request.user,
-            ),
-            "{} checklist(s) reopened.",
-            "Could not reopen checklist",
-        )
+@admin.register(ChemicalCoA)
+class RegisteredChemicalCoAAdmin(ChemicalCoAAdmin):
+    pass

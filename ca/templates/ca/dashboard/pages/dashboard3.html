@@ -1,0 +1,2710 @@
+
+{% extends "ca/dashboard/layout/app.html" %}
+{% load static %}
+
+{% block title %}Chemical Analysis Intelligence Command Center{% endblock %}
+
+{% block page_css %}
+<link rel="stylesheet" href="{% static 'ca/css/pages/dashboard.css' %}">
+<link rel="stylesheet" href="{% static 'ca/css/pages/dashboard-analytics.css' %}">
+{% endblock %}
+
+{% block breadcrumbs %}
+    <span aria-hidden="true">/</span>
+    <span aria-current="page">Analytics</span>
+{% endblock %}
+
+{% block content %}
+<div
+    class="ca-dashboard ca-dashboard--intelligence"
+    id="chemical-analysis-dashboard"
+    data-dashboard-url="{{ urls.dashboard }}"
+    data-analytics-url="{{ urls.analytics }}"
+    data-refresh-interval="{{ refresh.interval_seconds|default:60 }}"
+    data-process-url="{{ urls.processes }}"
+    data-dashboard-version="3"
+>
+
+    <header class="dashboard-intelligence-header">
+        <div class="dashboard-intelligence-header__identity">
+            <div class="dashboard-intelligence-header__eyebrow">
+                NCWSC QUALITY ASSURANCE &amp; CHEMICAL ANALYSIS INTELLIGENCE
+            </div>
+
+            <h1 class="dashboard-intelligence-header__title">
+                {{ dashboard.title|default:"Chemical Analysis Intelligence Command Center" }}
+            </h1>
+
+            <p class="dashboard-intelligence-header__subtitle">
+                {{ dashboard.subtitle|default:"Multi-dimensional operational, statistical, quality and workflow analytics." }}
+            </p>
+        </div>
+
+        <div class="dashboard-intelligence-header__actions">
+            <span class="dashboard-badge dashboard-badge--info">
+                {{ filters.period|default:"30d"|upper }}
+            </span>
+
+            <button
+                type="button"
+                class="ca-btn ca-btn--secondary"
+                id="dashboard-refresh"
+            >
+                Refresh
+            </button>
+
+            {% if permissions.export %}
+                <div class="dashboard-export">
+                    <button
+                        type="button"
+                        class="ca-btn ca-btn--secondary"
+                        id="dashboard-export-toggle"
+                        aria-expanded="false"
+                    >
+                        Export
+                    </button>
+
+                    <div
+                        class="dashboard-export__menu"
+                        id="dashboard-export-menu"
+                        hidden
+                    >
+                        <a href="{{ urls.export_csv }}">CSV</a>
+                        <a href="{{ urls.export_xlsx }}">Excel</a>
+                        <a href="{{ urls.export_pdf }}">PDF</a>
+                        <a href="{{ urls.export_docx }}">Word</a>
+                        <a href="{{ urls.export_json|default:urls.analytics }}">JSON</a>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </header>
+
+
+    <section class="dashboard-control-bar" id="dashboard-controls">
+
+        <div class="dashboard-control">
+            <label for="dashboard-period">Period</label>
+            <select id="dashboard-period" name="period">
+                {% for option in filters.available_periods %}
+                    <option
+                        value="{{ option }}"
+                        {% if filters.period == option %}selected{% endif %}
+                    >
+                        {{ option|upper }}
+                    </option>
+                {% empty %}
+                    <option value="7d">7D</option>
+                    <option value="30d" selected>30D</option>
+                    <option value="90d">90D</option>
+                    <option value="365d">365D</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="dashboard-control">
+            <label for="dashboard-grouping">Time grouping</label>
+            <select id="dashboard-grouping" name="group">
+                <option value="day" {% if filters.group == "day" %}selected{% endif %}>
+                    Daily
+                </option>
+                <option value="week" {% if filters.group == "week" %}selected{% endif %}>
+                    Weekly
+                </option>
+                <option value="month" {% if filters.group == "month" %}selected{% endif %}>
+                    Monthly
+                </option>
+            </select>
+        </div>
+
+        <div class="dashboard-control">
+            <label for="dashboard-dimension">Comparison dimension</label>
+            <select id="dashboard-dimension" name="dimension">
+                <option value="chemical" {% if filters.dimension == "chemical" %}selected{% endif %}>
+                    Chemical
+                </option>
+                <option value="supplier" {% if filters.dimension == "supplier" %}selected{% endif %}>
+                    Supplier
+                </option>
+                <option value="analyst" {% if filters.dimension == "analyst" %}selected{% endif %}>
+                    Analyst
+                </option>
+                <option value="plant" {% if filters.dimension == "plant" %}selected{% endif %}>
+                    Treatment Plant
+                </option>
+                <option value="status" {% if filters.dimension == "status" %}selected{% endif %}>
+                    Workflow Status
+                </option>
+            </select>
+        </div>
+
+        <div class="dashboard-control">
+            <label for="dashboard-status">Workflow status</label>
+            <select id="dashboard-status" name="status">
+                <option value="">All statuses</option>
+                {% for status in filters.available_statuses %}
+                    <option
+                        value="{{ status }}"
+                        {% if filters.status == status %}selected{% endif %}
+                    >
+                        {{ status }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="dashboard-control">
+            <label for="dashboard-date-start">From</label>
+            <input
+                type="date"
+                id="dashboard-date-start"
+                name="start"
+                value="{{ filters.start|date:'Y-m-d' }}"
+            >
+        </div>
+
+        <div class="dashboard-control">
+            <label for="dashboard-date-end">To</label>
+            <div class="dashboard-control-actions">
+                <input
+                    type="date"
+                    id="dashboard-date-end"
+                    name="end"
+                    value="{{ filters.end|date:'Y-m-d' }}"
+                >
+
+                <button
+                    type="button"
+                    class="ca-btn ca-btn--small"
+                    id="dashboard-apply-filters"
+                >
+                    Apply
+                </button>
+            </div>
+        </div>
+
+    </section>
+
+
+    <div id="dashboard-live-region" class="dashboard-live-region">
+
+        <section class="dashboard-kpi-grid--advanced">
+
+            <article class="kpi-card kpi-card--primary kpi-card--analytical">
+                <div class="kpi-card__label">Total Batches</div>
+                <div class="kpi-card__value">
+                    {{ kpis.total_batches|default:0 }}
+                </div>
+                <div class="kpi-card__meta">
+                    Selected analytical population
+                </div>
+                <div class="kpi-card__trend">
+                    <span>Previous period</span>
+                    <span class="kpi-card__trend-value kpi-card__trend-value--neutral">
+                        {{ comparisons.total_batches_delta|default:"—" }}
+                    </span>
+                </div>
+            </article>
+
+            <article class="kpi-card kpi-card--analytical">
+                <div class="kpi-card__label">Active Processes</div>
+                <div class="kpi-card__value">
+                    {{ kpis.active_analyses|default:0 }}
+                </div>
+                <div class="kpi-card__meta">
+                    Current workflow load
+                </div>
+            </article>
+
+            <article class="kpi-card kpi-card--analytical">
+                <div class="kpi-card__label">Completed</div>
+                <div class="kpi-card__value">
+                    {{ kpis.completed|default:0 }}
+                </div>
+                <div class="kpi-card__meta">
+                    Completed analytical processes
+                </div>
+            </article>
+
+            <article class="kpi-card kpi-card--analytical">
+                <div class="kpi-card__label">Pass Rate</div>
+                <div class="kpi-card__value">
+                    {{ kpis.pass_rate|default:0 }}%
+                </div>
+                <div class="kpi-card__meta">
+                    {{ kpis.pass_count|default:0 }} passing results
+                </div>
+            </article>
+
+            <article class="kpi-card kpi-card--analytical">
+                <div class="kpi-card__label">Failure Rate</div>
+                <div class="kpi-card__value">
+                    {{ kpis.fail_rate|default:0 }}%
+                </div>
+                <div class="kpi-card__meta">
+                    {{ kpis.fail_count|default:0 }} failed results
+                </div>
+            </article>
+
+            <article class="kpi-card kpi-card--analytical">
+                <div class="kpi-card__label">SLA Compliance</div>
+                <div class="kpi-card__value">
+                    {{ sla.sla_rate|default:0 }}%
+                </div>
+                <div class="kpi-card__meta">
+                    {{ sla.overdue|default:0 }} overdue
+                </div>
+            </article>
+
+            <article class="kpi-card kpi-card--analytical">
+                <div class="kpi-card__label">Median TAT</div>
+                <div class="kpi-card__value">
+                    {{ turnaround.median_hours|default:0 }} h
+                </div>
+                <div class="kpi-card__meta">
+                    P90 {{ turnaround.p90_hours|default:0 }} h
+                </div>
+            </article>
+
+            <article class="kpi-card kpi-card--analytical">
+                <div class="kpi-card__label">Retest Rate</div>
+                <div class="kpi-card__value">
+                    {{ statistics.retest_rate|default:kpis.retest_rate|default:0 }}%
+                </div>
+                <div class="kpi-card__meta">
+                    {{ kpis.retest_count|default:0 }} retest events
+                </div>
+            </article>
+
+        </section>
+
+
+        <section class="dashboard-section">
+            <div class="dashboard-section__header">
+                <div>
+                    <h2 class="dashboard-section__title">
+                        Executive Analytical Overview
+                    </h2>
+                    <p class="dashboard-section__subtitle">
+                        Throughput, quality, SLA and workload relationships.
+                    </p>
+                </div>
+
+                <div class="dashboard-badge-row">
+                    <span class="dashboard-badge">
+                        N={{ statistics.sample_size|default:kpis.total_batches|default:0 }}
+                    </span>
+
+                    <span class="dashboard-badge dashboard-badge--info">
+                        {{ dashboard.generated_at|date:"Y-m-d H:i:s" }}
+                    </span>
+                </div>
+            </div>
+
+            <div class="dashboard-grid--analytics">
+
+                <article class="dashboard-panel dashboard-panel--span-8 dashboard-panel--analytical">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h2>Throughput &amp; Quality Time Series</h2>
+                            <p>
+                                Volume, completion, pass rate and failure rate over time.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div
+                        id="chart-throughput-quality"
+                        class="plot-container plot-container--large"
+                    ></div>
+
+                    <div class="dashboard-stat-strip">
+                        <div class="dashboard-stat">
+                            <span class="dashboard-stat__label">Mean Daily Volume</span>
+                            <span class="dashboard-stat__value">
+                                {{ statistics.mean_daily_volume|default:0 }}
+                            </span>
+                        </div>
+
+                        <div class="dashboard-stat">
+                            <span class="dashboard-stat__label">Volume Std Dev</span>
+                            <span class="dashboard-stat__value">
+                                {{ statistics.volume_std|default:0 }}
+                            </span>
+                        </div>
+
+                        <div class="dashboard-stat">
+                            <span class="dashboard-stat__label">Trend Slope</span>
+                            <span class="dashboard-stat__value">
+                                {{ statistics.volume_trend_slope|default:0 }}
+                            </span>
+                        </div>
+
+                        <div class="dashboard-stat">
+                            <span class="dashboard-stat__label">R²</span>
+                            <span class="dashboard-stat__value">
+                                {{ statistics.volume_r2|default:0 }}
+                            </span>
+                        </div>
+
+                        <div class="dashboard-stat">
+                            <span class="dashboard-stat__label">Peak Volume</span>
+                            <span class="dashboard-stat__value">
+                                {{ statistics.peak_volume|default:0 }}
+                            </span>
+                        </div>
+
+                        <div class="dashboard-stat">
+                            <span class="dashboard-stat__label">Peak Date</span>
+                            <span class="dashboard-stat__value">
+                                {{ statistics.peak_volume_date|default:"—" }}
+                            </span>
+                        </div>
+                    </div>
+                </article>
+
+
+                <article class="dashboard-panel dashboard-panel--span-4 dashboard-panel--analytical">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h2>Result Composition</h2>
+                            <p>
+                                PASS, FAIL and NA analytical result distribution.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div
+                        id="chart-result-composition"
+                        class="plot-container"
+                    ></div>
+
+                    <div class="dashboard-drilldown">
+                        <div class="dashboard-drilldown__item">
+                            <span class="dashboard-drilldown__label">PASS</span>
+                            <span class="dashboard-drilldown__value">
+                                {{ quality.pass|default:kpis.pass_count|default:0 }}
+                            </span>
+                        </div>
+
+                        <div class="dashboard-drilldown__item">
+                            <span class="dashboard-drilldown__label">FAIL</span>
+                            <span class="dashboard-drilldown__value">
+                                {{ quality.fail|default:kpis.fail_count|default:0 }}
+                            </span>
+                        </div>
+
+                        <div class="dashboard-drilldown__item">
+                            <span class="dashboard-drilldown__label">NA</span>
+                            <span class="dashboard-drilldown__value">
+                                {{ quality.na|default:0 }}
+                            </span>
+                        </div>
+
+                        <div class="dashboard-drilldown__item">
+                            <span class="dashboard-drilldown__label">Retests</span>
+                            <span class="dashboard-drilldown__value">
+                                {{ quality.retest_count|default:kpis.retest_count|default:0 }}
+                            </span>
+                        </div>
+                    </div>
+                </article>
+
+
+                <article class="dashboard-panel dashboard-panel--span-4 dashboard-panel--analytical">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h2>Workflow Funnel</h2>
+                            <p>
+                                Process population across workflow stages.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div
+                        id="chart-workflow-funnel"
+                        class="plot-container"
+                    ></div>
+                </article>
+
+
+                <article class="dashboard-panel dashboard-panel--span-8 dashboard-panel--analytical">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h2>Workflow Distribution</h2>
+                            <p>
+                                Current process population by workflow state.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div
+                        id="chart-workflow-distribution"
+                        class="plot-container"
+                    ></div>
+                </article>
+
+            </div>
+        </section>
+
+
+        <section class="dashboard-section">
+
+            <div class="dashboard-section__header">
+                <div>
+                    <h2 class="dashboard-section__title">
+                        Comparative Analytics
+                    </h2>
+                    <p class="dashboard-section__subtitle">
+                        Compare workload, quality, rejection, turnaround and intervention metrics.
+                    </p>
+                </div>
+
+                <div class="dashboard-comparison__control">
+                    <label for="comparison-metric">Metric</label>
+                    <select id="comparison-metric">
+                        <option value="volume">Volume</option>
+                        <option value="pass_rate">Pass Rate</option>
+                        <option value="failure_rate">Failure Rate</option>
+                        <option value="rejection_rate">Rejection Rate</option>
+                        <option value="turnaround">Turnaround</option>
+                        <option value="retest_rate">Retest Rate</option>
+                        <option value="sla_rate">SLA Compliance</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="dashboard-grid--analytics">
+
+                <article class="dashboard-panel dashboard-panel--span-8 dashboard-panel--analytical">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h2>
+                                {{ filters.dimension|default:"Chemical"|title }} Comparison
+                            </h2>
+                            <p>
+                                Relative performance across the selected analytical dimension.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div
+                        id="chart-comparison"
+                        class="plot-container plot-container--large"
+                    ></div>
+                </article>
+
+
+                <article class="dashboard-panel dashboard-panel--span-4 dashboard-panel--analytical">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h2>Comparative Statistics</h2>
+                            <p>
+                                Distribution characteristics of the selected metric.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-analysis-grid">
+
+                        <div class="dashboard-analysis-card">
+                            <div class="dashboard-analysis-card__label">
+                                Mean
+                            </div>
+                            <div class="dashboard-analysis-card__value">
+                                {{ comparative_statistics.mean|default:0 }}
+                            </div>
+                            <div class="dashboard-analysis-card__meta">
+                                Arithmetic mean
+                            </div>
+                        </div>
+
+                        <div class="dashboard-analysis-card">
+                            <div class="dashboard-analysis-card__label">
+                                Median
+                            </div>
+                            <div class="dashboard-analysis-card__value">
+                                {{ comparative_statistics.median|default:0 }}
+                            </div>
+                            <div class="dashboard-analysis-card__meta">
+                                50th percentile
+                            </div>
+                        </div>
+
+                        <div class="dashboard-analysis-card">
+                            <div class="dashboard-analysis-card__label">
+                                P90
+                            </div>
+                            <div class="dashboard-analysis-card__value">
+                                {{ comparative_statistics.p90|default:0 }}
+                            </div>
+                            <div class="dashboard-analysis-card__meta">
+                                90th percentile
+                            </div>
+                        </div>
+
+                        <div class="dashboard-analysis-card">
+                            <div class="dashboard-analysis-card__label">
+                                Std Dev
+                            </div>
+                            <div class="dashboard-analysis-card__value">
+                                {{ comparative_statistics.std|default:0 }}
+                            </div>
+                            <div class="dashboard-analysis-card__meta">
+                                Dispersion
+                            </div>
+                        </div>
+
+                        <div class="dashboard-analysis-card">
+                            <div class="dashboard-analysis-card__label">
+                                CV
+                            </div>
+                            <div class="dashboard-analysis-card__value">
+                                {{ comparative_statistics.cv|default:0 }}%
+                            </div>
+                            <div class="dashboard-analysis-card__meta">
+                                Relative variability
+                            </div>
+                        </div>
+
+                        <div class="dashboard-analysis-card">
+                            <div class="dashboard-analysis-card__label">
+                                IQR
+                            </div>
+                            <div class="dashboard-analysis-card__value">
+                                {{ comparative_statistics.iqr|default:0 }}
+                            </div>
+                            <div class="dashboard-analysis-card__meta">
+                                Q3 − Q1
+                            </div>
+                        </div>
+
+                        <div class="dashboard-analysis-card">
+                            <div class="dashboard-analysis-card__label">
+                                Skewness
+                            </div>
+                            <div class="dashboard-analysis-card__value">
+                                {{ comparative_statistics.skew|default:0 }}
+                            </div>
+                            <div class="dashboard-analysis-card__meta">
+                                Distribution asymmetry
+                            </div>
+                        </div>
+
+                        <div class="dashboard-analysis-card">
+                            <div class="dashboard-analysis-card__label">
+                                Kurtosis
+                            </div>
+                            <div class="dashboard-analysis-card__value">
+                                {{ comparative_statistics.kurtosis|default:0 }}
+                            </div>
+                            <div class="dashboard-analysis-card__meta">
+                                Tail behaviour
+                            </div>
+                        </div>
+
+                    </div>
+                </article>
+
+            </div>
+        </section>
+
+
+        <section class="dashboard-section">
+
+            <div class="dashboard-grid--analytics">
+
+                <article class="dashboard-panel dashboard-panel--span-7 dashboard-panel--analytical">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h2>Turnaround Distribution &amp; Control Limits</h2>
+                            <p>
+                                Process-duration distribution, median, percentiles and statistical control boundaries.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div
+                        id="chart-turnaround-distribution"
+                        class="plot-container plot-container--large"
+                    ></div>
+
+                    <div class="dashboard-stat-strip">
+                        <div class="dashboard-stat">
+                            <span class="dashboard-stat__label">Mean</span>
+                            <span class="dashboard-stat__value">
+                                {{ turnaround.average_hours|default:0 }} h
+                            </span>
+                        </div>
+
+                        <div class="dashboard-stat">
+                            <span class="dashboard-stat__label">Median</span>
+                            <span class="dashboard-stat__value">
+                                {{ turnaround.median_hours|default:0 }} h
+                            </span>
+                        </div>
+
+                        <div class="dashboard-stat">
+                            <span class="dashboard-stat__label">P75</span>
+                            <span class="dashboard-stat__value">
+                                {{ turnaround.p75_hours|default:0 }} h
+                            </span>
+                        </div>
+
+                        <div class="dashboard-stat">
+                            <span class="dashboard-stat__label">P90</span>
+                            <span class="dashboard-stat__value">
+                                {{ turnaround.p90_hours|default:0 }} h
+                            </span>
+                        </div>
+
+                        <div class="dashboard-stat">
+                            <span class="dashboard-stat__label">P95</span>
+                            <span class="dashboard-stat__value">
+                                {{ turnaround.p95_hours|default:0 }} h
+                            </span>
+                        </div>
+
+                        <div class="dashboard-stat">
+                            <span class="dashboard-stat__label">Max</span>
+                            <span class="dashboard-stat__value">
+                                {{ turnaround.max_hours|default:0 }} h
+                            </span>
+                        </div>
+                    </div>
+                </article>
+
+
+                <article class="dashboard-panel dashboard-panel--span-5 dashboard-panel--analytical">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h2>SLA Analytical Control</h2>
+                            <p>
+                                Deadline adherence and overdue population.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div
+                        id="chart-sla"
+                        class="plot-container"
+                    ></div>
+
+                    <div class="dashboard-analysis-grid">
+
+                        <div class="dashboard-analysis-card">
+                            <div class="dashboard-analysis-card__label">
+                                Tracked
+                            </div>
+                            <div class="dashboard-analysis-card__value">
+                                {{ sla.tracked|default:0 }}
+                            </div>
+                        </div>
+
+                        <div class="dashboard-analysis-card">
+                            <div class="dashboard-analysis-card__label">
+                                Within SLA
+                            </div>
+                            <div class="dashboard-analysis-card__value">
+                                {{ sla.within_sla|default:0 }}
+                            </div>
+                        </div>
+
+                        <div class="dashboard-analysis-card">
+                            <div class="dashboard-analysis-card__label">
+                                Overdue
+                            </div>
+                            <div class="dashboard-analysis-card__value">
+                                {{ sla.overdue|default:0 }}
+                            </div>
+                        </div>
+
+                        <div class="dashboard-analysis-card">
+                            <div class="dashboard-analysis-card__label">
+                                Overdue Rate
+                            </div>
+                            <div class="dashboard-analysis-card__value">
+                                {{ sla.overdue_rate|default:0 }}%
+                            </div>
+                        </div>
+
+                    </div>
+                </article>
+
+
+                <article class="dashboard-panel dashboard-panel--span-6 dashboard-panel--analytical">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h2>SLA Aging Profile</h2>
+                            <p>
+                                Distribution of active and unresolved analytical requests by age.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div
+                        id="chart-aging"
+                        class="plot-container"
+                    ></div>
+                </article>
+
+
+                <article class="dashboard-panel dashboard-panel--span-6 dashboard-panel--analytical">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h2>Retest &amp; Rework Trend</h2>
+                            <p>
+                                Rework frequency and intervention intensity over time.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div
+                        id="chart-retest"
+                        class="plot-container"
+                    ></div>
+                </article>
+
+            </div>
+        </section>
+
+
+        <section class="dashboard-section">
+
+            <div class="dashboard-grid--analytics">
+
+                <article class="dashboard-panel dashboard-panel--span-7 dashboard-panel--analytical">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h2>Chemical Quality Matrix</h2>
+                            <p>
+                                Comparative workload, pass/fail performance and rejection exposure.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div
+                        id="chart-chemical-matrix"
+                        class="plot-container plot-container--large"
+                    ></div>
+                </article>
+
+
+                <article class="dashboard-panel dashboard-panel--span-5 dashboard-panel--analytical">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h2>Failure Pareto</h2>
+                            <p>
+                                Concentration of analytical failures by chemical.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div
+                        id="chart-failure-pareto"
+                        class="plot-container plot-container--large"
+                    ></div>
+                </article>
+
+
+                <article class="dashboard-panel dashboard-panel--span-6 dashboard-panel--analytical">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h2>Supplier Quality Comparison</h2>
+                            <p>
+                                Acceptance, rejection and workload by supplier.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div
+                        id="chart-supplier-quality"
+                        class="plot-container"
+                    ></div>
+                </article>
+
+
+                <article class="dashboard-panel dashboard-panel--span-6 dashboard-panel--analytical">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h2>Analyst Workload &amp; Intervention</h2>
+                            <p>
+                                Assigned workload, completion and rework indicators.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div
+                        id="chart-analyst-performance"
+                        class="plot-container"
+                    ></div>
+                </article>
+
+            </div>
+        </section>
+
+
+        <section class="dashboard-section">
+
+            <div class="dashboard-grid--analytics">
+
+                <article class="dashboard-panel dashboard-panel--span-8 dashboard-panel--analytical">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h2>Statistical Relationships</h2>
+                            <p>
+                                Correlation structure across operational and quality variables.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div
+                        id="chart-correlation"
+                        class="plot-container plot-container--large"
+                    ></div>
+                </article>
+
+
+                <article class="dashboard-panel dashboard-panel--span-4 dashboard-panel--analytical">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h2>Regression / Trend Diagnostics</h2>
+                            <p>
+                                Statistical trend indicators for the selected period.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-analysis-grid">
+
+                        <div class="dashboard-analysis-card">
+                            <div class="dashboard-analysis-card__label">
+                                Slope
+                            </div>
+                            <div class="dashboard-analysis-card__value">
+                                {{ statistics.trend_slope|default:0 }}
+                            </div>
+                            <div class="dashboard-analysis-card__meta">
+                                Time trend
+                            </div>
+                        </div>
+
+                        <div class="dashboard-analysis-card">
+                            <div class="dashboard-analysis-card__label">
+                                R²
+                            </div>
+                            <div class="dashboard-analysis-card__value">
+                                {{ statistics.trend_r2|default:0 }}
+                            </div>
+                            <div class="dashboard-analysis-card__meta">
+                                Explained variance
+                            </div>
+                        </div>
+
+                        <div class="dashboard-analysis-card">
+                            <div class="dashboard-analysis-card__label">
+                                p-value
+                            </div>
+                            <div class="dashboard-analysis-card__value">
+                                {{ statistics.trend_pvalue|default:0 }}
+                            </div>
+                            <div class="dashboard-analysis-card__meta">
+                                Trend test
+                            </div>
+                        </div>
+
+                        <div class="dashboard-analysis-card">
+                            <div class="dashboard-analysis-card__label">
+                                CI 95%
+                            </div>
+                            <div class="dashboard-analysis-card__value">
+                                {{ statistics.mean_ci_low|default:0 }}
+                                –
+                                {{ statistics.mean_ci_high|default:0 }}
+                            </div>
+                            <div class="dashboard-analysis-card__meta">
+                                Mean confidence interval
+                            </div>
+                        </div>
+
+                    </div>
+                </article>
+
+            </div>
+        </section>
+
+
+        <section class="dashboard-section">
+
+            <div class="dashboard-grid--analytics">
+
+                <article class="dashboard-panel dashboard-panel--span-8 dashboard-panel--analytical">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h2>Forecast &amp; Capacity Outlook</h2>
+                            <p>
+                                Historical throughput with projected workload trajectory.
+                            </p>
+                        </div>
+
+                        {% if forecast.available %}
+                            <span class="dashboard-badge dashboard-badge--info">
+                                Forecast available
+                            </span>
+                        {% endif %}
+                    </div>
+
+                    <div
+                        id="chart-forecast"
+                        class="plot-container plot-container--large"
+                    ></div>
+                </article>
+
+
+                <article class="dashboard-panel dashboard-panel--span-4 dashboard-panel--analytical">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h2>Forecast Summary</h2>
+                            <p>
+                                Projected analytical workload.
+                            </p>
+                        </div>
+                    </div>
+
+                    {% if forecast.available %}
+
+                        <div class="dashboard-table-scroll">
+                            <table class="dashboard-analytics-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Predicted</th>
+                                        <th>Lower</th>
+                                        <th>Upper</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody>
+                                    {% for row in forecast.values|slice:":14" %}
+                                        <tr>
+                                            <td>{{ row.date }}</td>
+                                            <td>{{ row.predicted }}</td>
+                                            <td>{{ row.lower|default:"—" }}</td>
+                                            <td>{{ row.upper|default:"—" }}</td>
+                                        </tr>
+                                    {% empty %}
+                                        <tr>
+                                            <td colspan="4">
+                                                No forecast observations.
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                    {% else %}
+
+                        <div class="dashboard-empty-advanced">
+                            Insufficient historical observations for a stable forecast.
+                        </div>
+
+                    {% endif %}
+                </article>
+
+            </div>
+        </section>
+
+
+        <section class="dashboard-section">
+
+            <div class="dashboard-grid--analytics">
+
+                <article class="dashboard-panel dashboard-panel--span-8 dashboard-panel--analytical">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h2>Operational Risk Register</h2>
+                            <p>
+                                Processes with elevated age, rework, SLA or workflow exposure.
+                            </p>
+                        </div>
+
+                        <span class="dashboard-panel__count">
+                            {{ risk_register|length }}
+                        </span>
+                    </div>
+
+                    <div class="dashboard-table-scroll">
+                        <table class="dashboard-analytics-table">
+                            <thead>
+                                <tr>
+                                    <th>Process</th>
+                                    <th>Chemical</th>
+                                    <th>Status</th>
+                                    <th>Age</th>
+                                    <th>Rework</th>
+                                    <th>Escalations</th>
+                                    <th>Risk</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                {% for row in risk_register|slice:":75" %}
+                                    <tr data-process-id="{{ row.id }}">
+                                        <td>#{{ row.id }}</td>
+                                        <td>{{ row.chemical|default:"—" }}</td>
+                                        <td>{{ row.status|default:"—" }}</td>
+                                        <td>{{ row.age_hours|default:0 }} h</td>
+                                        <td>{{ row.rework_count|default:0 }}</td>
+                                        <td>{{ row.escalation_count|default:0 }}</td>
+                                        <td>
+                                            {% if row.risk_score >= 75 %}
+                                                <span class="dashboard-badge dashboard-badge--danger">
+                                                    {{ row.risk_score }}
+                                                </span>
+                                            {% elif row.risk_score >= 40 %}
+                                                <span class="dashboard-badge dashboard-badge--warning">
+                                                    {{ row.risk_score }}
+                                                </span>
+                                            {% else %}
+                                                <span class="dashboard-badge dashboard-badge--success">
+                                                    {{ row.risk_score }}
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="7">
+                                            No elevated process risk detected.
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </article>
+
+
+                <article class="dashboard-panel dashboard-panel--span-4 dashboard-panel--analytical">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h2>Anomaly Detection</h2>
+                            <p>
+                                Unusual workload, quality or turnaround observations.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-alert-list">
+
+                        {% for anomaly in anomalies %}
+
+                            <div class="dashboard-alert-item dashboard-alert-item--{{ anomaly.severity|default:'info'|lower }}">
+
+                                <div class="dashboard-alert-item__indicator"></div>
+
+                                <div class="dashboard-alert-item__content">
+                                    <span class="dashboard-alert-item__title">
+                                        {{ anomaly.type }}
+                                    </span>
+
+                                    <span class="dashboard-alert-item__description">
+                                        {{ anomaly.date }}
+                                        ·
+                                        {{ anomaly.description|default:"Statistical deviation detected." }}
+                                    </span>
+                                </div>
+
+                                <div class="dashboard-alert-item__value">
+                                    {{ anomaly.value }}
+                                </div>
+
+                            </div>
+
+                        {% empty %}
+
+                            <div class="dashboard-empty-advanced">
+                                No significant anomalies detected in the selected period.
+                            </div>
+
+                        {% endfor %}
+
+                    </div>
+                </article>
+
+            </div>
+        </section>
+
+
+        <section class="dashboard-section">
+
+            <div class="dashboard-grid--analytics">
+
+                <article class="dashboard-panel dashboard-panel--span-4 dashboard-panel--analytical">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h2>Plant Comparison</h2>
+                            <p>
+                                Comparative workload and quality indicators.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div
+                        id="chart-plant-comparison"
+                        class="plot-container"
+                    ></div>
+                </article>
+
+
+                <article class="dashboard-panel dashboard-panel--span-4 dashboard-panel--analytical">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h2>Process Aging</h2>
+                            <p>
+                                Active process population by elapsed duration.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div
+                        id="chart-process-aging"
+                        class="plot-container"
+                    ></div>
+                </article>
+
+
+                <article class="dashboard-panel dashboard-panel--span-4 dashboard-panel--analytical">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h2>CoA Integrity</h2>
+                            <p>
+                                Certificate generation and verification state.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div
+                        id="chart-coa-integrity"
+                        class="plot-container"
+                    ></div>
+
+                    <div class="dashboard-badge-row">
+                        <span class="dashboard-badge dashboard-badge--success">
+                            Valid {{ quality.coa_integrity.valid|default:0 }}
+                        </span>
+
+                        <span class="dashboard-badge dashboard-badge--warning">
+                            Unverified {{ quality.coa_integrity.unverified|default:0 }}
+                        </span>
+
+                        <span class="dashboard-badge dashboard-badge--danger">
+                            Invalid {{ quality.coa_integrity.invalid|default:0 }}
+                        </span>
+
+                        <span class="dashboard-badge">
+                            Missing {{ quality.coa_integrity.missing_assets|default:0 }}
+                        </span>
+                    </div>
+                </article>
+
+            </div>
+        </section>
+
+
+        <section class="dashboard-section">
+
+            <div class="dashboard-grid--analytics">
+
+                <article class="dashboard-panel dashboard-panel--span-6 dashboard-panel--analytical">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h2>QA Queue</h2>
+                            <p>
+                                Quality intervention workload requiring review.
+                            </p>
+                        </div>
+
+                        <span class="dashboard-panel__count">
+                            {{ qa_queue|length }}
+                        </span>
+                    </div>
+
+                    <div class="dashboard-table-scroll">
+                        <table class="dashboard-analytics-table">
+                            <thead>
+                                <tr>
+                                    <th>Process</th>
+                                    <th>Status</th>
+                                    <th>Age</th>
+                                    <th>Risk</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                {% for row in qa_queue %}
+                                    <tr data-process-id="{{ row.id }}">
+                                        <td>#{{ row.id }}</td>
+                                        <td>{{ row.status }}</td>
+                                        <td>{{ row.age_hours|default:0 }} h</td>
+                                        <td>{{ row.risk|default:"—" }}</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="4">
+                                            QA queue is clear.
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </article>
+
+
+                <article class="dashboard-panel dashboard-panel--span-6 dashboard-panel--analytical">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h2>Approval Queue</h2>
+                            <p>
+                                Processes awaiting final approval.
+                            </p>
+                        </div>
+
+                        <span class="dashboard-panel__count">
+                            {{ approval_queue|length }}
+                        </span>
+                    </div>
+
+                    <div class="dashboard-table-scroll">
+                        <table class="dashboard-analytics-table">
+                            <thead>
+                                <tr>
+                                    <th>Process</th>
+                                    <th>Status</th>
+                                    <th>Date</th>
+                                    <th>Risk</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                {% for row in approval_queue %}
+                                    <tr data-process-id="{{ row.id }}">
+                                        <td>#{{ row.id }}</td>
+                                        <td>{{ row.status }}</td>
+                                        <td>{{ row.date|default:"—" }}</td>
+                                        <td>{{ row.risk|default:"—" }}</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="4">
+                                            Approval queue is clear.
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </article>
+
+            </div>
+        </section>
+
+
+        <section class="dashboard-section">
+
+            <div class="dashboard-grid--analytics">
+
+                <article class="dashboard-panel dashboard-panel--span-6 dashboard-panel--analytical">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h2>Supplier Performance Register</h2>
+                            <p>
+                                Acceptance, rejection and risk indicators.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-table-scroll">
+                        <table class="dashboard-analytics-table">
+                            <thead>
+                                <tr>
+                                    <th>Supplier</th>
+                                    <th>Total</th>
+                                    <th>Approved</th>
+                                    <th>Rejected</th>
+                                    <th>Acceptance</th>
+                                    <th>Risk</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                {% for row in supplier_performance %}
+                                    <tr>
+                                        <td><strong>{{ row.supplier }}</strong></td>
+                                        <td>{{ row.total }}</td>
+                                        <td>{{ row.approved }}</td>
+                                        <td>{{ row.rejected }}</td>
+                                        <td>{{ row.acceptance_rate }}%</td>
+                                        <td>{{ row.risk_score }}</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="6">
+                                            No supplier performance data.
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </article>
+
+
+                <article class="dashboard-panel dashboard-panel--span-6 dashboard-panel--analytical">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h2>Analyst Performance Register</h2>
+                            <p>
+                                Workload, completion, retest and QA intervention.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-table-scroll">
+                        <table class="dashboard-analytics-table">
+                            <thead>
+                                <tr>
+                                    <th>Analyst</th>
+                                    <th>Total</th>
+                                    <th>Active</th>
+                                    <th>Completed</th>
+                                    <th>Retest</th>
+                                    <th>QA</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                {% for row in analyst_performance %}
+                                    <tr>
+                                        <td><strong>{{ row.analyst }}</strong></td>
+                                        <td>{{ row.total }}</td>
+                                        <td>{{ row.active }}</td>
+                                        <td>{{ row.completed }}</td>
+                                        <td>{{ row.retest }}</td>
+                                        <td>{{ row.qa|default:row.capa|default:0 }}</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="6">
+                                            No analyst performance data.
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </article>
+
+            </div>
+        </section>
+
+
+        <section class="dashboard-section">
+
+            <div class="dashboard-section__header">
+                <div>
+                    <h2 class="dashboard-section__title">
+                        Deep Process Drill-Down
+                    </h2>
+
+                    <p class="dashboard-section__subtitle">
+                        Select any analytical process to inspect workflow, timing, quality and risk detail.
+                    </p>
+                </div>
+
+                <div class="dashboard-badge-row">
+                    <span class="dashboard-badge">
+                        {{ active_processes|length }} active
+                    </span>
+
+                    <span class="dashboard-badge dashboard-badge--warning">
+                        {{ sla.overdue|default:0 }} overdue
+                    </span>
+                </div>
+            </div>
+
+            <article class="dashboard-panel dashboard-panel--analytical">
+
+                <div class="dashboard-table-scroll">
+                    <table class="dashboard-analytics-table" id="process-drilldown-table">
+
+                        <thead>
+                            <tr>
+                                <th>Process</th>
+                                <th>Chemical</th>
+                                <th>Status</th>
+                                <th>Age</th>
+                                <th>Rework</th>
+                                <th>SLA</th>
+                                <th>Risk</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+
+                            {% for row in active_processes %}
+
+                                <tr
+                                    data-process-id="{{ row.id }}"
+                                    data-process-status="{{ row.status }}"
+                                >
+                                    <td>
+                                        <strong>#{{ row.id }}</strong>
+                                    </td>
+
+                                    <td>
+                                        {{ row.chemical|default:"—" }}
+                                    </td>
+
+                                    <td>
+                                        <span class="ca-badge">
+                                            {{ row.status }}
+                                        </span>
+                                    </td>
+
+                                    <td>
+                                        {{ row.age_hours|default:0 }} h
+                                    </td>
+
+                                    <td>
+                                        {{ row.rework_count|default:0 }}
+                                    </td>
+
+                                    <td>
+                                        {% if row.overdue %}
+                                            <span class="dashboard-badge dashboard-badge--danger">
+                                                Overdue
+                                            </span>
+                                        {% else %}
+                                            <span class="dashboard-badge dashboard-badge--success">
+                                                Within
+                                            </span>
+                                        {% endif %}
+                                    </td>
+
+                                    <td>
+                                        {% if row.risk == "CRITICAL" %}
+                                            <span class="dashboard-badge dashboard-badge--danger">
+                                                Critical
+                                            </span>
+                                        {% elif row.risk == "HIGH" %}
+                                            <span class="dashboard-badge dashboard-badge--warning">
+                                                High
+                                            </span>
+                                        {% elif row.risk == "MEDIUM" %}
+                                            <span class="dashboard-badge">
+                                                Medium
+                                            </span>
+                                        {% else %}
+                                            <span class="dashboard-badge dashboard-badge--success">
+                                                Low
+                                            </span>
+                                        {% endif %}
+                                    </td>
+
+                                    <td>
+                                        <a
+                                            href="{{ urls.processes }}?id={{ row.id }}"
+                                            class="ca-btn ca-btn--small"
+                                        >
+                                            Inspect
+                                        </a>
+                                    </td>
+                                </tr>
+
+                            {% empty %}
+
+                                <tr>
+                                    <td colspan="8">
+                                        No active analytical processes.
+                                    </td>
+                                </tr>
+
+                            {% endfor %}
+
+                        </tbody>
+
+                    </table>
+                </div>
+
+            </article>
+        </section>
+
+
+        <section class="dashboard-section">
+
+            <div class="dashboard-grid--analytics">
+
+                <article class="dashboard-panel dashboard-panel--span-4 dashboard-panel--analytical">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h2>Sampling Control</h2>
+                            <p>
+                                Systematic random sampling control state.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div
+                        id="chart-sampling"
+                        class="plot-container plot-container--small"
+                    ></div>
+                </article>
+
+
+                <article class="dashboard-panel dashboard-panel--span-4 dashboard-panel--analytical">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h2>CoA Integrity</h2>
+                            <p>
+                                Certificate completeness and verification.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="metric-list">
+
+                        <div class="metric-row">
+                            <span>Valid</span>
+                            <strong>
+                                {{ quality.coa_integrity.valid|default:0 }}
+                            </strong>
+                        </div>
+
+                        <div class="metric-row">
+                            <span>Unverified</span>
+                            <strong>
+                                {{ quality.coa_integrity.unverified|default:0 }}
+                            </strong>
+                        </div>
+
+                        <div class="metric-row metric-row--danger">
+                            <span>Invalid</span>
+                            <strong>
+                                {{ quality.coa_integrity.invalid|default:0 }}
+                            </strong>
+                        </div>
+
+                        <div class="metric-row metric-row--warning">
+                            <span>Missing assets</span>
+                            <strong>
+                                {{ quality.coa_integrity.missing_assets|default:0 }}
+                            </strong>
+                        </div>
+
+                    </div>
+                </article>
+
+
+                <article class="dashboard-panel dashboard-panel--span-4 dashboard-panel--analytical">
+                    <div class="dashboard-panel__header">
+                        <div>
+                            <h2>Queue Concentration</h2>
+                            <p>
+                                Current operational bottlenecks.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="metric-list">
+
+                        <div class="metric-row">
+                            <span>Sampling</span>
+                            <strong>
+                                {{ workflow.queues.sampling_pending.count|default:0 }}
+                            </strong>
+                        </div>
+
+                        <div class="metric-row">
+                            <span>Counter-check</span>
+                            <strong>
+                                {{ workflow.queues.counter_check.count|default:0 }}
+                            </strong>
+                        </div>
+
+                        <div class="metric-row">
+                            <span>Results</span>
+                            <strong>
+                                {{ workflow.queues.pending_results.count|default:0 }}
+                            </strong>
+                        </div>
+
+                        <div class="metric-row metric-row--warning">
+                            <span>QA</span>
+                            <strong>
+                                {{ workflow.queues.qa.count|default:0 }}
+                            </strong>
+                        </div>
+
+                        <div class="metric-row metric-row--danger">
+                            <span>Approval</span>
+                            <strong>
+                                {{ workflow.queues.approval.count|default:0 }}
+                            </strong>
+                        </div>
+
+                    </div>
+                </article>
+
+            </div>
+        </section>
+
+
+        <footer class="dashboard-footer dashboard-footer--advanced">
+
+            <div>
+                Generated:
+                {{ dashboard.generated_at|date:"Y-m-d H:i:s" }}
+            </div>
+
+            <div>
+                Period:
+                {{ filters.start|date:"Y-m-d" }}
+                —
+                {{ filters.end|date:"Y-m-d" }}
+            </div>
+
+            <div>
+                Auto-refresh:
+                {{ refresh.interval_seconds|default:60 }}s
+            </div>
+
+            <div id="dashboard-connection-state">
+                Operational
+            </div>
+
+        </footer>
+
+    </div>
+</div>
+
+
+<div
+    id="dashboard-loading-overlay"
+    class="dashboard-loading-overlay"
+    aria-hidden="true"
+>
+    <div class="dashboard-loading-card">
+        <strong>Updating analytical model</strong>
+        <div class="dashboard-loading-bar"></div>
+    </div>
+</div>
+
+
+{% if chart_payload %}
+{{ chart_payload|json_script:"dashboard-chart-payload" }}
+{% endif %}
+
+{% if dashboard_json %}
+{{ dashboard_json|json_script:"dashboard-data-payload" }}
+{% endif %}
+
+{% endblock %}
+
+
+{% block extra_js %}
+
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+<script>
+(function () {
+    "use strict";
+
+    const dashboard = document.getElementById(
+        "chemical-analysis-dashboard"
+    );
+
+    if (!dashboard) {
+        return;
+    }
+
+    const state = {
+        charts: {},
+        refreshTimer: null,
+        refreshInterval:
+            Number(
+                dashboard.dataset.refreshInterval || 60
+            ) * 1000,
+        filterTimer: null
+    };
+
+
+    function readJSONScript(id, fallback) {
+        const element = document.getElementById(id);
+
+        if (!element) {
+            return fallback;
+        }
+
+        try {
+            return JSON.parse(element.textContent);
+        } catch (error) {
+            return fallback;
+        }
+    }
+
+
+    const payload = readJSONScript(
+        "dashboard-chart-payload",
+        {}
+    );
+
+    const dashboardData = readJSONScript(
+        "dashboard-data-payload",
+        {}
+    );
+
+
+    function getChart(name) {
+        if (
+            payload &&
+            payload.charts &&
+            payload.charts[name]
+        ) {
+            return payload.charts[name];
+        }
+
+        if (
+            payload &&
+            payload[name]
+        ) {
+            return payload[name];
+        }
+
+        if (
+            dashboardData &&
+            dashboardData.charts &&
+            dashboardData.charts[name]
+        ) {
+            return dashboardData.charts[name];
+        }
+
+        return null;
+    }
+
+
+    function normaliseFigure(figure) {
+        if (!figure) {
+            return null;
+        }
+
+        if (typeof figure === "string") {
+            try {
+                return JSON.parse(figure);
+            } catch (error) {
+                return null;
+            }
+        }
+
+        if (
+            figure.figure &&
+            typeof figure.figure === "object"
+        ) {
+            return figure.figure;
+        }
+
+        return figure;
+    }
+
+
+    function defaultLayout() {
+        return {
+            autosize: true,
+            margin: {
+                l: 48,
+                r: 18,
+                t: 20,
+                b: 48
+            },
+            paper_bgcolor: "transparent",
+            plot_bgcolor: "transparent",
+            font: {
+                size: 11
+            },
+            hovermode: "x unified",
+            legend: {
+                orientation: "h",
+                y: -0.18
+            }
+        };
+    }
+
+
+    function renderPlot(
+        elementId,
+        chartName,
+        overrides
+    ) {
+        const element =
+            document.getElementById(elementId);
+
+        if (!element || !window.Plotly) {
+            return;
+        }
+
+        const raw =
+            normaliseFigure(
+                getChart(chartName)
+            );
+
+        if (!raw) {
+            element.innerHTML =
+                '<div class="dashboard-empty-advanced">No analytical data available.</div>';
+            return;
+        }
+
+        const figure = {
+            data:
+                Array.isArray(raw.data)
+                    ? raw.data
+                    : [],
+            layout: {
+                ...defaultLayout(),
+                ...(raw.layout || {}),
+                ...(overrides || {})
+            },
+            config: {
+                responsive: true,
+                displaylogo: false,
+                modeBarButtonsToRemove: [
+                    "lasso2d",
+                    "select2d"
+                ],
+                toImageButtonOptions: {
+                    format: "png",
+                    filename: "chemical-analysis-dashboard",
+                    scale: 2
+                },
+                ...(raw.config || {})
+            }
+        };
+
+        window.Plotly.react(
+            element,
+            figure.data,
+            figure.layout,
+            figure.config
+        );
+
+        state.charts[elementId] = element;
+    }
+
+
+    function renderAllCharts() {
+
+        renderPlot(
+            "chart-throughput-quality",
+            "throughput_quality"
+        );
+
+        renderPlot(
+            "chart-result-composition",
+            "result_composition",
+            {
+                margin: {
+                    l: 20,
+                    r: 20,
+                    t: 20,
+                    b: 20
+                },
+                showlegend: true
+            }
+        );
+
+        renderPlot(
+            "chart-workflow-funnel",
+            "workflow_funnel"
+        );
+
+        renderPlot(
+            "chart-workflow-distribution",
+            "workflow_distribution"
+        );
+
+        renderPlot(
+            "chart-comparison",
+            "comparison"
+        );
+
+        renderPlot(
+            "chart-turnaround-distribution",
+            "turnaround_distribution"
+        );
+
+        renderPlot(
+            "chart-sla",
+            "sla"
+        );
+
+        renderPlot(
+            "chart-aging",
+            "aging"
+        );
+
+        renderPlot(
+            "chart-retest",
+            "retest"
+        );
+
+        renderPlot(
+            "chart-chemical-matrix",
+            "chemical_matrix"
+        );
+
+        renderPlot(
+            "chart-failure-pareto",
+            "failure_pareto"
+        );
+
+        renderPlot(
+            "chart-supplier-quality",
+            "supplier_quality"
+        );
+
+        renderPlot(
+            "chart-analyst-performance",
+            "analyst_performance"
+        );
+
+        renderPlot(
+            "chart-correlation",
+            "correlation"
+        );
+
+        renderPlot(
+            "chart-forecast",
+            "forecast"
+        );
+
+        renderPlot(
+            "chart-plant-comparison",
+            "plant_comparison"
+        );
+
+        renderPlot(
+            "chart-process-aging",
+            "process_aging"
+        );
+
+        renderPlot(
+            "chart-coa-integrity",
+            "coa_integrity"
+        );
+
+        renderPlot(
+            "chart-sampling",
+            "sampling"
+        );
+    }
+
+
+    function setConnectionState(
+        text
+    ) {
+        const element =
+            document.getElementById(
+                "dashboard-connection-state"
+            );
+
+        if (element) {
+            element.textContent = text;
+        }
+    }
+
+
+    function setLoading(
+        visible
+    ) {
+        const overlay =
+            document.getElementById(
+                "dashboard-loading-overlay"
+            );
+
+        if (!overlay) {
+            return;
+        }
+
+        overlay.classList.toggle(
+            "is-visible",
+            visible
+        );
+
+        overlay.setAttribute(
+            "aria-hidden",
+            visible ? "false" : "true"
+        );
+    }
+
+
+    function currentFilters() {
+        const params =
+            new URLSearchParams();
+
+        const period =
+            document.getElementById(
+                "dashboard-period"
+            );
+
+        const grouping =
+            document.getElementById(
+                "dashboard-grouping"
+            );
+
+        const dimension =
+            document.getElementById(
+                "dashboard-dimension"
+            );
+
+        const status =
+            document.getElementById(
+                "dashboard-status"
+            );
+
+        const start =
+            document.getElementById(
+                "dashboard-date-start"
+            );
+
+        const end =
+            document.getElementById(
+                "dashboard-date-end"
+            );
+
+        if (
+            period &&
+            period.value
+        ) {
+            params.set(
+                "period",
+                period.value
+            );
+        }
+
+        if (
+            grouping &&
+            grouping.value
+        ) {
+            params.set(
+                "group",
+                grouping.value
+            );
+        }
+
+        if (
+            dimension &&
+            dimension.value
+        ) {
+            params.set(
+                "dimension",
+                dimension.value
+            );
+        }
+
+        if (
+            status &&
+            status.value
+        ) {
+            params.set(
+                "status",
+                status.value
+            );
+        }
+
+        if (
+            start &&
+            start.value
+        ) {
+            params.set(
+                "start",
+                start.value
+            );
+        }
+
+        if (
+            end &&
+            end.value
+        ) {
+            params.set(
+                "end",
+                end.value
+            );
+        }
+
+        return params;
+    }
+
+
+    function analyticsURL() {
+        const base =
+            dashboard.dataset.analyticsUrl;
+
+        if (!base) {
+            return null;
+        }
+
+        const params =
+            currentFilters();
+
+        const separator =
+            base.includes("?")
+                ? "&"
+                : "?";
+
+        return (
+            base +
+            (
+                params.toString()
+                    ? separator + params.toString()
+                    : ""
+            )
+        );
+    }
+
+
+    async function refreshDashboard() {
+
+        const url =
+            analyticsURL();
+
+        if (!url) {
+            return;
+        }
+
+        setLoading(true);
+        setConnectionState("Refreshing");
+
+        try {
+            const response =
+                await fetch(
+                    url,
+                    {
+                        method: "GET",
+                        headers: {
+                            "X-Requested-With":
+                                "XMLHttpRequest",
+                            "Accept":
+                                "application/json"
+                        },
+                        credentials: "same-origin"
+                    }
+                );
+
+            if (!response.ok) {
+                throw new Error(
+                    "Analytics request failed"
+                );
+            }
+
+            const contentType =
+                response.headers.get(
+                    "content-type"
+                ) || "";
+
+            if (
+                contentType.includes(
+                    "application/json"
+                )
+            ) {
+                const data =
+                    await response.json();
+
+                updateFromPayload(
+                    data
+                );
+            } else {
+                const html =
+                    await response.text();
+
+                const parser =
+                    new DOMParser();
+
+                const documentNode =
+                    parser.parseFromString(
+                        html,
+                        "text/html"
+                    );
+
+                const incoming =
+                    documentNode.querySelector(
+                        "#dashboard-live-region"
+                    );
+
+                const current =
+                    document.getElementById(
+                        "dashboard-live-region"
+                    );
+
+                if (
+                    incoming &&
+                    current
+                ) {
+                    current.innerHTML =
+                        incoming.innerHTML;
+                }
+            }
+
+            setConnectionState(
+                "Operational"
+            );
+
+            const refreshLabel =
+                document.getElementById(
+                    "dashboard-last-refresh"
+                );
+
+            if (refreshLabel) {
+                refreshLabel.textContent =
+                    "Updated " +
+                    new Date()
+                        .toLocaleTimeString();
+            }
+
+        } catch (error) {
+
+            setConnectionState(
+                "Refresh failed"
+            );
+
+        } finally {
+
+            setLoading(false);
+        }
+    }
+
+
+    function updateFromPayload(
+        data
+    ) {
+        if (!data) {
+            return;
+        }
+
+        if (data.charts) {
+            payload.charts =
+                data.charts;
+        }
+
+        if (data.dashboard) {
+            Object.assign(
+                dashboardData,
+                data.dashboard
+            );
+        }
+
+        renderAllCharts();
+    }
+
+
+    function applyFilters() {
+
+        const url =
+            analyticsURL();
+
+        if (!url) {
+            return;
+        }
+
+        window.location.href =
+            url;
+    }
+
+
+    function scheduleFilterApply() {
+
+        window.clearTimeout(
+            state.filterTimer
+        );
+
+        state.filterTimer =
+            window.setTimeout(
+                applyFilters,
+                150
+            );
+    }
+
+
+    function updateComparisonMetric() {
+
+        const metric =
+            document.getElementById(
+                "comparison-metric"
+            );
+
+        const figure =
+            normaliseFigure(
+                getChart("comparison")
+            );
+
+        if (
+            !metric ||
+            !figure ||
+            !Array.isArray(
+                figure.data
+            )
+        ) {
+            return;
+        }
+
+        const selected =
+            metric.value;
+
+        const matching =
+            figure.data.filter(
+                dataset =>
+                    !dataset.metric ||
+                    dataset.metric === selected
+            );
+
+        if (
+            matching.length
+        ) {
+            window.Plotly.react(
+                "chart-comparison",
+                matching,
+                {
+                    ...defaultLayout(),
+                    ...(figure.layout || {})
+                },
+                {
+                    responsive: true,
+                    displaylogo: false
+                }
+            );
+        }
+    }
+
+
+    function attachProcessDrilldown() {
+
+        document
+            .querySelectorAll(
+                "[data-process-id]"
+            )
+            .forEach(
+                row => {
+
+                    row.addEventListener(
+                        "dblclick",
+                        function () {
+
+                            const id =
+                                row.dataset.processId;
+
+                            if (!id) {
+                                return;
+                            }
+
+                            const base =
+                                dashboard.dataset.processUrl;
+
+                            if (!base) {
+                                return;
+                            }
+
+                            const separator =
+                                base.includes("?")
+                                    ? "&"
+                                    : "?";
+
+                            window.location.href =
+                                base +
+                                separator +
+                                "id=" +
+                                encodeURIComponent(id);
+                        }
+                    );
+
+                }
+            );
+    }
+
+
+    function attachPlotDrilldown() {
+
+        Object.values(
+            state.charts
+        ).forEach(
+            element => {
+
+                if (!element) {
+                    return;
+                }
+
+                element.on(
+                    "plotly_click",
+                    function (event) {
+
+                        if (
+                            !event ||
+                            !event.points ||
+                            !event.points.length
+                        ) {
+                            return;
+                        }
+
+                        const point =
+                            event.points[0];
+
+                        const customdata =
+                            point.customdata;
+
+                        if (
+                            customdata &&
+                            typeof customdata ===
+                                "object"
+                        ) {
+
+                            const processId =
+                                customdata.process_id ||
+                                customdata.id;
+
+                            if (processId) {
+
+                                const base =
+                                    dashboard.dataset.processUrl;
+
+                                if (base) {
+
+                                    const separator =
+                                        base.includes("?")
+                                            ? "&"
+                                            : "?";
+
+                                    window.location.href =
+                                        base +
+                                        separator +
+                                        "id=" +
+                                        encodeURIComponent(
+                                            processId
+                                        );
+                                }
+                            }
+                        }
+                    }
+                );
+            }
+        );
+    }
+
+
+    const refreshButton =
+        document.getElementById(
+            "dashboard-refresh"
+        );
+
+    if (refreshButton) {
+
+        refreshButton.addEventListener(
+            "click",
+            function () {
+                refreshDashboard();
+            }
+        );
+    }
+
+
+    const applyButton =
+        document.getElementById(
+            "dashboard-apply-filters"
+        );
+
+    if (applyButton) {
+
+        applyButton.addEventListener(
+            "click",
+            applyFilters
+        );
+    }
+
+
+    [
+        "dashboard-period",
+        "dashboard-grouping",
+        "dashboard-dimension",
+        "dashboard-status"
+    ].forEach(
+        id => {
+
+            const element =
+                document.getElementById(
+                    id
+                );
+
+            if (!element) {
+                return;
+            }
+
+            element.addEventListener(
+                "change",
+                scheduleFilterApply
+            );
+        }
+    );
+
+
+    [
+        "dashboard-date-start",
+        "dashboard-date-end"
+    ].forEach(
+        id => {
+
+            const element =
+                document.getElementById(
+                    id
+                );
+
+            if (!element) {
+                return;
+            }
+
+            element.addEventListener(
+                "change",
+                scheduleFilterApply
+            );
+        }
+    );
+
+
+    const comparisonMetric =
+        document.getElementById(
+            "comparison-metric"
+        );
+
+    if (comparisonMetric) {
+
+        comparisonMetric.addEventListener(
+            "change",
+            updateComparisonMetric
+        );
+    }
+
+
+    const exportToggle =
+        document.getElementById(
+            "dashboard-export-toggle"
+        );
+
+    const exportMenu =
+        document.getElementById(
+            "dashboard-export-menu"
+        );
+
+    if (
+        exportToggle &&
+        exportMenu
+    ) {
+
+        exportToggle.addEventListener(
+            "click",
+            function (event) {
+
+                event.stopPropagation();
+
+                exportMenu.hidden =
+                    !exportMenu.hidden;
+
+                exportToggle.setAttribute(
+                    "aria-expanded",
+                    exportMenu.hidden
+                        ? "false"
+                        : "true"
+                );
+            }
+        );
+
+        document.addEventListener(
+            "click",
+            function () {
+
+                exportMenu.hidden =
+                    true;
+
+                exportToggle.setAttribute(
+                    "aria-expanded",
+                    "false"
+                );
+            }
+        );
+
+        exportMenu.addEventListener(
+            "click",
+            function (event) {
+                event.stopPropagation();
+            }
+        );
+    }
+
+
+    if (
+        state.refreshInterval > 0
+    ) {
+
+        state.refreshTimer =
+            window.setInterval(
+                refreshDashboard,
+                state.refreshInterval
+            );
+    }
+
+
+    document.addEventListener(
+        "visibilitychange",
+        function () {
+
+            if (
+                document.hidden
+            ) {
+
+                if (
+                    state.refreshTimer
+                ) {
+                    window.clearInterval(
+                        state.refreshTimer
+                    );
+
+                    state.refreshTimer =
+                        null;
+                }
+
+            } else if (
+                state.refreshInterval > 0 &&
+                !state.refreshTimer
+            ) {
+
+                state.refreshTimer =
+                    window.setInterval(
+                        refreshDashboard,
+                        state.refreshInterval
+                    );
+            }
+        }
+    );
+
+
+    renderAllCharts();
+
+    attachProcessDrilldown();
+
+    window.setTimeout(
+        attachPlotDrilldown,
+        250
+    );
+
+})();
+</script>
+
+{% endblock %}
+

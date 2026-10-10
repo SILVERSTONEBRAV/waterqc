@@ -1,387 +1,119 @@
-<div class="ca-sidebar-inner">
-
-    <div class="ca-sidebar-header">
-        <a
-            href="{% url 'ca:dashboard' %}"
-            class="ca-sidebar-brand"
-            aria-label="Chemical Analysis Dashboard"
-        >
-            <span class="ca-sidebar-brand-mark">CA</span>
-
-            <span class="ca-sidebar-brand-content">
-                <strong>Chemical Analysis</strong>
-                <small>Laboratory Control</small>
-            </span>
-        </a>
-
-        <button
-            type="button"
-            class="ca-sidebar-toggle"
-            data-sidebar-toggle
-            aria-label="Toggle sidebar"
-            aria-expanded="true"
-        >
-            <span></span>
-            <span></span>
-            <span></span>
-        </button>
-    </div>
-
-    <div class="ca-sidebar-system">
-        <span class="ca-sidebar-system-indicator"></span>
-
-        <div class="ca-sidebar-system-content">
-            <strong>System Operational</strong>
-            <small>Chemical workflow active</small>
+{% with url_name=request.resolver_match.url_name|default:"" %}
+<aside
+    id="ca-sidebar"
+    class="ca-sidebar"
+    aria-label="Chemical analysis navigation"
+    data-state="expanded"
+>
+    <div class="ca-sidebar-inner">
+        <div class="ca-sidebar-header">
+            <a href="{% url 'ca:dashboard' %}" class="ca-sidebar-brand" aria-label="Chemical Analysis dashboard">
+                <span class="ca-sidebar-brand-mark" aria-hidden="true">CA</span>
+                <span class="ca-sidebar-brand-content">
+                    <strong>Chemical Analysis</strong>
+                    <small>Quality Assurance</small>
+                </span>
+            </a>
+            <button
+                type="button"
+                class="ca-sidebar-toggle"
+                id="sidebar-close"
+                aria-label="Collapse navigation"
+                aria-controls="ca-sidebar"
+                title="Collapse navigation"
+                data-action="collapse-sidebar"
+            >
+                <span aria-hidden="true">‹</span>
+            </button>
         </div>
 
-        <span class="ca-sidebar-system-state">LIVE</span>
-    </div>
-
-    <nav
-        class="ca-sidebar-navigation"
-        aria-label="Chemical Analysis navigation"
-    >
-
-        <section class="ca-sidebar-section">
-
-            <div class="ca-sidebar-section-heading">
-                <span>Command</span>
+        <div class="ca-sidebar-system">
+            <span class="ca-sidebar-system-indicator" aria-hidden="true"></span>
+            <div class="ca-sidebar-system-content">
+                <strong>System Online</strong>
+                <small>Chemical analysis workflow</small>
             </div>
-
-            <a
-                href="{% url 'ca:dashboard' %}"
-                class="ca-sidebar-item{% if request.resolver_match.url_name == 'dashboard' %} is-active{% endif %}"
-            >
-                <span class="ca-sidebar-item-icon ca-sidebar-icon-dashboard">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                </span>
-
-                <span class="ca-sidebar-item-label">
-                    Dashboard
-                </span>
-            </a>
-
-            <a
-                href="{% url 'ca:my-tasks' %}"
-                class="ca-sidebar-item{% if request.resolver_match.url_name == 'my-tasks' %} is-active{% endif %}"
-            >
-                <span class="ca-sidebar-item-icon">
-                    <span class="ca-sidebar-icon-tasks"></span>
-                </span>
-
-                <span class="ca-sidebar-item-label">
-                    My Tasks
-                </span>
-
-                {% if overdue_count %}
-                    <span class="ca-sidebar-counter ca-sidebar-counter-danger">
-                        {{ overdue_count }}
-                    </span>
-                {% endif %}
-            </a>
-
-            <a
-                href="{% url 'ca:process-list' %}"
-                class="ca-sidebar-item{% if request.resolver_match.url_name == 'process-list' or request.resolver_match.url_name == 'process-detail' %} is-active{% endif %}"
-            >
-                <span class="ca-sidebar-item-icon">
-                    <span class="ca-sidebar-icon-process"></span>
-                </span>
-
-                <span class="ca-sidebar-item-label">
-                    Processes
-                </span>
-
-                {% if active_analysis %}
-                    <span class="ca-sidebar-counter">
-                        {{ active_analysis }}
-                    </span>
-                {% endif %}
-            </a>
-
-        </section>
-
-        <section class="ca-sidebar-section">
-
-            <div class="ca-sidebar-section-heading">
-                <span>Operations</span>
-            </div>
-
-            <a
-                href="{% url 'ca:batch-list' %}"
-                class="ca-sidebar-item{% if request.resolver_match.url_name == 'batch-list' or request.resolver_match.url_name == 'batch-detail' or request.resolver_match.url_name == 'batch-update' %} is-active{% endif %}"
-            >
-                <span class="ca-sidebar-item-icon">
-                    <span class="ca-sidebar-icon-batch"></span>
-                </span>
-
-                <span class="ca-sidebar-item-label">
-                    Chemical Batches
-                </span>
-
-                {% if received_batches %}
-                    <span class="ca-sidebar-counter">
-                        {{ received_batches }}
-                    </span>
-                {% endif %}
-            </a>
-
-            <a
-                href="{% url 'ca:batch-create' %}"
-                class="ca-sidebar-item ca-sidebar-item-secondary"
-            >
-                <span class="ca-sidebar-item-icon">
-                    <span class="ca-sidebar-icon-add"></span>
-                </span>
-
-                <span class="ca-sidebar-item-label">
-                    Receive Batch
-                </span>
-            </a>
-
-            <a
-                href="{% url 'ca:request-list' %}"
-                class="ca-sidebar-item{% if request.resolver_match.url_name == 'request-list' or request.resolver_match.url_name == 'request-detail' %} is-active{% endif %}"
-            >
-                <span class="ca-sidebar-item-icon">
-                    <span class="ca-sidebar-icon-document"></span>
-                </span>
-
-                <span class="ca-sidebar-item-label">
-                    Analysis Requests
-                </span>
-
-                {% if pending_requests %}
-                    <span class="ca-sidebar-counter ca-sidebar-counter-warning">
-                        {{ pending_requests }}
-                    </span>
-                {% endif %}
-            </a>
-
-            <a
-                href="{% url 'ca:result-list' %}"
-                class="ca-sidebar-item{% if request.resolver_match.url_name == 'result-list' or request.resolver_match.url_name == 'result-detail' %} is-active{% endif %}"
-            >
-                <span class="ca-sidebar-item-icon">
-                    <span class="ca-sidebar-icon-results"></span>
-                </span>
-
-                <span class="ca-sidebar-item-label">
-                    Test Results
-                </span>
-
-                {% if failed_results %}
-                    <span class="ca-sidebar-counter ca-sidebar-counter-danger">
-                        {{ failed_results }}
-                    </span>
-                {% endif %}
-            </a>
-
-        </section>
-
-        <section class="ca-sidebar-section">
-
-            <div class="ca-sidebar-section-heading">
-                <span>Quality Control</span>
-            </div>
-
-            <a
-                href="{% url 'ca:checklist-list' %}"
-                class="ca-sidebar-item{% if request.resolver_match.url_name == 'checklist-list' or request.resolver_match.url_name == 'checklist-detail' %} is-active{% endif %}"
-            >
-                <span class="ca-sidebar-item-icon">
-                    <span class="ca-sidebar-icon-checklist"></span>
-                </span>
-
-                <span class="ca-sidebar-item-label">
-                    Receiving Checklists
-                </span>
-            </a>
-
-            <a
-                href="{% url 'ca:pending-analysis' %}"
-                class="ca-sidebar-item{% if request.resolver_match.url_name == 'pending-analysis' %} is-active{% endif %}"
-            >
-                <span class="ca-sidebar-item-icon">
-                    <span class="ca-sidebar-icon-analysis"></span>
-                </span>
-
-                <span class="ca-sidebar-item-label">
-                    Pending Analysis
-                </span>
-
-                {% if tests_in_progress %}
-                    <span class="ca-sidebar-counter">
-                        {{ tests_in_progress }}
-                    </span>
-                {% endif %}
-            </a>
-
-            <a
-                href="{% url 'ca:pending-qa' %}"
-                class="ca-sidebar-item{% if request.resolver_match.url_name == 'pending-qa' %} is-active{% endif %}"
-            >
-                <span class="ca-sidebar-item-icon">
-                    <span class="ca-sidebar-icon-qa"></span>
-                </span>
-
-                <span class="ca-sidebar-item-label">
-                    QA Review
-                </span>
-
-                {% if awaiting_qa %}
-                    <span class="ca-sidebar-counter ca-sidebar-counter-warning">
-                        {{ awaiting_qa }}
-                    </span>
-                {% endif %}
-            </a>
-
-            <a
-                href="{% url 'ca:pending-approval' %}"
-                class="ca-sidebar-item{% if request.resolver_match.url_name == 'pending-approval' %} is-active{% endif %}"
-            >
-                <span class="ca-sidebar-item-icon">
-                    <span class="ca-sidebar-icon-approval"></span>
-                </span>
-
-                <span class="ca-sidebar-item-label">
-                    Batch Approval
-                </span>
-
-                {% if pending_approval %}
-                    <span class="ca-sidebar-counter ca-sidebar-counter-warning">
-                        {{ pending_approval }}
-                    </span>
-                {% endif %}
-            </a>
-
-            <a
-                href="{% url 'ca:overdue-analysis' %}"
-                class="ca-sidebar-item{% if request.resolver_match.url_name == 'overdue-analysis' %} is-active{% endif %}"
-            >
-                <span class="ca-sidebar-item-icon">
-                    <span class="ca-sidebar-icon-alert"></span>
-                </span>
-
-                <span class="ca-sidebar-item-label">
-                    Overdue Analysis
-                </span>
-
-                {% if overdue_count %}
-                    <span class="ca-sidebar-counter ca-sidebar-counter-danger">
-                        {{ overdue_count }}
-                    </span>
-                {% endif %}
-            </a>
-
-        </section>
-
-        <section class="ca-sidebar-section">
-
-            <div class="ca-sidebar-section-heading">
-                <span>Release &amp; Compliance</span>
-            </div>
-
-            <a
-                href="{% url 'ca:pending-coa-approval' %}"
-                class="ca-sidebar-item{% if request.resolver_match.url_name == 'pending-coa-approval' %} is-active{% endif %}"
-            >
-                <span class="ca-sidebar-item-icon">
-                    <span class="ca-sidebar-icon-coa"></span>
-                </span>
-
-                <span class="ca-sidebar-item-label">
-                    CoA Approval
-                </span>
-
-                {% if pending_coa_approval %}
-                    <span class="ca-sidebar-counter ca-sidebar-counter-warning">
-                        {{ pending_coa_approval }}
-                    </span>
-                {% endif %}
-            </a>
-
-            <a
-                href="{% url 'ca:coa-list' %}"
-                class="ca-sidebar-item{% if request.resolver_match.url_name == 'coa-list' or request.resolver_match.url_name == 'coa-detail' %} is-active{% endif %}"
-            >
-                <span class="ca-sidebar-item-icon">
-                    <span class="ca-sidebar-icon-certificate"></span>
-                </span>
-
-                <span class="ca-sidebar-item-label">
-                    Certificates of Analysis
-                </span>
-
-                {% if coa_ready %}
-                    <span class="ca-sidebar-counter">
-                        {{ coa_ready }}
-                    </span>
-                {% endif %}
-            </a>
-
-            <a
-                href="{% url 'ca:specification-list' %}"
-                class="ca-sidebar-item{% if request.resolver_match.url_name == 'specification-list' %} is-active{% endif %}"
-            >
-                <span class="ca-sidebar-item-icon">
-                    <span class="ca-sidebar-icon-specification"></span>
-                </span>
-
-                <span class="ca-sidebar-item-label">
-                    Specifications
-                </span>
-            </a>
-
-        </section>
-
-        <section class="ca-sidebar-section">
-
-            <div class="ca-sidebar-section-heading">
-                <span>Workflow</span>
-            </div>
-
-            <a
-                href="{% url 'ca:process-list' %}"
-                class="ca-sidebar-item"
-            >
-                <span class="ca-sidebar-item-icon">
-                    <span class="ca-sidebar-icon-workflow"></span>
-                </span>
-
-                <span class="ca-sidebar-item-label">
-                    Workflow Monitor
-                </span>
-
-                <span class="ca-sidebar-live">
-                    LIVE
-                </span>
-            </a>
-
-        </section>
-
-    </nav>
-
-    <div class="ca-sidebar-footer">
-
-        <div class="ca-sidebar-footer-status">
-            <span class="ca-sidebar-footer-dot"></span>
-
-            <div>
-                <strong>Workflow Engine</strong>
-                <small>Operational</small>
-            </div>
+            <span class="ca-sidebar-system-state">LIVE</span>
         </div>
 
-        <div class="ca-sidebar-footer-meta">
-            <span>CA</span>
-            <span>1.0</span>
+        <nav class="ca-sidebar-navigation" aria-label="Chemical analysis modules">
+            {% for section in ca_sidebar_sections %}
+            <section class="ca-sidebar-section" data-section="{{ section.key }}">
+                <div class="ca-sidebar-section-heading">{{ section.heading }}</div>
+
+                {% for item in section.items %}
+                <a
+                    href="{{ item.href }}"
+                    class="ca-sidebar-item{% if item.is_active %} is-active{% endif %}"
+                    data-route="{{ item.name }}"
+                    data-sidebar-close
+                    {% if item.is_active %}aria-current="page"{% endif %}
+                >
+                    <span class="ca-sidebar-item-icon" aria-hidden="true">
+                        <span class="ca-sidebar-icon ca-sidebar-icon-{{ item.icon }}"></span>
+                    </span>
+                    <span class="ca-sidebar-item-content">
+                        <span class="ca-sidebar-item-label">{{ item.label }}</span>
+                        {% if item.description %}
+                        <span class="ca-sidebar-item-description">{{ item.description }}</span>
+                        {% endif %}
+                    </span>
+                </a>
+                {% endfor %}
+            </section>
+            {% empty %}
+            {# Fallback: user has no accessible CA sections #}
+            <section class="ca-sidebar-section" data-section="empty">
+                <div class="ca-sidebar-section-heading">Navigation</div>
+                <a href="{% url 'ca:dashboard' %}" class="ca-sidebar-item{% if url_name == 'dashboard' or url_name == 'dashboard-view' %} is-active{% endif %}" data-route="dashboard">
+                    <span class="ca-sidebar-item-icon" aria-hidden="true">
+                        <span class="ca-sidebar-icon ca-sidebar-icon-dashboard"><span></span><span></span><span></span><span></span></span>
+                    </span>
+                    <span class="ca-sidebar-item-content">
+                        <span class="ca-sidebar-item-label">Dashboard</span>
+                    </span>
+                </a>
+            </section>
+            {% endfor %}
+        </nav>
+
+        <div class="ca-sidebar-footer">
+            <div class="ca-sidebar-footer-status">
+                <span class="ca-sidebar-footer-dot" aria-hidden="true"></span>
+                <div>
+                    <strong>
+                        {% if treatment_plant %}
+                            {{ treatment_plant.name }}
+                        {% elif request.user.is_superuser %}
+                            All Treatment Plants
+                        {% else %}
+                            Current Scope
+                        {% endif %}
+                    </strong>
+                    <small>
+                        {% if request.user.assigned_lab %}
+                            {{ request.user.assigned_lab }}
+                        {% elif request.user.is_superuser %}
+                            Administrative Scope
+                        {% elif request.user.is_staff %}
+                            Staff User
+                        {% else %}
+                            Authenticated User
+                        {% endif %}
+                    </small>
+                </div>
+            </div>
+            <div class="ca-sidebar-footer-meta">
+                {% if request.user.is_superuser %}
+                    <span>ADMIN</span>
+                {% elif request.user.is_staff %}
+                    <span>STAFF</span>
+                {% else %}
+                    <span>USER</span>
+                {% endif %}
+                <span>LIVE</span>
+            </div>
         </div>
-
     </div>
-
-</div>
+</aside>
+{% endwith %}

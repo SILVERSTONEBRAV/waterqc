@@ -1,0 +1,998 @@
+
+{% extends "ca/dashboard/layout/app.html" %}
+{% load static %}
+
+{% block title %}Chemical Analysis Intelligence{% endblock %}
+
+{% block app_module %}dashboard{% endblock %}
+
+{% block page_css %}
+<link rel="stylesheet" href="{% static 'ca/css/pages/dashboard.css' %}">
+<link rel="stylesheet" href="{% static 'ca/css/pages/dashboard-operations.css' %}">
+{% endblock %}
+
+{% block breadcrumbs %}
+    <span aria-hidden="true">/</span>
+    <span aria-current="page">Operations</span>
+{% endblock %}
+
+{% block page_actions %}
+<div class="ai-actions">
+    <button type="button" class="ai-btn" id="ai-refresh">Refresh</button>
+
+    <div class="ai-export-menu">
+        <button type="button" class="ai-btn ai-btn-primary">Export</button>
+        <div class="ai-export-list">
+            <a href="?format=pdf{{ request.GET.urlencode|cut:'format=pdf' }}">PDF</a>
+            <a href="?format=xlsx{{ request.GET.urlencode|cut:'format=xlsx' }}">Excel</a>
+            <a href="?format=csv{{ request.GET.urlencode|cut:'format=csv' }}">CSV</a>
+            <a href="?format=json{{ request.GET.urlencode|cut:'format=json' }}">JSON</a>
+            <a href="?format=docx{{ request.GET.urlencode|cut:'format=docx' }}">Word</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div
+    class="ca-intelligence"
+    id="dashboard2"
+    data-dashboard-url="{{ request.path }}"
+    data-dashboard-json="{{ dashboard_json|escapejs }}"
+>
+
+    <section class="ai-toolbar">
+        <div>
+            <h1 class="ai-title">Chemical Analysis Intelligence</h1>
+            <p class="ai-subtitle">
+                Statistical process control, quality intelligence, SLA analytics,
+                comparative performance and predictive analysis.
+            </p>
+        </div>
+
+        <div class="ai-actions">
+            <a class="ai-btn" href="{% url 'ca:my-tasks' %}">My Tasks</a>
+            <a class="ai-btn" href="{% url 'ca:process-list' %}">Processes</a>
+            <a class="ai-btn" href="{% url 'ca:result-list' %}">Results</a>
+            <a class="ai-btn" href="{% url 'ca:coa-list' %}">CoA</a>
+        </div>
+    </section>
+
+    <form method="get" class="ai-filters" id="ai-filter-form">
+        <input
+            class="ai-filter ai-filter-wide"
+            type="text"
+            name="q"
+            value="{{ filters.q|default:'' }}"
+            placeholder="Search sample, batch, chemical..."
+        >
+
+        <select class="ai-filter" name="period">
+            <option value="7" {% if filters.period == 7 or filters.period == "7" %}selected{% endif %}>7 days</option>
+            <option value="30" {% if filters.period == 30 or filters.period == "30" %}selected{% endif %}>30 days</option>
+            <option value="90" {% if filters.period == 90 or filters.period == "90" %}selected{% endif %}>90 days</option>
+            <option value="180" {% if filters.period == 180 or filters.period == "180" %}selected{% endif %}>180 days</option>
+            <option value="365" {% if filters.period == 365 or filters.period == "365" %}selected{% endif %}>365 days</option>
+        </select>
+
+        <select class="ai-filter" name="group">
+            <option value="day" {% if filters.group == "day" %}selected{% endif %}>Daily</option>
+            <option value="week" {% if filters.group == "week" %}selected{% endif %}>Weekly</option>
+            <option value="month" {% if filters.group == "month" %}selected{% endif %}>Monthly</option>
+        </select>
+
+        <select class="ai-filter" name="compare">
+            <option value="chemical" {% if filters.compare == "chemical" %}selected{% endif %}>Compare Chemical</option>
+            <option value="supplier" {% if filters.compare == "supplier" %}selected{% endif %}>Compare Supplier</option>
+            <option value="analyst" {% if filters.compare == "analyst" %}selected{% endif %}>Compare Analyst</option>
+            <option value="status" {% if filters.compare == "status" %}selected{% endif %}>Compare Status</option>
+        </select>
+
+        <select class="ai-filter" name="status">
+            <option value="">All Statuses</option>
+            <option value="CREATED" {% if filters.status == "CREATED" %}selected{% endif %}>Created</option>
+            <option value="RECEIVED" {% if filters.status == "RECEIVED" %}selected{% endif %}>Received</option>
+            <option value="REQUESTED" {% if filters.status == "REQUESTED" %}selected{% endif %}>Requested</option>
+            <option value="CHECKLIST" {% if filters.status == "CHECKLIST" %}selected{% endif %}>Checklist</option>
+            <option value="ASSIGNED" {% if filters.status == "ASSIGNED" %}selected{% endif %}>Assigned</option>
+            <option value="SYSTEMATIC_RANDOM_SAMPLING" {% if filters.status == "SYSTEMATIC_RANDOM_SAMPLING" %}selected{% endif %}>Sampling</option>
+            <option value="ANALYSIS" {% if filters.status == "ANALYSIS" %}selected{% endif %}>Analysis</option>
+            <option value="RETEST" {% if filters.status == "RETEST" %}selected{% endif %}>Retest</option>
+            <option value="QA" {% if filters.status == "QA" %}selected{% endif %}>QA</option>
+            <option value="APPROVED" {% if filters.status == "APPROVED" %}selected{% endif %}>Approved</option>
+            <option value="REJECTED" {% if filters.status == "REJECTED" %}selected{% endif %}>Rejected</option>
+            <option value="COMPLETED" {% if filters.status == "COMPLETED" %}selected{% endif %}>Completed</option>
+        </select>
+
+        <input
+            class="ai-filter"
+            type="date"
+            name="date_from"
+            value="{{ filters.date_from|default:'' }}"
+        >
+
+        <input
+            class="ai-filter"
+            type="date"
+            name="date_to"
+            value="{{ filters.date_to|default:'' }}"
+        >
+
+        <button class="ai-btn ai-btn-primary" type="submit">Apply</button>
+        <a class="ai-btn" href="{{ request.path }}">Reset</a>
+    </form>
+
+    <div class="ai-status">
+        <span class="ai-status-item">
+            <span class="ai-dot"></span>
+            Analytics engine operational
+        </span>
+
+        <span class="ai-status-item">
+            Scope:
+            <strong>{{ plant_context.name|default:"All authorized plants" }}</strong>
+        </span>
+
+        <span class="ai-status-item">
+            Period:
+            <strong>{{ filters.period|default:30 }} days</strong>
+        </span>
+
+        <span class="ai-status-item">
+            Generated:
+            <strong>{{ generated_at|default:"—" }}</strong>
+        </span>
+    </div>
+
+    <section class="ai-grid-kpi">
+        <article class="ai-kpi ai-kpi-info">
+            <div class="ai-kpi-label">Total Batches</div>
+            <div class="ai-kpi-value">{{ kpis.total_batches|default:"0" }}</div>
+            <div class="ai-kpi-meta">Scoped analytical population</div>
+        </article>
+
+        <article class="ai-kpi ai-kpi-info">
+            <div class="ai-kpi-label">Processes</div>
+            <div class="ai-kpi-value">{{ kpis.total_processes|default:"0" }}</div>
+            <div class="ai-kpi-meta">{{ kpis.active_processes|default:"0" }} active</div>
+        </article>
+
+        <article class="ai-kpi {% if kpis.overdue %}ai-kpi-negative{% else %}ai-kpi-positive{% endif %}">
+            <div class="ai-kpi-label">Overdue</div>
+            <div class="ai-kpi-value">{{ kpis.overdue|default:"0" }}</div>
+            <div class="ai-kpi-meta">Current SLA exceptions</div>
+        </article>
+
+        <article class="ai-kpi ai-kpi-positive">
+            <div class="ai-kpi-label">SLA Compliance</div>
+            <div class="ai-kpi-value">{{ kpis.sla_rate|default:"0" }}%</div>
+            <div class="ai-kpi-meta">{{ kpis.within_sla|default:"0" }} within SLA</div>
+        </article>
+
+        <article class="ai-kpi ai-kpi-positive">
+            <div class="ai-kpi-label">Pass Rate</div>
+            <div class="ai-kpi-value">{{ kpis.pass_rate|default:"0" }}%</div>
+            <div class="ai-kpi-meta">{{ kpis.pass_count|default:"0" }} passing results</div>
+        </article>
+
+        <article class="ai-kpi {% if kpis.retest_rate > 20 %}ai-kpi-warning{% else %}ai-kpi-info{% endif %}">
+            <div class="ai-kpi-label">Retest Rate</div>
+            <div class="ai-kpi-value">{{ kpis.retest_rate|default:"0" }}%</div>
+            <div class="ai-kpi-meta">{{ kpis.retest_count|default:"0" }} retest events</div>
+        </article>
+
+        <article class="ai-kpi">
+            <div class="ai-kpi-label">Avg Turnaround</div>
+            <div class="ai-kpi-value">{{ kpis.average_hours|default:"0" }}h</div>
+            <div class="ai-kpi-meta">Completed processes</div>
+        </article>
+
+        <article class="ai-kpi">
+            <div class="ai-kpi-label">Median Turnaround</div>
+            <div class="ai-kpi-value">{{ kpis.median_hours|default:"0" }}h</div>
+            <div class="ai-kpi-meta">50th percentile</div>
+        </article>
+
+        <article class="ai-kpi">
+            <div class="ai-kpi-label">P90 Turnaround</div>
+            <div class="ai-kpi-value">{{ kpis.p90_hours|default:"0" }}h</div>
+            <div class="ai-kpi-meta">90th percentile</div>
+        </article>
+
+        <article class="ai-kpi">
+            <div class="ai-kpi-label">Failed Results</div>
+            <div class="ai-kpi-value">{{ kpis.fail_count|default:"0" }}</div>
+            <div class="ai-kpi-meta">Quality exceptions</div>
+        </article>
+
+        <article class="ai-kpi">
+            <div class="ai-kpi-label">Approved</div>
+            <div class="ai-kpi-value">{{ kpis.approved|default:"0" }}</div>
+            <div class="ai-kpi-meta">Released batches</div>
+        </article>
+
+        <article class="ai-kpi ai-kpi-warning">
+            <div class="ai-kpi-label">Risk Events</div>
+            <div class="ai-kpi-value">{{ risk.total|default:"0" }}</div>
+            <div class="ai-kpi-meta">Detected analytical risks</div>
+        </article>
+    </section>
+
+    <section class="ai-section">
+        <div class="ai-section-header">
+            <h2 class="ai-section-title">Executive Trend Intelligence</h2>
+            <span class="ai-section-note">Volume, completion, failure and SLA trajectory</span>
+        </div>
+
+        <div class="ai-section-body">
+            <div class="ai-chart-grid">
+                <div class="ai-chart ai-span-8" id="chart-volume"></div>
+                <div class="ai-chart ai-span-4" id="chart-status"></div>
+                <div class="ai-chart ai-span-6" id="chart-sla"></div>
+                <div class="ai-chart ai-span-6" id="chart-turnaround"></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="ai-section">
+        <div class="ai-section-header">
+            <h2 class="ai-section-title">Quality Intelligence</h2>
+            <span class="ai-section-note">Result distribution, failures, retesting and chemical quality</span>
+        </div>
+
+        <div class="ai-section-body">
+            <div class="ai-chart-grid">
+                <div class="ai-chart ai-chart-sm ai-span-4" id="chart-result-distribution"></div>
+                <div class="ai-chart ai-chart-sm ai-span-8" id="chart-failure-pareto"></div>
+                <div class="ai-chart ai-chart-sm ai-span-6" id="chart-retest"></div>
+                <div class="ai-chart ai-chart-sm ai-span-6" id="chart-quality-comparison"></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="ai-section">
+        <div class="ai-section-header">
+            <h2 class="ai-section-title">Comparative Performance Analytics</h2>
+            <span class="ai-section-note">
+                Dynamic comparison dimension:
+                <strong>{{ filters.compare|default:"chemical" }}</strong>
+            </span>
+        </div>
+
+        <div class="ai-section-body">
+            <div class="ai-chart-grid">
+                <div class="ai-chart ai-span-7" id="chart-comparison"></div>
+                <div class="ai-chart ai-span-5" id="chart-comparison-rate"></div>
+            </div>
+
+            <div class="ai-table-wrap" style="margin-top:10px;">
+                <table class="ai-table">
+                    <thead>
+                        <tr>
+                            <th>Entity</th>
+                            <th class="num">Population</th>
+                            <th class="num">Completed</th>
+                            <th class="num">Failed</th>
+                            <th class="num">Pass %</th>
+                            <th class="num">Retest</th>
+                            <th class="num">Avg h</th>
+                            <th class="num">P90 h</th>
+                            <th class="num">SLA %</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in comparisons %}
+                        <tr>
+                            <td>{{ row.name|default:"Unknown" }}</td>
+                            <td class="num">{{ row.population|default:0 }}</td>
+                            <td class="num">{{ row.completed|default:0 }}</td>
+                            <td class="num">{{ row.failed|default:0 }}</td>
+                            <td class="num">{{ row.pass_rate|default:0 }}%</td>
+                            <td class="num">{{ row.retest_count|default:0 }}</td>
+                            <td class="num">{{ row.average_hours|default:0 }}</td>
+                            <td class="num">{{ row.p90_hours|default:0 }}</td>
+                            <td class="num">{{ row.sla_rate|default:0 }}%</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="9">
+                                <div class="ai-empty">No comparative data available.</div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <section class="ai-section">
+        <div class="ai-section-header">
+            <h2 class="ai-section-title">Statistical Process Analysis</h2>
+            <span class="ai-section-note">Distributional statistics and process variation</span>
+        </div>
+
+        <div class="ai-section-body">
+            <div class="ai-stat-grid">
+                <div class="ai-stat">
+                    <div class="ai-stat-label">Mean</div>
+                    <div class="ai-stat-value">{{ statistics.turnaround.mean|default:"0" }}h</div>
+                </div>
+
+                <div class="ai-stat">
+                    <div class="ai-stat-label">Median</div>
+                    <div class="ai-stat-value">{{ statistics.turnaround.median|default:"0" }}h</div>
+                </div>
+
+                <div class="ai-stat">
+                    <div class="ai-stat-label">Std Dev</div>
+                    <div class="ai-stat-value">{{ statistics.turnaround.std|default:"0" }}h</div>
+                </div>
+
+                <div class="ai-stat">
+                    <div class="ai-stat-label">Coefficient Variation</div>
+                    <div class="ai-stat-value">{{ statistics.turnaround.cv|default:"0" }}%</div>
+                </div>
+
+                <div class="ai-stat">
+                    <div class="ai-stat-label">IQR</div>
+                    <div class="ai-stat-value">{{ statistics.turnaround.iqr|default:"0" }}h</div>
+                </div>
+
+                <div class="ai-stat">
+                    <div class="ai-stat-label">P25</div>
+                    <div class="ai-stat-value">{{ statistics.turnaround.p25|default:"0" }}h</div>
+                </div>
+
+                <div class="ai-stat">
+                    <div class="ai-stat-label">P75</div>
+                    <div class="ai-stat-value">{{ statistics.turnaround.p75|default:"0" }}h</div>
+                </div>
+
+                <div class="ai-stat">
+                    <div class="ai-stat-label">P95</div>
+                    <div class="ai-stat-value">{{ statistics.turnaround.p95|default:"0" }}h</div>
+                </div>
+
+                <div class="ai-stat">
+                    <div class="ai-stat-label">Skewness</div>
+                    <div class="ai-stat-value">{{ statistics.turnaround.skew|default:"0" }}</div>
+                </div>
+
+                <div class="ai-stat">
+                    <div class="ai-stat-label">Kurtosis</div>
+                    <div class="ai-stat-value">{{ statistics.turnaround.kurtosis|default:"0" }}</div>
+                </div>
+            </div>
+
+            <div class="ai-chart-grid" style="margin-top:10px;">
+                <div class="ai-chart ai-span-6" id="chart-distribution"></div>
+                <div class="ai-chart ai-span-6" id="chart-control"></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="ai-section">
+        <div class="ai-section-header">
+            <h2 class="ai-section-title">Bottleneck and Workflow Analysis</h2>
+            <span class="ai-section-note">Stage latency and process conversion</span>
+        </div>
+
+        <div class="ai-section-body">
+            <div class="ai-chart-grid">
+                <div class="ai-chart ai-span-7" id="chart-bottlenecks"></div>
+                <div class="ai-chart ai-span-5" id="chart-funnel"></div>
+            </div>
+
+            <div class="ai-table-wrap" style="margin-top:10px;">
+                <table class="ai-table">
+                    <thead>
+                        <tr>
+                            <th>Stage</th>
+                            <th class="num">Population</th>
+                            <th class="num">Average h</th>
+                            <th class="num">Median h</th>
+                            <th class="num">P90 h</th>
+                            <th class="num">Share</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in bottlenecks %}
+                        <tr>
+                            <td>{{ row.stage }}</td>
+                            <td class="num">{{ row.population|default:0 }}</td>
+                            <td class="num">{{ row.average_hours|default:0 }}</td>
+                            <td class="num">{{ row.median_hours|default:0 }}</td>
+                            <td class="num">{{ row.p90_hours|default:0 }}</td>
+                            <td class="num">{{ row.share|default:0 }}%</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6">
+                                <div class="ai-empty">No stage latency data available.</div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <section class="ai-section">
+        <div class="ai-section-header">
+            <h2 class="ai-section-title">Predictive and Forecast Analytics</h2>
+            <span class="ai-section-note">Trend projection based on available historical observations</span>
+        </div>
+
+        <div class="ai-section-body">
+            <div class="ai-chart-grid">
+                <div class="ai-chart ai-span-8" id="chart-forecast"></div>
+
+                <div class="ai-span-4">
+                    <div class="ai-drill">
+                        <div class="ai-drill-card">
+                            <h4>Trend Model</h4>
+                            <ul class="ai-list">
+                                <li>
+                                    <span>R²</span>
+                                    <strong>{{ forecast.r_squared|default:"—" }}</strong>
+                                </li>
+                                <li>
+                                    <span>Slope</span>
+                                    <strong>{{ forecast.slope|default:"—" }}</strong>
+                                </li>
+                                <li>
+                                    <span>P-value</span>
+                                    <strong>{{ forecast.p_value|default:"—" }}</strong>
+                                </li>
+                                <li>
+                                    <span>Forecast horizon</span>
+                                    <strong>{{ forecast.horizon|default:"—" }}</strong>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div class="ai-drill-card">
+                            <h4>Forecast Summary</h4>
+                            <ul class="ai-list">
+                                <li>
+                                    <span>Projected volume</span>
+                                    <strong>{{ forecast.projected_volume|default:"—" }}</strong>
+                                </li>
+                                <li>
+                                    <span>Projected failures</span>
+                                    <strong>{{ forecast.projected_failures|default:"—" }}</strong>
+                                </li>
+                                <li>
+                                    <span>Model</span>
+                                    <strong>{{ forecast.model|default:"—" }}</strong>
+                                </li>
+                                <li>
+                                    <span>Observations</span>
+                                    <strong>{{ forecast.observations|default:"—" }}</strong>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="ai-section">
+        <div class="ai-section-header">
+            <h2 class="ai-section-title">Risk, Anomaly and Exception Intelligence</h2>
+            <span class="ai-section-note">Statistical and workflow exceptions</span>
+        </div>
+
+        <div class="ai-section-body">
+            <div class="ai-chart-grid">
+                <div class="ai-chart ai-span-6" id="chart-risk"></div>
+                <div class="ai-chart ai-span-6" id="chart-anomaly"></div>
+            </div>
+
+            <div class="ai-table-wrap" style="margin-top:10px;">
+                <table class="ai-table">
+                    <thead>
+                        <tr>
+                            <th>Risk</th>
+                            <th>Severity</th>
+                            <th>Count</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in risk.items %}
+                        <tr>
+                            <td>{{ item.title }}</td>
+                            <td>
+                                <span class="
+                                    ai-badge
+                                    {% if item.severity == 'HIGH' or item.severity == 'CRITICAL' %}
+                                        ai-badge-danger
+                                    {% elif item.severity == 'MEDIUM' %}
+                                        ai-badge-warning
+                                    {% else %}
+                                        ai-badge-success
+                                    {% endif %}
+                                ">
+                                    {{ item.severity }}
+                                </span>
+                            </td>
+                            <td>{{ item.count|default:0 }}</td>
+                            <td>{{ item.description }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4">
+                                <div class="ai-empty">No active analytical risks detected.</div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <section class="ai-section">
+        <div class="ai-section-header">
+            <h2 class="ai-section-title">Analyst Workload and Performance</h2>
+            <span class="ai-section-note">Workload, throughput, retesting and QA activity</span>
+        </div>
+
+        <div class="ai-section-body">
+            <div class="ai-chart-grid">
+                <div class="ai-chart ai-span-8" id="chart-analyst"></div>
+                <div class="ai-chart ai-span-4" id="chart-analyst-sla"></div>
+            </div>
+
+            <div class="ai-table-wrap" style="margin-top:10px;">
+                <table class="ai-table">
+                    <thead>
+                        <tr>
+                            <th>Analyst</th>
+                            <th class="num">Active</th>
+                            <th class="num">Completed</th>
+                            <th class="num">Retest</th>
+                            <th class="num">QA</th>
+                            <th class="num">Avg h</th>
+                            <th class="num">SLA %</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in analyst_performance %}
+                        <tr>
+                            <td>{{ row.name }}</td>
+                            <td class="num">{{ row.active|default:0 }}</td>
+                            <td class="num">{{ row.completed|default:0 }}</td>
+                            <td class="num">{{ row.retest|default:0 }}</td>
+                            <td class="num">{{ row.qa|default:0 }}</td>
+                            <td class="num">{{ row.average_hours|default:0 }}</td>
+                            <td class="num">{{ row.sla_rate|default:0 }}%</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7">
+                                <div class="ai-empty">No analyst performance data available.</div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <section class="ai-section">
+        <div class="ai-section-header">
+            <h2 class="ai-section-title">Supplier and Chemical Quality Intelligence</h2>
+            <span class="ai-section-note">Rejection, failure and process performance by entity</span>
+        </div>
+
+        <div class="ai-section-body">
+            <div class="ai-chart-grid">
+                <div class="ai-chart ai-span-6" id="chart-supplier"></div>
+                <div class="ai-chart ai-span-6" id="chart-chemical"></div>
+            </div>
+
+            <div class="ai-table-wrap" style="margin-top:10px;">
+                <table class="ai-table">
+                    <thead>
+                        <tr>
+                            <th>Supplier</th>
+                            <th class="num">Analysed</th>
+                            <th class="num">Rejected</th>
+                            <th class="num">Rejection %</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in supplier_performance %}
+                        <tr>
+                            <td>{{ row.name }}</td>
+                            <td class="num">{{ row.analysed|default:0 }}</td>
+                            <td class="num">{{ row.rejected|default:0 }}</td>
+                            <td class="num">{{ row.rejection_rate|default:0 }}%</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4">
+                                <div class="ai-empty">No supplier quality data available.</div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="ai-table-wrap" style="margin-top:10px;">
+                <table class="ai-table">
+                    <thead>
+                        <tr>
+                            <th>Chemical</th>
+                            <th class="num">Analysed</th>
+                            <th class="num">Rejected</th>
+                            <th class="num">Rejection %</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in chemical_performance %}
+                        <tr>
+                            <td>{{ row.name }}</td>
+                            <td class="num">{{ row.analysed|default:0 }}</td>
+                            <td class="num">{{ row.rejected|default:0 }}</td>
+                            <td class="num">{{ row.rejection_rate|default:0 }}%</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4">
+                                <div class="ai-empty">No chemical quality data available.</div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <section class="ai-section">
+        <div class="ai-section-header">
+            <h2 class="ai-section-title">Deep Drill-Down</h2>
+            <span class="ai-section-note">Filtered process-level analytical records</span>
+        </div>
+
+        <div class="ai-section-body">
+            <div class="ai-table-wrap">
+                <table class="ai-table" id="ai-record-table">
+                    <thead>
+                        <tr>
+                            <th>Sample</th>
+                            <th>Chemical</th>
+                            <th>Supplier</th>
+                            <th>Analyst</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th>Completed</th>
+                            <th class="num">Turnaround h</th>
+                            <th class="num">SLA</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in records %}
+                        <tr>
+                            <td>{{ row.sample_id|default:"—" }}</td>
+                            <td>{{ row.chemical|default:"—" }}</td>
+                            <td>{{ row.supplier|default:"—" }}</td>
+                            <td>{{ row.analyst|default:"—" }}</td>
+                            <td>
+                                <span class="ai-badge ai-badge-info">
+                                    {{ row.status|default:"—" }}
+                                </span>
+                            </td>
+                            <td>{{ row.created|default:"—" }}</td>
+                            <td>{{ row.completed|default:"—" }}</td>
+                            <td class="num">{{ row.turnaround_hours|default:"—" }}</td>
+                            <td>
+                                {% if row.overdue %}
+                                    <span class="ai-badge ai-badge-danger">Overdue</span>
+                                {% else %}
+                                    <span class="ai-badge ai-badge-success">Within</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.process_id %}
+                                <a href="{% url 'ca:process-detail' row.process_id %}">Open</a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="10">
+                                <div class="ai-empty">No records match the selected analytical filters.</div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <section class="ai-section">
+        <div class="ai-section-header">
+            <h2 class="ai-section-title">Analytical Correlations</h2>
+            <span class="ai-section-note">Relationships among process and quality variables</span>
+        </div>
+
+        <div class="ai-section-body">
+            <div class="ai-chart-grid">
+                <div class="ai-chart ai-span-7" id="chart-correlation"></div>
+
+                <div class="ai-span-5">
+                    <div class="ai-table-wrap">
+                        <table class="ai-table">
+                            <thead>
+                                <tr>
+                                    <th>Variable</th>
+                                    <th class="num">Correlation</th>
+                                    <th>Interpretation</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in correlations %}
+                                <tr>
+                                    <td>{{ row.variable }}</td>
+                                    <td class="num">{{ row.correlation|default:"0" }}</td>
+                                    <td>{{ row.interpretation|default:"—" }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="3">
+                                        <div class="ai-empty">Insufficient numerical observations.</div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="ai-section">
+        <div class="ai-section-header">
+            <h2 class="ai-section-title">Current Active Processes</h2>
+            <span class="ai-section-note">Operational deep-link queue</span>
+        </div>
+
+        <div class="ai-section-body">
+            <div class="ai-table-wrap">
+                <table class="ai-table">
+                    <thead>
+                        <tr>
+                            <th>Sample</th>
+                            <th>Chemical</th>
+                            <th>Status</th>
+                            <th>Analyst</th>
+                            <th>Age</th>
+                            <th>SLA</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for process in active_processes %}
+                        <tr>
+                            <td>{{ process.sample_id|default:"—" }}</td>
+                            <td>{{ process.chemical|default:"—" }}</td>
+                            <td>{{ process.status|default:"—" }}</td>
+                            <td>{{ process.analyst|default:"—" }}</td>
+                            <td>{{ process.age_hours|default:"—" }}h</td>
+                            <td>
+                                {% if process.overdue %}
+                                    <span class="ai-badge ai-badge-danger">Overdue</span>
+                                {% else %}
+                                    <span class="ai-badge ai-badge-success">Within</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{% url 'ca:process-detail' process.id %}">Open</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7">
+                                <div class="ai-empty">No active processes.</div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <footer class="ai-status">
+        <span>Population: <strong>{{ kpis.total_processes|default:0 }}</strong></span>
+        <span>Completed: <strong>{{ kpis.completed|default:0 }}</strong></span>
+        <span>Pass: <strong>{{ kpis.pass_count|default:0 }}</strong></span>
+        <span>Fail: <strong>{{ kpis.fail_count|default:0 }}</strong></span>
+        <span>Retest: <strong>{{ kpis.retest_count|default:0 }}</strong></span>
+        <span>Overdue: <strong>{{ kpis.overdue|default:0 }}</strong></span>
+    </footer>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+<script>
+(function () {
+    "use strict";
+
+    const root = document.getElementById("dashboard2");
+    if (!root) return;
+
+    let payload = {};
+
+    try {
+        payload = JSON.parse(root.dataset.dashboardJson || "{}");
+    } catch (error) {
+        payload = {};
+    }
+
+    const charts = payload.charts || {};
+    const theme = {
+        font: {
+            family: "Arial, sans-serif",
+            size: 10
+        },
+        margin: {
+            l: 42,
+            r: 18,
+            t: 35,
+            b: 38
+        },
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(0,0,0,0)",
+        hovermode: "x unified"
+    };
+
+    function renderChart(id, spec) {
+        const element = document.getElementById(id);
+
+        if (!element) return;
+
+        if (!spec) {
+            element.innerHTML = '<div class="ai-empty">No visualization data available.</div>';
+            return;
+        }
+
+        if (!window.Plotly) {
+            element.innerHTML = '<div class="ai-empty">Visualization engine unavailable.</div>';
+            return;
+        }
+
+        const data = spec.data || [];
+        const layout = Object.assign({}, theme, spec.layout || {});
+        const config = Object.assign({
+            responsive: true,
+            displaylogo: false,
+            modeBarButtonsToRemove: [
+                "lasso2d",
+                "select2d",
+                "autoScale2d"
+            ]
+        }, spec.config || {});
+
+        Plotly.newPlot(element, data, layout, config);
+    }
+
+    function renderAll() {
+        renderChart("chart-volume", charts.volume);
+        renderChart("chart-status", charts.status);
+        renderChart("chart-sla", charts.sla);
+        renderChart("chart-turnaround", charts.turnaround);
+
+        renderChart("chart-result-distribution", charts.result_distribution);
+        renderChart("chart-failure-pareto", charts.failure_pareto);
+        renderChart("chart-retest", charts.retest);
+        renderChart("chart-quality-comparison", charts.quality_comparison);
+
+        renderChart("chart-comparison", charts.comparison);
+        renderChart("chart-comparison-rate", charts.comparison_rate);
+
+        renderChart("chart-distribution", charts.distribution);
+        renderChart("chart-control", charts.control);
+
+        renderChart("chart-bottlenecks", charts.bottlenecks);
+        renderChart("chart-funnel", charts.funnel);
+
+        renderChart("chart-forecast", charts.forecast);
+
+        renderChart("chart-risk", charts.risk);
+        renderChart("chart-anomaly", charts.anomaly);
+
+        renderChart("chart-analyst", charts.analyst);
+        renderChart("chart-analyst-sla", charts.analyst_sla);
+
+        renderChart("chart-supplier", charts.supplier);
+        renderChart("chart-chemical", charts.chemical);
+
+        renderChart("chart-correlation", charts.correlation);
+    }
+
+    function refreshDashboard() {
+        const button = document.getElementById("ai-refresh");
+
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Refreshing...";
+        }
+
+        const url = new URL(window.location.href);
+        url.searchParams.delete("format");
+
+        fetch(url.toString(), {
+            headers: {
+                "X-Requested-With": "XMLHttpRequest",
+                "Accept": "application/json"
+            },
+            credentials: "same-origin"
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error("Dashboard refresh failed.");
+            }
+
+            return response.json();
+        })
+        .then(data => {
+            if (data && data.dashboard_json) {
+                root.dataset.dashboardJson =
+                    typeof data.dashboard_json === "string"
+                        ? data.dashboard_json
+                        : JSON.stringify(data.dashboard_json);
+            }
+
+            if (data && data.charts) {
+                payload.charts = data.charts;
+            }
+
+            window.location.reload();
+        })
+        .catch(() => {
+            window.location.reload();
+        })
+        .finally(() => {
+            if (button) {
+                button.disabled = false;
+                button.textContent = "Refresh";
+            }
+        });
+    }
+
+    function installChartResize() {
+        if (!window.Plotly) return;
+
+        window.addEventListener("resize", function () {
+            document.querySelectorAll(".ai-chart").forEach(element => {
+                if (element.data) {
+                    Plotly.Plots.resize(element);
+                }
+            });
+        });
+    }
+
+    document
+        .getElementById("ai-refresh")
+        ?.addEventListener("click", refreshDashboard);
+
+    renderAll();
+    installChartResize();
+})();
+</script>
+{% endblock %}

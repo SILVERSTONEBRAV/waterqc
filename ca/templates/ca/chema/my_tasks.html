@@ -4,249 +4,1151 @@
 
 {% block content %}
 
-<div class="ca-page">
+<div
+    class="ca-page ca-tasks-page"
+    id="ca-my-tasks"
+    data-page="my-tasks"
+>
 
-```
-<div class="page-header">
-    <div>
-        <h1>My Chemical Tasks</h1>
-        <p>Review and manage chemical analysis workflow tasks assigned to you.</p>
-    </div>
+    <header class="ca-command-header page-header">
 
-    <div class="page-actions">
-        <a href="{% url 'ca:dashboard' %}" class="btn btn-secondary">
-            Dashboard
-        </a>
-    </div>
-</div>
+        <div class="ca-command-heading">
 
-<div class="stats-grid">
-
-    <div class="card">
-        <div class="card-body">
-            <div class="stat-label">Total Tasks</div>
-            <div class="stat-value">
-                {{ tasks|length }}
+            <div class="ca-page-kicker">
+                CHEMICAL ANALYSIS WORKFLOW
             </div>
-        </div>
-    </div>
 
-    <div class="card">
-        <div class="card-body">
-            <div class="stat-label">Pending Analysis</div>
-            <div class="stat-value">
-                {{ pending_analysis|default:0 }}
+            <div class="ca-command-title-row">
+                <h1>My Chemical Tasks</h1>
+
+                <span class="ca-live-indicator">
+                    <span class="ca-live-dot" aria-hidden="true"></span>
+                    Live Queue
+                </span>
             </div>
-        </div>
-    </div>
 
-    <div class="card">
-        <div class="card-body">
-            <div class="stat-label">Pending QA</div>
-            <div class="stat-value">
-                {{ pending_qa|default:0 }}
+            <p>
+                Operational view of chemical analysis activities,
+                workflow ownership, deadlines and quality-control actions
+                assigned to your account.
+            </p>
+
+        </div>
+
+        <div class="page-actions ca-command-actions">
+
+            <a
+                href="{% url 'ca:dashboard' %}"
+                class="btn btn-secondary"
+            >
+                Dashboard
+            </a>
+
+            <a
+                href="/ca/workflow/"
+                class="btn btn-primary"
+            >
+                Open Workflow
+            </a>
+
+        </div>
+
+    </header>
+
+
+    <section
+        class="ca-task-command-strip"
+        aria-label="Task queue controls"
+    >
+
+        <div class="ca-task-context">
+
+            <span class="ca-context-label">
+                Current queue
+            </span>
+
+            <strong>
+                My assigned workflow activities
+            </strong>
+
+        </div>
+
+        <div class="ca-task-context">
+
+            <span class="ca-context-label">
+                Scope
+            </span>
+
+            <strong>
+                {% if request.user.assigned_treatment_plant %}
+                    {{ request.user.assigned_treatment_plant }}
+                {% else %}
+                    All authorised plants
+                {% endif %}
+            </strong>
+
+        </div>
+
+        <div class="ca-task-context">
+
+            <span class="ca-context-label">
+                Queue state
+            </span>
+
+            <strong>
+                {% if overdue_count %}
+                    Attention required
+                {% elif tasks %}
+                    Active
+                {% else %}
+                    Clear
+                {% endif %}
+            </strong>
+
+        </div>
+
+        <div class="ca-task-context ca-task-context-action">
+
+            <a
+                href="{% url 'ca:my-tasks' %}"
+                class="btn btn-sm btn-secondary"
+            >
+                Refresh Queue
+            </a>
+
+        </div>
+
+    </section>
+
+
+    <section
+        class="stats-grid ca-task-kpis"
+        aria-label="Task workload summary"
+    >
+
+        <article
+            class="card ca-kpi-card ca-kpi-total"
+            data-metric="total"
+        >
+
+            <div class="card-body">
+
+                <div class="ca-kpi-topline">
+                    <span class="stat-label">
+                        Total Tasks
+                    </span>
+
+                    <span class="ca-kpi-code">
+                        ALL
+                    </span>
+                </div>
+
+                <div class="stat-value">
+                    {{ tasks|length|default:0 }}
+                </div>
+
+                <div class="ca-kpi-caption">
+                    Activities currently assigned to you
+                </div>
+
             </div>
-        </div>
-    </div>
 
-    <div class="card">
-        <div class="card-body">
-            <div class="stat-label">Overdue</div>
-            <div class="stat-value">
-                {{ overdue_count|default:0 }}
+        </article>
+
+
+        <article
+            class="card ca-kpi-card ca-kpi-analysis"
+            data-metric="analysis"
+        >
+
+            <div class="card-body">
+
+                <div class="ca-kpi-topline">
+                    <span class="stat-label">
+                        Pending Analysis
+                    </span>
+
+                    <span class="ca-kpi-code">
+                        ANA
+                    </span>
+                </div>
+
+                <div class="stat-value">
+                    {{ pending_analysis|default:0 }}
+                </div>
+
+                <div class="ca-kpi-caption">
+                    Analytical activities awaiting completion
+                </div>
+
             </div>
+
+        </article>
+
+
+        <article
+            class="card ca-kpi-card ca-kpi-qa"
+            data-metric="qa"
+        >
+
+            <div class="card-body">
+
+                <div class="ca-kpi-topline">
+                    <span class="stat-label">
+                        Pending QA
+                    </span>
+
+                    <span class="ca-kpi-code">
+                        QA
+                    </span>
+                </div>
+
+                <div class="stat-value">
+                    {{ pending_qa|default:0 }}
+                </div>
+
+                <div class="ca-kpi-caption">
+                    Results awaiting quality review
+                </div>
+
+            </div>
+
+        </article>
+
+
+        <article
+            class="card ca-kpi-card ca-kpi-overdue"
+            data-metric="overdue"
+        >
+
+            <div class="card-body">
+
+                <div class="ca-kpi-topline">
+                    <span class="stat-label">
+                        Overdue
+                    </span>
+
+                    <span class="ca-kpi-code">
+                        SLA
+                    </span>
+                </div>
+
+                <div class="stat-value">
+                    {{ overdue_count|default:0 }}
+                </div>
+
+                <div class="ca-kpi-caption">
+                    Activities beyond their current deadline
+                </div>
+
+            </div>
+
+        </article>
+
+    </section>
+
+
+    <section class="ca-task-intelligence-grid">
+
+        <article class="card ca-task-health-card">
+
+            <div class="card-header">
+
+                <div>
+                    <div class="ca-section-kicker">
+                        WORKLOAD TELEMETRY
+                    </div>
+
+                    <h2>Queue Health</h2>
+
+                    <p>
+                        Current distribution of assigned work.
+                    </p>
+                </div>
+
+                <span
+                    class="ca-status-chip
+                    {% if overdue_count %}
+                        ca-status-danger
+                    {% elif tasks %}
+                        ca-status-active
+                    {% else %}
+                        ca-status-clear
+                    {% endif %}"
+                >
+                    {% if overdue_count %}
+                        Attention
+                    {% elif tasks %}
+                        Active
+                    {% else %}
+                        Clear
+                    {% endif %}
+                </span>
+
+            </div>
+
+            <div class="card-body">
+
+                <div class="ca-health-metrics">
+
+                    <div class="ca-health-metric">
+
+                        <div class="ca-health-label">
+                            Active workload
+                        </div>
+
+                        <div class="ca-health-value">
+                            {{ tasks|length|default:0 }}
+                        </div>
+
+                    </div>
+
+
+                    <div class="ca-health-metric">
+
+                        <div class="ca-health-label">
+                            Analysis queue
+                        </div>
+
+                        <div class="ca-health-value">
+                            {{ pending_analysis|default:0 }}
+                        </div>
+
+                    </div>
+
+
+                    <div class="ca-health-metric">
+
+                        <div class="ca-health-label">
+                            QA queue
+                        </div>
+
+                        <div class="ca-health-value">
+                            {{ pending_qa|default:0 }}
+                        </div>
+
+                    </div>
+
+
+                    <div class="ca-health-metric">
+
+                        <div class="ca-health-label">
+                            SLA exceptions
+                        </div>
+
+                        <div class="ca-health-value ca-danger-value">
+                            {{ overdue_count|default:0 }}
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <div class="ca-health-bar">
+
+                    <div class="ca-health-bar-label">
+                        <span>
+                            Workload distribution
+                        </span>
+
+                        <span>
+                            {% if tasks %}
+                                {{ tasks|length }} active
+                            {% else %}
+                                No active work
+                            {% endif %}
+                        </span>
+                    </div>
+
+                    <div class="ca-health-track">
+
+                        {% if tasks %}
+
+                            {% widthratio pending_analysis tasks|length 100 as analysis_width %}
+
+                            {% widthratio pending_qa tasks|length 100 as qa_width %}
+
+                            <span
+                                class="ca-health-segment ca-health-analysis"
+                                style="width: {{ analysis_width }}%;"
+                                title="Pending analysis"
+                            ></span>
+
+                            <span
+                                class="ca-health-segment ca-health-qa"
+                                style="width: {{ qa_width }}%;"
+                                title="Pending QA"
+                            ></span>
+
+                        {% endif %}
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </article>
+
+
+        <article class="card ca-task-actions-card">
+
+            <div class="card-header">
+
+                <div>
+                    <div class="ca-section-kicker">
+                        WORKFLOW ACCESS
+                    </div>
+
+                    <h2>Operational Queues</h2>
+
+                    <p>
+                        Navigate directly to the relevant workflow queue.
+                    </p>
+                </div>
+
+            </div>
+
+            <div class="card-body">
+
+                <div class="ca-action-grid">
+
+                    <a
+                        href="{% url 'ca:pending-analysis' %}"
+                        class="ca-action-tile"
+                    >
+
+                        <span class="ca-action-code">
+                            ANA
+                        </span>
+
+                        <span class="ca-action-content">
+
+                            <strong>
+                                Pending Analysis
+                            </strong>
+
+                            <small>
+                                Analytical activities
+                            </small>
+
+                        </span>
+
+                        <span class="ca-action-count">
+                            {{ pending_analysis|default:0 }}
+                        </span>
+
+                    </a>
+
+
+                    <a
+                        href="/ca/workflow/"
+                        class="ca-action-tile"
+                    >
+
+                        <span class="ca-action-code">
+                            QA
+                        </span>
+
+                        <span class="ca-action-content">
+
+                            <strong>
+                                Pending QA
+                            </strong>
+
+                            <small>
+                                Quality review workflow
+                            </small>
+
+                        </span>
+
+                        <span class="ca-action-count">
+                            {{ pending_qa|default:0 }}
+                        </span>
+
+                    </a>
+
+
+                    <a
+                        href="{% url 'ca:pending-approval' %}"
+                        class="ca-action-tile"
+                    >
+
+                        <span class="ca-action-code">
+                            APR
+                        </span>
+
+                        <span class="ca-action-content">
+
+                            <strong>
+                                Pending Approval
+                            </strong>
+
+                            <small>
+                                Final disposition
+                            </small>
+
+                        </span>
+
+                    </a>
+
+
+                    <a
+                        href="{% url 'ca:overdue-analysis' %}"
+                        class="ca-action-tile ca-action-danger"
+                    >
+
+                        <span class="ca-action-code">
+                            SLA
+                        </span>
+
+                        <span class="ca-action-content">
+
+                            <strong>
+                                Overdue Analysis
+                            </strong>
+
+                            <small>
+                                Deadline exceptions
+                            </small>
+
+                        </span>
+
+                        <span class="ca-action-count">
+                            {{ overdue_count|default:0 }}
+                        </span>
+
+                    </a>
+
+                </div>
+
+            </div>
+
+        </article>
+
+    </section>
+
+
+    <section class="card ca-task-table-card">
+
+        <div class="card-header ca-task-table-header">
+
+            <div>
+
+                <div class="ca-section-kicker">
+                    ASSIGNED WORK
+                </div>
+
+                <h2>Active Chemical Workflow Tasks</h2>
+
+                <p>
+                    Tasks requiring action across the current chemical
+                    analysis lifecycle.
+                </p>
+
+            </div>
+
+            <div class="ca-table-toolbar">
+
+                <label
+                    class="ca-search-control"
+                    for="task-search"
+                >
+                    <span class="sr-only">
+                        Search tasks
+                    </span>
+
+                    <input
+                        id="task-search"
+                        type="search"
+                        class="form-control"
+                        placeholder="Search batch, sample, analyst or stage..."
+                        autocomplete="off"
+                        data-task-search
+                    >
+                </label>
+
+                <select
+                    id="task-status-filter"
+                    class="form-control"
+                    data-task-filter
+                    aria-label="Filter tasks by status"
+                >
+                    <option value="all">
+                        All statuses
+                    </option>
+
+                    <option value="ANALYSIS">
+                        Analysis
+                    </option>
+
+                    <option value="QA">
+                        QA
+                    </option>
+
+                    <option value="APPROVED">
+                        Approved
+                    </option>
+
+                    <option value="COMPLETED">
+                        Completed
+                    </option>
+
+                    <option value="overdue">
+                        Overdue
+                    </option>
+                </select>
+
+            </div>
+
         </div>
-    </div>
 
-</div>
 
-<div class="card">
+        <div class="ca-table-meta">
 
-    <div class="card-header">
-        <div>
-            <h2>Assigned Tasks</h2>
-            <p>Your current chemical workflow activities.</p>
+            <div class="ca-table-result-count">
+                Showing
+                <strong data-visible-count>
+                    {{ tasks|length|default:0 }}
+                </strong>
+                tasks
+            </div>
+
+            <div class="ca-table-state">
+                <span class="ca-live-dot" aria-hidden="true"></span>
+                Queue synchronized
+            </div>
+
         </div>
-    </div>
 
-    <div class="table-responsive">
-        <table class="table">
 
-            <thead>
-                <tr>
-                    <th>Batch</th>
-                    <th>Sample ID</th>
-                    <th>Stage</th>
-                    <th>Analyst</th>
-                    <th>Progress</th>
-                    <th>Deadline</th>
-                    <th>Status</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
+        <div class="table-responsive">
 
-            <tbody>
+            <table
+                class="table ca-task-table"
+                id="chemical-task-table"
+            >
 
-                {% for task in tasks %}
-
-                    {% with process=task.process|default:task %}
+                <thead>
 
                     <tr>
 
-                        <td>
-                            {% if process.pk %}
-                                <a href="{% url 'ca:process-detail' process.pk %}">
-                                    {% if process.batch %}
-                                        {{ process.batch.sample_id|default:process.batch }}
-                                    {% elif process.batch_number %}
-                                        {{ process.batch_number }}
-                                    {% else %}
-                                        —
-                                    {% endif %}
-                                </a>
-                            {% else %}
-                                —
-                            {% endif %}
-                        </td>
+                        <th scope="col">
+                            <button
+                                type="button"
+                                class="ca-sort-button"
+                                data-sort="batch"
+                            >
+                                Batch
+                            </button>
+                        </th>
 
-                        <td>
-                            {{ process.sample_id|default:"—" }}
-                        </td>
+                        <th scope="col">
+                            Sample
+                        </th>
 
-                        <td>
-                            {% if process.status %}
-                                {{ process.get_status_display|default:process.status }}
-                            {% else %}
-                                —
-                            {% endif %}
-                        </td>
+                        <th scope="col">
+                            Stage
+                        </th>
 
-                        <td>
-                            {% if process.assigned_analyst %}
-                                {{ process.assigned_analyst.get_full_name|default:process.assigned_analyst.username }}
-                            {% else %}
-                                Unassigned
-                            {% endif %}
-                        </td>
+                        <th scope="col">
+                            Analyst
+                        </th>
 
-                        <td>
-                            {% if process.analysis_progress != None %}
-                                <div class="progress">
-                                    <div
-                                        class="progress-bar"
-                                        role="progressbar"
-                                        style="width: {{ process.analysis_progress }}%;"
-                                        aria-valuenow="{{ process.analysis_progress }}"
-                                        aria-valuemin="0"
-                                        aria-valuemax="100"
-                                    >
-                                        {{ process.analysis_progress }}%
+                        <th scope="col">
+                            Progress
+                        </th>
+
+                        <th scope="col">
+                            Deadline
+                        </th>
+
+                        <th scope="col">
+                            Status
+                        </th>
+
+                        <th scope="col">
+                            Action
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody>
+
+                    {% for task in tasks %}
+
+                        {% with process=task.process|default:task %}
+
+                            <tr
+                                class="ca-task-row"
+                                data-task-row
+                                data-status="{{ process.status|default:'' }}"
+                                data-overdue="{% if process.is_overdue %}true{% else %}false{% endif %}"
+                                data-search="{{ process.batch.sample_id|default:'' }} {{ process.batch_number|default:'' }} {{ process.sample_id|default:'' }} {{ process.status|default:'' }} {{ process.assigned_analyst.username|default:'' }} {{ process.assigned_analyst.get_full_name|default:'' }}"
+                            >
+
+                                <td>
+
+                                    <div class="ca-table-primary">
+
+                                        {% if process.pk %}
+
+                                            <a
+                                                href="{% url 'ca:process-detail' process.pk %}"
+                                                class="ca-entity-link"
+                                            >
+
+                                                {% if process.batch %}
+
+                                                    {{ process.batch.sample_id|default:process.batch }}
+
+                                                {% elif process.batch_number %}
+
+                                                    {{ process.batch_number }}
+
+                                                {% else %}
+
+                                                    Process {{ process.pk }}
+
+                                                {% endif %}
+
+                                            </a>
+
+                                        {% else %}
+
+                                            <span>
+                                                —
+                                            </span>
+
+                                        {% endif %}
+
                                     </div>
+
+                                    {% if process.batch.chemical %}
+
+                                        <div class="ca-table-secondary">
+                                            {{ process.batch.chemical }}
+                                        </div>
+
+                                    {% endif %}
+
+                                </td>
+
+
+                                <td>
+
+                                    <span class="ca-mono">
+                                        {{ process.sample_id|default:"—" }}
+                                    </span>
+
+                                </td>
+
+
+                                <td>
+
+                                    {% if process.status %}
+
+                                        <span class="ca-stage-badge">
+                                            {{ process.get_status_display|default:process.status }}
+                                        </span>
+
+                                    {% else %}
+
+                                        <span class="ca-stage-badge">
+                                            Pending
+                                        </span>
+
+                                    {% endif %}
+
+                                </td>
+
+
+                                <td>
+
+                                    {% if process.assigned_analyst %}
+
+                                        {% with analyst=process.assigned_analyst %}
+
+                                            <div class="ca-table-primary">
+                                                {{ analyst.get_full_name|default:analyst.username }}
+                                            </div>
+
+                                            {% if analyst.username %}
+
+                                                <div class="ca-table-secondary">
+                                                    {{ analyst.username }}
+                                                </div>
+
+                                            {% endif %}
+
+                                        {% endwith %}
+
+                                    {% else %}
+
+                                        <span class="ca-muted">
+                                            Unassigned
+                                        </span>
+
+                                    {% endif %}
+
+                                </td>
+
+
+                                <td>
+
+                                    {% if process.analysis_progress != None %}
+
+                                        <div class="ca-progress-cell">
+
+                                            <div
+                                                class="progress ca-task-progress"
+                                                role="progressbar"
+                                                aria-valuenow="{{ process.analysis_progress }}"
+                                                aria-valuemin="0"
+                                                aria-valuemax="100"
+                                            >
+
+                                                <div
+                                                    class="progress-bar"
+                                                    style="width: {{ process.analysis_progress }}%;"
+                                                ></div>
+
+                                            </div>
+
+                                            <span class="ca-progress-value">
+                                                {{ process.analysis_progress }}%
+                                            </span>
+
+                                        </div>
+
+                                    {% else %}
+
+                                        <span class="ca-muted">
+                                            —
+                                        </span>
+
+                                    {% endif %}
+
+                                </td>
+
+
+                                <td>
+
+                                    {% if process.analysis_request.due_at %}
+
+                                        <time
+                                            datetime="{{ process.analysis_request.due_at|date:'c' }}"
+                                            class="ca-deadline"
+                                        >
+                                            {{ process.analysis_request.due_at|date:"d M Y H:i" }}
+                                        </time>
+
+                                    {% else %}
+
+                                        <span class="ca-muted">
+                                            —
+                                        </span>
+
+                                    {% endif %}
+
+                                </td>
+
+
+                                <td>
+
+                                    {% if process.is_overdue %}
+
+                                        <span class="badge badge-danger">
+                                            Overdue
+                                        </span>
+
+                                    {% elif process.status == "COMPLETED" %}
+
+                                        <span class="badge badge-success">
+                                            Completed
+                                        </span>
+
+                                    {% elif process.status == "QA" %}
+
+                                        <span class="badge badge-info">
+                                            QA Review
+                                        </span>
+
+                                    {% elif process.status == "ANALYSIS" %}
+
+                                        <span class="badge badge-warning">
+                                            In Analysis
+                                        </span>
+
+                                    {% elif process.status %}
+
+                                        <span class="badge">
+                                            {{ process.get_status_display|default:process.status }}
+                                        </span>
+
+                                    {% else %}
+
+                                        <span class="badge badge-warning">
+                                            Pending
+                                        </span>
+
+                                    {% endif %}
+
+                                </td>
+
+
+                                <td>
+
+                                    <div class="ca-row-actions">
+
+                                        {% if process.pk %}
+
+                                            <a
+                                                href="{% url 'ca:process-detail' process.pk %}"
+                                                class="btn btn-sm btn-primary"
+                                            >
+                                                Open
+                                            </a>
+
+                                        {% endif %}
+
+                                        {% if task.url %}
+
+                                            <a
+                                                href="{{ task.url }}"
+                                                class="btn btn-sm btn-secondary"
+                                            >
+                                                Task
+                                            </a>
+
+                                        {% endif %}
+
+                                    </div>
+
+                                </td>
+
+                            </tr>
+
+                        {% endwith %}
+
+                    {% empty %}
+
+                        <tr>
+
+                            <td
+                                colspan="8"
+                                class="empty-state"
+                            >
+
+                                <div class="ca-empty-state">
+
+                                    <div class="ca-empty-state-code">
+                                        QUEUE CLEAR
+                                    </div>
+
+                                    <strong>
+                                        No tasks assigned
+                                    </strong>
+
+                                    <p>
+                                        You currently have no chemical
+                                        workflow activities requiring action.
+                                    </p>
+
+                                    <div class="page-actions">
+
+                                        <a
+                                            href="/ca/workflow/"
+                                            class="btn btn-primary"
+                                        >
+                                            Open Workflow
+                                        </a>
+
+                                        <a
+                                            href="{% url 'ca:dashboard' %}"
+                                            class="btn btn-secondary"
+                                        >
+                                            Return to Dashboard
+                                        </a>
+
+                                    </div>
+
                                 </div>
-                            {% else %}
-                                —
-                            {% endif %}
-                        </td>
 
-                        <td>
-                            {% if process.analysis_request %}
-                                {% if process.analysis_request.due_at %}
-                                    {{ process.analysis_request.due_at|date:"d M Y H:i" }}
-                                {% else %}
-                                    —
-                                {% endif %}
-                            {% else %}
-                                —
-                            {% endif %}
-                        </td>
+                            </td>
 
-                        <td>
-                            {% if process.is_overdue %}
-                                <span class="badge badge-danger">
-                                    Overdue
-                                </span>
-                            {% elif process.status == "COMPLETED" %}
-                                <span class="badge badge-success">
-                                    Completed
-                                </span>
-                            {% elif process.status == "QA" %}
-                                <span class="badge badge-info">
-                                    QA Review
-                                </span>
-                            {% elif process.status == "ANALYSIS" %}
-                                <span class="badge badge-warning">
-                                    In Analysis
-                                </span>
-                            {% elif process.status %}
-                                <span class="badge">
-                                    {{ process.get_status_display|default:process.status }}
-                                </span>
-                            {% else %}
-                                <span class="badge badge-warning">
-                                    Pending
-                                </span>
-                            {% endif %}
-                        </td>
+                        </tr>
 
-                        <td>
-                            {% if process.pk %}
-                                <a
-                                    href="{% url 'ca:process-detail' process.pk %}"
-                                    class="btn btn-sm btn-primary"
-                                >
-                                    Open
-                                </a>
-                            {% else %}
-                                —
-                            {% endif %}
-                        </td>
+                    {% endfor %}
 
-                    </tr>
+                </tbody>
 
-                    {% endwith %}
+            </table>
 
-                {% empty %}
+        </div>
 
-                    <tr>
-                        <td colspan="8" class="empty-state">
-                            <strong>No tasks assigned</strong>
-                            <p>
-                                You currently have no chemical workflow tasks
-                                requiring action.
-                            </p>
-                        </td>
-                    </tr>
+    </section>
 
-                {% endfor %}
 
-            </tbody>
+    <section class="ca-task-bottom-grid">
 
-        </table>
-    </div>
+        <article class="card">
+
+            <div class="card-header">
+
+                <div>
+                    <div class="ca-section-kicker">
+                        SLA CONTROL
+                    </div>
+
+                    <h2>Deadline Management</h2>
+
+                    <p>
+                        Prioritize activities according to workflow deadlines.
+                    </p>
+                </div>
+
+            </div>
+
+            <div class="card-body">
+
+                <div class="ca-sla-list">
+
+                    <div class="ca-sla-row">
+
+                        <span class="ca-sla-indicator ca-sla-critical"></span>
+
+                        <div class="ca-sla-content">
+                            <strong>Overdue</strong>
+                            <small>
+                                Deadline already exceeded
+                            </small>
+                        </div>
+
+                        <strong>
+                            {{ overdue_count|default:0 }}
+                        </strong>
+
+                    </div>
+
+
+                    <div class="ca-sla-row">
+
+                        <span class="ca-sla-indicator ca-sla-warning"></span>
+
+                        <div class="ca-sla-content">
+                            <strong>Analysis queue</strong>
+                            <small>
+                                Work awaiting analytical completion
+                            </small>
+                        </div>
+
+                        <strong>
+                            {{ pending_analysis|default:0 }}
+                        </strong>
+
+                    </div>
+
+
+                    <div class="ca-sla-row">
+
+                        <span class="ca-sla-indicator ca-sla-info"></span>
+
+                        <div class="ca-sla-content">
+                            <strong>QA queue</strong>
+                            <small>
+                                Results awaiting quality review
+                            </small>
+                        </div>
+
+                        <strong>
+                            {{ pending_qa|default:0 }}
+                        </strong>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </article>
+
+
+        <article class="card">
+
+            <div class="card-header">
+
+                <div>
+                    <div class="ca-section-kicker">
+                        WORKFLOW CONTROL
+                    </div>
+
+                    <h2>Workflow Navigation</h2>
+
+                    <p>
+                        Continue processing through the Viewflow workflow.
+                    </p>
+                </div>
+
+            </div>
+
+            <div class="card-body">
+
+                <div class="ca-workflow-route">
+
+                    <div class="ca-route-stage">
+                        <span>Receive</span>
+                    </div>
+
+                    <span class="ca-route-line"></span>
+
+                    <div class="ca-route-stage">
+                        <span>Analysis</span>
+                    </div>
+
+                    <span class="ca-route-line"></span>
+
+                    <div class="ca-route-stage">
+                        <span>QA</span>
+                    </div>
+
+                    <span class="ca-route-line"></span>
+
+                    <div class="ca-route-stage">
+                        <span>Approval</span>
+                    </div>
+
+                </div>
+
+                <div class="page-actions">
+
+                    <a
+                        href="/ca/workflow/"
+                        class="btn btn-primary"
+                    >
+                        Enter Viewflow Workflow
+                    </a>
+
+                    <a
+                        href="{% url 'ca:process-list' %}"
+                        class="btn btn-secondary"
+                    >
+                        Browse Processes
+                    </a>
+
+                </div>
+
+            </div>
+
+        </article>
+
+    </section>
 
 </div>
 
-<div class="page-actions">
-
-    <a href="{% url 'ca:pending-analysis' %}" class="btn btn-primary">
-        Pending Analysis
-    </a>
-
-    <a href="{% url 'ca:pending-qa' %}" class="btn btn-secondary">
-        Pending QA
-    </a>
-
-    <a href="{% url 'ca:pending-approval' %}" class="btn btn-secondary">
-        Pending Approval
-    </a>
-
-    <a href="{% url 'ca:overdue-analysis' %}" class="btn btn-danger">
-        Overdue Analysis
-    </a>
-
-</div>
-```
-
-</div>
 
 {% endblock %}

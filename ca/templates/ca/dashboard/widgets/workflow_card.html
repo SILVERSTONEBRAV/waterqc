@@ -1,74 +1,275 @@
+<div
+    class="ca-workflow-card"
+    aria-labelledby="workflow-pipeline-title"
+    data-workflow-card
+>
+    <div class="ca-workflow-header">
+        <div>
+            <span class="ca-section-eyebrow">
+                Workflow Control
+            </span>
 
-<div class="ca-workflow-card">
-
-    <div class="ca-workflow-pipeline">
-        {% for stage in stages %}
-            <div
-                class="ca-workflow-stage
-                {% if stage.status == 'completed' %}is-completed{% endif %}
-                {% if stage.status == 'active' %}is-active{% endif %}
-                {% if stage.status == 'blocked' %}is-blocked{% endif %}"
+            <h2
+                id="workflow-pipeline-title"
+                class="ca-workflow-title"
             >
-                <div class="ca-workflow-stage-node">
-                    {% if stage.status == "completed" %}
-                        <span class="ca-icon ca-icon-check"></span>
-                    {% else %}
-                        <span>{{ forloop.counter }}</span>
-                    {% endif %}
-                </div>
+                Chemical Analysis Pipeline
+            </h2>
 
-                <div class="ca-workflow-stage-content">
-                    <strong>{{ stage.label }}</strong>
+            <p class="ca-workflow-subtitle">
+                Real-time progression across the controlled laboratory
+                workflow.
+            </p>
+        </div>
 
-                    <span>
-                        {{ stage.count|default:0 }}
-                        {% if stage.status == "active" %}
-                            active
-                        {% elif stage.status == "completed" %}
-                            completed
-                        {% elif stage.status == "blocked" %}
-                            blocked
-                        {% else %}
-                            pending
-                        {% endif %}
-                    </span>
-                </div>
-            </div>
+        <div
+            class="ca-workflow-indicator"
+            aria-label="Workflow monitoring active"
+        >
+            <span
+                class="ca-workflow-indicator-dot"
+                aria-hidden="true"
+            ></span>
+            <span>Live Workflow</span>
+        </div>
+    </div>
 
-            {% if not forloop.last %}
+    {% if stages %}
+
+        <div
+            class="ca-workflow-pipeline"
+            role="list"
+            aria-label="Chemical analysis workflow stages"
+        >
+
+            {% for stage in stages %}
+
                 <div
-                    class="ca-workflow-connector
-                    {% if stage.status == 'completed' %}is-completed{% endif %}"
-                ></div>
-            {% endif %}
-        {% empty %}
-            <div class="ca-workflow-empty">
-                No workflow stages are currently available.
+                    class="
+                        ca-workflow-stage
+                        {% if stage.status == 'completed' %}is-completed{% endif %}
+                        {% if stage.status == 'active' %}is-active{% endif %}
+                        {% if stage.status == 'blocked' %}is-blocked{% endif %}
+                        {% if stage.status == 'pending' %}is-pending{% endif %}
+                    "
+                    role="listitem"
+                    data-stage="{{ stage.key|default:stage.label|slugify }}"
+                    data-status="{{ stage.status|default:'pending' }}"
+                >
+
+                    <div class="ca-workflow-stage-visual">
+
+                        <div
+                            class="ca-workflow-stage-node"
+                            aria-hidden="true"
+                        >
+                            {% if stage.status == "completed" %}
+                                <span class="ca-icon ca-icon-check"></span>
+                            {% elif stage.status == "active" %}
+                                <span class="ca-workflow-stage-pulse"></span>
+                                <span>{{ forloop.counter }}</span>
+                            {% elif stage.status == "blocked" %}
+                                <span class="ca-workflow-stage-lock"></span>
+                                <span>{{ forloop.counter }}</span>
+                            {% else %}
+                                <span>{{ forloop.counter }}</span>
+                            {% endif %}
+                        </div>
+
+                        {% if not forloop.last %}
+                            <div
+                                class="
+                                    ca-workflow-connector
+                                    {% if stage.status == 'completed' %}is-completed{% endif %}
+                                    {% if stage.status == 'active' %}is-active{% endif %}
+                                "
+                                aria-hidden="true"
+                            >
+                                <span></span>
+                            </div>
+                        {% endif %}
+
+                    </div>
+
+                    <div class="ca-workflow-stage-content">
+
+                        <div class="ca-workflow-stage-heading">
+
+                            <strong class="ca-workflow-stage-label">
+                                {{ stage.label }}
+                            </strong>
+
+                            {% if stage.status == "active" %}
+                                <span class="ca-workflow-stage-badge active">
+                                    Active
+                                </span>
+
+                            {% elif stage.status == "completed" %}
+                                <span class="ca-workflow-stage-badge completed">
+                                    Completed
+                                </span>
+
+                            {% elif stage.status == "blocked" %}
+                                <span class="ca-workflow-stage-badge blocked">
+                                    Blocked
+                                </span>
+
+                            {% else %}
+                                <span class="ca-workflow-stage-badge pending">
+                                    Pending
+                                </span>
+                            {% endif %}
+
+                        </div>
+
+                        <div class="ca-workflow-stage-meta">
+
+                            <span class="ca-workflow-stage-count">
+                                {{ stage.count|default:0 }}
+                            </span>
+
+                            <span class="ca-workflow-stage-count-label">
+                                {% if stage.status == "active" %}
+                                    active item{{ stage.count|pluralize }}
+                                {% elif stage.status == "completed" %}
+                                    completed item{{ stage.count|pluralize }}
+                                {% elif stage.status == "blocked" %}
+                                    blocked item{{ stage.count|pluralize }}
+                                {% else %}
+                                    pending item{{ stage.count|pluralize }}
+                                {% endif %}
+                            </span>
+
+                        </div>
+
+                        {% if stage.description %}
+                            <p class="ca-workflow-stage-description">
+                                {{ stage.description }}
+                            </p>
+                        {% endif %}
+
+                    </div>
+
+                </div>
+
+            {% endfor %}
+
+        </div>
+
+    {% else %}
+
+        <div
+            class="ca-workflow-empty"
+            role="status"
+        >
+            <div
+                class="ca-workflow-empty-icon"
+                aria-hidden="true"
+            >
+                <span></span>
             </div>
-        {% endfor %}
+
+            <div>
+                <strong>
+                    Workflow unavailable
+                </strong>
+
+                <span>
+                    No workflow stages are currently available for this
+                    laboratory context.
+                </span>
+            </div>
+        </div>
+
+    {% endif %}
+
+    <div
+        class="ca-workflow-summary"
+        aria-label="Workflow summary"
+    >
+
+        <div class="ca-workflow-summary-item active">
+            <div class="ca-workflow-summary-icon">
+                <span aria-hidden="true"></span>
+            </div>
+
+            <div>
+                <span>Active</span>
+                <strong>
+                    {{ workflow_summary.active|default:0 }}
+                </strong>
+            </div>
+        </div>
+
+        <div class="ca-workflow-summary-item pending">
+            <div class="ca-workflow-summary-icon">
+                <span aria-hidden="true"></span>
+            </div>
+
+            <div>
+                <span>Pending</span>
+                <strong>
+                    {{ workflow_summary.pending|default:0 }}
+                </strong>
+            </div>
+        </div>
+
+        <div class="ca-workflow-summary-item blocked">
+            <div class="ca-workflow-summary-icon">
+                <span aria-hidden="true"></span>
+            </div>
+
+            <div>
+                <span>Blocked</span>
+                <strong>
+                    {{ workflow_summary.blocked|default:0 }}
+                </strong>
+            </div>
+        </div>
+
+        <div class="ca-workflow-summary-item completed">
+            <div class="ca-workflow-summary-icon">
+                <span aria-hidden="true"></span>
+            </div>
+
+            <div>
+                <span>Completed</span>
+                <strong>
+                    {{ workflow_summary.completed|default:0 }}
+                </strong>
+            </div>
+        </div>
+
     </div>
 
-    <div class="ca-workflow-summary">
-        <div>
-            <span>Active</span>
-            <strong>{{ workflow_summary.active|default:0 }}</strong>
-        </div>
+    {% if workflow_summary.total %}
+        <div class="ca-workflow-footer">
 
-        <div>
-            <span>Pending</span>
-            <strong>{{ workflow_summary.pending|default:0 }}</strong>
-        </div>
+            <div class="ca-workflow-progress-label">
+                <span>Overall workflow completion</span>
 
-        <div>
-            <span>Blocked</span>
-            <strong>{{ workflow_summary.blocked|default:0 }}</strong>
-        </div>
+                <strong>
+                    {{ workflow_summary.completed|default:0 }}
+                    /
+                    {{ workflow_summary.total }}
+                </strong>
+            </div>
 
-        <div>
-            <span>Completed</span>
-            <strong>{{ workflow_summary.completed|default:0 }}</strong>
+            <div
+                class="ca-workflow-progress"
+                role="progressbar"
+                aria-valuemin="0"
+                aria-valuemax="{{ workflow_summary.total }}"
+                aria-valuenow="{{ workflow_summary.completed|default:0 }}"
+            >
+                <span
+                    data-workflow-progress
+                    data-completed="{{ workflow_summary.completed|default:0 }}"
+                    data-total="{{ workflow_summary.total }}"
+                ></span>
+            </div>
+
         </div>
-    </div>
+    {% endif %}
 
 </div>
-

@@ -1,0 +1,31 @@
+.ca-navigation {
+    min-width: 0;
+}
+
+.ca-navigation-list {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+}
+
+.ca-navigation-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 6px 10px;
+    border-radius: var(--ca-radius-sm);
+    color: var(--ca-text-muted);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.ca-navigation-link:hover {
+    background: var(--ca-surface-muted);
+    color: var(--ca-text);
+}
+
+.ca-navigation-link.is-active {
+    background: var(--ca-primary-soft);
+    color: var(--ca-primary);
+}

@@ -1,0 +1,58 @@
+.ca-form-group {
+    min-width: 0;
+}
+
+.ca-form-label {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--ca-text);
+    font-size: 13px;
+    font-weight: 650;
+    line-height: 1.35;
+}
+
+.ca-form-help {
+    margin-top: 5px;
+    color: var(--ca-text-muted);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.ca-input,
+.ca-select,
+.ca-textarea {
+    width: 100%;
+    min-width: 0;
+    border: 1px solid var(--ca-border-strong);
+    border-radius: var(--ca-radius-md);
+    background: var(--ca-surface);
+    color: var(--ca-text);
+    outline: none;
+    transition:
+        border-color var(--ca-transition-fast),
+        box-shadow var(--ca-transition-fast);
+}
+
+.ca-input,
+.ca-select {
+    height: 38px;
+    padding: 7px 10px;
+}
+
+.ca-textarea {
+    min-height: 100px;
+    padding: 9px 10px;
+    resize: vertical;
+}
+
+.ca-input:focus,
+.ca-select:focus,
+.ca-textarea:focus {
+    border-color: var(--ca-primary);
+    box-shadow: 0 0 0 3px rgb(37 99 235 / .10);
+}
+
+.ca-input::placeholder,
+.ca-textarea::placeholder {
+    color: var(--ca-text-faint);
+}

@@ -1,9 +1,10 @@
-# ca/registry.py
+
+from __future__ import annotations
 
 import logging
 import re
 from copy import deepcopy
-from typing import Any, Dict
+from typing import Any, Dict, Iterable
 
 from django.apps import apps
 from django.core.exceptions import FieldDoesNotExist
@@ -17,21 +18,27 @@ APP_LABEL = "ca"
 
 
 def get_model(name: str):
-    return apps.get_model(APP_LABEL, name)
+    try:
+        return apps.get_model(APP_LABEL, name)
+    except LookupError:
+        logger.exception(
+            "[ca.registry] Unable to resolve model %s.%s",
+            APP_LABEL,
+            name,
+        )
+        return None
 
 
 Chemical = get_model("Chemical")
 Supplier = get_model("Supplier")
 ChemicalLocation = get_model("ChemicalLocation")
 ChemicalSpecification = get_model("ChemicalSpecification")
-
 ChemicalBatch = get_model("ChemicalBatch")
 ChemicalAnalysisRequest = get_model("ChemicalAnalysisRequest")
+ChemicalAnalysisProcess = get_model("ChemicalAnalysisProcess")
 BatchTestResult = get_model("BatchTestResult")
 ChemicalAnalysisInput = get_model("ChemicalAnalysisInput")
-
 ChemicalCoA = get_model("ChemicalCoA")
-
 PackagingStatus = get_model("PackagingStatus")
 ChemicalCertApprover = get_model("ChemicalCertApprover")
 ChecklistForWaterTreatmentChemicalAnalysis = get_model(
@@ -46,6 +53,7 @@ ICONS = {
     "ChemicalSpecification": "vial-circle-check",
     "ChemicalBatch": "boxes-stacked",
     "ChemicalAnalysisRequest": "clipboard-list",
+    "ChemicalAnalysisProcess": "diagram-project",
     "BatchTestResult": "microscope",
     "ChemicalAnalysisInput": "keyboard",
     "ChemicalCoA": "certificate",
@@ -62,6 +70,7 @@ GROUPS = {
     "ChemicalSpecification": "specifications",
     "ChemicalBatch": "batches",
     "ChemicalAnalysisRequest": "analysis",
+    "ChemicalAnalysisProcess": "analysis",
     "BatchTestResult": "results",
     "ChemicalAnalysisInput": "analysis",
     "ChemicalCoA": "certificates",
@@ -86,94 +95,204 @@ def build_meta(model) -> Dict[str, Any]:
         "key": f"{model._meta.app_label}.{model._meta.model_name}",
         "app_label": model._meta.app_label,
         "model_name": model._meta.model_name,
-        "verbose_name": verbose,
-        "verbose_name_plural": f"{verbose}s",
+        "verbose_name": model._meta.verbose_name
+        or verbose,
+        "verbose_name_plural": model._meta.verbose_name_plural
+        or f"{verbose}s",
     }
 
 
 def chemical_qs(model) -> QuerySet:
-    return model.objects.prefetch_related(
-        "specifications",
+    return (
+        model.objects
+        .prefetch_related(
+            "specifications",
+        )
+        .order_by("name")
     )
 
 
 def supplier_qs(model) -> QuerySet:
-    return model.objects.all()
+    return model.objects.order_by("name")
 
 
 def location_qs(model) -> QuerySet:
-    return model.objects.select_related(
-        "treatment_plant",
+    return (
+        model.objects
+        .select_related(
+            "treatment_plant",
+        )
+        .order_by(
+            "treatment_plant__name",
+            "name",
+        )
     )
 
 
 def specification_qs(model) -> QuerySet:
-    return model.objects.select_related(
-        "chemical",
-        "method",
+    return (
+        model.objects
+        .select_related(
+            "chemical",
+            "method",
+            "treatment_plant",
+        )
+        .prefetch_related(
+            "remarks",
+        )
+        .order_by(
+            "chemical__name",
+            "parameter_name",
+            "-version",
+        )
     )
 
 
 def batch_qs(model) -> QuerySet:
-    return model.objects.select_related(
-        "chemical",
-        "supplier",
-        "treatment_plant",
-        "received_by",
-    ).prefetch_related(
-        "test_results",
-        "test_results__parameter",
+    return (
+        model.objects
+        .select_related(
+            "chemical",
+            "supplier",
+            "treatment_plant",
+            "received_by",
+        )
+        .prefetch_related(
+            "test_results",
+            "test_results__parameter",
+            "test_results__analyst",
+        )
+        .order_by(
+            "-received_date",
+            "-created_at",
+        )
     )
 
 
 def request_qs(model) -> QuerySet:
-    return model.objects.select_related(
-        "batch",
-        "requested_by",
-        "received_by",
-        "location",
-    ).prefetch_related(
-        "assigned_analysts",
+    return (
+        model.objects
+        .select_related(
+            "batch",
+            "batch__chemical",
+            "batch__supplier",
+            "batch__treatment_plant",
+            "requested_by",
+            "received_by",
+            "location",
+        )
+        .prefetch_related(
+            "assigned_analysts",
+        )
+        .order_by(
+            "-created_at",
+        )
+    )
+
+
+def process_qs(model) -> QuerySet:
+    return (
+        model.objects
+        .select_related(
+            "batch",
+            "batch__chemical",
+            "batch__supplier",
+            "batch__treatment_plant",
+            "request",
+            "initiated_by",
+            "assigned_analyst",
+            "qa_officer",
+            "approver",
+        )
+        .prefetch_related(
+            "batch__test_results",
+            "batch__test_results__parameter",
+            "batch__test_results__analyst",
+        )
+        .order_by(
+            "-created_at",
+        )
     )
 
 
 def result_qs(model) -> QuerySet:
-    return model.objects.select_related(
-        "batch",
-        "parameter",
-        "parameter__chemical",
-        "analyst",
+    return (
+        model.objects
+        .select_related(
+            "batch",
+            "batch__chemical",
+            "batch__treatment_plant",
+            "parameter",
+            "parameter__chemical",
+            "parameter__method",
+            "analyst",
+        )
+        .order_by(
+            "-tested_at",
+            "parameter__parameter_name",
+        )
     )
 
 
 def input_qs(model) -> QuerySet:
-    return model.objects.select_related(
-        "test_result",
-        "test_result__batch",
-        "test_result__parameter",
+    return (
+        model.objects
+        .select_related(
+            "test_result",
+            "test_result__batch",
+            "test_result__batch__chemical",
+            "test_result__parameter",
+            "test_result__parameter__method",
+        )
+        .order_by(
+            "-id",
+        )
     )
 
 
 def coa_qs(model) -> QuerySet:
-    return model.objects.select_related(
-        "batch",
-        "approved_by",
-        "packaging_status",
+    return (
+        model.objects
+        .select_related(
+            "batch",
+            "batch__chemical",
+            "batch__supplier",
+            "batch__treatment_plant",
+            "approved_by",
+            "packaging_status",
+        )
+        .order_by(
+            "-date_of_report",
+        )
     )
 
 
 def approver_qs(model) -> QuerySet:
-    return model.objects.select_related(
-        "user",
+    return (
+        model.objects
+        .select_related(
+            "user",
+        )
+        .order_by(
+            "user__username",
+        )
     )
 
 
 def checklist_qs(model) -> QuerySet:
-    return model.objects.select_related(
-        "chemical_analysis_request",
-        "chemical",
-        "sampled_by",
-        "requested_by",
+    return (
+        model.objects
+        .select_related(
+            "chemical_analysis_request",
+            "chemical_analysis_request__batch",
+            "chemical_analysis_request__batch__treatment_plant",
+            "chemical",
+            "sampled_by",
+            "requested_by",
+        )
+        .order_by(
+            "-created_at",
+        )
     )
 
 
@@ -188,7 +307,9 @@ BATCH_BASE_CONFIG = {
     "search_fields": [
         "sample_id",
         "batch_number",
+        "delivery_note_number",
         "chemical__name",
+        "chemical__code",
         "supplier__name",
     ],
     "filter_fields": [
@@ -199,12 +320,16 @@ BATCH_BASE_CONFIG = {
     ],
     "ordering": [
         "-received_date",
+        "-created_at",
     ],
     "select_related": [
         "chemical",
         "supplier",
         "treatment_plant",
         "received_by",
+    ],
+    "prefetch_related": [
+        "test_results",
     ],
     "queryset_factory": batch_qs,
 }
@@ -215,6 +340,7 @@ ANALYSIS_REQUEST_BASE_CONFIG = {
         "request_id",
         "batch__sample_id",
         "batch__batch_number",
+        "batch__chemical__name",
     ],
     "filter_fields": [
         "status",
@@ -230,7 +356,39 @@ ANALYSIS_REQUEST_BASE_CONFIG = {
         "received_by",
         "location",
     ],
+    "prefetch_related": [
+        "assigned_analysts",
+    ],
     "queryset_factory": request_qs,
+}
+
+
+ANALYSIS_PROCESS_BASE_CONFIG = {
+    "search_fields": [
+        "batch__sample_id",
+        "batch__batch_number",
+        "batch__chemical__name",
+        "assigned_analyst__username",
+    ],
+    "filter_fields": [
+        "status",
+        "batch",
+        "assigned_analyst",
+        "qa_officer",
+        "approver",
+    ],
+    "ordering": [
+        "-created_at",
+    ],
+    "select_related": [
+        "batch",
+        "request",
+        "initiated_by",
+        "assigned_analyst",
+        "qa_officer",
+        "approver",
+    ],
+    "queryset_factory": process_qs,
 }
 
 
@@ -240,6 +398,7 @@ TEST_RESULT_BASE_CONFIG = {
         "batch__batch_number",
         "parameter__parameter_name",
         "parameter__chemical__name",
+        "analyst__username",
     ],
     "filter_fields": [
         "status",
@@ -254,6 +413,7 @@ TEST_RESULT_BASE_CONFIG = {
         "batch",
         "parameter",
         "parameter__chemical",
+        "parameter__method",
         "analyst",
     ],
     "queryset_factory": result_qs,
@@ -265,6 +425,8 @@ CERTIFICATE_BASE_CONFIG = {
         "batch__sample_id",
         "batch__batch_number",
         "chemical_name",
+        "supplier_name",
+        "delivery_note_number",
     ],
     "filter_fields": [
         "packaging_status",
@@ -286,13 +448,17 @@ CERTIFICATE_BASE_CONFIG = {
 CHECKLIST_BASE_CONFIG = {
     "search_fields": [
         "chemical__name",
+        "chemical__code",
         "chemical_analysis_request__request_id",
+        "chemical_analysis_request__batch__sample_id",
+        "chemical_analysis_request__batch__batch_number",
     ],
     "filter_fields": [
         "grade",
         "country_of_origin",
         "chemical",
         "chemical_analysis_request",
+        "completed",
     ],
     "ordering": [
         "-created_at",
@@ -363,6 +529,20 @@ MODEL_CAPABILITIES = {
         "export": True,
         "bulk_edit": True,
         "workflow": True,
+        "assignment": True,
+    },
+    "ChemicalAnalysisProcess": {
+        "create": False,
+        "update": True,
+        "delete": False,
+        "search": True,
+        "filter": True,
+        "export": True,
+        "bulk_edit": False,
+        "workflow": True,
+        "assignment": True,
+        "qa": True,
+        "approval": True,
     },
     "BatchTestResult": {
         "create": True,
@@ -372,7 +552,6 @@ MODEL_CAPABILITIES = {
         "filter": True,
         "export": True,
         "bulk_edit": True,
-        "workflow": True,
     },
     "ChemicalAnalysisInput": {
         "create": True,
@@ -382,6 +561,7 @@ MODEL_CAPABILITIES = {
         "filter": True,
         "export": True,
         "bulk_edit": True,
+        "calculation": True,
     },
     "ChemicalCoA": {
         "create": False,
@@ -393,6 +573,8 @@ MODEL_CAPABILITIES = {
         "bulk_edit": False,
         "workflow": True,
         "document": True,
+        "verification": True,
+        "hash_verification": True,
     },
     "PackagingStatus": {
         "create": True,
@@ -420,6 +602,7 @@ MODEL_CAPABILITIES = {
         "filter": True,
         "export": True,
         "bulk_edit": True,
+        "workflow": True,
     },
 }
 
@@ -531,6 +714,10 @@ PERMISSIONS = {
             "Operations",
             "Lab Supervisor",
         ],
+        "return": [
+            "Lab Supervisor",
+            "Operations",
+        ],
     },
     "ChemicalAnalysisRequest": {
         "view": [
@@ -556,7 +743,53 @@ PERMISSIONS = {
         "complete_analysis": [
             "Lab Supervisor",
         ],
+        "assign_analyst": [
+            "Lab Supervisor",
+            "Lab Technician",
+        ],
         "cancel": [
+            "Lab Supervisor",
+            "QA Officer",
+        ],
+    },
+    "ChemicalAnalysisProcess": {
+        "view": [
+            "Lab Technician",
+            "Lab Assistant",
+            "Lab Supervisor",
+            "QA Officer",
+        ],
+        "update": [
+            "Lab Technician",
+            "Lab Assistant",
+            "Lab Supervisor",
+        ],
+        "start_analysis": [
+            "Lab Technician",
+            "Lab Assistant",
+        ],
+        "complete_analysis": [
+            "Lab Technician",
+            "Lab Assistant",
+            "Lab Supervisor",
+        ],
+        "approve": [
+            "Lab Supervisor",
+            "QA Officer",
+        ],
+        "reject": [
+            "Lab Supervisor",
+            "QA Officer",
+        ],
+        "utilize": [
+            "Operations",
+            "Lab Supervisor",
+        ],
+        "return": [
+            "Operations",
+            "Lab Supervisor",
+        ],
+        "complete": [
             "Lab Supervisor",
             "QA Officer",
         ],
@@ -599,6 +832,10 @@ PERMISSIONS = {
             "Lab Technician",
             "Lab Assistant",
         ],
+        "calculate": [
+            "Lab Technician",
+            "Lab Assistant",
+        ],
     },
     "ChemicalCoA": {
         "view": [
@@ -623,6 +860,10 @@ PERMISSIONS = {
             "Lab Assistant",
             "Lab Supervisor",
             "QA Officer",
+        ],
+        "revoke": [
+            "QA Officer",
+            "ChemicalCertApprover",
         ],
     },
     "PackagingStatus": {
@@ -673,7 +914,16 @@ PERMISSIONS = {
             "Lab Assistant",
             "Lab Supervisor",
         ],
+        "complete": [
+            "Lab Technician",
+            "Lab Assistant",
+            "Lab Supervisor",
+        ],
         "verify": [
+            "Lab Supervisor",
+            "QA Officer",
+        ],
+        "reopen": [
             "Lab Supervisor",
             "QA Officer",
         ],
@@ -684,123 +934,214 @@ PERMISSIONS = {
 WORKFLOW_CONFIG = {
     "ChemicalBatch": {
         "enabled": True,
+        "state_field": "status",
         "states": [
             "received",
-            "under_analysis",
+            "analysed",
             "approved",
             "rejected",
             "utilized",
+            "returned",
         ],
         "transitions": {
             "received": [
-                "under_analysis",
+                "analysed",
                 "rejected",
             ],
-            "under_analysis": [
+            "analysed": [
                 "approved",
                 "rejected",
             ],
             "approved": [
                 "utilized",
+                "returned",
             ],
             "rejected": [],
             "utilized": [],
+            "returned": [],
         },
         "actions": [
             "approve",
             "reject",
             "utilize",
+            "return",
         ],
     },
     "ChemicalAnalysisRequest": {
         "enabled": True,
+        "state_field": "status",
         "states": [
             "pending",
-            "assigned",
             "in_progress",
             "completed",
-            "rejected",
-            "cancelled",
         ],
         "transitions": {
             "pending": [
-                "assigned",
-                "cancelled",
-            ],
-            "assigned": [
                 "in_progress",
-                "cancelled",
             ],
             "in_progress": [
                 "completed",
-                "rejected",
             ],
             "completed": [],
-            "rejected": [],
-            "cancelled": [],
         },
         "actions": [
             "start_analysis",
             "complete_analysis",
-            "cancel",
         ],
+        "assignment": {
+            "manual": True,
+            "automatic": True,
+            "timeout_minutes": 30,
+            "field": "assigned_analysts",
+            "due_field": "assignment_due_at",
+            "manual_timestamp_field": "manual_assigned_at",
+            "automatic_timestamp_field": "auto_assigned_at",
+        },
     },
-    "BatchTestResult": {
+    "ChemicalAnalysisProcess": {
         "enabled": True,
+        "state_field": "status",
         "states": [
-            "pending",
-            "analysed",
-            "verified",
+            "created",
+            "received",
+            "requested",
+            "assigned",
+            "checklist",
+            "analysis",
+            "retest",
+            "qa",
+            "approved",
             "rejected",
+            "utilized",
+            "returned",
+            "completed",
         ],
         "transitions": {
-            "pending": [
-                "analysed",
+            "created": [
+                "received",
             ],
-            "analysed": [
-                "verified",
+            "received": [
+                "requested",
+            ],
+            "requested": [
+                "assigned",
+                "checklist",
+            ],
+            "assigned": [
+                "checklist",
+            ],
+            "checklist": [
+                "analysis",
+            ],
+            "analysis": [
+                "retest",
+                "qa",
+            ],
+            "retest": [
+                "analysis",
+                "qa",
+            ],
+            "qa": [
+                "approved",
                 "rejected",
             ],
-            "verified": [],
+            "approved": [
+                "utilized",
+                "returned",
+            ],
             "rejected": [],
+            "utilized": [
+                "completed",
+            ],
+            "returned": [
+                "completed",
+            ],
+            "completed": [],
         },
         "actions": [
-            "verify",
-            "reject",
+            "move_to_analysis",
+            "mark_analysis_started",
+            "mark_analysis_completed",
+            "mark_approved",
+            "mark_rejected",
+            "mark_disposition_completed",
+            "mark_completed",
         ],
+        "assignment": {
+            "field": "assigned_analyst",
+            "manual": True,
+            "automatic": True,
+            "timeout_minutes": 30,
+        },
+        "sampling": {
+            "enabled": False,
+        },
+    },
+    "BatchTestResult": {
+        "enabled": False,
+        "state_field": "status",
+        "states": [
+            "pass",
+            "fail",
+            "na",
+        ],
+        "transitions": {},
+        "actions": [],
     },
     "ChemicalCoA": {
         "enabled": True,
-        "states": [
-            "draft",
+        "state_field": None,
+        "derived_states": [
+            "not_generated",
             "generated",
-            "verified",
             "approved",
             "revoked",
         ],
         "transitions": {
-            "draft": [
+            "not_generated": [
                 "generated",
             ],
             "generated": [
-                "verified",
-                "revoked",
-            ],
-            "verified": [
                 "approved",
                 "revoked",
             ],
             "approved": [
                 "revoked",
             ],
-            "revoked": [],
+            "revoked": [
+                "generated",
+            ],
         },
         "actions": [
             "generate",
             "verify",
             "approve",
             "download",
+            "revoke",
         ],
+    },
+    "ChecklistForWaterTreatmentChemicalAnalysis": {
+        "enabled": True,
+        "state_field": "completed",
+        "states": [
+            "pending",
+            "completed",
+        ],
+        "transitions": {
+            "pending": [
+                "completed",
+            ],
+            "completed": [
+                "pending",
+            ],
+        },
+        "actions": [
+            "complete",
+            "reopen",
+        ],
+        "sampling": {
+            "enabled": False,
+        },
     },
 }
 
@@ -843,19 +1184,30 @@ AUDIT_CONFIG = {
         "track_update": True,
         "track_delete": False,
         "track_workflow": True,
+        "track_assignment": True,
+    },
+    "ChemicalAnalysisProcess": {
+        "enabled": True,
+        "track_create": True,
+        "track_update": True,
+        "track_delete": False,
+        "track_workflow": True,
+        "track_assignment": True,
+        "track_qa": True,
+        "track_approval": True,
     },
     "BatchTestResult": {
         "enabled": True,
         "track_create": True,
         "track_update": True,
         "track_delete": False,
-        "track_workflow": True,
     },
     "ChemicalAnalysisInput": {
         "enabled": True,
         "track_create": True,
         "track_update": True,
         "track_delete": False,
+        "track_calculation": True,
     },
     "ChemicalCoA": {
         "enabled": True,
@@ -864,6 +1216,7 @@ AUDIT_CONFIG = {
         "track_delete": False,
         "track_workflow": True,
         "track_download": True,
+        "track_verification": True,
     },
     "PackagingStatus": {
         "enabled": True,
@@ -882,6 +1235,7 @@ AUDIT_CONFIG = {
         "track_create": True,
         "track_update": True,
         "track_delete": False,
+        "track_workflow": True,
     },
 }
 
@@ -896,7 +1250,9 @@ EXPORT_CONFIG = {
         "columns": [
             "name",
             "code",
+            "description",
             "grade",
+            "hydrometer_formula",
         ],
     },
     "Supplier": {
@@ -907,10 +1263,8 @@ EXPORT_CONFIG = {
         ],
         "columns": [
             "name",
-            "code",
-            "contact_person",
-            "phone",
-            "email",
+            "contract_number",
+            "contact_info",
         ],
     },
     "ChemicalLocation": {
@@ -921,9 +1275,7 @@ EXPORT_CONFIG = {
         ],
         "columns": [
             "name",
-            "code",
             "treatment_plant",
-            "status",
         ],
     },
     "ChemicalSpecification": {
@@ -935,10 +1287,13 @@ EXPORT_CONFIG = {
         "columns": [
             "chemical",
             "parameter_name",
-            "minimum_value",
-            "maximum_value",
+            "unit",
+            "min_limit",
+            "max_limit",
             "method",
-            "status",
+            "is_required",
+            "version",
+            "treatment_plant",
         ],
     },
     "ChemicalBatch": {
@@ -950,12 +1305,16 @@ EXPORT_CONFIG = {
         "columns": [
             "sample_id",
             "batch_number",
+            "delivery_note_number",
             "chemical",
             "supplier",
             "treatment_plant",
             "status",
             "quantity_received",
+            "unit",
+            "package_count",
             "received_date",
+            "received_by",
         ],
     },
     "ChemicalAnalysisRequest": {
@@ -968,8 +1327,39 @@ EXPORT_CONFIG = {
             "request_id",
             "batch",
             "status",
-            "created_at",
+            "delivery_date",
+            "location",
+            "analysis_started_at",
             "analysis_deadline",
+            "completed_at",
+            "assignment_due_at",
+            "auto_assigned_at",
+            "manual_assigned_at",
+        ],
+    },
+    "ChemicalAnalysisProcess": {
+        "formats": [
+            "csv",
+            "xlsx",
+            "pdf",
+        ],
+        "columns": [
+            "batch",
+            "request",
+            "status",
+            "initiated_by",
+            "assigned_analyst",
+            "qa_officer",
+            "approver",
+            "started_at",
+            "checklist_completed_at",
+            "analysis_started_at",
+            "analysis_completed_at",
+            "qa_reviewed_at",
+            "approved_at",
+            "rejected_at",
+            "completed_at",
+            "rework_count",
         ],
     },
     "BatchTestResult": {
@@ -982,9 +1372,11 @@ EXPORT_CONFIG = {
             "batch",
             "parameter",
             "value",
+            "textual_result",
             "status",
             "tested_at",
             "analyst",
+            "auto_remark",
         ],
     },
     "ChemicalAnalysisInput": {
@@ -995,8 +1387,8 @@ EXPORT_CONFIG = {
         ],
         "columns": [
             "test_result",
-            "value",
-            "remarks",
+            "inputs",
+            "calculated_value",
         ],
     },
     "ChemicalCoA": {
@@ -1006,9 +1398,18 @@ EXPORT_CONFIG = {
         "columns": [
             "batch",
             "chemical_name",
-            "date_of_report",
+            "supplier_name",
+            "quantity",
+            "delivered_to",
+            "delivery_date",
+            "delivery_note_number",
             "packaging_status",
+            "sampling_date",
+            "analysis_date",
+            "date_of_report",
             "approved_by",
+            "approved_on",
+            "verified_hash",
         ],
     },
     "PackagingStatus": {
@@ -1019,8 +1420,7 @@ EXPORT_CONFIG = {
         ],
         "columns": [
             "name",
-            "code",
-            "status",
+            "description",
         ],
     },
     "ChemicalCertApprover": {
@@ -1031,7 +1431,6 @@ EXPORT_CONFIG = {
         ],
         "columns": [
             "user",
-            "status",
         ],
     },
     "ChecklistForWaterTreatmentChemicalAnalysis": {
@@ -1044,15 +1443,273 @@ EXPORT_CONFIG = {
             "chemical",
             "chemical_analysis_request",
             "grade",
+            "manufacture_date",
+            "expiry_date",
+            "storage_conditions",
+            "net_weight",
             "country_of_origin",
+            "sampled_by",
+            "requested_by",
+            "completed",
+            "completed_at",
+            "completed_by",
             "created_at",
         ],
     },
 }
 
 
-def get_model_field_names(model):
-    names = set()
+MODEL_CONFIGS = {
+    "Chemical": {
+        "search_fields": [
+            "name",
+            "code",
+            "description",
+            "grade",
+        ],
+        "filter_fields": [
+            "grade",
+        ],
+        "ordering": [
+            "name",
+        ],
+        "prefetch_related": [
+            "specifications",
+        ],
+        "queryset_factory": chemical_qs,
+        "inline_edit_fields": [
+            "name",
+            "code",
+            "description",
+            "grade",
+            "hydrometer_formula",
+        ],
+    },
+    "Supplier": {
+        "search_fields": [
+            "name",
+            "contract_number",
+            "contact_info",
+        ],
+        "ordering": [
+            "name",
+        ],
+        "queryset_factory": supplier_qs,
+        "inline_edit_fields": [
+            "name",
+            "contract_number",
+            "contact_info",
+        ],
+    },
+    "ChemicalLocation": {
+        "search_fields": [
+            "name",
+            "treatment_plant__name",
+        ],
+        "filter_fields": [
+            "treatment_plant",
+        ],
+        "ordering": [
+            "name",
+        ],
+        "select_related": [
+            "treatment_plant",
+        ],
+        "queryset_factory": location_qs,
+        "inline_edit_fields": [
+            "name",
+        ],
+    },
+    "ChemicalSpecification": {
+        "search_fields": [
+            "chemical__name",
+            "chemical__code",
+            "parameter_name",
+            "unit",
+            "method__name",
+        ],
+        "filter_fields": [
+            "chemical",
+            "method",
+            "treatment_plant",
+            "is_required",
+            "version",
+        ],
+        "ordering": [
+            "chemical__name",
+            "parameter_name",
+            "-version",
+        ],
+        "select_related": [
+            "chemical",
+            "method",
+            "treatment_plant",
+        ],
+        "prefetch_related": [
+            "remarks",
+        ],
+        "queryset_factory": specification_qs,
+        "inline_edit_fields": [
+            "parameter_name",
+            "unit",
+            "min_limit",
+            "max_limit",
+            "is_required",
+            "version",
+            "method",
+        ],
+    },
+    "ChemicalBatch": {
+        **BATCH_BASE_CONFIG,
+        "inline_edit_fields": [
+            "status",
+            "remarks",
+            "quantity_received",
+            "package_count",
+            "unit",
+        ],
+        "bulk_actions": {
+            "approve": True,
+            "reject": True,
+            "utilize": True,
+            "return": True,
+        },
+    },
+    "ChemicalAnalysisRequest": {
+        **ANALYSIS_REQUEST_BASE_CONFIG,
+        "inline_edit_fields": [
+            "status",
+            "analysis_deadline",
+        ],
+        "bulk_actions": {
+            "start_analysis": True,
+            "complete_analysis": True,
+        },
+    },
+    "ChemicalAnalysisProcess": {
+        **ANALYSIS_PROCESS_BASE_CONFIG,
+        "bulk_actions": {
+            "move_to_analysis": True,
+            "mark_analysis_started": True,
+            "mark_analysis_completed": True,
+            "mark_approved": True,
+            "mark_rejected": True,
+            "mark_disposition_completed": True,
+            "mark_completed": True,
+        },
+    },
+    "BatchTestResult": {
+        **TEST_RESULT_BASE_CONFIG,
+        "inline_edit_fields": [
+            "value",
+            "textual_result",
+            "status",
+            "auto_remark",
+        ],
+        "bulk_actions": {
+            "verify": True,
+            "reject": True,
+        },
+    },
+    "ChemicalAnalysisInput": {
+        "search_fields": [
+            "test_result__id",
+            "test_result__batch__sample_id",
+            "test_result__batch__batch_number",
+            "test_result__parameter__parameter_name",
+        ],
+        "filter_fields": [
+            "test_result",
+        ],
+        "ordering": [
+            "-id",
+        ],
+        "select_related": [
+            "test_result",
+            "test_result__batch",
+            "test_result__parameter",
+        ],
+        "queryset_factory": input_qs,
+        "inline_edit_fields": [
+            "inputs",
+        ],
+        "calculation": {
+            "property": "calculated_value",
+            "formula_property": "formula",
+            "required_fields_property": "required_input_fields",
+            "precision_property": "rounding_precision",
+        },
+    },
+    "ChemicalCoA": {
+        **CERTIFICATE_BASE_CONFIG,
+        "bulk_actions": {
+            "generate": True,
+            "verify": True,
+            "approve": True,
+            "download": True,
+            "revoke": True,
+        },
+        "meta": {
+            "document_type": "certificate_of_analysis",
+            "supports_pdf": True,
+            "supports_hash_verification": True,
+            "immutable_after_approval": True,
+        },
+    },
+    "PackagingStatus": {
+        "search_fields": [
+            "name",
+            "description",
+        ],
+        "ordering": [
+            "name",
+        ],
+        "inline_edit_fields": [
+            "name",
+            "description",
+        ],
+    },
+    "ChemicalCertApprover": {
+        "search_fields": [
+            "user__username",
+            "user__first_name",
+            "user__last_name",
+            "user__email",
+        ],
+        "filter_fields": [
+            "user",
+        ],
+        "ordering": [
+            "user__username",
+        ],
+        "select_related": [
+            "user",
+        ],
+        "queryset_factory": approver_qs,
+    },
+    "ChecklistForWaterTreatmentChemicalAnalysis": {
+        **CHECKLIST_BASE_CONFIG,
+        "inline_edit_fields": [
+            "grade",
+            "country_of_origin",
+            "manufacture_date",
+            "expiry_date",
+            "storage_conditions",
+            "net_weight",
+        ],
+        "bulk_actions": {
+            "complete": True,
+            "reopen": True,
+        },
+    },
+}
+
+
+def get_model_field_names(model) -> set[str]:
+    if model is None:
+        return set()
+
+    names: set[str] = set()
 
     for field in model._meta.get_fields():
         if getattr(field, "concrete", False):
@@ -1061,14 +1718,28 @@ def get_model_field_names(model):
     return names
 
 
-def valid_fields(model, fields):
-    available = get_model_field_names(model)
-    result = []
+def resolve_field_path(model, path: str):
+    current_model = model
+
+    for component in path.lstrip("-").split("__"):
+        try:
+            field = current_model._meta.get_field(component)
+        except FieldDoesNotExist:
+            return None
+
+        remote_model = getattr(field, "remote_field", None)
+
+        if remote_model is not None and remote_model.model is not None:
+            current_model = remote_model.model
+
+    return field
+
+
+def valid_fields(model, fields: Iterable[str] | None) -> list[str]:
+    result: list[str] = []
 
     for field_name in fields or []:
-        root = field_name.lstrip("-").split("__")[0]
-
-        if root in available:
+        if resolve_field_path(model, field_name) is not None:
             result.append(field_name)
 
     return result
@@ -1093,11 +1764,7 @@ def validate_registry_fields(model, config):
         invalid = []
 
         for value in values:
-            root = value.lstrip("-").split("__")[0]
-
-            try:
-                model._meta.get_field(root)
-            except FieldDoesNotExist:
+            if resolve_field_path(model, value) is None:
                 invalid.append(value)
 
         if invalid:
@@ -1112,7 +1779,16 @@ def validate_registry_fields(model, config):
 def build_model_config(model, **kwargs):
     name = model.__name__
 
-    config = deepcopy(kwargs)
+    config = deepcopy(
+        MODEL_CONFIGS.get(
+            name,
+            {},
+        )
+    )
+
+    config.update(
+        deepcopy(kwargs)
+    )
 
     config.setdefault(
         "capabilities",
@@ -1235,248 +1911,26 @@ def safe_register(model, **kwargs):
         raise
 
 
-safe_register(
+REGISTERED_MODELS = (
     Chemical,
-    search_fields=[
-        "name",
-        "code",
-    ],
-    filter_fields=[
-        "grade",
-        "status",
-    ],
-    ordering=[
-        "name",
-    ],
-    prefetch_related=[
-        "specifications",
-    ],
-    queryset_factory=chemical_qs,
-    inline_edit_fields=[
-        "name",
-        "code",
-        "grade",
-    ],
-)
-
-
-safe_register(
     Supplier,
-    search_fields=[
-        "name",
-        "code",
-        "contact_person",
-    ],
-    filter_fields=[
-        "status",
-    ],
-    ordering=[
-        "name",
-    ],
-    queryset_factory=supplier_qs,
-    inline_edit_fields=[
-        "name",
-        "code",
-        "contact_person",
-        "phone",
-        "email",
-    ],
-)
-
-
-safe_register(
     ChemicalLocation,
-    search_fields=[
-        "name",
-        "code",
-    ],
-    filter_fields=[
-        "treatment_plant",
-        "status",
-    ],
-    ordering=[
-        "name",
-    ],
-    select_related=[
-        "treatment_plant",
-    ],
-    queryset_factory=location_qs,
-    inline_edit_fields=[
-        "name",
-        "code",
-        "status",
-    ],
-)
-
-
-safe_register(
     ChemicalSpecification,
-    search_fields=[
-        "chemical__name",
-        "chemical__code",
-        "parameter_name",
-    ],
-    filter_fields=[
-        "chemical",
-        "method",
-        "status",
-    ],
-    ordering=[
-        "chemical__name",
-        "parameter_name",
-    ],
-    select_related=[
-        "chemical",
-        "method",
-    ],
-    queryset_factory=specification_qs,
-    inline_edit_fields=[
-        "parameter_name",
-        "minimum_value",
-        "maximum_value",
-        "method",
-    ],
-)
-
-
-safe_register(
     ChemicalBatch,
-    **BATCH_BASE_CONFIG,
-    inline_edit_fields=[
-        "status",
-        "remarks",
-        "quantity_received",
-        "received_date",
-    ],
-    bulk_actions={
-        "approve": True,
-        "reject": True,
-        "utilize": True,
-    },
-)
-
-
-safe_register(
     ChemicalAnalysisRequest,
-    **ANALYSIS_REQUEST_BASE_CONFIG,
-    inline_edit_fields=[
-        "status",
-        "analysis_deadline",
-    ],
-    bulk_actions={
-        "start_analysis": True,
-        "complete_analysis": True,
-    },
-)
-
-
-safe_register(
+    ChemicalAnalysisProcess,
     BatchTestResult,
-    **TEST_RESULT_BASE_CONFIG,
-    inline_edit_fields=[
-        "value",
-        "status",
-        "textual_result",
-    ],
-    bulk_actions={
-        "verify": True,
-        "reject": True,
-    },
-)
-
-
-safe_register(
     ChemicalAnalysisInput,
-    search_fields=[
-        "test_result__id",
-        "test_result__batch__sample_id",
-        "test_result__parameter__parameter_name",
-    ],
-    filter_fields=[
-        "test_result",
-    ],
-    ordering=[
-        "-id",
-    ],
-    select_related=[
-        "test_result",
-        "test_result__batch",
-        "test_result__parameter",
-    ],
-    queryset_factory=input_qs,
-    inline_edit_fields=[
-        "value",
-        "remarks",
-    ],
-)
-
-
-safe_register(
     ChemicalCoA,
-    **CERTIFICATE_BASE_CONFIG,
-    bulk_actions={
-        "generate": True,
-        "verify": True,
-        "approve": True,
-        "download": True,
-    },
-    meta={
-        "document_type": "certificate_of_analysis",
-        "supports_pdf": True,
-        "supports_hash_verification": True,
-    },
-)
-
-
-safe_register(
     PackagingStatus,
-    search_fields=[
-        "name",
-        "code",
-    ],
-    filter_fields=[
-        "status",
-    ],
-    ordering=[
-        "name",
-    ],
-    inline_edit_fields=[
-        "name",
-        "code",
-        "status",
-    ],
-)
-
-
-safe_register(
     ChemicalCertApprover,
-    search_fields=[
-        "user__username",
-        "user__first_name",
-        "user__last_name",
-        "user__email",
-    ],
-    filter_fields=[
-        "user",
-        "status",
-    ],
-    ordering=[
-        "user__username",
-    ],
-    select_related=[
-        "user",
-    ],
-    queryset_factory=approver_qs,
-    inline_edit_fields=[
-        "status",
-    ],
-)
-
-
-safe_register(
     ChecklistForWaterTreatmentChemicalAnalysis,
-    **CHECKLIST_BASE_CONFIG,
 )
+
+
+for _model in REGISTERED_MODELS:
+    if _model is not None:
+        safe_register(_model)
 
 
 try:
@@ -1539,6 +1993,15 @@ def get_export_config(model_name: str):
     )
 
 
+def get_model_config(model_name: str):
+    return deepcopy(
+        MODEL_CONFIGS.get(
+            model_name,
+            {},
+        )
+    )
+
+
 def get_registered_models():
     try:
         from core.registry import registry
@@ -1548,6 +2011,9 @@ def get_registered_models():
         )
 
     except Exception:
+        logger.exception(
+            "[ca.registry] Unable to read registry"
+        )
         return {}
 
 
@@ -1579,6 +2045,40 @@ def list_registered_models():
     )
 
 
+def get_registered_model_config(model_name: str) -> Dict[str, Any]:
+    entry = get_registered_model(model_name)
+
+    if entry is None:
+        return {}
+
+    if hasattr(entry, "config"):
+        config = getattr(
+            entry,
+            "config",
+            {},
+        )
+
+        if isinstance(config, dict):
+            return deepcopy(config)
+
+    if hasattr(entry, "meta"):
+        meta = getattr(
+            entry,
+            "meta",
+            {},
+        )
+
+        if isinstance(meta, dict):
+            return {
+                "meta": deepcopy(meta),
+            }
+
+    if isinstance(entry, dict):
+        return deepcopy(entry)
+
+    return {}
+
+
 def registry_health() -> Dict[str, Any]:
     registered = get_registered_models()
 
@@ -1589,6 +2089,7 @@ def registry_health() -> Dict[str, Any]:
         "ChemicalSpecification": ChemicalSpecification,
         "ChemicalBatch": ChemicalBatch,
         "ChemicalAnalysisRequest": ChemicalAnalysisRequest,
+        "ChemicalAnalysisProcess": ChemicalAnalysisProcess,
         "BatchTestResult": BatchTestResult,
         "ChemicalAnalysisInput": ChemicalAnalysisInput,
         "ChemicalCoA": ChemicalCoA,
@@ -1617,12 +2118,28 @@ def registry_health() -> Dict[str, Any]:
         actual - expected
     )
 
+    model_health = {}
+
+    for name, model in expected_models.items():
+        if model is None:
+            model_health[name] = {
+                "resolved": False,
+                "registered": False,
+            }
+            continue
+
+        model_health[name] = {
+            "resolved": True,
+            "registered": name in actual,
+        }
+
     return {
         "app_label": APP_LABEL,
         "expected_models": len(expected),
         "registered_models": len(actual),
         "missing": missing,
         "unexpected": unexpected,
+        "models": model_health,
         "healthy": not missing and not unexpected,
     }
 
@@ -1637,6 +2154,9 @@ def registry_summary() -> Dict[str, Any]:
         "workflow_models": [],
         "document_models": [],
         "exportable_models": [],
+        "assignment_models": [],
+        "qa_models": [],
+        "approval_models": [],
     }
 
     for model_name in sorted(registered):
@@ -1645,6 +2165,10 @@ def registry_summary() -> Dict[str, Any]:
         )
 
         workflow = get_workflow(
+            model_name
+        )
+
+        config = get_model_config(
             model_name
         )
 
@@ -1664,6 +2188,25 @@ def registry_summary() -> Dict[str, Any]:
                 {},
             )
 
+        elif hasattr(
+            registered_entry,
+            "config",
+        ):
+            entry_config = getattr(
+                registered_entry,
+                "config",
+                {},
+            )
+
+            if isinstance(
+                entry_config,
+                dict,
+            ):
+                meta = entry_config.get(
+                    "meta",
+                    {},
+                )
+
         elif isinstance(
             registered_entry,
             dict,
@@ -1678,18 +2221,44 @@ def registry_summary() -> Dict[str, Any]:
             "general",
         )
 
+        model_item = {
+            "name": model_name,
+            "key": meta.get(
+                "key",
+                f"{APP_LABEL}.{model_name.lower()}",
+            ),
+            "verbose_name": meta.get(
+                "verbose_name",
+                humanize_model_name(
+                    registered_entry
+                    if hasattr(
+                        registered_entry,
+                        "__name__",
+                    )
+                    else type(
+                        registered_entry
+                    ),
+                ),
+            ),
+            "group": group,
+            "capabilities": deepcopy(
+                capabilities
+            ),
+            "workflow": deepcopy(
+                workflow
+            ),
+            "export": deepcopy(
+                config.get(
+                    "export",
+                    get_export_config(
+                        model_name
+                    ),
+                )
+            ),
+        }
+
         summary["models"].append(
-            {
-                "name": model_name,
-                "key": meta.get(
-                    "key",
-                    f"{APP_LABEL}.{model_name.lower()}",
-                ),
-                "group": group,
-                "capabilities": deepcopy(
-                    capabilities
-                ),
-            }
+            model_item
         )
 
         summary["groups"].setdefault(
@@ -1699,9 +2268,15 @@ def registry_summary() -> Dict[str, Any]:
             model_name
         )
 
-        if workflow.get(
-            "enabled",
-            False,
+        if (
+            workflow.get(
+                "enabled",
+                False,
+            )
+            or capabilities.get(
+                "workflow",
+                False,
+            )
         ):
             summary["workflow_models"].append(
                 model_name
@@ -1723,6 +2298,30 @@ def registry_summary() -> Dict[str, Any]:
                 model_name
             )
 
+        if capabilities.get(
+            "assignment",
+            False,
+        ):
+            summary["assignment_models"].append(
+                model_name
+            )
+
+        if capabilities.get(
+            "qa",
+            False,
+        ):
+            summary["qa_models"].append(
+                model_name
+            )
+
+        if capabilities.get(
+            "approval",
+            False,
+        ):
+            summary["approval_models"].append(
+                model_name
+            )
+
     summary["model_count"] = len(
         summary["models"]
     )
@@ -1739,4 +2338,19 @@ def registry_summary() -> Dict[str, Any]:
         summary["exportable_models"]
     )
 
+    summary["assignment_count"] = len(
+        summary["assignment_models"]
+    )
+
+    summary["qa_count"] = len(
+        summary["qa_models"]
+    )
+
+    summary["approval_count"] = len(
+        summary["approval_models"]
+    )
+
+    summary["health"] = registry_health()
+
     return summary
+

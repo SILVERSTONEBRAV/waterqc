@@ -1,1345 +1,3932 @@
 {% extends "ca/dashboard/layout/app.html" %}
 {% load static %}
 
-{% block title %}Chemical Analysis Command Center{% endblock %}
+{% block title %}
+    Chemical Analysis Command Center
+{% endblock %}
 
-{% block app_module %}dashboard{% endblock %}
+{% block page_title %}
+    Chemical Analysis Command Center
+{% endblock %}
+
+{% block meta_description %}
+    Chemical Analysis workflow command center for chemical batches, sampling,
+    analysis, quality assurance, approval, certificates and batch disposition.
+{% endblock %}
+
+{% block breadcrumbs %}
+    <span aria-hidden="true">/</span>
+    <span aria-current="page">Command Center</span>
+{% endblock %}
 
 {% block page_css %}
-
 <link rel="stylesheet" href="{% static 'ca/css/pages/dashboard.css' %}">
+<link rel="stylesheet" href="{% static 'ca/css/pages/dashboard-command.css' %}">
+{% endblock %}
+
+{% block page_actions %}
+
+    <div class="ca-dashboard-actions">
+
+        {% if permissions.receive_chemical_batch %}
+            <a
+                href="{% url 'ca:batch-create' %}"
+                class="ca-button ca-button--primary ca-button--sm"
+            >
+                Receive Batch
+            </a>
+        {% endif %}
+
+        {% if permissions.view_process or permissions.record_result or permissions.qa_review or permissions.approve_chemical_batch %}
+            <a
+                href="{% url 'ca:my-tasks' %}"
+                class="ca-button ca-button--secondary ca-button--sm"
+            >
+                My Tasks
+            </a>
+        {% endif %}
+
+        {% if permissions.view_chemicalrequest or permissions.create_analysis_request %}
+            <a
+                href="{% url 'ca:request-list' %}"
+                class="ca-button ca-button--secondary ca-button--sm"
+            >
+                Requests
+            </a>
+        {% endif %}
+
+        <button
+            type="button"
+            class="ca-button ca-button--secondary ca-button--sm"
+            id="dashboard-refresh"
+            data-action="refresh-dashboard"
+        >
+            Refresh
+        </button>
+
+    </div>
+
 {% endblock %}
 
 {% block content %}
 
 <div
-    class="ca-dashboard"
     id="chemical-analysis-dashboard"
+    class="ca-dashboard"
     data-dashboard="command-center"
     data-refresh-url="{% url 'ca:dashboard' %}"
-    data-action-url="{% url 'ca:dashboard-action' %}"
-    data-process-refresh-url="{% url 'ca:process-refresh' 0 %}"
+    data-refresh-seconds="30"
+    data-dashboard-view="dashboard"
+    data-live-enabled="true"
 >
 
-```
-<section class="dashboard-commandbar">
-    <div class="dashboard-commandbar__identity">
-        <span class="dashboard-eyebrow">CHEMICAL ANALYSIS</span>
-        <h1>Chemical Analysis Command Center</h1>
+    <!-- ========================================================= -->
+    <!-- DASHBOARD HEADER                                          -->
+    <!-- ========================================================= -->
 
-        <p>
-            End-to-end control of chemical receipt, sampling, analysis,
-            quality review, approval, certification and batch disposition.
-        </p>
+    <header class="ca-dashboard-header">
 
-        {% if treatment_plant %}
-            <div class="dashboard-context">
-                <span>Plant</span>
-                <strong>{{ treatment_plant.name }}</strong>
+        <div class="ca-dashboard-header__identity">
+
+            <div class="ca-dashboard-eyebrow">
+                CHEMICAL ANALYSIS
             </div>
-        {% elif plant_context.is_superuser %}
-            <div class="dashboard-context">
-                <span>Scope</span>
-                <strong>All Treatment Plants</strong>
+
+            <h1 class="ca-dashboard-title">
+                Command Center
+            </h1>
+
+            <p class="ca-dashboard-subtitle">
+                End-to-end chemical receiving, sampling, analysis,
+                quality assurance, certification and disposition.
+            </p>
+
+        </div>
+
+        <div class="ca-dashboard-header__status">
+
+            <div class="ca-dashboard-scope">
+
+                <span class="ca-dashboard-scope__label">
+                    Scope
+                </span>
+
+                {% if plant_context.is_superuser %}
+                    {# Superuser: dropdown to filter by treatment plant #}
+                    <form
+                        id="ca-plant-scope-form"
+                        class="ca-dashboard-scope__form"
+                        method="get"
+                        action=""
+                        autocomplete="off"
+                    >
+                        <label for="ca-plant-scope-select" class="sr-only">Filter by treatment plant</label>
+                        <select
+                            id="ca-plant-scope-select"
+                            name="{{ plant_context.query_param }}"
+                            class="ca-dashboard-scope__select"
+                            aria-label="Filter by treatment plant"
+                            onchange="this.form.submit()"
+                        >
+                            <option value="all" {% if not plant_context.plant_id %}selected{% endif %}>
+                                All Treatment Plants
+                            </option>
+                            {% for p in plant_context.available_plants %}
+                            <option
+                                value="{{ p.id }}"
+                                {% if plant_context.plant_id == p.id %}selected{% endif %}
+                            >
+                                {{ p.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </form>
+                {% else %}
+                    {# Regular users: static display of their assigned plant #}
+                    <strong class="ca-dashboard-scope__value">
+                        {% if treatment_plant %}
+                            {{ treatment_plant.name }}
+                        {% elif request.user.assigned_lab %}
+                            {{ request.user.assigned_lab }}
+                        {% else %}
+                            Current Workspace
+                        {% endif %}
+                    </strong>
+                {% endif %}
+
             </div>
-        {% endif %}
+
+            <div
+                id="dashboard-live-state"
+                class="ca-dashboard-live"
+                data-state="loading"
+                aria-live="polite"
+            >
+                <span
+                    class="ca-dashboard-live__indicator"
+                    aria-hidden="true"
+                ></span>
+
+                <span
+                    id="dashboard-live-label"
+                    class="ca-dashboard-live__label"
+                >
+                    Loading
+                </span>
+
+                <span
+                    id="dashboard-last-updated"
+                    class="ca-dashboard-live__time"
+                ></span>
+
+            </div>
+
+        </div>
+
+    </header>
+
+
+    <!-- ========================================================= -->
+    <!-- EXECUTIVE KPIs                                            -->
+    <!-- One representation per operational concept               -->
+    <!-- ========================================================= -->
+
+    <section
+        class="ca-dashboard-section ca-dashboard-section--kpis"
+        aria-labelledby="dashboard-kpis-title"
+    >
+
+        <div class="ca-dashboard-section__header">
+
+            <div>
+                <span class="ca-dashboard-section__eyebrow">
+                    OPERATIONS
+                </span>
+
+                <h2
+                    id="dashboard-kpis-title"
+                    class="ca-dashboard-section__title"
+                >
+                    Current Control Position
+                </h2>
+            </div>
+
+        </div>
+
+
+        <div
+            id="dashboard-kpis"
+            class="ca-dashboard-kpi-grid"
+        >
+
+            <article class="ca-dashboard-kpi">
+                <span class="ca-dashboard-kpi__label">
+                    Active Workflow
+                </span>
+
+                <strong
+                    id="kpi-active"
+                    class="ca-dashboard-kpi__value"
+                >
+                    —
+                </strong>
+
+                <span
+                    id="kpi-active-detail"
+                    class="ca-dashboard-kpi__detail"
+                >
+                    Active chemical workflows
+                </span>
+            </article>
+
+
+            <article class="ca-dashboard-kpi">
+                <span class="ca-dashboard-kpi__label">
+                    Pending Analysis
+                </span>
+
+                <strong
+                    id="kpi-analysis"
+                    class="ca-dashboard-kpi__value"
+                >
+                    —
+                </strong>
+
+                <span
+                    id="kpi-analysis-detail"
+                    class="ca-dashboard-kpi__detail"
+                >
+                    Awaiting laboratory action
+                </span>
+            </article>
+
+
+            <article class="ca-dashboard-kpi">
+                <span class="ca-dashboard-kpi__label">
+                    Pending Approval
+                </span>
+
+                <strong
+                    id="kpi-approval"
+                    class="ca-dashboard-kpi__value"
+                >
+                    —
+                </strong>
+
+                <span
+                    id="kpi-approval-detail"
+                    class="ca-dashboard-kpi__detail"
+                >
+                    Awaiting authorization
+                </span>
+            </article>
+
+
+            <article class="ca-dashboard-kpi">
+                <span class="ca-dashboard-kpi__label">
+                    QA / Retest
+                </span>
+
+                <strong
+                    id="kpi-qa"
+                    class="ca-dashboard-kpi__value"
+                >
+                    —
+                </strong>
+
+                <span
+                    id="kpi-qa-detail"
+                    class="ca-dashboard-kpi__detail"
+                >
+                    Quality-control intervention
+                </span>
+            </article>
+
+
+            <article class="ca-dashboard-kpi">
+                <span class="ca-dashboard-kpi__label">
+                    Overdue
+                </span>
+
+                <strong
+                    id="kpi-overdue"
+                    class="ca-dashboard-kpi__value"
+                >
+                    —
+                </strong>
+
+                <span
+                    id="kpi-overdue-detail"
+                    class="ca-dashboard-kpi__detail"
+                >
+                    Beyond analysis SLA
+                </span>
+            </article>
+
+
+            <article class="ca-dashboard-kpi">
+                <span class="ca-dashboard-kpi__label">
+                    Completed
+                </span>
+
+                <strong
+                    id="kpi-completed"
+                    class="ca-dashboard-kpi__value"
+                >
+                    —
+                </strong>
+
+                <span
+                    id="kpi-completed-detail"
+                    class="ca-dashboard-kpi__detail"
+                >
+                    Completed workflows
+                </span>
+            </article>
+
+        </div>
+
+    </section>
+
+
+    <!-- ========================================================= -->
+    <!-- COMPLETE WORKFLOW                                         -->
+    <!-- ========================================================= -->
+
+    {% if permissions.view_process %}
+    <section
+        class="ca-dashboard-section ca-dashboard-section--workflow"
+        aria-labelledby="workflow-title"
+    >
+
+        <div class="ca-dashboard-section__header">
+
+            <div>
+                <span class="ca-dashboard-section__eyebrow">
+                    WORKFLOW
+                </span>
+
+                <h2
+                    id="workflow-title"
+                    class="ca-dashboard-section__title"
+                >
+                    Chemical Analysis Lifecycle
+                </h2>
+
+                <p class="ca-dashboard-section__description">
+                    Complete operational path from chemical receipt
+                    through sampling, analysis, quality control,
+                    certification and final disposition.
+                </p>
+            </div>
+
+        </div>
+
+
+        <div
+            id="workflow-pipeline"
+            class="ca-workflow-pipeline"
+            aria-label="Chemical analysis workflow"
+        >
+
+            <article
+                class="ca-workflow-stage"
+                data-stage="receive"
+            >
+                <div class="ca-workflow-stage__number">
+                    01
+                </div>
+
+                <div class="ca-workflow-stage__content">
+                    <span class="ca-workflow-stage__title">
+                        Receive
+                    </span>
+
+                    <strong
+                        class="ca-workflow-stage__count"
+                        data-workflow-count="receive"
+                    >
+                        —
+                    </strong>
+
+                    <span class="ca-workflow-stage__status">
+                        Chemical received
+                    </span>
+                </div>
+            </article>
+
+
+            <div class="ca-workflow-connector">
+                →
+            </div>
+
+
+            <article
+                class="ca-workflow-stage"
+                data-stage="request"
+            >
+                <div class="ca-workflow-stage__number">
+                    02
+                </div>
+
+                <div class="ca-workflow-stage__content">
+                    <span class="ca-workflow-stage__title">
+                        Request
+                    </span>
+
+                    <strong
+                        class="ca-workflow-stage__count"
+                        data-workflow-count="request"
+                    >
+                        —
+                    </strong>
+
+                    <span class="ca-workflow-stage__status">
+                        Analysis requested
+                    </span>
+                </div>
+            </article>
+
+
+            <div class="ca-workflow-connector">
+                →
+            </div>
+
+
+            <article
+                class="ca-workflow-stage"
+                data-stage="checklist"
+            >
+                <div class="ca-workflow-stage__number">
+                    03
+                </div>
+
+                <div class="ca-workflow-stage__content">
+                    <span class="ca-workflow-stage__title">
+                        Checklist
+                    </span>
+
+                    <strong
+                        class="ca-workflow-stage__count"
+                        data-workflow-count="checklist"
+                    >
+                        —
+                    </strong>
+
+                    <span class="ca-workflow-stage__status">
+                        Pre-analysis control
+                    </span>
+                </div>
+            </article>
+
+
+            <div class="ca-workflow-connector">
+                →
+            </div>
+
+
+            <article
+                class="ca-workflow-stage"
+                data-stage="assignment"
+            >
+                <div class="ca-workflow-stage__number">
+                    04
+                </div>
+
+                <div class="ca-workflow-stage__content">
+                    <span class="ca-workflow-stage__title">
+                        Assignment
+                    </span>
+
+                    <strong
+                        class="ca-workflow-stage__count"
+                        data-workflow-count="assignment"
+                    >
+                        —
+                    </strong>
+
+                    <span class="ca-workflow-stage__status">
+                        Analyst assigned
+                    </span>
+                </div>
+            </article>
+
+
+            <div class="ca-workflow-connector">
+                →
+            </div>
+
+
+            <article
+                class="ca-workflow-stage"
+                data-stage="sampling"
+            >
+                <div class="ca-workflow-stage__number">
+                    05
+                </div>
+
+                <div class="ca-workflow-stage__content">
+                    <span class="ca-workflow-stage__title">
+                        Sampling
+                    </span>
+
+                    <strong
+                        class="ca-workflow-stage__count"
+                        data-workflow-count="sampling"
+                    >
+                        —
+                    </strong>
+
+                    <span class="ca-workflow-stage__status">
+                        Systematic random sampling
+                    </span>
+                </div>
+            </article>
+
+
+            <div class="ca-workflow-connector">
+                →
+            </div>
+
+
+            <article
+                class="ca-workflow-stage"
+                data-stage="analysis"
+            >
+                <div class="ca-workflow-stage__number">
+                    06
+                </div>
+
+                <div class="ca-workflow-stage__content">
+                    <span class="ca-workflow-stage__title">
+                        Analysis
+                    </span>
+
+                    <strong
+                        class="ca-workflow-stage__count"
+                        data-workflow-count="analysis"
+                    >
+                        —
+                    </strong>
+
+                    <span class="ca-workflow-stage__status">
+                        Laboratory testing
+                    </span>
+                </div>
+            </article>
+
+
+            <div class="ca-workflow-connector">
+                →
+            </div>
+
+
+            <article
+                class="ca-workflow-stage ca-workflow-stage--control"
+                data-stage="qa"
+            >
+                <div class="ca-workflow-stage__number">
+                    07
+                </div>
+
+                <div class="ca-workflow-stage__content">
+                    <span class="ca-workflow-stage__title">
+                        QA / Retest
+                    </span>
+
+                    <strong
+                        class="ca-workflow-stage__count"
+                        data-workflow-count="qa"
+                    >
+                        —
+                    </strong>
+
+                    <span class="ca-workflow-stage__status">
+                        Review and control
+                    </span>
+                </div>
+            </article>
+
+
+            <div class="ca-workflow-connector">
+                →
+            </div>
+
+
+            <article
+                class="ca-workflow-stage"
+                data-stage="approval"
+            >
+                <div class="ca-workflow-stage__number">
+                    08
+                </div>
+
+                <div class="ca-workflow-stage__content">
+                    <span class="ca-workflow-stage__title">
+                        Approval
+                    </span>
+
+                    <strong
+                        class="ca-workflow-stage__count"
+                        data-workflow-count="approval"
+                    >
+                        —
+                    </strong>
+
+                    <span class="ca-workflow-stage__status">
+                        Batch authorization
+                    </span>
+                </div>
+            </article>
+
+
+            <div class="ca-workflow-connector">
+                →
+            </div>
+
+
+            <article
+                class="ca-workflow-stage"
+                data-stage="coa"
+            >
+                <div class="ca-workflow-stage__number">
+                    09
+                </div>
+
+                <div class="ca-workflow-stage__content">
+                    <span class="ca-workflow-stage__title">
+                        Certificate
+                    </span>
+
+                    <strong
+                        class="ca-workflow-stage__count"
+                        data-workflow-count="coa"
+                    >
+                        —
+                    </strong>
+
+                    <span class="ca-workflow-stage__status">
+                        Certificate of analysis
+                    </span>
+                </div>
+            </article>
+
+
+            <div class="ca-workflow-connector">
+                →
+            </div>
+
+
+            <article
+                class="ca-workflow-stage"
+                data-stage="disposition"
+            >
+                <div class="ca-workflow-stage__number">
+                    10
+                </div>
+
+                <div class="ca-workflow-stage__content">
+                    <span class="ca-workflow-stage__title">
+                        Disposition
+                    </span>
+
+                    <strong
+                        class="ca-workflow-stage__count"
+                        data-workflow-count="disposition"
+                    >
+                        —
+                    </strong>
+
+                    <span class="ca-workflow-stage__status">
+                        Utilize / Return
+                    </span>
+                </div>
+            </article>
+
+
+            <div class="ca-workflow-connector">
+                →
+            </div>
+
+
+            <article
+                class="ca-workflow-stage ca-workflow-stage--terminal"
+                data-stage="completed"
+            >
+                <div class="ca-workflow-stage__number">
+                    11
+                </div>
+
+                <div class="ca-workflow-stage__content">
+                    <span class="ca-workflow-stage__title">
+                        Completed
+                    </span>
+
+                    <strong
+                        class="ca-workflow-stage__count"
+                        data-workflow-count="completed"
+                    >
+                        —
+                    </strong>
+
+                    <span class="ca-workflow-stage__status">
+                        Workflow closed
+                    </span>
+                </div>
+            </article>
+
+        </div>
+
+
+        <div
+            id="workflow-branches"
+            class="ca-workflow-branches"
+        >
+
+            <div class="ca-workflow-branch ca-workflow-branch--retest">
+
+                <span class="ca-workflow-branch__label">
+                    Retest
+                </span>
+
+                <strong
+                    data-workflow-branch="retest"
+                >
+                    —
+                </strong>
+
+                <span>
+                    Return to controlled analysis
+                </span>
+
+            </div>
+
+
+            <div class="ca-workflow-branch ca-workflow-branch--reject">
+
+                <span class="ca-workflow-branch__label">
+                    Reject
+                </span>
+
+                <strong
+                    data-workflow-branch="rejected"
+                >
+                    —
+                </strong>
+
+                <span>
+                    Controlled rejection path
+                </span>
+
+            </div>
+
+
+            <div class="ca-workflow-branch ca-workflow-branch--capa">
+
+                <span class="ca-workflow-branch__label">
+                    CAPA
+                </span>
+
+                <strong
+                    data-workflow-branch="capa"
+                >
+                    —
+                </strong>
+
+                <span>
+                    Corrective action / preventive action
+                </span>
+
+            </div>
+
+        </div>
+
+    </section>
+    {% endif %}
+
+
+    <!-- ========================================================= -->
+    <!-- OPERATIONAL CONTROL GRID                                  -->
+    <!-- ========================================================= -->
+
+    <section
+        class="ca-dashboard-section ca-dashboard-section--control"
+        aria-labelledby="control-title"
+    >
+
+        <div class="ca-dashboard-section__header">
+
+            <div>
+                <span class="ca-dashboard-section__eyebrow">
+                    CONTROL
+                </span>
+
+                <h2
+                    id="control-title"
+                    class="ca-dashboard-section__title"
+                >
+                    Operational Queues
+                </h2>
+
+            </div>
+
+        </div>
+
+
+        <div class="ca-dashboard-control-grid">
+
+            <!-- Pending Analysis -->
+            {% if permissions.view_process or permissions.start_analysis or permissions.record_result or permissions.complete_analysis %}
+            <article class="ca-dashboard-panel">
+
+                <header class="ca-dashboard-panel__header">
+
+                    <div>
+                        <span class="ca-dashboard-panel__eyebrow">
+                            LABORATORY
+                        </span>
+
+                        <h3 class="ca-dashboard-panel__title">
+                            Pending Analysis
+                        </h3>
+                    </div>
+
+                    <strong
+                        id="queue-analysis-count"
+                        class="ca-dashboard-panel__count"
+                    >
+                        —
+                    </strong>
+
+                </header>
+
+                <div
+                    id="queue-analysis"
+                    class="ca-dashboard-queue"
+                ></div>
+
+                <footer class="ca-dashboard-panel__footer">
+
+                    {% if permissions.view_process or permissions.start_analysis or permissions.record_result %}
+                        <a href="{% url 'ca:pending-analysis' %}">
+                            Open analysis queue
+                        </a>
+                    {% endif %}
+
+                </footer>
+
+            </article>
+            {% endif %}
+
+
+            <!-- Approval -->
+            {% if permissions.approve_chemical_batch or permissions.approve_chemical_coa or permissions.view_process %}
+            <article class="ca-dashboard-panel">
+
+                <header class="ca-dashboard-panel__header">
+
+                    <div>
+                        <span class="ca-dashboard-panel__eyebrow">
+                            AUTHORIZATION
+                        </span>
+
+                        <h3 class="ca-dashboard-panel__title">
+                            Pending Approval
+                        </h3>
+                    </div>
+
+                    <strong
+                        id="queue-approval-count"
+                        class="ca-dashboard-panel__count"
+                    >
+                        —
+                    </strong>
+
+                </header>
+
+                <div
+                    id="queue-approval"
+                    class="ca-dashboard-queue"
+                ></div>
+
+                <footer class="ca-dashboard-panel__footer">
+
+                    {% if permissions.approve_chemical_batch or permissions.approve_chemical_coa %}
+                        <a href="{% url 'ca:pending-approval' %}">
+                            Open approval queue
+                        </a>
+                    {% endif %}
+
+                </footer>
+
+            </article>
+            {% endif %}
+
+
+            <!-- QA -->
+            {% if permissions.qa_review or permissions.retest or permissions.view_process %}
+            <article class="ca-dashboard-panel">
+
+                <header class="ca-dashboard-panel__header">
+
+                    <div>
+                        <span class="ca-dashboard-panel__eyebrow">
+                            QUALITY
+                        </span>
+
+                        <h3 class="ca-dashboard-panel__title">
+                            QA / Retest
+                        </h3>
+                    </div>
+
+                    <strong
+                        id="queue-qa-count"
+                        class="ca-dashboard-panel__count"
+                    >
+                        —
+                    </strong>
+
+                </header>
+
+                <div
+                    id="queue-qa"
+                    class="ca-dashboard-queue"
+                ></div>
+
+                <footer class="ca-dashboard-panel__footer">
+
+                    <a href="{% url 'ca:pending-qa' %}">
+                        Open QA review queue
+                    </a>
+
+                </footer>
+
+            </article>
+            {% endif %}
+
+
+            <!-- Overdue -->
+            {% if permissions.view_process %}
+            <article class="ca-dashboard-panel">
+
+                <header class="ca-dashboard-panel__header">
+
+                    <div>
+                        <span class="ca-dashboard-panel__eyebrow">
+                            SLA
+                        </span>
+
+                        <h3 class="ca-dashboard-panel__title">
+                            Overdue Analysis
+                        </h3>
+                    </div>
+
+                    <strong
+                        id="queue-overdue-count"
+                        class="ca-dashboard-panel__count"
+                    >
+                        —
+                    </strong>
+
+                </header>
+
+                <div
+                    id="queue-overdue"
+                    class="ca-dashboard-queue"
+                ></div>
+
+                <footer class="ca-dashboard-panel__footer">
+
+                    {% if permissions.view_process %}
+                        <a href="{% url 'ca:overdue-analysis' %}">
+                            Open overdue queue
+                        </a>
+                    {% endif %}
+
+                </footer>
+
+            </article>
+            {% endif %}
+
+        </div>
+
+    </section>
+
+
+    <!-- ========================================================= -->
+    <!-- QUALITY CONTROL                                           -->
+    <!-- ========================================================= -->
+
+    {% if permissions.view_process or permissions.qa_review or permissions.record_result or permissions.view_batchtestresult %}
+    <section
+        class="ca-dashboard-section"
+        aria-labelledby="quality-title"
+    >
+
+        <div class="ca-dashboard-section__header">
+
+            <div>
+                <span class="ca-dashboard-section__eyebrow">
+                    QUALITY ASSURANCE
+                </span>
+
+                <h2
+                    id="quality-title"
+                    class="ca-dashboard-section__title"
+                >
+                    Sampling, Results and Quality Control
+                </h2>
+            </div>
+
+        </div>
+
+
+        <div class="ca-dashboard-quality-grid">
+
+            <article class="ca-dashboard-panel">
+
+                <header class="ca-dashboard-panel__header">
+
+                    <h3 class="ca-dashboard-panel__title">
+                        Sampling
+                    </h3>
+
+                </header>
+
+                <div class="ca-dashboard-metric-list">
+
+                    <div class="ca-dashboard-metric">
+                        <span>Sampling required</span>
+                        <strong data-quality="sampling-required">—</strong>
+                    </div>
+
+                    <div class="ca-dashboard-metric">
+                        <span>Sampling completed</span>
+                        <strong data-quality="sampling-completed">—</strong>
+                    </div>
+
+                    <div class="ca-dashboard-metric">
+                        <span>Sampling passed</span>
+                        <strong data-quality="sampling-passed">—</strong>
+                    </div>
+
+                    <div class="ca-dashboard-metric">
+                        <span>Sampling exceptions</span>
+                        <strong data-quality="sampling-exceptions">—</strong>
+                    </div>
+
+                </div>
+
+            </article>
+
+
+            <article class="ca-dashboard-panel">
+
+                <header class="ca-dashboard-panel__header">
+
+                    <h3 class="ca-dashboard-panel__title">
+                        Test Results
+                    </h3>
+
+                </header>
+
+                <div class="ca-dashboard-metric-list">
+
+                    <div class="ca-dashboard-metric">
+                        <span>Total results</span>
+                        <strong data-quality="results-total">—</strong>
+                    </div>
+
+                    <div class="ca-dashboard-metric">
+                        <span>Passed</span>
+                        <strong data-quality="results-passed">—</strong>
+                    </div>
+
+                    <div class="ca-dashboard-metric">
+                        <span>Failed</span>
+                        <strong data-quality="results-failed">—</strong>
+                    </div>
+
+                    <div class="ca-dashboard-metric">
+                        <span>Retest required</span>
+                        <strong data-quality="retest">—</strong>
+                    </div>
+
+                </div>
+
+            </article>
+
+
+            <article class="ca-dashboard-panel">
+
+                <header class="ca-dashboard-panel__header">
+
+                    <h3 class="ca-dashboard-panel__title">
+                        QA Controls
+                    </h3>
+
+                </header>
+
+                <div class="ca-dashboard-metric-list">
+
+                    <div class="ca-dashboard-metric">
+                        <span>QA required</span>
+                        <strong data-quality="qa-required">—</strong>
+                    </div>
+
+                    <div class="ca-dashboard-metric">
+                        <span>QA approved</span>
+                        <strong data-quality="qa-approved">—</strong>
+                    </div>
+
+                    <div class="ca-dashboard-metric">
+                        <span>CAPA</span>
+                        <strong data-quality="capa">—</strong>
+                    </div>
+
+                    <div class="ca-dashboard-metric">
+                        <span>Rejected</span>
+                        <strong data-quality="rejected">—</strong>
+                    </div>
+
+                </div>
+
+            </article>
+
+
+            <article class="ca-dashboard-panel">
+
+                <header class="ca-dashboard-panel__header">
+
+                    <h3 class="ca-dashboard-panel__title">
+                        Quality Rate
+                    </h3>
+
+                </header>
+
+                <div class="ca-dashboard-quality-rate">
+
+                    <strong
+                        id="quality-pass-rate"
+                        class="ca-dashboard-quality-rate__value"
+                    >
+                        —
+                    </strong>
+
+                    <span>
+                        Result pass rate
+                    </span>
+
+                </div>
+
+                <div
+                    id="quality-rate-bar"
+                    class="ca-dashboard-progress"
+                    aria-hidden="true"
+                >
+                    <span></span>
+                </div>
+
+            </article>
+
+        </div>
+
+    </section>
+    {% endif %}
+
+
+    <!-- ========================================================= -->
+    <!-- BATCH LIFECYCLE                                           -->
+    <!-- ========================================================= -->
+
+    {% if permissions.view_chemicalbatch or permissions.receive_chemical_batch %}
+    <section
+        class="ca-dashboard-section"
+        aria-labelledby="batch-title"
+    >
+
+        <div class="ca-dashboard-section__header">
+
+            <div>
+                <span class="ca-dashboard-section__eyebrow">
+                    BATCH CONTROL
+                </span>
+
+                <h2
+                    id="batch-title"
+                    class="ca-dashboard-section__title"
+                >
+                    Chemical Batch Lifecycle
+                </h2>
+            </div>
+
+            {% if permissions.view_chemicalbatch %}
+                <a
+                    href="{% url 'ca:batch-list' %}"
+                    class="ca-button ca-button--secondary ca-button--sm"
+                >
+                    View Batches
+                </a>
+            {% endif %}
+
+        </div>
+
+
+        <div
+            id="batch-lifecycle"
+            class="ca-batch-lifecycle"
+        >
+
+            <div class="ca-batch-state">
+                <span>Received</span>
+                <strong data-batch-count="received">—</strong>
+            </div>
+
+            <div class="ca-batch-state">
+                <span>Analysed</span>
+                <strong data-batch-count="analysed">—</strong>
+            </div>
+
+            <div class="ca-batch-state">
+                <span>Approved</span>
+                <strong data-batch-count="approved">—</strong>
+            </div>
+
+            <div class="ca-batch-state">
+                <span>Rejected</span>
+                <strong data-batch-count="rejected">—</strong>
+            </div>
+
+            <div class="ca-batch-state">
+                <span>Utilized</span>
+                <strong data-batch-count="utilized">—</strong>
+            </div>
+
+            <div class="ca-batch-state">
+                <span>Returned</span>
+                <strong data-batch-count="returned">—</strong>
+            </div>
+
+        </div>
+
+    </section>
+    {% endif %}
+
+
+    <!-- ========================================================= -->
+    <!-- CERTIFICATION                                             -->
+    <!-- ========================================================= -->
+
+    {% if permissions.view_chemicalcoa or permissions.approve_chemical_coa or permissions.verify_coa %}
+    <section
+        class="ca-dashboard-section"
+        aria-labelledby="certificate-title"
+    >
+
+        <div class="ca-dashboard-section__header">
+
+            <div>
+                <span class="ca-dashboard-section__eyebrow">
+                    CERTIFICATION
+                </span>
+
+                <h2
+                    id="certificate-title"
+                    class="ca-dashboard-section__title"
+                >
+                    Certificate of Analysis Control
+                </h2>
+            </div>
+
+            {% if permissions.view_chemicalcoa %}
+                <a
+                    href="{% url 'ca:coa-list' %}"
+                    class="ca-button ca-button--secondary ca-button--sm"
+                >
+                    View Certificates
+                </a>
+            {% endif %}
+
+        </div>
+
+
+        <div class="ca-dashboard-certificate-grid">
+
+            <div class="ca-dashboard-certificate-stat">
+                <span>Generated</span>
+                <strong data-coa="generated">—</strong>
+            </div>
+
+            <div class="ca-dashboard-certificate-stat">
+                <span>Pending approval</span>
+                <strong data-coa="pending">—</strong>
+            </div>
+
+            <div class="ca-dashboard-certificate-stat">
+                <span>Approved</span>
+                <strong data-coa="approved">—</strong>
+            </div>
+
+            <div class="ca-dashboard-certificate-stat">
+                <span>Verified</span>
+                <strong data-coa="verified">—</strong>
+            </div>
+
+        </div>
+
+    </section>
+    {% endif %}
+
+
+    <!-- ========================================================= -->
+    <!-- SLA / PERFORMANCE                                         -->
+    <!-- ========================================================= -->
+
+    {% if permissions.view_process %}
+    <section
+        class="ca-dashboard-section"
+        aria-labelledby="performance-title"
+    >
+
+        <div class="ca-dashboard-section__header">
+
+            <div>
+                <span class="ca-dashboard-section__eyebrow">
+                    PERFORMANCE
+                </span>
+
+                <h2
+                    id="performance-title"
+                    class="ca-dashboard-section__title"
+                >
+                    SLA and Turnaround
+                </h2>
+            </div>
+
+        </div>
+
+
+        <div class="ca-dashboard-performance-grid">
+
+            <article class="ca-dashboard-panel">
+
+                <header class="ca-dashboard-panel__header">
+
+                    <h3 class="ca-dashboard-panel__title">
+                        SLA Position
+                    </h3>
+
+                </header>
+
+                <div class="ca-dashboard-metric-list">
+
+                    <div class="ca-dashboard-metric">
+                        <span>Within SLA</span>
+                        <strong data-sla="within">—</strong>
+                    </div>
+
+                    <div class="ca-dashboard-metric">
+                        <span>Over SLA</span>
+                        <strong data-sla="overdue">—</strong>
+                    </div>
+
+                    <div class="ca-dashboard-metric">
+                        <span>Compliance</span>
+                        <strong data-sla="compliance">—</strong>
+                    </div>
+
+                </div>
+
+            </article>
+
+
+            <article class="ca-dashboard-panel">
+
+                <header class="ca-dashboard-panel__header">
+
+                    <h3 class="ca-dashboard-panel__title">
+                        Turnaround
+                    </h3>
+
+                </header>
+
+                <div class="ca-dashboard-metric-list">
+
+                    <div class="ca-dashboard-metric">
+                        <span>Average</span>
+                        <strong data-turnaround="average">—</strong>
+                    </div>
+
+                    <div class="ca-dashboard-metric">
+                        <span>Median</span>
+                        <strong data-turnaround="median">—</strong>
+                    </div>
+
+                    <div class="ca-dashboard-metric">
+                        <span>Longest</span>
+                        <strong data-turnaround="maximum">—</strong>
+                    </div>
+
+                </div>
+
+            </article>
+
+
+            <article class="ca-dashboard-panel">
+
+                <header class="ca-dashboard-panel__header">
+
+                    <h3 class="ca-dashboard-panel__title">
+                        Workflow Health
+                    </h3>
+
+                </header>
+
+                <div
+                    id="workflow-health"
+                    class="ca-dashboard-health"
+                ></div>
+
+            </article>
+
+        </div>
+
+    </section>
+    {% endif %}
+
+
+    <!-- ========================================================= -->
+    <!-- EXCEPTIONS                                                -->
+    <!-- ========================================================= -->
+
+    {% if permissions.view_process or permissions.qa_review or permissions.approve_chemical_batch or permissions.approve_chemical_coa %}
+    <section
+        class="ca-dashboard-section ca-dashboard-section--exceptions"
+        aria-labelledby="exceptions-title"
+    >
+
+        <div class="ca-dashboard-section__header">
+
+            <div>
+                <span class="ca-dashboard-section__eyebrow">
+                    ATTENTION
+                </span>
+
+                <h2
+                    id="exceptions-title"
+                    class="ca-dashboard-section__title"
+                >
+                    Exceptions Requiring Action
+                </h2>
+            </div>
+
+        </div>
+
+
+        <div
+            id="dashboard-exceptions"
+            class="ca-dashboard-exceptions"
+        ></div>
+
+    </section>
+    {% endif %}
+
+
+    <!-- ========================================================= -->
+    <!-- RECENT ACTIVITY                                           -->
+    <!-- ========================================================= -->
+
+    {% if permissions.view_process %}
+    <section
+        class="ca-dashboard-section ca-dashboard-section--activity"
+        aria-labelledby="activity-title"
+    >
+
+        <div class="ca-dashboard-section__header">
+
+            <div>
+                <span class="ca-dashboard-section__eyebrow">
+                    AUDIT TRAIL
+                </span>
+
+                <h2
+                    id="activity-title"
+                    class="ca-dashboard-section__title"
+                >
+                    Recent Workflow Activity
+                </h2>
+            </div>
+
+        </div>
+
+
+        <div
+            id="dashboard-activity"
+            class="ca-dashboard-activity"
+        ></div>
+
+    </section>
+    {% endif %}
+
+
+    <!-- ========================================================= -->
+    <!-- WORKFLOW TASKS                                            -->
+    <!-- ========================================================= -->
+
+    {% if permissions.view_process or permissions.record_result or permissions.qa_review or permissions.approve_chemical_batch %}
+    <section
+        class="ca-dashboard-section ca-dashboard-section--tasks"
+        aria-labelledby="tasks-title"
+    >
+
+        <div class="ca-dashboard-section__header">
+
+            <div>
+                <span class="ca-dashboard-section__eyebrow">
+                    WORK QUEUE
+                </span>
+
+                <h2
+                    id="tasks-title"
+                    class="ca-dashboard-section__title"
+                >
+                    Current Workflow Tasks
+                </h2>
+            </div>
+
+            {% if permissions.view_process %}
+                <a
+                    href="{% url 'ca:my-tasks' %}"
+                    class="ca-button ca-button--secondary ca-button--sm"
+                >
+                    My Tasks
+                </a>
+            {% endif %}
+
+        </div>
+
+
+        <div
+            id="dashboard-tasks"
+            class="ca-dashboard-tasks"
+        ></div>
+
+    </section>
+    {% endif %}
+
+
+    <!-- ========================================================= -->
+    <!-- EMPTY / ERROR STATES                                      -->
+    <!-- ========================================================= -->
+
+    <div
+        id="dashboard-empty"
+        class="ca-dashboard-empty"
+        hidden
+    >
+        <strong>
+            No dashboard data available.
+        </strong>
+
+        <span>
+            The dashboard could not retrieve the current workflow state.
+        </span>
     </div>
 
-    <div class="dashboard-commandbar__actions">
-        <a
-            href="{% url 'ca:my-tasks' %}"
-            class="ca-btn ca-btn--primary"
-        >
-            My Tasks
-        </a>
 
-        <a
-            href="{% url 'ca:batch-create' %}"
-            class="ca-btn ca-btn--secondary"
-        >
-            Receive Batch
-        </a>
+    <div
+        id="dashboard-error"
+        class="ca-dashboard-error"
+        role="alert"
+        hidden
+    >
+        <strong>
+            Dashboard update failed.
+        </strong>
 
-        <a
-            href="{% url 'ca:process-list' %}"
-            class="ca-btn ca-btn--secondary"
-        >
-            Processes
-        </a>
-
-        <a
-            href="{% url 'ca:result-list' %}"
-            class="ca-btn ca-btn--secondary"
-        >
-            Results
-        </a>
-
-        <a
-            href="{% url 'ca:coa-list' %}"
-            class="ca-btn ca-btn--secondary"
-        >
-            CoA
-        </a>
+        <span id="dashboard-error-message">
+            The current dashboard data could not be loaded.
+        </span>
 
         <button
             type="button"
-            class="ca-btn ca-btn--ghost"
-            data-dashboard-refresh
+            class="ca-button ca-button--secondary ca-button--sm"
+            data-action="refresh-dashboard"
         >
-            Refresh
+            Retry
         </button>
     </div>
-</section>
-
-<section class="dashboard-status-strip">
-    <div class="status-strip__item">
-        <span>System Status</span>
-        <strong class="status-positive">Operational</strong>
-    </div>
-
-    <div class="status-strip__item">
-        <span>Last Updated</span>
-        <strong>
-            {{ dashboard.generated_at|default:"Now" }}
-        </strong>
-    </div>
-
-    <div class="status-strip__item">
-        <span>Active Processes</span>
-        <strong>
-            {{ kpis.active_analyses|default:0 }}
-        </strong>
-    </div>
-
-    <div class="status-strip__item">
-        <span>Overdue</span>
-        <strong class="{% if sla.overdue %}status-critical{% else %}status-positive{% endif %}">
-            {{ sla.overdue|default:0 }}
-        </strong>
-    </div>
-
-    <div class="status-strip__item">
-        <span>Retest Queue</span>
-        <strong>
-            {{ kpis.retest_queue|default:0 }}
-        </strong>
-    </div>
-</section>
-
-<section class="dashboard-kpi-grid">
-
-    <a href="{% url 'ca:batch-list' %}" class="dashboard-kpi">
-        <div class="dashboard-kpi__label">Chemical Batches</div>
-        <div class="dashboard-kpi__value">
-            {{ kpis.total_batches|default:0 }}
-        </div>
-        <div class="dashboard-kpi__meta">
-            All received chemical batches
-        </div>
-    </a>
-
-    <a href="{% url 'ca:pending-analysis' %}" class="dashboard-kpi">
-        <div class="dashboard-kpi__label">Pending Analysis</div>
-        <div class="dashboard-kpi__value">
-            {{ kpis.pending_requests|default:0 }}
-        </div>
-        <div class="dashboard-kpi__meta">
-            Awaiting analytical work
-        </div>
-    </a>
-
-    <a href="{% url 'ca:pending-qa' %}" class="dashboard-kpi">
-        <div class="dashboard-kpi__label">QA Queue</div>
-        <div class="dashboard-kpi__value">
-            {{ kpis.qa_queue|default:0 }}
-        </div>
-        <div class="dashboard-kpi__meta">
-            Awaiting quality review
-        </div>
-    </a>
-
-    <a href="{% url 'ca:pending-approval' %}" class="dashboard-kpi">
-        <div class="dashboard-kpi__label">Approval Queue</div>
-        <div class="dashboard-kpi__value">
-            {{ kpis.approval_queue|default:0 }}
-        </div>
-        <div class="dashboard-kpi__meta">
-            Awaiting chemical approval
-        </div>
-    </a>
-
-    <a href="{% url 'ca:pending-coa-approval' %}" class="dashboard-kpi">
-        <div class="dashboard-kpi__label">CoA Queue</div>
-        <div class="dashboard-kpi__value">
-            {{ kpis.coa_count|default:0 }}
-        </div>
-        <div class="dashboard-kpi__meta">
-            Certification activity
-        </div>
-    </a>
-
-    <a href="{% url 'ca:overdue-analysis' %}" class="dashboard-kpi dashboard-kpi--critical">
-        <div class="dashboard-kpi__label">Overdue Analysis</div>
-        <div class="dashboard-kpi__value">
-            {{ sla.overdue|default:0 }}
-        </div>
-        <div class="dashboard-kpi__meta">
-            Requires immediate attention
-        </div>
-    </a>
-
-    <div class="dashboard-kpi">
-        <div class="dashboard-kpi__label">QA Pass Rate</div>
-        <div class="dashboard-kpi__value">
-            {{ kpis.pass_rate|default:0 }}%
-        </div>
-        <div class="dashboard-kpi__meta">
-            {{ kpis.pass_count|default:0 }} passed
-        </div>
-    </div>
-
-    <div class="dashboard-kpi">
-        <div class="dashboard-kpi__label">SLA Compliance</div>
-        <div class="dashboard-kpi__value">
-            {{ sla.sla_rate|default:0 }}%
-        </div>
-        <div class="dashboard-kpi__meta">
-            {{ sla.within_sla|default:0 }} within SLA
-        </div>
-    </div>
-
-</section>
-
-<section class="dashboard-section dashboard-workflow-command">
-
-    <div class="dashboard-section__header">
-        <div>
-            <span class="dashboard-eyebrow">WORKFLOW CONTROL</span>
-            <h2>Analysis Workflow</h2>
-            <p>
-                Every active chemical analysis process is controlled through
-                the Viewflow workflow and its associated permissions.
-            </p>
-        </div>
-
-        <div class="dashboard-section__actions">
-            <a
-                href="{% url 'ca:workflow' %}"
-                class="ca-btn ca-btn--secondary"
-            >
-                Workflow
-            </a>
-
-            <a
-                href="{% url 'ca:process-list' %}"
-                class="ca-btn ca-btn--secondary"
-            >
-                All Processes
-            </a>
-        </div>
-    </div>
-
-    <div class="workflow-pipeline">
-
-        <a
-            href="{% url 'ca:batch-list' %}?status=RECEIVED"
-            class="workflow-stage"
-            data-stage="receive"
-        >
-            <span class="workflow-stage__number">01</span>
-            <span class="workflow-stage__title">Receive Batch</span>
-            <span class="workflow-stage__description">
-                Receive and register chemical delivery.
-            </span>
-            <strong class="workflow-stage__count">
-                {{ workflow.receive|default:0 }}
-            </strong>
-        </a>
-
-        <a
-            href="{% url 'ca:request-list' %}?status=PENDING"
-            class="workflow-stage"
-            data-stage="request"
-        >
-            <span class="workflow-stage__number">02</span>
-            <span class="workflow-stage__title">Analysis Request</span>
-            <span class="workflow-stage__description">
-                Create the analytical request.
-            </span>
-            <strong class="workflow-stage__count">
-                {{ workflow.request|default:0 }}
-            </strong>
-        </a>
-
-        <a
-            href="{% url 'ca:pending-analysis' %}"
-            class="workflow-stage"
-            data-stage="assign"
-        >
-            <span class="workflow-stage__number">03</span>
-            <span class="workflow-stage__title">Assign Analyst</span>
-            <span class="workflow-stage__description">
-                Assign active plant analysts.
-            </span>
-            <strong class="workflow-stage__count">
-                {{ workflow.assign|default:0 }}
-            </strong>
-        </a>
-
-        <a
-            href="{% url 'ca:checklist-list' %}"
-            class="workflow-stage"
-            data-stage="checklist"
-        >
-            <span class="workflow-stage__number">04</span>
-            <span class="workflow-stage__title">Receiving Checklist</span>
-            <span class="workflow-stage__description">
-                Verify receipt and complete checklist.
-            </span>
-            <strong class="workflow-stage__count">
-                {{ workflow.checklist|default:0 }}
-            </strong>
-        </a>
-
-        <a
-            href="{% url 'ca:my-tasks' %}"
-            class="workflow-stage"
-            data-stage="sampling"
-        >
-            <span class="workflow-stage__number">05</span>
-            <span class="workflow-stage__title">Sampling Plan</span>
-            <span class="workflow-stage__description">
-                Generate systematic random sampling plan.
-            </span>
-            <strong class="workflow-stage__count">
-                {{ workflow.sampling|default:0 }}
-            </strong>
-        </a>
-
-        <a
-            href="{% url 'ca:my-tasks' %}"
-            class="workflow-stage"
-            data-stage="measurement"
-        >
-            <span class="workflow-stage__number">06</span>
-            <span class="workflow-stage__title">Sample Measurements</span>
-            <span class="workflow-stage__description">
-                Record selected package measurements.
-            </span>
-            <strong class="workflow-stage__count">
-                {{ workflow.measurements|default:0 }}
-            </strong>
-        </a>
-
-        <a
-            href="{% url 'ca:my-tasks' %}"
-            class="workflow-stage"
-            data-stage="counter-check"
-        >
-            <span class="workflow-stage__number">07</span>
-            <span class="workflow-stage__title">Counter-Check</span>
-            <span class="workflow-stage__description">
-                Independently verify sampling measurements.
-            </span>
-            <strong class="workflow-stage__count">
-                {{ workflow.counter_check|default:0 }}
-            </strong>
-        </a>
-
-        <a
-            href="{% url 'ca:my-tasks' %}"
-            class="workflow-stage"
-            data-stage="sampling-qa"
-        >
-            <span class="workflow-stage__number">08</span>
-            <span class="workflow-stage__title">Sampling QA</span>
-            <span class="workflow-stage__description">
-                Review weight deviation when QA approval is required.
-            </span>
-            <strong class="workflow-stage__count">
-                {{ workflow.sampling_qa|default:0 }}
-            </strong>
-        </a>
-
-        <a
-            href="{% url 'ca:pending-analysis' %}"
-            class="workflow-stage"
-            data-stage="start-analysis"
-        >
-            <span class="workflow-stage__number">09</span>
-            <span class="workflow-stage__title">Start Analysis</span>
-            <span class="workflow-stage__description">
-                Clear the sampled batch for chemical analysis.
-            </span>
-            <strong class="workflow-stage__count">
-                {{ workflow.start_analysis|default:0 }}
-            </strong>
-        </a>
-
-        <a
-            href="{% url 'ca:result-list' %}"
-            class="workflow-stage"
-            data-stage="results"
-        >
-            <span class="workflow-stage__number">10</span>
-            <span class="workflow-stage__title">Record Results</span>
-            <span class="workflow-stage__description">
-                Record the next required analytical parameter.
-            </span>
-            <strong class="workflow-stage__count">
-                {{ workflow.results|default:0 }}
-            </strong>
-        </a>
-
-        <a
-            href="{% url 'ca:analysis-input-detail' 0 %}"
-            class="workflow-stage"
-            data-stage="method-inputs"
-        >
-            <span class="workflow-stage__number">11</span>
-            <span class="workflow-stage__title">Method Inputs</span>
-            <span class="workflow-stage__description">
-                Capture analytical method inputs where required.
-            </span>
-            <strong class="workflow-stage__count">
-                {{ workflow.method_inputs|default:0 }}
-            </strong>
-        </a>
-
-        <a
-            href="{% url 'ca:my-tasks' %}"
-            class="workflow-stage"
-            data-stage="complete-analysis"
-        >
-            <span class="workflow-stage__number">12</span>
-            <span class="workflow-stage__title">Complete Analysis</span>
-            <span class="workflow-stage__description">
-                Finalize all required analytical parameters.
-            </span>
-            <strong class="workflow-stage__count">
-                {{ workflow.complete_analysis|default:0 }}
-            </strong>
-        </a>
-
-        <a
-            href="{% url 'ca:pending-qa' %}"
-            class="workflow-stage workflow-stage--quality"
-            data-stage="qa"
-        >
-            <span class="workflow-stage__number">13</span>
-            <span class="workflow-stage__title">QA Review</span>
-            <span class="workflow-stage__description">
-                Pass, request retest or reject.
-            </span>
-            <strong class="workflow-stage__count">
-                {{ workflow.qa|default:kpis.qa_queue|default:0 }}
-            </strong>
-        </a>
-
-        <a
-            href="{% url 'ca:my-tasks' %}"
-            class="workflow-stage workflow-stage--retest"
-            data-stage="retest"
-        >
-            <span class="workflow-stage__number">14</span>
-            <span class="workflow-stage__title">Retest</span>
-            <span class="workflow-stage__description">
-                Repeat the selected failed or questioned parameter.
-            </span>
-            <strong class="workflow-stage__count">
-                {{ workflow.retest|default:kpis.retest_queue|default:0 }}
-            </strong>
-        </a>
-
-        <a
-            href="{% url 'ca:pending-approval' %}"
-            class="workflow-stage workflow-stage--approval"
-            data-stage="approval"
-        >
-            <span class="workflow-stage__number">15</span>
-            <span class="workflow-stage__title">Chemical Approval</span>
-            <span class="workflow-stage__description">
-                Approve or reject the completed analysis.
-            </span>
-            <strong class="workflow-stage__count">
-                {{ workflow.approval|default:kpis.approval_queue|default:0 }}
-            </strong>
-        </a>
-
-        <a
-            href="{% url 'ca:pending-coa-approval' %}"
-            class="workflow-stage workflow-stage--coa"
-            data-stage="coa"
-        >
-            <span class="workflow-stage__number">16</span>
-            <span class="workflow-stage__title">Generate & Approve CoA</span>
-            <span class="workflow-stage__description">
-                Generate and approve the Certificate of Analysis.
-            </span>
-            <strong class="workflow-stage__count">
-                {{ workflow.coa|default:kpis.coa_count|default:0 }}
-            </strong>
-        </a>
-
-        <a
-            href="{% url 'ca:my-tasks' %}"
-            class="workflow-stage workflow-stage--disposition"
-            data-stage="disposition"
-        >
-            <span class="workflow-stage__number">17</span>
-            <span class="workflow-stage__title">Batch Disposition</span>
-            <span class="workflow-stage__description">
-                Select utilization or return to supplier.
-            </span>
-            <strong class="workflow-stage__count">
-                {{ workflow.disposition|default:0 }}
-            </strong>
-        </a>
-
-        <a
-            href="{% url 'ca:batch-list' %}?status=UTILIZED"
-            class="workflow-stage workflow-stage--complete"
-            data-stage="completed"
-        >
-            <span class="workflow-stage__number">18</span>
-            <span class="workflow-stage__title">Completed</span>
-            <span class="workflow-stage__description">
-                Finalized chemical workflow.
-            </span>
-            <strong class="workflow-stage__count">
-                {{ workflow.completed|default:0 }}
-            </strong>
-        </a>
-
-    </div>
-
-    <div class="workflow-decision-map">
-
-        <div class="workflow-decision">
-            <span class="workflow-decision__label">Sampling QA</span>
-            <strong>Required?</strong>
-            <span>Yes → Sampling QA Review</span>
-            <span>No → Start Analysis</span>
-        </div>
-
-        <div class="workflow-decision">
-            <span class="workflow-decision__label">Analytical Result</span>
-            <strong>Method Input?</strong>
-            <span>Yes → Record Method Inputs</span>
-            <span>No → Continue Analysis</span>
-        </div>
-
-        <div class="workflow-decision">
-            <span class="workflow-decision__label">QA Decision</span>
-            <strong>PASS / RETEST / REJECT</strong>
-            <span>PASS → Approval</span>
-            <span>RETEST → Retest → QA</span>
-            <span>REJECT → Rejected</span>
-        </div>
-
-        <div class="workflow-decision">
-            <span class="workflow-decision__label">Approval Decision</span>
-            <strong>APPROVE / REJECT</strong>
-            <span>APPROVE → CoA</span>
-            <span>REJECT → Rejected</span>
-        </div>
-
-        <div class="workflow-decision">
-            <span class="workflow-decision__label">Disposition</span>
-            <strong>UTILIZE / RETURN</strong>
-            <span>UTILIZE → Completed</span>
-            <span>RETURN → Completed</span>
-        </div>
-
-    </div>
-</section>
-
-<section class="dashboard-grid dashboard-grid--three">
-
-    <article class="dashboard-panel">
-        <div class="dashboard-panel__header">
-            <div>
-                <span class="dashboard-eyebrow">EXECUTION</span>
-                <h2>Active Analysis Queue</h2>
-            </div>
-
-            <a href="{% url 'ca:process-list' %}">
-                View all
-            </a>
-        </div>
-
-        <div class="dashboard-table-wrap">
-            <table class="dashboard-table">
-                <thead>
-                    <tr>
-                        <th>Process</th>
-                        <th>Chemical</th>
-                        <th>Stage</th>
-                        <th>Age</th>
-                        <th>Risk</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-                    {% for process in active_processes %}
-                        <tr>
-                            <td>
-                                <a href="{% url 'ca:process-detail' process.id %}">
-                                    #{{ process.id }}
-                                </a>
-                            </td>
-
-                            <td>
-                                {{ process.chemical|default:"—" }}
-                            </td>
-
-                            <td>
-                                <span class="ca-badge">
-                                    {{ process.status }}
-                                </span>
-                            </td>
-
-                            <td>
-                                {{ process.age_hours|default:0 }}h
-                            </td>
-
-                            <td>
-                                <span class="risk-indicator risk-indicator--{{ process.risk|lower|default:'normal' }}">
-                                    {{ process.risk|default:"Normal" }}
-                                </span>
-                            </td>
-                        </tr>
-                    {% empty %}
-                        <tr>
-                            <td colspan="5">
-                                No active chemical analysis processes.
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </article>
-
-    <article class="dashboard-panel">
-        <div class="dashboard-panel__header">
-            <div>
-                <span class="dashboard-eyebrow">QUALITY</span>
-                <h2>QA Control</h2>
-            </div>
-
-            <a href="{% url 'ca:pending-qa' %}">
-                Open queue
-            </a>
-        </div>
-
-        <div class="control-metrics">
-
-            <div class="control-metric">
-                <span>Pending QA</span>
-                <strong>{{ kpis.qa_queue|default:0 }}</strong>
-            </div>
-
-            <div class="control-metric">
-                <span>Pass Rate</span>
-                <strong>{{ kpis.pass_rate|default:0 }}%</strong>
-            </div>
-
-            <div class="control-metric">
-                <span>Retests</span>
-                <strong>{{ kpis.retest_queue|default:0 }}</strong>
-            </div>
-
-            <div class="control-metric">
-                <span>Rejected</span>
-                <strong>{{ kpis.rejected|default:0 }}</strong>
-            </div>
-
-        </div>
-
-        <div class="dashboard-list">
-            {% for item in qa_queue %}
-                <a
-                    href="{% url 'ca:process-detail' item.id %}"
-                    class="dashboard-list__item"
-                >
-                    <span>
-                        Process #{{ item.id }}
-                    </span>
-
-                    <strong>
-                        {{ item.status }}
-                    </strong>
-
-                    <small>
-                        {{ item.age_hours|default:0 }}h
-                    </small>
-                </a>
-            {% empty %}
-                <div class="dashboard-empty">
-                    No QA items currently awaiting review.
-                </div>
-            {% endfor %}
-        </div>
-    </article>
-
-    <article class="dashboard-panel">
-        <div class="dashboard-panel__header">
-            <div>
-                <span class="dashboard-eyebrow">CERTIFICATION</span>
-                <h2>Approval & CoA</h2>
-            </div>
-
-            <a href="{% url 'ca:coa-list' %}">
-                Open CoA
-            </a>
-        </div>
-
-        <div class="control-metrics">
-
-            <div class="control-metric">
-                <span>Approval Queue</span>
-                <strong>{{ kpis.approval_queue|default:0 }}</strong>
-            </div>
-
-            <div class="control-metric">
-                <span>CoA Queue</span>
-                <strong>{{ kpis.coa_count|default:0 }}</strong>
-            </div>
-
-            <div class="control-metric">
-                <span>Certificates</span>
-                <strong>{{ kpis.coa_count|default:0 }}</strong>
-            </div>
-
-        </div>
-
-        <div class="dashboard-action-stack">
-
-            <a
-                href="{% url 'ca:pending-approval' %}"
-                class="dashboard-action"
-            >
-                <span>Chemical Approval</span>
-                <strong>
-                    {{ kpis.approval_queue|default:0 }}
-                </strong>
-            </a>
-
-            <a
-                href="{% url 'ca:pending-coa-approval' %}"
-                class="dashboard-action"
-            >
-                <span>CoA Approval</span>
-                <strong>
-                    {{ kpis.coa_count|default:0 }}
-                </strong>
-            </a>
-
-            <a
-                href="{% url 'ca:coa-list' %}"
-                class="dashboard-action"
-            >
-                <span>Certificate Register</span>
-                <strong>→</strong>
-            </a>
-
-        </div>
-    </article>
-
-</section>
-
-<section class="dashboard-grid dashboard-grid--two">
-
-    <article class="dashboard-panel dashboard-panel--wide">
-        <div class="dashboard-panel__header">
-            <div>
-                <span class="dashboard-eyebrow">SLA INTELLIGENCE</span>
-                <h2>Turnaround Performance</h2>
-            </div>
-
-            <a href="{% url 'ca:overdue-analysis' %}">
-                Overdue analysis
-            </a>
-        </div>
-
-        <div class="performance-grid">
-
-            <div class="performance-card">
-                <span>Average</span>
-                <strong>
-                    {{ turnaround.average_hours|default:0 }}h
-                </strong>
-            </div>
-
-            <div class="performance-card">
-                <span>Median</span>
-                <strong>
-                    {{ turnaround.median_hours|default:0 }}h
-                </strong>
-            </div>
-
-            <div class="performance-card">
-                <span>P90</span>
-                <strong>
-                    {{ turnaround.p90_hours|default:0 }}h
-                </strong>
-            </div>
-
-            <div class="performance-card">
-                <span>Maximum</span>
-                <strong>
-                    {{ turnaround.max_hours|default:0 }}h
-                </strong>
-            </div>
-
-            <div class="performance-card performance-card--critical">
-                <span>Overdue</span>
-                <strong>
-                    {{ sla.overdue|default:0 }}
-                </strong>
-            </div>
-
-        </div>
-
-        <div class="sla-bar">
-            <div
-                class="sla-bar__fill"
-                style="--progress: {{ sla.sla_rate|default:0 }}%;"
-            ></div>
-        </div>
-
-        <div class="sla-summary">
-            <span>
-                {{ sla.within_sla|default:0 }} within SLA
-            </span>
-
-            <strong>
-                {{ sla.sla_rate|default:0 }}%
-            </strong>
-
-            <span>
-                {{ sla.overdue|default:0 }} overdue
-            </span>
-        </div>
-    </article>
-
-    <article class="dashboard-panel">
-        <div class="dashboard-panel__header">
-            <div>
-                <span class="dashboard-eyebrow">AGING</span>
-                <h2>Process Aging</h2>
-            </div>
-
-            <a href="{% url 'ca:overdue-analysis' %}">
-                View overdue
-            </a>
-        </div>
-
-        <div class="dashboard-list">
-            {% for item in aging %}
-                <a
-                    href="{% url 'ca:process-detail' item.id %}"
-                    class="dashboard-list__item"
-                >
-                    <span>
-                        #{{ item.id }}
-                    </span>
-
-                    <strong>
-                        {{ item.status }}
-                    </strong>
-
-                    <small>
-                        {{ item.age_days|default:0 }}d
-                    </small>
-                </a>
-            {% empty %}
-                <div class="dashboard-empty">
-                    No aging exceptions detected.
-                </div>
-            {% endfor %}
-        </div>
-    </article>
-
-</section>
-
-<section class="dashboard-section">
-
-    <div class="dashboard-section__header">
-        <div>
-            <span class="dashboard-eyebrow">OPERATIONAL INTELLIGENCE</span>
-            <h2>Plant Performance</h2>
-        </div>
-
-        <a
-            href="{% url 'ca:process-statistics' 0 %}"
-            class="ca-btn ca-btn--secondary"
-        >
-            Statistics
-        </a>
-    </div>
-
-    <div class="dashboard-table-wrap">
-        <table class="dashboard-table dashboard-table--performance">
-            <thead>
-                <tr>
-                    <th>Treatment Plant</th>
-                    <th>Total</th>
-                    <th>Active</th>
-                    <th>Completed</th>
-                    <th>Rejected</th>
-                    <th>Completion</th>
-                    <th>Rejection</th>
-                </tr>
-            </thead>
-
-            <tbody>
-                {% for row in plant_summary %}
-                    <tr>
-                        <td>
-                            <strong>{{ row.plant }}</strong>
-                        </td>
-
-                        <td>{{ row.total|default:0 }}</td>
-                        <td>{{ row.active|default:0 }}</td>
-                        <td>{{ row.completed|default:0 }}</td>
-                        <td>{{ row.rejected|default:0 }}</td>
-
-                        <td>
-                            <div class="table-progress">
-                                <span
-                                    style="--progress: {{ row.completion_rate|default:0 }}%;"
-                                ></span>
-                                <strong>
-                                    {{ row.completion_rate|default:0 }}%
-                                </strong>
-                            </div>
-                        </td>
-
-                        <td>
-                            {{ row.rejection_rate|default:0 }}%
-                        </td>
-                    </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="7">
-                            No plant performance data available.
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-
-</section>
-
-<section class="dashboard-grid dashboard-grid--three">
-
-    <article class="dashboard-panel">
-        <div class="dashboard-panel__header">
-            <div>
-                <span class="dashboard-eyebrow">SUPPLIERS</span>
-                <h2>Supplier Quality</h2>
-            </div>
-
-            <a href="{% url 'ca:batch-list' %}">
-                Batches
-            </a>
-        </div>
-
-        <div class="dashboard-list">
-            {% for supplier in supplier_performance %}
-                <div class="dashboard-list__item">
-                    <span>
-                        {{ supplier.supplier }}
-                    </span>
-
-                    <strong>
-                        {{ supplier.acceptance_rate|default:0 }}%
-                    </strong>
-
-                    <small>
-                        {{ supplier.total|default:0 }} batches
-                    </small>
-                </div>
-            {% empty %}
-                <div class="dashboard-empty">
-                    No supplier performance data available.
-                </div>
-            {% endfor %}
-        </div>
-    </article>
-
-    <article class="dashboard-panel">
-        <div class="dashboard-panel__header">
-            <div>
-                <span class="dashboard-eyebrow">ANALYSTS</span>
-                <h2>Analyst Performance</h2>
-            </div>
-
-            <a href="{% url 'ca:my-tasks' %}">
-                Tasks
-            </a>
-        </div>
-
-        <div class="dashboard-list">
-            {% for analyst in analyst_performance %}
-                <div class="dashboard-list__item">
-                    <span>
-                        {{ analyst.analyst }}
-                    </span>
-
-                    <strong>
-                        {{ analyst.completed|default:0 }}
-                    </strong>
-
-                    <small>
-                        {{ analyst.retest|default:0 }} retests
-                    </small>
-                </div>
-            {% empty %}
-                <div class="dashboard-empty">
-                    No analyst performance data available.
-                </div>
-            {% endfor %}
-        </div>
-    </article>
-
-    <article class="dashboard-panel">
-        <div class="dashboard-panel__header">
-            <div>
-                <span class="dashboard-eyebrow">CHEMICALS</span>
-                <h2>Chemical Quality</h2>
-            </div>
-
-            <a href="{% url 'ca:specification-list' %}">
-                Specifications
-            </a>
-        </div>
-
-        <div class="dashboard-list">
-            {% for chemical in chemical_performance %}
-                <div class="dashboard-list__item">
-                    <span>
-                        {{ chemical.chemical }}
-                    </span>
-
-                    <strong>
-                        {{ chemical.quality_rate|default:0 }}%
-                    </strong>
-
-                    <small>
-                        {{ chemical.total|default:0 }} batches
-                    </small>
-                </div>
-            {% empty %}
-                <div class="dashboard-empty">
-                    No chemical quality data available.
-                </div>
-            {% endfor %}
-        </div>
-    </article>
-
-</section>
-
-<section class="dashboard-grid dashboard-grid--two">
-
-    <article class="dashboard-panel">
-        <div class="dashboard-panel__header">
-            <div>
-                <span class="dashboard-eyebrow">EXCEPTIONS</span>
-                <h2>Risk Register</h2>
-            </div>
-
-            <a href="{% url 'ca:overdue-analysis' %}">
-                Investigate
-            </a>
-        </div>
-
-        <div class="dashboard-table-wrap">
-            <table class="dashboard-table">
-                <thead>
-                    <tr>
-                        <th>Process</th>
-                        <th>Status</th>
-                        <th>Age</th>
-                        <th>Retests</th>
-                        <th>Risk</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-                    {% for item in risk_register %}
-                        <tr>
-                            <td>
-                                <a href="{% url 'ca:process-detail' item.id %}">
-                                    #{{ item.id }}
-                                </a>
-                            </td>
-
-                            <td>{{ item.status }}</td>
-                            <td>{{ item.age_hours|default:0 }}h</td>
-                            <td>{{ item.rework_count|default:0 }}</td>
-
-                            <td>
-                                <span class="risk-indicator risk-indicator--{{ item.risk|lower|default:'normal' }}">
-                                    {{ item.risk|default:"Normal" }}
-                                </span>
-                            </td>
-                        </tr>
-                    {% empty %}
-                        <tr>
-                            <td colspan="5">
-                                No workflow exceptions detected.
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </article>
-
-    <article class="dashboard-panel">
-        <div class="dashboard-panel__header">
-            <div>
-                <span class="dashboard-eyebrow">RECENT ACTIVITY</span>
-                <h2>Workflow Activity</h2>
-            </div>
-
-            <a href="{% url 'ca:process-list' %}">
-                Processes
-            </a>
-        </div>
-
-        <div class="dashboard-activity">
-
-            {% for event in recent_activity %}
-                <div class="dashboard-activity__item">
-
-                    <div class="dashboard-activity__time">
-                        {{ event.date|default:"—" }}
-                    </div>
-
-                    <div class="dashboard-activity__body">
-                        <strong>
-                            {{ event.type|default:"Workflow Event" }}
-                        </strong>
-
-                        <span>
-                            {{ event.description|default:event.status|default:"Process activity" }}
-                        </span>
-                    </div>
-
-                </div>
-            {% empty %}
-                <div class="dashboard-empty">
-                    No recent workflow activity.
-                </div>
-            {% endfor %}
-
-        </div>
-    </article>
-
-</section>
-
-<section class="dashboard-section">
-
-    <div class="dashboard-section__header">
-        <div>
-            <span class="dashboard-eyebrow">COMMAND ACCESS</span>
-            <h2>Workflow & Operations</h2>
-        </div>
-    </div>
-
-    <div class="dashboard-command-grid">
-
-        <a
-            href="{% url 'ca:batch-list' %}"
-            class="dashboard-command-card"
-        >
-            <span>Batch Register</span>
-            <strong>→</strong>
-            <small>Receive, inspect, edit and transition chemical batches.</small>
-        </a>
-
-        <a
-            href="{% url 'ca:request-list' %}"
-            class="dashboard-command-card"
-        >
-            <span>Analysis Requests</span>
-            <strong>→</strong>
-            <small>Monitor requests and request-state transitions.</small>
-        </a>
-
-        <a
-            href="{% url 'ca:process-list' %}"
-            class="dashboard-command-card"
-        >
-            <span>Process Control</span>
-            <strong>→</strong>
-            <small>Inspect active workflow processes and operational state.</small>
-        </a>
-
-        <a
-            href="{% url 'ca:my-tasks' %}"
-            class="dashboard-command-card"
-        >
-            <span>My Workflow Tasks</span>
-            <strong>→</strong>
-            <small>Execute the Viewflow tasks assigned to you.</small>
-        </a>
-
-        <a
-            href="{% url 'ca:result-list' %}"
-            class="dashboard-command-card"
-        >
-            <span>Analytical Results</span>
-            <strong>→</strong>
-            <small>Review chemical analytical results and filtering.</small>
-        </a>
-
-        <a
-            href="{% url 'ca:checklist-list' %}"
-            class="dashboard-command-card"
-        >
-            <span>Receiving Checklists</span>
-            <strong>→</strong>
-            <small>Monitor receiving verification and completion.</small>
-        </a>
-
-        <a
-            href="{% url 'ca:specification-list' %}"
-            class="dashboard-command-card"
-        >
-            <span>Chemical Specifications</span>
-            <strong>→</strong>
-            <small>Manage plant-specific analytical specifications.</small>
-        </a>
-
-        <a
-            href="{% url 'ca:coa-list' %}"
-            class="dashboard-command-card"
-        >
-            <span>Certificates of Analysis</span>
-            <strong>→</strong>
-            <small>Generate, verify, approve and download CoAs.</small>
-        </a>
-
-        <a
-            href="{% url 'ca:workflow' %}"
-            class="dashboard-command-card"
-        >
-            <span>Workflow Console</span>
-            <strong>→</strong>
-            <small>Open the Viewflow workflow task interface.</small>
-        </a>
-
-    </div>
-
-</section>
-
-<section class="dashboard-section dashboard-section--compact">
-
-    <div class="dashboard-section__header">
-        <div>
-            <span class="dashboard-eyebrow">QUALITY CONTROL</span>
-            <h2>Immediate Actions</h2>
-        </div>
-    </div>
-
-    <div class="dashboard-action-grid">
-
-        <a
-            href="{% url 'ca:pending-analysis' %}"
-            class="dashboard-action-card"
-        >
-            <span>Pending Analysis</span>
-            <strong>{{ kpis.pending_requests|default:0 }}</strong>
-        </a>
-
-        <a
-            href="{% url 'ca:pending-qa' %}"
-            class="dashboard-action-card"
-        >
-            <span>Pending QA</span>
-            <strong>{{ kpis.qa_queue|default:0 }}</strong>
-        </a>
-
-        <a
-            href="{% url 'ca:pending-approval' %}"
-            class="dashboard-action-card"
-        >
-            <span>Pending Approval</span>
-            <strong>{{ kpis.approval_queue|default:0 }}</strong>
-        </a>
-
-        <a
-            href="{% url 'ca:pending-coa-approval' %}"
-            class="dashboard-action-card"
-        >
-            <span>Pending CoA</span>
-            <strong>{{ kpis.coa_count|default:0 }}</strong>
-        </a>
-
-        <a
-            href="{% url 'ca:overdue-analysis' %}"
-            class="dashboard-action-card dashboard-action-card--critical"
-        >
-            <span>Overdue</span>
-            <strong>{{ sla.overdue|default:0 }}</strong>
-        </a>
-
-        <a
-            href="{% url 'ca:my-tasks' %}"
-            class="dashboard-action-card dashboard-action-card--primary"
-        >
-            <span>My Tasks</span>
-            <strong>→</strong>
-        </a>
-
-    </div>
-
-</section>
-
-<section class="dashboard-footer-summary">
-
-    <div>
-        <span>Workflow integrity</span>
-        <strong>Viewflow controlled</strong>
-    </div>
-
-    <div>
-        <span>Authorization</span>
-        <strong>Django permissions</strong>
-    </div>
-
-    <div>
-        <span>Plant scope</span>
-        <strong>
-            {% if plant_context.is_superuser %}
-                All plants
-            {% elif treatment_plant %}
-                {{ treatment_plant.name }}
-            {% else %}
-                Assigned plant
-            {% endif %}
-        </strong>
-    </div>
-
-    <div>
-        <span>Quality path</span>
-        <strong>PASS / RETEST / REJECT</strong>
-    </div>
-
-</section>
 
 </div>
 
 {% endblock %}
 
-{% block page_js %}
 
-<script src="{% static 'ca/js/pages/dashboard.js' %}" defer></script>
+{% block extra_js %}
+
+<script>
+(() => {
+    "use strict";
+
+    const root =
+        document.getElementById(
+            "chemical-analysis-dashboard"
+        );
+
+    if (!root) {
+        return;
+    }
+
+    const state = {
+        payload: null,
+        loading: false,
+        controller: null,
+        timer: null
+    };
+
+
+    /* ========================================================= */
+    /* GENERAL HELPERS                                           */
+    /* ========================================================= */
+
+    const number = (
+        value,
+        fallback = 0
+    ) => {
+
+        if (
+            value === null ||
+            value === undefined ||
+            value === ""
+        ) {
+            return fallback;
+        }
+
+        const parsed =
+            Number(value);
+
+        return Number.isFinite(parsed)
+            ? parsed
+            : fallback;
+    };
+
+
+    const formatNumber = (
+        value
+    ) => {
+
+        return number(value)
+            .toLocaleString();
+    };
+
+
+    const escapeHtml = (
+        value
+    ) => {
+
+        return String(
+            value ?? ""
+        )
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
+    };
+
+
+    const firstValue = (
+        object,
+        paths,
+        fallback = null
+    ) => {
+
+        if (
+            !object ||
+            typeof object !== "object"
+        ) {
+            return fallback;
+        }
+
+        for (
+            const path of paths
+        ) {
+
+            const parts =
+                String(path).split(".");
+
+            let current =
+                object;
+
+            let found = true;
+
+            for (
+                const part of parts
+            ) {
+
+                if (
+                    current === null ||
+                    current === undefined ||
+                    !Object.prototype.hasOwnProperty.call(
+                        current,
+                        part
+                    )
+                ) {
+
+                    found = false;
+                    break;
+
+                }
+
+                current =
+                    current[part];
+
+            }
+
+            if (found && current !== undefined) {
+                return current;
+            }
+
+        }
+
+        return fallback;
+    };
+
+
+    const normalizePayload = (
+        raw
+    ) => {
+
+        if (
+            raw &&
+            typeof raw === "object" &&
+            raw.data &&
+            typeof raw.data === "object"
+        ) {
+            return raw.data;
+        }
+
+        return raw || {};
+    };
+
+
+    const collection = (
+        value
+    ) => {
+
+        if (Array.isArray(value)) {
+            return value;
+        }
+
+        if (
+            value &&
+            typeof value === "object"
+        ) {
+
+            return (
+                value.items ||
+                value.results ||
+                value.data ||
+                []
+            );
+
+        }
+
+        return [];
+    };
+
+
+    const setText = (
+        selector,
+        value
+    ) => {
+
+        const element =
+            document.querySelector(
+                selector
+            );
+
+        if (element) {
+            element.textContent =
+                value;
+        }
+    };
+
+
+    const getDashboardUrl = () => {
+
+        return (
+            window.CA?.config?.urls?.dashboard ||
+            root.dataset.refreshUrl ||
+            window.location.href
+        );
+
+    };
+
+
+    const formatDate = (
+        value
+    ) => {
+
+        if (!value) {
+            return "";
+        }
+
+        const date =
+            new Date(value);
+
+        if (
+            Number.isNaN(
+                date.getTime()
+            )
+        ) {
+            return String(value);
+        }
+
+        return date.toLocaleString(
+            undefined,
+            {
+                dateStyle: "short",
+                timeStyle: "short"
+            }
+        );
+
+    };
+
+
+    const formatDuration = (
+        value
+    ) => {
+
+        if (
+            value === null ||
+            value === undefined ||
+            value === ""
+        ) {
+            return "—";
+        }
+
+        if (
+            typeof value === "string" &&
+            !/^\d+(\.\d+)?$/.test(
+                value
+            )
+        ) {
+            return value;
+        }
+
+        const minutes =
+            number(value);
+
+        if (
+            minutes < 60
+        ) {
+            return `${Math.round(minutes)}m`;
+        }
+
+        const hours =
+            minutes / 60;
+
+        if (
+            hours < 24
+        ) {
+            return `${hours.toFixed(1)}h`;
+        }
+
+        return `${(
+            hours / 24
+        ).toFixed(1)}d`;
+
+    };
+
+
+    /* ========================================================= */
+    /* DASHBOARD STATE                                           */
+    /* ========================================================= */
+
+    const setLiveState = (
+        stateName,
+        label
+    ) => {
+
+        const element =
+            document.getElementById(
+                "dashboard-live-state"
+            );
+
+        if (!element) {
+            return;
+        }
+
+        element.dataset.state =
+            stateName;
+
+        const labelElement =
+            document.getElementById(
+                "dashboard-live-label"
+            );
+
+        if (labelElement) {
+            labelElement.textContent =
+                label;
+        }
+
+    };
+
+
+    const setLastUpdated = (
+        value
+    ) => {
+
+        const element =
+            document.getElementById(
+                "dashboard-last-updated"
+            );
+
+        if (!element) {
+            return;
+        }
+
+        element.textContent =
+            value
+                ? `Updated ${formatDate(value)}`
+                : "";
+
+    };
+
+
+    /* ========================================================= */
+    /* KPIs                                                       */
+    /* ========================================================= */
+
+    const renderKpis = (
+        data
+    ) => {
+
+        const kpis =
+            data.kpis ||
+            {};
+
+        const sla =
+            data.sla ||
+            data.sla_metrics ||
+            {};
+
+        const quality =
+            data.quality_metrics ||
+            data.quality ||
+            {};
+
+        const active =
+            firstValue(
+                data,
+                [
+                    "kpis.active",
+                    "kpis.active_workflows",
+                    "kpis.active_processes",
+                    "totals.active",
+                    "active_processes.total"
+                ],
+                null
+            );
+
+        const analysis =
+            firstValue(
+                data,
+                [
+                    "kpis.pending_analysis",
+                    "queues.pending_analysis",
+                    "queues.analysis",
+                    "pending_analysis",
+                    "workflow.queues.pending_analysis"
+                ],
+                null
+            );
+
+        const approval =
+            firstValue(
+                data,
+                [
+                    "kpis.pending_approval",
+                    "queues.pending_approval",
+                    "queues.approval",
+                    "pending_approval",
+                    "workflow.queues.pending_approval"
+                ],
+                null
+            );
+
+        const qa =
+            firstValue(
+                data,
+                [
+                    "kpis.qa",
+                    "kpis.qa_required",
+                    "kpis.retest",
+                    "quality_metrics.qa_required",
+                    "quality.qa_required",
+                    "queues.qa"
+                ],
+                null
+            );
+
+        const overdue =
+            firstValue(
+                data,
+                [
+                    "kpis.overdue",
+                    "sla.overdue",
+                    "sla.over_9h",
+                    "sla_metrics.overdue",
+                    "overdue_analysis"
+                ],
+                null
+            );
+
+        const completed =
+            firstValue(
+                data,
+                [
+                    "kpis.completed",
+                    "completed_count",
+                    "totals.completed",
+                    "process_counts.COMPLETED",
+                    "status_counts.COMPLETED"
+                ],
+                null
+            );
+
+        setText(
+            "#kpi-active",
+            formatNumber(
+                active ?? 0
+            )
+        );
+
+        setText(
+            "#kpi-analysis",
+            formatNumber(
+                analysis ?? 0
+            )
+        );
+
+        setText(
+            "#kpi-approval",
+            formatNumber(
+                approval ?? 0
+            )
+        );
+
+        setText(
+            "#kpi-qa",
+            formatNumber(
+                qa ?? 0
+            )
+        );
+
+        setText(
+            "#kpi-overdue",
+            formatNumber(
+                overdue ?? 0
+            )
+        );
+
+        setText(
+            "#kpi-completed",
+            formatNumber(
+                completed ?? 0
+            )
+        );
+
+        setText(
+            "#kpi-active-detail",
+            `${formatNumber(active ?? 0)} active workflow(s)`
+        );
+
+        setText(
+            "#kpi-analysis-detail",
+            `${formatNumber(analysis ?? 0)} awaiting analysis`
+        );
+
+        setText(
+            "#kpi-approval-detail",
+            `${formatNumber(approval ?? 0)} awaiting approval`
+        );
+
+        setText(
+            "#kpi-qa-detail",
+            `${formatNumber(qa ?? 0)} QA / retest item(s)`
+        );
+
+        setText(
+            "#kpi-overdue-detail",
+            `${formatNumber(overdue ?? 0)} beyond SLA`
+        );
+
+        setText(
+            "#kpi-completed-detail",
+            `${formatNumber(completed ?? 0)} completed`
+        );
+
+    };
+
+
+    /* ========================================================= */
+    /* WORKFLOW                                                   */
+    /* ========================================================= */
+
+    const getWorkflowCount = (
+        data,
+        stage
+    ) => {
+
+        const workflow =
+            data.workflow ||
+            {};
+
+        const counts =
+            workflow.stage_counts ||
+            workflow.counts ||
+            workflow.stages ||
+            {};
+
+        const aliases = {
+
+            receive: [
+                "receive",
+                "received",
+                "RECEIVED",
+                "receive_count",
+                "received_count",
+                "created",
+                "created_count"
+            ],
+
+            request: [
+                "request",
+                "requested",
+                "REQUESTED",
+                "request_count",
+                "requested_count"
+            ],
+
+            checklist: [
+                "checklist",
+                "CHECKLIST",
+                "checklist_count"
+            ],
+
+            assignment: [
+                "assignment",
+                "assigned",
+                "ASSIGNED",
+                "assignment_count",
+                "assigned_count"
+            ],
+
+            sampling: [
+                "sampling",
+                "SYSTEMATIC_RANDOM_SAMPLING",
+                "sampling_count"
+            ],
+
+            analysis: [
+                "analysis",
+                "ANALYSIS",
+                "analysis_count",
+                "active_analysis"
+            ],
+
+            qa: [
+                "qa",
+                "RETEST",
+                "retest",
+                "QA",
+                "qa_required"
+            ],
+
+            approval: [
+                "approval",
+                "APPROVED",
+                "pending_approval",
+                "approval_count"
+            ],
+
+            coa: [
+                "coa",
+                "certificate",
+                "certificates",
+                "coa_count"
+            ],
+
+            disposition: [
+                "disposition",
+                "utilization",
+                "UTILIZED",
+                "RETURNED",
+                "utilized",
+                "returned"
+            ],
+
+            completed: [
+                "completed",
+                "COMPLETED",
+                "completed_count"
+            ]
+
+        };
+
+        const paths = [
+            `workflow.stage_counts.${stage}`,
+            `workflow.counts.${stage}`,
+            `workflow.stages.${stage}`,
+            `workflow.${stage}`,
+            `workflow_stage_health.${stage}`,
+            `workflow_nodes.${stage}.count`,
+            `process_counts.${stage}`,
+            `status_counts.${stage.toUpperCase()}`,
+            `status_counts.${stage}`
+        ];
+
+        for (
+            const alias of (
+                aliases[stage] ||
+                []
+            )
+        ) {
+
+            paths.push(
+                `workflow.stage_counts.${alias}`,
+                `workflow.counts.${alias}`,
+                `workflow.stages.${alias}`,
+                `process_counts.${alias}`,
+                `status_counts.${alias}`
+            );
+
+        }
+
+        return firstValue(
+            data,
+            paths,
+            counts[stage] ?? 0
+        );
+
+    };
+
+
+    const renderWorkflow = (
+        data
+    ) => {
+
+        document
+            .querySelectorAll(
+                "[data-workflow-count]"
+            )
+            .forEach(
+                element => {
+
+                    const stage =
+                        element.dataset.workflowCount;
+
+                    element.textContent =
+                        formatNumber(
+                            getWorkflowCount(
+                                data,
+                                stage
+                            )
+                        );
+
+                }
+            );
+
+
+        document
+            .querySelectorAll(
+                "[data-workflow-branch]"
+            )
+            .forEach(
+                element => {
+
+                    const branch =
+                        element.dataset.workflowBranch;
+
+                    const value =
+                        firstValue(
+                            data,
+                            [
+                                `workflow.branches.${branch}`,
+                                `workflow.branch_counts.${branch}`,
+                                `workflow.${branch}`,
+                                `workflow_nodes.${branch}.count`,
+                                `status_counts.${branch.toUpperCase()}`
+                            ],
+                            0
+                        );
+
+                    element.textContent =
+                        formatNumber(
+                            value
+                        );
+
+                }
+            );
+
+    };
+
+
+    /* ========================================================= */
+    /* QUEUES                                                     */
+    /* ========================================================= */
+
+    const renderQueue = (
+        selector,
+        items,
+        emptyText
+    ) => {
+
+        const container =
+            document.querySelector(
+                selector
+            );
+
+        if (!container) {
+            return;
+        }
+
+        const records =
+            collection(items)
+                .slice(0, 5);
+
+        if (!records.length) {
+
+            container.innerHTML = `
+                <div class="ca-dashboard-empty-row">
+                    ${escapeHtml(emptyText)}
+                </div>
+            `;
+
+            return;
+        }
+
+        container.innerHTML =
+            records.map(
+                item => {
+
+                    const title =
+                        item.title ||
+                        item.name ||
+                        item.batch_number ||
+                        item.sample_id ||
+                        item.reference ||
+                        item.id ||
+                        "Workflow item";
+
+                    const meta =
+                        item.meta ||
+                        item.status_label ||
+                        item.status ||
+                        item.analyst ||
+                        item.assigned_to ||
+                        "";
+
+                    const value =
+                        item.age ||
+                        item.age_display ||
+                        item.deadline_display ||
+                        item.priority ||
+                        "";
+
+                    return `
+                        <div class="ca-dashboard-queue-item">
+
+                            <div class="ca-dashboard-queue-item__primary">
+
+                                <span class="ca-dashboard-queue-item__title">
+                                    ${escapeHtml(title)}
+                                </span>
+
+                                <span class="ca-dashboard-queue-item__meta">
+                                    ${escapeHtml(meta)}
+                                </span>
+
+                            </div>
+
+                            <span class="ca-dashboard-queue-item__value">
+                                ${escapeHtml(value)}
+                            </span>
+
+                        </div>
+                    `;
+
+                }
+            )
+            .join("");
+
+    };
+
+
+    const renderQueues = (
+        data
+    ) => {
+
+        const queues =
+            data.queues ||
+            data.workflow?.queues ||
+            data.workflow_queues ||
+            {};
+
+        const analysis =
+            firstValue(
+                data,
+                [
+                    "sampling_queue",
+                    "queues.pending_analysis",
+                    "queues.analysis",
+                    "workflow.queues.pending_analysis"
+                ],
+                queues.pending_analysis ||
+                queues.analysis ||
+                []
+            );
+
+        const approval =
+            firstValue(
+                data,
+                [
+                    "queues.pending_approval",
+                    "queues.approval",
+                    "workflow.queues.pending_approval"
+                ],
+                queues.pending_approval ||
+                queues.approval ||
+                []
+            );
+
+        const qa =
+            firstValue(
+                data,
+                [
+                    "sampling_queue",
+                    "queues.qa",
+                    "qa_queue",
+                    "workflow.queues.qa"
+                ],
+                queues.qa ||
+                []
+            );
+
+        const overdue =
+            firstValue(
+                data,
+                [
+                    "aging_list",
+                    "aging",
+                    "sla.aging",
+                    "queues.overdue",
+                    "workflow.queues.overdue"
+                ],
+                []
+            );
+
+        renderQueue(
+            "#queue-analysis",
+            analysis,
+            "No pending analysis items."
+        );
+
+        renderQueue(
+            "#queue-approval",
+            approval,
+            "No pending approval items."
+        );
+
+        renderQueue(
+            "#queue-qa",
+            qa,
+            "No QA or retest items."
+        );
+
+        renderQueue(
+            "#queue-overdue",
+            overdue,
+            "No overdue analysis items."
+        );
+
+
+        const analysisCount =
+            Array.isArray(analysis)
+                ? analysis.length
+                : number(
+                    analysis?.count ??
+                    analysis?.total ??
+                    firstValue(
+                        data,
+                        [
+                            "kpis.pending_analysis",
+                            "queues.pending_analysis.count"
+                        ],
+                        0
+                    )
+                );
+
+        const approvalCount =
+            Array.isArray(approval)
+                ? approval.length
+                : number(
+                    approval?.count ??
+                    approval?.total ??
+                    firstValue(
+                        data,
+                        [
+                            "kpis.pending_approval",
+                            "queues.pending_approval.count"
+                        ],
+                        0
+                    )
+                );
+
+        const qaCount =
+            Array.isArray(qa)
+                ? qa.length
+                : number(
+                    qa?.count ??
+                    qa?.total ??
+                    firstValue(
+                        data,
+                        [
+                            "kpis.qa",
+                            "quality_metrics.qa_required"
+                        ],
+                        0
+                    )
+                );
+
+        const overdueCount =
+            Array.isArray(overdue)
+                ? overdue.length
+                : number(
+                    overdue?.count ??
+                    overdue?.total ??
+                    firstValue(
+                        data,
+                        [
+                            "kpis.overdue",
+                            "sla.overdue"
+                        ],
+                        0
+                    )
+                );
+
+        setText(
+            "#queue-analysis-count",
+            formatNumber(
+                analysisCount
+            )
+        );
+
+        setText(
+            "#queue-approval-count",
+            formatNumber(
+                approvalCount
+            )
+        );
+
+        setText(
+            "#queue-qa-count",
+            formatNumber(
+                qaCount
+            )
+        );
+
+        setText(
+            "#queue-overdue-count",
+            formatNumber(
+                overdueCount
+            )
+        );
+
+    };
+
+
+    /* ========================================================= */
+    /* QUALITY                                                    */
+    /* ========================================================= */
+
+    const renderQuality = (
+        data
+    ) => {
+
+        const sampling =
+            data.sampling_metrics ||
+            data.sampling ||
+            {};
+
+        const results =
+            data.result_metrics ||
+            data.results ||
+            {};
+
+        const quality =
+            data.quality_metrics ||
+            data.quality ||
+            {};
+
+        const values = {
+
+            "sampling-required":
+                firstValue(
+                    data,
+                    [
+                        "sampling_metrics.required",
+                        "sampling_metrics.sampling_required",
+                        "sampling.required"
+                    ],
+                    0
+                ),
+
+            "sampling-completed":
+                firstValue(
+                    data,
+                    [
+                        "sampling_metrics.completed",
+                        "sampling_metrics.sampling_completed",
+                        "sampling.completed"
+                    ],
+                    0
+                ),
+
+            "sampling-passed":
+                firstValue(
+                    data,
+                    [
+                        "sampling_metrics.passed",
+                        "sampling_metrics.sampling_passed",
+                        "sampling.passed"
+                    ],
+                    0
+                ),
+
+            "sampling-exceptions":
+                firstValue(
+                    data,
+                    [
+                        "sampling_metrics.exceptions",
+                        "sampling_metrics.failed",
+                        "sampling.exceptions"
+                    ],
+                    0
+                ),
+
+            "results-total":
+                firstValue(
+                    data,
+                    [
+                        "result_metrics.total",
+                        "result_counts.total",
+                        "results.total"
+                    ],
+                    0
+                ),
+
+            "results-passed":
+                firstValue(
+                    data,
+                    [
+                        "result_metrics.passed",
+                        "result_counts.PASS",
+                        "results.passed"
+                    ],
+                    0
+                ),
+
+            "results-failed":
+                firstValue(
+                    data,
+                    [
+                        "result_metrics.failed",
+                        "result_counts.FAIL",
+                        "results.failed"
+                    ],
+                    0
+                ),
+
+            "retest":
+                firstValue(
+                    data,
+                    [
+                        "result_metrics.retest",
+                        "quality_metrics.retest",
+                        "quality.retest",
+                        "workflow.branches.retest"
+                    ],
+                    0
+                ),
+
+            "qa-required":
+                firstValue(
+                    data,
+                    [
+                        "quality_metrics.qa_required",
+                        "quality.qa_required",
+                        "qa_metrics.required"
+                    ],
+                    0
+                ),
+
+            "qa-approved":
+                firstValue(
+                    data,
+                    [
+                        "quality_metrics.qa_approved",
+                        "quality.qa_approved",
+                        "qa_metrics.approved"
+                    ],
+                    0
+                ),
+
+            "capa":
+                firstValue(
+                    data,
+                    [
+                        "quality_metrics.capa",
+                        "quality.capa",
+                        "workflow.branches.capa"
+                    ],
+                    0
+                ),
+
+            "rejected":
+                firstValue(
+                    data,
+                    [
+                        "quality_metrics.rejected",
+                        "quality.rejected",
+                        "batch_counts.REJECTED",
+                        "status_counts.REJECTED"
+                    ],
+                    0
+                )
+
+        };
+
+
+        Object.entries(
+            values
+        ).forEach(
+            ([key, value]) => {
+
+                const element =
+                    document.querySelector(
+                        `[data-quality="${key}"]`
+                    );
+
+                if (element) {
+                    element.textContent =
+                        formatNumber(
+                            value
+                        );
+                }
+
+            }
+        );
+
+
+        const passRate =
+            firstValue(
+                data,
+                [
+                    "quality_metrics.pass_rate",
+                    "quality.pass_rate",
+                    "result_metrics.pass_rate",
+                    "result_metrics.pass_percentage"
+                ],
+                null
+            );
+
+
+        const total =
+            number(
+                values["results-total"]
+            );
+
+        const passed =
+            number(
+                values["results-passed"]
+            );
+
+        const calculatedRate =
+            total > 0
+                ? (
+                    passed /
+                    total
+                ) * 100
+                : 0;
+
+        const rate =
+            passRate !== null
+                ? number(passRate)
+                : calculatedRate;
+
+        setText(
+            "#quality-pass-rate",
+            `${rate.toFixed(1)}%`
+        );
+
+        const progress =
+            document.querySelector(
+                "#quality-rate-bar span"
+            );
+
+        if (progress) {
+            progress.style.width =
+                `${Math.min(
+                    100,
+                    Math.max(
+                        0,
+                        rate
+                    )
+                )}%`;
+        }
+
+    };
+
+
+    /* ========================================================= */
+    /* BATCH LIFECYCLE                                            */
+    /* ========================================================= */
+
+    const renderBatchLifecycle = (
+        data
+    ) => {
+
+        const batches =
+            data.batch_counts ||
+            data.batches ||
+            {};
+
+        const keys = [
+            "received",
+            "analysed",
+            "approved",
+            "rejected",
+            "utilized",
+            "returned"
+        ];
+
+        keys.forEach(
+            key => {
+
+                const value =
+                    firstValue(
+                        data,
+                        [
+                            `batch_counts.${key}`,
+                            `batch_counts.${key.toUpperCase()}`,
+                            `batches.${key}`,
+                            `batches.counts.${key}`,
+                            `chemical_batches.${key}`
+                        ],
+                        batches[key] ?? 0
+                    );
+
+                const element =
+                    document.querySelector(
+                        `[data-batch-count="${key}"]`
+                    );
+
+                if (element) {
+                    element.textContent =
+                        formatNumber(
+                            value
+                        );
+                }
+
+            }
+        );
+
+    };
+
+
+    /* ========================================================= */
+    /* CERTIFICATES                                               */
+    /* ========================================================= */
+
+    const renderCertificates = (
+        data
+    ) => {
+
+        const coa =
+            data.coa_metrics ||
+            data.coa_operations ||
+            data.coa ||
+            {};
+
+        const values = {
+
+            generated:
+                firstValue(
+                    data,
+                    [
+                        "coa_metrics.generated",
+                        "coa_metrics.total",
+                        "coa.generated"
+                    ],
+                    coa.generated ?? 0
+                ),
+
+            pending:
+                firstValue(
+                    data,
+                    [
+                        "coa_metrics.pending",
+                        "coa_metrics.pending_approval",
+                        "coa_operations.pending"
+                    ],
+                    coa.pending ?? 0
+                ),
+
+            approved:
+                firstValue(
+                    data,
+                    [
+                        "coa_metrics.approved",
+                        "coa_operations.approved"
+                    ],
+                    coa.approved ?? 0
+                ),
+
+            verified:
+                firstValue(
+                    data,
+                    [
+                        "coa_metrics.verified",
+                        "coa_operations.verified"
+                    ],
+                    coa.verified ?? 0
+                )
+
+        };
+
+
+        Object.entries(
+            values
+        ).forEach(
+            ([key, value]) => {
+
+                const element =
+                    document.querySelector(
+                        `[data-coa="${key}"]`
+                    );
+
+                if (element) {
+                    element.textContent =
+                        formatNumber(
+                            value
+                        );
+                }
+
+            }
+        );
+
+    };
+
+
+    /* ========================================================= */
+    /* SLA / TURNAROUND                                           */
+    /* ========================================================= */
+
+    const renderPerformance = (
+        data
+    ) => {
+
+        const sla =
+            data.sla ||
+            data.sla_metrics ||
+            {};
+
+        const turnaround =
+            data.turnaround ||
+            data.performance ||
+            {};
+
+        const within =
+            firstValue(
+                data,
+                [
+                    "sla.within",
+                    "sla.within_sla",
+                    "sla_metrics.within",
+                    "sla_metrics.within_sla"
+                ],
+                0
+            );
+
+        const overdue =
+            firstValue(
+                data,
+                [
+                    "sla.overdue",
+                    "sla_metrics.overdue",
+                    "kpis.overdue"
+                ],
+                0
+            );
+
+        const compliance =
+            firstValue(
+                data,
+                [
+                    "sla.compliance",
+                    "sla.compliance_rate",
+                    "sla_metrics.compliance",
+                    "sla_metrics.compliance_rate"
+                ],
+                null
+            );
+
+        const total =
+            number(within) +
+            number(overdue);
+
+        const calculated =
+            total > 0
+                ? (
+                    number(within) /
+                    total
+                ) * 100
+                : 0;
+
+        setText(
+            '[data-sla="within"]',
+            formatNumber(within)
+        );
+
+        setText(
+            '[data-sla="overdue"]',
+            formatNumber(overdue)
+        );
+
+        setText(
+            '[data-sla="compliance"]',
+            `${number(
+                compliance ?? calculated
+            ).toFixed(1)}%`
+        );
+
+
+        setText(
+            '[data-turnaround="average"]',
+            formatDuration(
+                firstValue(
+                    data,
+                    [
+                        "turnaround.average",
+                        "turnaround.average_minutes",
+                        "performance.average"
+                    ],
+                    turnaround.average
+                )
+            )
+        );
+
+        setText(
+            '[data-turnaround="median"]',
+            formatDuration(
+                firstValue(
+                    data,
+                    [
+                        "turnaround.median",
+                        "turnaround.median_minutes",
+                        "performance.median"
+                    ],
+                    turnaround.median
+                )
+            )
+        );
+
+        setText(
+            '[data-turnaround="maximum"]',
+            formatDuration(
+                firstValue(
+                    data,
+                    [
+                        "turnaround.maximum",
+                        "turnaround.max",
+                        "turnaround.maximum_minutes",
+                        "performance.maximum"
+                    ],
+                    turnaround.maximum
+                )
+            )
+        );
+
+    };
+
+
+    /* ========================================================= */
+    /* WORKFLOW HEALTH                                            */
+    /* ========================================================= */
+
+    const renderWorkflowHealth = (
+        data
+    ) => {
+
+        const container =
+            document.getElementById(
+                "workflow-health"
+            );
+
+        if (!container) {
+            return;
+        }
+
+        const health =
+            data.workflow_health ||
+            data.workflow?.health ||
+            data.workflow_stage_health ||
+            {};
+
+        const entries =
+            Object.entries(
+                health
+            )
+            .slice(0, 5);
+
+        if (!entries.length) {
+
+            container.innerHTML = `
+                <div class="ca-dashboard-empty-row">
+                    No workflow health exceptions.
+                </div>
+            `;
+
+            return;
+        }
+
+        container.innerHTML =
+            entries.map(
+                ([name, item]) => {
+
+                    const value =
+                        typeof item === "object"
+                            ? (
+                                item.count ??
+                                item.value ??
+                                item.status ??
+                                "—"
+                            )
+                            : item;
+
+                    return `
+                        <div class="ca-dashboard-health-item">
+                            <span>
+                                ${escapeHtml(name)}
+                            </span>
+
+                            <span class="ca-dashboard-health-state">
+                                ${escapeHtml(value)}
+                            </span>
+                        </div>
+                    `;
+
+                }
+            )
+            .join("");
+
+    };
+
+
+    /* ========================================================= */
+    /* EXCEPTIONS                                                 */
+    /* ========================================================= */
+
+    const renderExceptions = (
+        data
+    ) => {
+
+        const container =
+            document.getElementById(
+                "dashboard-exceptions"
+            );
+
+        if (!container) {
+            return;
+        }
+
+        const attention =
+            data.workflow_attention ||
+            data.workflow?.attention ||
+            data.risk_register ||
+            data.risks ||
+            data.attention ||
+            {};
+
+        let records =
+            collection(
+                attention.items ||
+                attention.records ||
+                attention
+            );
+
+        if (
+            !Array.isArray(
+                attention
+            ) &&
+            typeof attention === "object" &&
+            !records.length
+        ) {
+
+            records =
+                Object.entries(
+                    attention
+                )
+                .map(
+                    ([key, value]) => ({
+                        title: key,
+                        count:
+                            typeof value === "object"
+                                ? (
+                                    value.count ??
+                                    value.total ??
+                                    0
+                                )
+                                : value
+                    })
+                );
+
+        }
+
+        records =
+            records.slice(
+                0,
+                6
+            );
+
+        if (!records.length) {
+
+            container.innerHTML = `
+                <div class="ca-dashboard-exception">
+                    <span
+                        class="ca-dashboard-exception__indicator"
+                        aria-hidden="true"
+                    ></span>
+
+                    <div class="ca-dashboard-exception__content">
+                        <span class="ca-dashboard-exception__title">
+                            No active exceptions
+                        </span>
+
+                        <span class="ca-dashboard-exception__meta">
+                            Current workflow attention queues are clear.
+                        </span>
+                    </div>
+
+                    <strong class="ca-dashboard-exception__count">
+                        0
+                    </strong>
+                </div>
+            `;
+
+            return;
+        }
+
+        container.innerHTML =
+            records.map(
+                item => {
+
+                    const title =
+                        item.title ||
+                        item.name ||
+                        item.type ||
+                        "Attention item";
+
+                    const meta =
+                        item.description ||
+                        item.detail ||
+                        item.status ||
+                        item.reason ||
+                        "";
+
+                    const count =
+                        item.count ??
+                        item.total ??
+                        item.value ??
+                        0;
+
+                    return `
+                        <div class="ca-dashboard-exception">
+
+                            <span
+                                class="ca-dashboard-exception__indicator"
+                                aria-hidden="true"
+                            ></span>
+
+                            <div class="ca-dashboard-exception__content">
+
+                                <span class="ca-dashboard-exception__title">
+                                    ${escapeHtml(title)}
+                                </span>
+
+                                <span class="ca-dashboard-exception__meta">
+                                    ${escapeHtml(meta)}
+                                </span>
+
+                            </div>
+
+                            <strong class="ca-dashboard-exception__count">
+                                ${formatNumber(count)}
+                            </strong>
+
+                        </div>
+                    `;
+
+                }
+            )
+            .join("");
+
+    };
+
+
+    /* ========================================================= */
+    /* ACTIVITY                                                   */
+    /* ========================================================= */
+
+    const renderActivity = (
+        data
+    ) => {
+
+        const container =
+            document.getElementById(
+                "dashboard-activity"
+            );
+
+        if (!container) {
+            return;
+        }
+
+        const records =
+            collection(
+                data.recent_activity ||
+                data.activity ||
+                data.workflow?.activity ||
+                []
+            )
+            .slice(
+                0,
+                8
+            );
+
+        if (!records.length) {
+
+            container.innerHTML = `
+                <div class="ca-dashboard-empty-row">
+                    No recent workflow activity.
+                </div>
+            `;
+
+            return;
+        }
+
+        container.innerHTML =
+            records.map(
+                item => {
+
+                    const timestamp =
+                        item.timestamp ||
+                        item.created_at ||
+                        item.date ||
+                        item.time ||
+                        "";
+
+                    const title =
+                        item.title ||
+                        item.action ||
+                        item.event ||
+                        item.name ||
+                        "Workflow activity";
+
+                    const detail =
+                        item.detail ||
+                        item.description ||
+                        item.status ||
+                        item.actor ||
+                        "";
+
+                    const value =
+                        item.reference ||
+                        item.batch ||
+                        item.sample_id ||
+                        "";
+
+                    return `
+                        <div class="ca-dashboard-activity-item">
+
+                            <span class="ca-dashboard-activity-item__time">
+                                ${escapeHtml(
+                                    formatDate(
+                                        timestamp
+                                    )
+                                )}
+                            </span>
+
+                            <div class="ca-dashboard-activity-item__content">
+
+                                <span class="ca-dashboard-activity-item__title">
+                                    ${escapeHtml(title)}
+                                </span>
+
+                                <span class="ca-dashboard-activity-item__detail">
+                                    ${escapeHtml(detail)}
+                                </span>
+
+                            </div>
+
+                            <span class="ca-dashboard-activity-item__time">
+                                ${escapeHtml(value)}
+                            </span>
+
+                        </div>
+                    `;
+
+                }
+            )
+            .join("");
+
+    };
+
+
+    /* ========================================================= */
+    /* TASKS                                                      */
+    /* ========================================================= */
+
+    const renderTasks = (
+        data
+    ) => {
+
+        const container =
+            document.getElementById(
+                "dashboard-tasks"
+            );
+
+        if (!container) {
+            return;
+        }
+
+        const records =
+            collection(
+                data.workflow_task_snapshot ||
+                data.workflow_tasks ||
+                data.my_work ||
+                data.tasks ||
+                data.workflow?.task_data ||
+                []
+            )
+            .slice(
+                0,
+                8
+            );
+
+        if (!records.length) {
+
+            container.innerHTML = `
+                <div class="ca-dashboard-empty-row">
+                    No current workflow tasks.
+                </div>
+            `;
+
+            return;
+        }
+
+        container.innerHTML =
+            records.map(
+                task => {
+
+                    const title =
+                        task.title ||
+                        task.name ||
+                        task.task_name ||
+                        task.node ||
+                        "Workflow task";
+
+                    const detail =
+                        task.detail ||
+                        task.status ||
+                        task.batch_number ||
+                        task.sample_id ||
+                        "";
+
+                    const assignee =
+                        task.assignee ||
+                        task.assigned_to ||
+                        task.analyst ||
+                        "";
+
+                    const url =
+                        task.execute_url ||
+                        task.task_url ||
+                        task.url ||
+                        "";
+
+                    const action =
+                        url
+                            ? `
+                                <a
+                                    href="${escapeHtml(url)}"
+                                    class="ca-button ca-button--secondary ca-button--sm"
+                                >
+                                    Open
+                                </a>
+                            `
+                            : "";
+
+                    return `
+                        <div class="ca-dashboard-task">
+
+                            <div class="ca-dashboard-task__content">
+
+                                <span class="ca-dashboard-task__title">
+                                    ${escapeHtml(title)}
+                                </span>
+
+                                <span class="ca-dashboard-task__detail">
+                                    ${escapeHtml(detail)}
+                                </span>
+
+                            </div>
+
+                            <span class="ca-dashboard-task__meta">
+                                ${escapeHtml(assignee)}
+                            </span>
+
+                            <span class="ca-dashboard-task__action">
+                                ${action}
+                            </span>
+
+                        </div>
+                    `;
+
+                }
+            )
+            .join("");
+
+    };
+
+
+    /* ========================================================= */
+    /* RENDER ALL                                                 */
+    /* ========================================================= */
+
+    const renderAll = (
+        data
+    ) => {
+
+        state.payload =
+            normalizePayload(
+                data
+            );
+
+        const payload =
+            state.payload;
+
+        renderKpis(
+            payload
+        );
+
+        renderWorkflow(
+            payload
+        );
+
+        renderQueues(
+            payload
+        );
+
+        renderQuality(
+            payload
+        );
+
+        renderBatchLifecycle(
+            payload
+        );
+
+        renderCertificates(
+            payload
+        );
+
+        renderPerformance(
+            payload
+        );
+
+        renderWorkflowHealth(
+            payload
+        );
+
+        renderExceptions(
+            payload
+        );
+
+        renderActivity(
+            payload
+        );
+
+        renderTasks(
+            payload
+        );
+
+        document
+            .getElementById(
+                "dashboard-empty"
+            )
+            ?.setAttribute(
+                "hidden",
+                ""
+            );
+
+        document
+            .getElementById(
+                "dashboard-error"
+            )
+            ?.setAttribute(
+                "hidden",
+                ""
+            );
+
+    };
+
+
+    /* ========================================================= */
+    /* REFRESH                                                    */
+    /* ========================================================= */
+
+    const refreshDashboard = async (
+        showLoading = true
+    ) => {
+
+        if (state.loading) {
+            return;
+        }
+
+        state.loading =
+            true;
+
+        if (showLoading) {
+            setLiveState(
+                "loading",
+                "Updating"
+            );
+        }
+
+        if (state.controller) {
+            state.controller.abort();
+        }
+
+        state.controller =
+            new AbortController();
+
+        try {
+
+            const response =
+                await fetch(
+                    getDashboardUrl(),
+                    {
+                        method: "GET",
+                        credentials: "same-origin",
+                        cache: "no-store",
+                        headers: {
+                            "Accept":
+                                "application/json",
+                            "X-Requested-With":
+                                "XMLHttpRequest"
+                        },
+                        signal:
+                            state.controller.signal
+                    }
+                );
+
+            if (!response.ok) {
+                throw new Error(
+                    `Dashboard request failed with status ${response.status}.`
+                );
+            }
+
+            const raw =
+                await response.json();
+
+            const payload =
+                normalizePayload(
+                    raw
+                );
+
+            renderAll(
+                payload
+            );
+
+            setLiveState(
+                "online",
+                "Live"
+            );
+
+            setLastUpdated(
+                firstValue(
+                    payload,
+                    [
+                        "generated_at",
+                        "dashboard.generated_at",
+                        "meta.generated_at"
+                    ],
+                    new Date().toISOString()
+                )
+            );
+
+        } catch (error) {
+
+            if (
+                error?.name ===
+                "AbortError"
+            ) {
+                return;
+            }
+
+            console.error(
+                "Chemical Analysis dashboard refresh failed:",
+                error
+            );
+
+            setLiveState(
+                "error",
+                "Update failed"
+            );
+
+            const errorElement =
+                document.getElementById(
+                    "dashboard-error"
+                );
+
+            const messageElement =
+                document.getElementById(
+                    "dashboard-error-message"
+                );
+
+            if (errorElement) {
+                errorElement.hidden =
+                    false;
+            }
+
+            if (messageElement) {
+                messageElement.textContent =
+                    error.message ||
+                    "The dashboard data could not be loaded.";
+            }
+
+        } finally {
+
+            state.loading =
+                false;
+
+        }
+
+    };
+
+
+    /* ========================================================= */
+    /* AUTO REFRESH                                               */
+    /* ========================================================= */
+
+    const scheduleRefresh = () => {
+
+        if (state.timer) {
+            clearInterval(
+                state.timer
+            );
+        }
+
+        const seconds =
+            Math.max(
+                10,
+                number(
+                    root.dataset.refreshSeconds,
+                    30
+                )
+            );
+
+        state.timer =
+            setInterval(
+                () => {
+
+                    if (
+                        document.visibilityState ===
+                        "visible"
+                    ) {
+                        refreshDashboard(
+                            false
+                        );
+                    }
+
+                },
+                seconds * 1000
+            );
+
+    };
+
+
+    /* ========================================================= */
+    /* MANUAL REFRESH                                             */
+    /* ========================================================= */
+
+    document
+        .querySelectorAll(
+            '[data-action="refresh-dashboard"]'
+        )
+        .forEach(
+            button => {
+
+                button.addEventListener(
+                    "click",
+                    () => {
+
+                        refreshDashboard(
+                            true
+                        );
+
+                    }
+                );
+
+            }
+        );
+
+
+    /* ========================================================= */
+    /* VISIBILITY RECOVERY                                        */
+    /* ========================================================= */
+
+    document.addEventListener(
+        "visibilitychange",
+        () => {
+
+            if (
+                document.visibilityState ===
+                "visible"
+            ) {
+                refreshDashboard(
+                    false
+                );
+            }
+
+        }
+    );
+
+
+    /* ========================================================= */
+    /* LIVE EVENT                                                 */
+    /* ========================================================= */
+
+    window.addEventListener(
+        "ca:live:update",
+        event => {
+
+            const payload =
+                event.detail?.data ||
+                event.detail?.payload ||
+                event.detail;
+
+            if (
+                payload &&
+                typeof payload === "object"
+            ) {
+                renderAll(
+                    normalizePayload(
+                        payload
+                    )
+                );
+
+                setLiveState(
+                    "online",
+                    "Live"
+                );
+
+                setLastUpdated(
+                    new Date().toISOString()
+                );
+            } else {
+                refreshDashboard(
+                    false
+                );
+            }
+
+        }
+    );
+
+
+    /* ========================================================= */
+    /* INITIAL LOAD                                               */
+    /* ========================================================= */
+
+    refreshDashboard(
+        true
+    );
+
+    scheduleRefresh();
+
+})();
+</script>
 
 {% endblock %}

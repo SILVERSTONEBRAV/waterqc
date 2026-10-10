@@ -1,94 +1,441 @@
 <div class="ca-header-inner">
-    <div class="ca-header-left">
-        <button
-            type="button"
-            class="ca-icon-button"
-            id="sidebar-toggle"
-            aria-label="Toggle sidebar"
-            aria-expanded="true"
-            data-action="toggle-sidebar"
-        >
-            <span class="ca-icon ca-icon-menu" aria-hidden="true"></span>
-        </button>
+<div class="ca-header-left">
 
-        <a href="{% url 'ca:dashboard' %}" class="ca-brand">
-            <span class="ca-brand-mark">
-                CA
+    <button
+        type="button"
+        class="ca-icon-button"
+        id="sidebar-toggle"
+        aria-label="Toggle sidebar"
+        aria-expanded="true"
+        aria-controls="ca-sidebar"
+        data-action="toggle-sidebar"
+    >
+        <span
+            class="ca-icon ca-icon-menu"
+            aria-hidden="true"
+        ></span>
+    </button>
+
+
+    <a
+        href="{% url 'ca:dashboard' %}"
+        class="ca-brand"
+        aria-label="Chemical Analysis Management System"
+    >
+
+        <span class="ca-brand-mark">
+            CA
+        </span>
+
+        <span class="ca-brand-text">
+
+            <span class="ca-brand-title">
+                Chemical Analysis
             </span>
-            <span class="ca-brand-text">
-                <span class="ca-brand-title">Chemical Analysis</span>
-                <span class="ca-brand-subtitle">Management System</span>
+
+            <span class="ca-brand-subtitle">
+                Management System
             </span>
+
+        </span>
+
+    </a>
+
+</div>
+
+
+<div class="ca-header-center">
+
+    <nav
+        class="ca-dashboard-switcher"
+        aria-label="Chemical Analysis dashboards"
+    >
+
+        <a
+            href="{% url 'ca:dashboard' %}"
+            class="ca-dashboard-button{% if request.resolver_match.url_name == 'dashboard' or request.resolver_match.url_name == 'dashboard-view' %} is-active{% endif %}"
+            {% if request.resolver_match.url_name == 'dashboard' or request.resolver_match.url_name == 'dashboard-view' %}
+                aria-current="page"
+            {% endif %}
+        >
+            <span class="ca-dashboard-button-index">
+                01
+            </span>
+
+            <span class="ca-dashboard-button-content">
+                <strong>
+                    Command Center
+                </strong>
+
+                <small>
+                    Operations &amp; control
+                </small>
+            </span>
+
         </a>
-    </div>
 
-    <div class="ca-header-center">
-        <div class="ca-global-search">
-            <button
-                type="button"
-                class="ca-search-trigger"
-                data-action="open-search"
-                aria-label="Search"
-            >
-                <span class="ca-icon ca-icon-search" aria-hidden="true"></span>
-                <span class="ca-search-placeholder">Search batches, requests, results...</span>
-                <kbd>Ctrl K</kbd>
-            </button>
-        </div>
-    </div>
 
-    <div class="ca-header-right">
-        {% include "ca/dashboard/layout/notifications.html" %}
+        <a
+            href="{% url 'ca:dashboard2' %}"
+            class="ca-dashboard-button{% if request.resolver_match.url_name == 'dashboard2' %} is-active{% endif %}"
+            {% if request.resolver_match.url_name == 'dashboard2' %}
+                aria-current="page"
+            {% endif %}
+        >
+
+            <span class="ca-dashboard-button-index">
+                02
+            </span>
+
+            <span class="ca-dashboard-button-content">
+                <strong>
+                    Operations
+                </strong>
+
+                <small>
+                    Workflow &amp; workload
+                </small>
+            </span>
+
+        </a>
+
+
+        <a
+            href="{% url 'ca:dashboard3' %}"
+            class="ca-dashboard-button{% if request.resolver_match.url_name == 'dashboard3' %} is-active{% endif %}"
+            {% if request.resolver_match.url_name == 'dashboard3' %}
+                aria-current="page"
+            {% endif %}
+        >
+
+            <span class="ca-dashboard-button-index">
+                03
+            </span>
+
+            <span class="ca-dashboard-button-content">
+                <strong>
+                    Analytics
+                </strong>
+
+                <small>
+                    Quality &amp; intelligence
+                </small>
+            </span>
+
+        </a>
+
+    </nav>
+
+
+    <div class="ca-global-search">
 
         <button
             type="button"
-            class="ca-icon-button"
-            data-action="open-command-palette"
-            aria-label="Command palette"
+            class="ca-search-trigger"
+            data-action="open-search"
+            aria-label="Search chemical analysis records"
+            aria-haspopup="dialog"
         >
-            <span class="ca-icon ca-icon-command" aria-hidden="true"></span>
+
+            <span
+                class="ca-icon ca-icon-search"
+                aria-hidden="true"
+            ></span>
+
+            <span class="ca-search-placeholder">
+                Search batches, requests, results...
+            </span>
+
+            <kbd>
+                Ctrl K
+            </kbd>
+
         </button>
 
-        <div class="ca-user-menu" data-component="user-menu">
-            <button
-                type="button"
-                class="ca-user-trigger"
-                data-action="toggle-user-menu"
-                aria-expanded="false"
-            >
-                <span class="ca-user-avatar">
+    </div>
+
+</div>
+
+
+<div class="ca-header-right">
+
+    <div class="ca-header-context">
+
+        <span class="ca-header-context-dot"></span>
+
+        <div class="ca-header-context-content">
+
+            <strong>
+                {% if treatment_plant %}
+                    {{ treatment_plant.name }}
+                {% else %}
+                    All Treatment Plants
+                {% endif %}
+            </strong>
+
+            <small>
+                ChemicalAnalysisFlow
+            </small>
+
+        </div>
+
+    </div>
+
+
+    {% include "ca/dashboard/layout/notifications.html" %}
+
+
+    <button
+        type="button"
+        class="ca-icon-button"
+        data-action="open-command-palette"
+        aria-label="Open command palette"
+        title="Command palette"
+    >
+        <span
+            class="ca-icon ca-icon-command"
+            aria-hidden="true"
+        ></span>
+    </button>
+
+
+    <button
+        type="button"
+        class="ca-icon-button"
+        data-action="refresh-dashboard"
+        aria-label="Refresh dashboard"
+        title="Refresh dashboard"
+        id="ca-header-refresh"
+    >
+        <span
+            class="ca-icon ca-icon-refresh"
+            aria-hidden="true"
+        ></span>
+    </button>
+
+
+    <div
+        class="ca-user-menu"
+        data-component="user-menu"
+    >
+
+        <button
+            type="button"
+            class="ca-user-trigger"
+            data-action="toggle-user-menu"
+            aria-expanded="false"
+            aria-haspopup="menu"
+            aria-controls="ca-user-dropdown"
+        >
+
+            <span class="ca-user-avatar">
+                {{ request.user.get_username|default:"U"|slice:":1"|upper }}
+            </span>
+
+
+            <span class="ca-user-info">
+
+                <strong>
+                    {{ request.user.get_full_name|default:request.user.username }}
+                </strong>
+
+                <small>
+                    {% if request.user.is_superuser %}
+                        System Administrator
+                    {% elif request.user.assigned_treatment_plant %}
+                        {{ request.user.assigned_treatment_plant.name }}
+                    {% else %}
+                        Laboratory User
+                    {% endif %}
+                </small>
+
+            </span>
+
+
+            <span
+                class="ca-icon ca-icon-chevron-down"
+                aria-hidden="true"
+            ></span>
+
+        </button>
+
+
+        <div
+            id="ca-user-dropdown"
+            class="ca-user-dropdown"
+            role="menu"
+            hidden
+        >
+
+            <div class="ca-user-dropdown-header">
+
+                <span class="ca-user-avatar ca-user-avatar-large">
                     {{ request.user.get_username|default:"U"|slice:":1"|upper }}
                 </span>
 
-                <span class="ca-user-info">
-                    <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
-                    <small>{{ request.user.email|default:"Laboratory User" }}</small>
+                <div>
+
+                    <strong>
+                        {{ request.user.get_full_name|default:request.user.username }}
+                    </strong>
+
+                    <small>
+                        {{ request.user.email|default:"Laboratory User" }}
+                    </small>
+
+                </div>
+
+            </div>
+
+
+            <div class="ca-menu-divider"></div>
+
+
+            <a
+                href="{% url 'ca:dashboard' %}"
+                class="ca-menu-item"
+                role="menuitem"
+            >
+
+                <span class="ca-icon ca-icon-dashboard"></span>
+
+                <span>
+                    Command Center
                 </span>
 
-                <span class="ca-icon ca-icon-chevron-down" aria-hidden="true"></span>
-            </button>
+            </a>
 
-            <div class="ca-user-dropdown" hidden>
-                <a href="#" class="ca-menu-item">
-                    <span class="ca-icon ca-icon-user"></span>
-                    Profile
-                </a>
 
-                <a href="#" class="ca-menu-item">
-                    <span class="ca-icon ca-icon-settings"></span>
-                    Settings
-                </a>
+            <a
+                href="{% url 'ca:my-tasks' %}"
+                class="ca-menu-item"
+                role="menuitem"
+            >
 
-                <div class="ca-menu-divider"></div>
+                <span class="ca-icon ca-icon-tasks"></span>
 
-                <form method="post" action="{% url 'accounts:logout' %}">
-                    {% csrf_token %}
-                    <button type="submit" class="ca-menu-item ca-menu-danger">
-                        <span class="ca-icon ca-icon-logout"></span>
+                <span>
+                    My Workflow Tasks
+                </span>
+
+                {% if overdue_count %}
+                    <span class="ca-menu-counter ca-menu-counter-danger">
+                        {{ overdue_count }}
+                    </span>
+                {% endif %}
+
+            </a>
+
+
+            <a
+                href="{% url 'ca:process-list' %}"
+                class="ca-menu-item"
+                role="menuitem"
+            >
+
+                <span class="ca-icon ca-icon-process"></span>
+
+                <span>
+                    Process Monitor
+                </span>
+
+            </a>
+
+
+            <div class="ca-menu-divider"></div>
+
+
+            <a
+                href="{% url 'ca:batch-list' %}"
+                class="ca-menu-item"
+                role="menuitem"
+            >
+
+                <span class="ca-icon ca-icon-batch"></span>
+
+                <span>
+                    Chemical Batches
+                </span>
+
+            </a>
+
+
+            <a
+                href="{% url 'ca:result-list' %}"
+                class="ca-menu-item"
+                role="menuitem"
+            >
+
+                <span class="ca-icon ca-icon-results"></span>
+
+                <span>
+                    Test Results
+                </span>
+
+            </a>
+
+
+            <a
+                href="{% url 'ca:coa-list' %}"
+                class="ca-menu-item"
+                role="menuitem"
+            >
+
+                <span class="ca-icon ca-icon-certificate"></span>
+
+                <span>
+                    Certificates of Analysis
+                </span>
+
+            </a>
+
+
+            <div class="ca-menu-divider"></div>
+
+
+            <a
+                href="{% url 'accounts:change-password' %}"
+                class="ca-menu-item"
+                role="menuitem"
+            >
+
+                <span class="ca-icon ca-icon-settings"></span>
+
+                <span>
+                    Change Password
+                </span>
+
+            </a>
+
+
+            <form
+                method="post"
+                action="{% url 'accounts:logout' %}"
+                class="ca-menu-form"
+            >
+
+                {% csrf_token %}
+
+                <button
+                    type="submit"
+                    class="ca-menu-item ca-menu-danger"
+                    role="menuitem"
+                >
+
+                    <span class="ca-icon ca-icon-logout"></span>
+
+                    <span>
                         Sign out
-                    </button>
-                </form>
-            </div>
+                    </span>
+
+                </button>
+
+            </form>
+
         </div>
+
     </div>
+
+</div>
+
 </div>

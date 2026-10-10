@@ -1,38 +1,429 @@
 <div class="ca-topbar-inner">
+<div class="ca-topbar-left">
+
     <div class="ca-breadcrumb-area">
         {% include "ca/dashboard/layout/breadcrumb.html" %}
     </div>
 
-    <div class="ca-topbar-actions">
-        <div class="ca-context-selector">
-            <span class="ca-context-label">Plant</span>
-            <select id="plant-selector" name="plant">
-                <option value="">All Plants</option>
-                {% for plant in treatment_plants %}
-                    <option value="{{ plant.pk }}">
-                        {{ plant }}
-                    </option>
-                {% endfor %}
-            </select>
+    <div class="ca-topbar-module">
+
+        <span class="ca-topbar-module-mark">CA</span>
+
+        <div class="ca-topbar-module-content">
+            <strong>Chemical Analysis</strong>
+            <span>Laboratory Control</span>
         </div>
 
-        <div class="ca-context-selector">
-            <span class="ca-context-label">Shift</span>
-            <select id="shift-selector" name="shift">
-                <option value="">All Shifts</option>
-                <option value="morning">Morning</option>
-                <option value="afternoon">Afternoon</option>
-                <option value="night">Night</option>
-            </select>
-        </div>
-
-        <button
-            type="button"
-            class="ca-button ca-button-primary"
-            data-action="open-quick-actions"
-        >
-            <span class="ca-icon ca-icon-plus"></span>
-            New Action
-        </button>
     </div>
+
+</div>
+
+
+<div class="ca-topbar-actions">
+
+    <div class="ca-topbar-status">
+
+        <span class="ca-topbar-status-dot"></span>
+
+        <div class="ca-topbar-status-content">
+            <strong>LIVE</strong>
+            <span>ChemicalAnalysisFlow</span>
+        </div>
+
+    </div>
+
+
+    <div class="ca-context-selector">
+
+        <span class="ca-context-label">
+            Plant
+        </span>
+
+        <select
+            id="plant-selector"
+            name="plant"
+            aria-label="Treatment plant"
+        >
+
+            <option value="">
+                All Plants
+            </option>
+
+            {% for plant in treatment_plants %}
+
+                <option
+                    value="{{ plant.pk }}"
+                    {% if treatment_plant and treatment_plant.pk == plant.pk %}
+                        selected
+                    {% endif %}
+                >
+                    {{ plant }}
+                </option>
+
+            {% endfor %}
+
+        </select>
+
+    </div>
+
+
+    <div class="ca-context-selector">
+
+        <span class="ca-context-label">
+            Shift
+        </span>
+
+        <select
+            id="shift-selector"
+            name="shift"
+            aria-label="Laboratory shift"
+        >
+
+            <option value="">
+                All Shifts
+            </option>
+
+            <option value="morning">
+                Morning
+            </option>
+
+            <option value="afternoon">
+                Afternoon
+            </option>
+
+            <option value="night">
+                Night
+            </option>
+
+        </select>
+
+    </div>
+
+
+    <div class="ca-topbar-divider"></div>
+
+
+    <nav
+        class="ca-topbar-views"
+        aria-label="Dashboard views"
+    >
+
+        <a
+            href="{% url 'ca:dashboard' %}"
+            class="ca-topbar-view{% if request.resolver_match.url_name == 'dashboard' or request.resolver_match.url_name == 'dashboard-view' %} is-active{% endif %}"
+            title="Command Center"
+        >
+            <span class="ca-topbar-view-mark">01</span>
+            <span class="ca-topbar-view-label">
+                Command
+            </span>
+        </a>
+
+        <a
+            href="{% url 'ca:dashboard2' %}"
+            class="ca-topbar-view{% if request.resolver_match.url_name == 'dashboard2' %} is-active{% endif %}"
+            title="Quality and Intelligence Dashboard"
+        >
+            <span class="ca-topbar-view-mark">02</span>
+            <span class="ca-topbar-view-label">
+                Intelligence
+            </span>
+        </a>
+
+        <a
+            href="{% url 'ca:dashboard3' %}"
+            class="ca-topbar-view{% if request.resolver_match.url_name == 'dashboard3' %} is-active{% endif %}"
+            title="Workflow and Performance Dashboard"
+        >
+            <span class="ca-topbar-view-mark">03</span>
+            <span class="ca-topbar-view-label">
+                Performance
+            </span>
+        </a>
+
+    </nav>
+
+
+    <div class="ca-topbar-divider"></div>
+
+
+    <div class="ca-topbar-quick-actions">
+
+        {% if permissions.receive_chemical_batch %}
+
+            <a
+                href="{% url 'ca:batch-create' %}"
+                class="ca-button ca-button-primary"
+                title="Register a new chemical batch"
+            >
+                <span class="ca-icon ca-icon-plus"></span>
+
+                <span>
+                    Register Batch
+                </span>
+            </a>
+
+        {% endif %}
+
+
+        <a
+            href="{% url 'ca:my-tasks' %}"
+            class="ca-button ca-button-secondary"
+            title="Open your workflow tasks"
+        >
+            <span class="ca-icon ca-icon-tasks"></span>
+
+            <span>
+                My Tasks
+            </span>
+
+            {% if overdue_count %}
+                <span class="ca-button-counter">
+                    {{ overdue_count }}
+                </span>
+            {% endif %}
+
+        </a>
+
+
+        <a
+            href="{% url 'ca:process-list' %}"
+            class="ca-button ca-button-secondary"
+            title="Monitor chemical analysis processes"
+        >
+            <span class="ca-icon ca-icon-process"></span>
+
+            <span>
+                Processes
+            </span>
+
+            {% if active_analysis %}
+                <span class="ca-button-counter">
+                    {{ active_analysis }}
+                </span>
+            {% endif %}
+
+        </a>
+
+    </div>
+
+
+    <button
+        type="button"
+        class="ca-topbar-refresh"
+        id="ca-topbar-refresh"
+        data-action="refresh-dashboard"
+        aria-label="Refresh dashboard"
+        title="Refresh dashboard"
+    >
+
+        <span class="ca-topbar-refresh-icon"></span>
+
+        <span class="ca-topbar-refresh-label">
+            Refresh
+        </span>
+
+    </button>
+
+
+    <button
+        type="button"
+        class="ca-topbar-more"
+        id="ca-topbar-more"
+        aria-label="Open dashboard actions"
+        aria-expanded="false"
+        aria-controls="ca-topbar-menu"
+    >
+
+        <span></span>
+        <span></span>
+        <span></span>
+
+    </button>
+
+
+    <div
+        id="ca-topbar-menu"
+        class="ca-topbar-menu"
+        hidden
+    >
+
+        <div class="ca-topbar-menu-heading">
+            <span>QUICK ACCESS</span>
+        </div>
+
+
+        <a
+            href="{% url 'ca:dashboard' %}"
+            class="ca-topbar-menu-item"
+        >
+            <span class="ca-topbar-menu-code">
+                01
+            </span>
+
+            <span>
+                <strong>Command Center</strong>
+                <small>Operational control</small>
+            </span>
+        </a>
+
+
+        <a
+            href="{% url 'ca:dashboard2' %}"
+            class="ca-topbar-menu-item"
+        >
+            <span class="ca-topbar-menu-code">
+                02
+            </span>
+
+            <span>
+                <strong>Quality &amp; Intelligence</strong>
+                <small>Analytical intelligence</small>
+            </span>
+        </a>
+
+
+        <a
+            href="{% url 'ca:dashboard3' %}"
+            class="ca-topbar-menu-item"
+        >
+            <span class="ca-topbar-menu-code">
+                03
+            </span>
+
+            <span>
+                <strong>Performance</strong>
+                <small>Workflow performance</small>
+            </span>
+        </a>
+
+
+        <div class="ca-topbar-menu-divider"></div>
+
+
+        <div class="ca-topbar-menu-heading">
+            <span>WORKFLOW</span>
+        </div>
+
+
+        <a
+            href="{% url 'ca:process-list' %}"
+            class="ca-topbar-menu-item"
+        >
+            <span class="ca-topbar-menu-icon ca-icon-process"></span>
+
+            <span>
+                <strong>Process Monitor</strong>
+                <small>Active chemical workflows</small>
+            </span>
+        </a>
+
+
+        <a
+            href="{% url 'ca:my-tasks' %}"
+            class="ca-topbar-menu-item"
+        >
+            <span class="ca-topbar-menu-icon ca-icon-tasks"></span>
+
+            <span>
+                <strong>My Workflow Tasks</strong>
+                <small>Assigned execution tasks</small>
+            </span>
+
+            {% if overdue_count %}
+                <span class="ca-topbar-menu-counter ca-topbar-menu-counter-danger">
+                    {{ overdue_count }}
+                </span>
+            {% endif %}
+        </a>
+
+
+        <a
+            href="{% url 'ca:pending-analysis' %}"
+            class="ca-topbar-menu-item"
+        >
+            <span class="ca-topbar-menu-icon ca-icon-analysis"></span>
+
+            <span>
+                <strong>Pending Analysis</strong>
+                <small>Analysis awaiting execution</small>
+            </span>
+        </a>
+
+
+        <a
+            href="{% url 'ca:pending-approval' %}"
+            class="ca-topbar-menu-item"
+        >
+            <span class="ca-topbar-menu-icon ca-icon-approval"></span>
+
+            <span>
+                <strong>Pending Approval</strong>
+                <small>Results awaiting approval</small>
+            </span>
+
+            {% if pending_approval %}
+                <span class="ca-topbar-menu-counter">
+                    {{ pending_approval }}
+                </span>
+            {% endif %}
+        </a>
+
+
+        <div class="ca-topbar-menu-divider"></div>
+
+
+        <div class="ca-topbar-menu-heading">
+            <span>CONTROL</span>
+        </div>
+
+
+        <a
+            href="{% url 'ca:batch-list' %}"
+            class="ca-topbar-menu-item"
+        >
+            <span class="ca-topbar-menu-icon ca-icon-batch"></span>
+
+            <span>
+                <strong>Chemical Batches</strong>
+                <small>Controlled inventory</small>
+            </span>
+        </a>
+
+
+        <a
+            href="{% url 'ca:result-list' %}"
+            class="ca-topbar-menu-item"
+        >
+            <span class="ca-topbar-menu-icon ca-icon-results"></span>
+
+            <span>
+                <strong>Test Results</strong>
+                <small>Analytical results</small>
+            </span>
+        </a>
+
+
+        <a
+            href="{% url 'ca:coa-list' %}"
+            class="ca-topbar-menu-item"
+        >
+            <span class="ca-topbar-menu-icon ca-icon-certificate"></span>
+
+            <span>
+                <strong>Certificates of Analysis</strong>
+                <small>CoA control and verification</small>
+            </span>
+
+            {% if coa_ready %}
+                <span class="ca-topbar-menu-counter">
+                    {{ coa_ready }}
+                </span>
+            {% endif %}
+        </a>
+
+    </div>
+
+</div>
+
 </div>

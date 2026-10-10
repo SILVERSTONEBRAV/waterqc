@@ -1,6 +1,13 @@
-{% extends "base.html" %}
+{% extends "ca/dashboard/layout/app.html" %}
 
 {% block title %}Chemical Analysis Process{% endblock %}
+
+{% block breadcrumbs %}
+    <span aria-hidden="true">/</span>
+    <a href="{% url 'ca:process-list' %}">Processes</a>
+    <span aria-hidden="true">/</span>
+    <span aria-current="page">Process #{{ process.pk }}</span>
+{% endblock %}
 
 {% block content %}
 
