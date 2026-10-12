@@ -1,4 +1,7 @@
 // static/qc/results/js/result.js
+// ──────────────────────────────────────────────────────────────
+// QC Results Card Client Logic (Autosave removed, validation & navigation preserved)
+// ──────────────────────────────────────────────────────────────
 
 (() => {
   "use strict";
@@ -6,7 +9,8 @@
   document.addEventListener("DOMContentLoaded", () => {
     const cardsContainer = document.getElementById("cards-container");
     const loadingIndicator = document.getElementById("loading-indicator");
-    let saveTimer = null;
+
+    // Autosave completely removed — manual form submission only
 
     /* ================================
        HTMX lifecycle hooks
@@ -21,18 +25,17 @@
 
     document.body.addEventListener("htmx:afterSwap", (evt) => {
       if (evt.target.id === "cards-container") {
-        // Animate cards on refresh
-        cardsContainer.querySelectorAll(".result-card").forEach((card, i) => {
-          card.style.opacity = 0;
-          setTimeout(() => {
-            card.style.transition = "opacity 0.4s ease, transform 0.4s ease";
-            card.style.opacity = 1;
-            card.style.transform = "translateY(0)";
-          }, i * 100);
-        });
-        // Re‑initialize validation, navigation, autosave
+        // Ensure cards remain visible immediately
+        if (cardsContainer) {
+          cardsContainer.querySelectorAll(".result-card").forEach((card) => {
+            card.style.opacity = "1";
+            card.style.visibility = "visible";
+            card.style.display = "flex";
+          });
+        }
+        // Re‑initialize validation and navigation
         initCardValidation();
-        initNavigationAndAutosave();
+        initNavigation();
       }
     });
 
@@ -44,7 +47,6 @@
       inputs.forEach((input) => {
         input.addEventListener("input", () => {
           handleValidation(input);
-          scheduleAutosave(); // trigger autosave countdown
         });
         input.addEventListener("blur", () => handleValidation(input));
       });
@@ -64,38 +66,38 @@
       }
 
       if (value < limits.min || value > limits.max) {
-        showSpec(input, spec);
+        showSpec(input, spec, "violation");
       } else {
-        hideSpec(input, spec);
+        showSpec(input, spec, "compliant");
       }
     }
 
     function parseSpec(text) {
       const match = text.match(/(\d+\.?\d*)\s*[-–]\s*(\d+\.?\d*)/);
-      return match ? { min: parseFloat(match[1]), max: parseFloat(match[2]) } : null;
+      if (match) return { min: parseFloat(match[1]), max: parseFloat(match[2]) };
+      const maxMatch = text.match(/≤\s*(\d+\.?\d*)/);
+      if (maxMatch) return { min: -Infinity, max: parseFloat(maxMatch[1]) };
+      const minMatch = text.match(/≥\s*(\d+\.?\d*)/);
+      if (minMatch) return { min: parseFloat(minMatch[1]), max: Infinity };
+      return null;
     }
 
-    function showSpec(input, spec) {
-      input.classList.add("form-control-danger");
-      spec.style.display = "block";
-      spec.style.color = "var(--danger-700)";
-      spec.style.transition = "opacity 0.3s ease";
-      spec.style.opacity = "1";
+    function showSpec(input, spec, type) {
+      spec.classList.remove("hidden-spec", "compliant", "violation");
+      spec.classList.add(type);
+      input.classList.remove("input-compliant", "input-violation");
+      input.classList.add(`input-${type}`);
     }
 
     function hideSpec(input, spec) {
-      input.classList.remove("form-control-danger");
-      spec.style.transition = "opacity 0.3s ease";
-      spec.style.opacity = "0";
-      setTimeout(() => {
-        spec.style.display = "none";
-      }, 300);
+      spec.classList.add("hidden-spec");
+      input.classList.remove("input-compliant", "input-violation");
     }
 
     /* ================================
-       Excel‑like Navigation + Autosave
+       Excel‑like Navigation
        ================================ */
-    function initNavigationAndAutosave() {
+    function initNavigation() {
       const inputs = Array.from(document.querySelectorAll("#cards-container .form-control"));
 
       inputs.forEach((input, idx) => {
@@ -112,15 +114,14 @@
           }
           if (e.key === "Enter") {
             e.preventDefault();
-            saveResults(); // immediate save
             const next = inputs[idx + 1];
             if (next) next.focus();
           }
           if (e.ctrlKey && e.key.toLowerCase() === "c") {
-            document.execCommand("copy"); // basic copy support
+            document.execCommand("copy");
           }
           if (e.ctrlKey && e.key.toLowerCase() === "v") {
-            document.execCommand("paste"); // basic paste support
+            document.execCommand("paste");
           }
         });
 
@@ -140,40 +141,8 @@
       });
     }
 
-    function scheduleAutosave() {
-      clearTimeout(saveTimer);
-      saveTimer = setTimeout(() => {
-        saveResults();
-      }, 3000); // auto‑save after 3s of inactivity
-    }
-
-    function saveResults() {
-      const form = document.querySelector("form.dashboard-stack");
-      if (!form) return;
-      htmx.trigger(form, "submit");
-      logSaveFeedback();
-    }
-
-    function logSaveFeedback() {
-      console.log("[QC Autosave] Results saved at", new Date().toLocaleTimeString());
-      const toast = document.createElement("div");
-      toast.textContent = "Results auto‑saved";
-      toast.className = "toast-notification";
-      toast.style.position = "fixed";
-      toast.style.bottom = "1rem";
-      toast.style.right = "1rem";
-      toast.style.background = "rgba(37,99,235,0.9)";
-      toast.style.color = "#fff";
-      toast.style.padding = "0.5rem 1rem";
-      toast.style.borderRadius = "6px";
-      toast.style.boxShadow = "0 2px 6px rgba(0,0,0,0.3)";
-      toast.style.zIndex = "9999";
-      document.body.appendChild(toast);
-      setTimeout(() => toast.remove(), 2000);
-    }
-
     // Initialize once on page load
     initCardValidation();
-    initNavigationAndAutosave();
+    initNavigation();
   });
 })();

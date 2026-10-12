@@ -1,0 +1,28 @@
+<form id="sectionForm" method="post" action="{{ action_url|default:request.path }}">
+    {% csrf_token %}
+    <div class="mb-3">
+        <label for="id_name" class="form-label fw-bold">Section Name</label>
+        {{ form.name }}
+        {% if form.name.errors %}
+            <div class="text-danger small mt-1">{{ form.name.errors|striptags }}</div>
+        {% endif %}
+    </div>
+    <div class="mb-3">
+        <label for="id_code" class="form-label fw-bold">Section Code</label>
+        {{ form.code }}
+        {% if form.code.errors %}
+            <div class="text-danger small mt-1">{{ form.code.errors|striptags }}</div>
+        {% endif %}
+    </div>
+    <div class="mb-3 form-check form-switch">
+        {{ form.is_active }}
+        <label class="form-check-label" for="id_is_active">Active Status</label>
+        {% if form.is_active.errors %}
+            <div class="text-danger small mt-1">{{ form.is_active.errors|striptags }}</div>
+        {% endif %}
+    </div>
+    <div class="modal-footer px-0 pb-0 pt-3">
+        <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-primary rounded-pill">Save Section</button>
+    </div>
+</form>

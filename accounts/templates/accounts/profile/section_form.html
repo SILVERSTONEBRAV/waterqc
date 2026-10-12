@@ -1,0 +1,40 @@
+{% extends "accounts/base.html" %}
+{% block content %}
+<div class="container py-4">
+    <div class="card border-0 shadow-sm mx-auto" style="max-width: 600px;">
+        <div class="card-header bg-white border-0 py-3">
+            <h4 class="mb-0 fw-bold">{% if form.instance.pk %}Edit Section{% else %}Create Section{% endif %}</h4>
+        </div>
+        <div class="card-body">
+            <form id="sectionForm" method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="id_name" class="form-label fw-bold">Section Name</label>
+                    {{ form.name }}
+                    {% if form.name.errors %}
+                        <div class="text-danger small mt-1">{{ form.name.errors|striptags }}</div>
+                    {% endif %}
+                </div>
+                <div class="mb-3">
+                    <label for="id_code" class="form-label fw-bold">Section Code</label>
+                    {{ form.code }}
+                    {% if form.code.errors %}
+                        <div class="text-danger small mt-1">{{ form.code.errors|striptags }}</div>
+                    {% endif %}
+                </div>
+                <div class="mb-3 form-check form-switch">
+                    {{ form.is_active }}
+                    <label class="form-check-label" for="id_is_active">Active Status</label>
+                    {% if form.is_active.errors %}
+                        <div class="text-danger small mt-1">{{ form.is_active.errors|striptags }}</div>
+                    {% endif %}
+                </div>
+                <div class="d-flex justify-content-end gap-2 pt-3">
+                    <a href="{% url 'accounts:profile' %}" class="btn btn-secondary rounded-pill">Cancel</a>
+                    <button type="submit" class="btn btn-primary rounded-pill">Save Section</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

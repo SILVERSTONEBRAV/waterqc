@@ -2,7 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="manifest" href="{% static 'manifest.json' %}">
     <meta name="description" content="Water Quality Assurance - Ensuring the quality of water for a healthier future.">
     <meta name="keywords" content="Water, Quality, Assurance, Health, Environment">
     <meta name="author" content="Water Quality Assurance Team">
@@ -90,6 +95,7 @@
     <script src="{% static 'js/PasswordInput.js' %}"></script>
     <script src="{% static 'js/popper.min.js' %}"></script>
     <script src="{% static 'js/slim.min.js' %}"></script>
+    <script src="{% static 'core/js/fullscreen.js' %}"></script>
     {% block extra_js %}{% endblock %}
 
     <style>

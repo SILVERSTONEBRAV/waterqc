@@ -94,6 +94,12 @@ class ResultGroup:
         default_factory=list
     )
 
+    total_cells: int = 0
+
+    entered_cells: int = 0
+
+    is_completed: bool = False
+
 
 @dataclass(slots=True)
 class AnalysisCard:
@@ -320,15 +326,25 @@ class ResultCardService:
                 name=title
             )
 
+        row_list = list(rows.values())
+        param_list = cls.extract_parameters(results)
+        total_cells = 0
+        entered_cells = 0
+        for r in row_list:
+            for cell in r.results.values():
+                total_cells += 1
+                if cell.entered:
+                    entered_cells += 1
+        is_completed = (total_cells > 0 and entered_cells == total_cells)
+
         return ResultGroup(
             title=title,
             water_type=analysis.water_type,
-            rows=list(
-                rows.values()
-            ),
-            parameters=cls.extract_parameters(
-                results
-            ),
+            rows=row_list,
+            parameters=param_list,
+            total_cells=total_cells,
+            entered_cells=entered_cells,
+            is_completed=is_completed,
         )
 
 
@@ -576,6 +592,7 @@ class ResultCardService:
             *,
             treatment_plant,
             selected_date=None,
+            dismiss_completed=False,
     ):
 
         generated_at = timezone.localtime()
@@ -590,6 +607,25 @@ class ResultCardService:
                 "plant": None,
                 "generated_at": generated_at,
                 "current_only": True,
+                "raw_water_snapshot": {
+                    "available": False,
+                    "time_label": None,
+                    "analysis_id": None,
+                    "parameters": [],
+                    "abnormal_count": 0,
+                    "entered_count": 0,
+                    "total_count": 0,
+                },
+                "current_analysis": None,
+                "current_time_label": None,
+                "analysis_count": 0,
+                "completion": {
+                    "total": 0,
+                    "entered": 0,
+                    "pending": 0,
+                    "abnormal": 0,
+                    "percent": 0,
+                },
             }
 
         # --------------------------------------------------
@@ -604,8 +640,21 @@ class ResultCardService:
         )
 
         # --------------------------------------------------
-        # No scheduled analyses
+        # No scheduled analyses - lazy auto-generate if today
         # --------------------------------------------------
+
+        if not analyses:
+            if selected_date is None or selected_date == timezone.localdate():
+                from qc.services.analysis_generator import AnalysisGenerator
+                AnalysisGenerator.generate_due_analyses(
+                    plant_ids=[treatment_plant.pk] if hasattr(treatment_plant, "pk") else None
+                )
+                analyses = list(
+                    cls.get_active_analyses(
+                        treatment_plant=treatment_plant,
+                        selected_date=selected_date,
+                    )
+                )
 
         if not analyses:
             return {
@@ -613,6 +662,25 @@ class ResultCardService:
                 "plant": treatment_plant,
                 "generated_at": generated_at,
                 "current_only": True,
+                "raw_water_snapshot": {
+                    "available": False,
+                    "time_label": None,
+                    "analysis_id": None,
+                    "parameters": [],
+                    "abnormal_count": 0,
+                    "entered_count": 0,
+                    "total_count": 0,
+                },
+                "current_analysis": None,
+                "current_time_label": None,
+                "analysis_count": 0,
+                "completion": {
+                    "total": 0,
+                    "entered": 0,
+                    "pending": 0,
+                    "abnormal": 0,
+                    "percent": 0,
+                },
             }
 
         # --------------------------------------------------
@@ -634,24 +702,29 @@ class ResultCardService:
         )
 
         # ==================================================
-        # CURRENT SAMPLING CYCLE ONLY
+        # CURRENT ANALYSIS ONLY (Strict Active Analysis)
+        # Result cards stay visible continuously until the next analysis.
         # ==================================================
+        from qc.services.analysis_generator import AnalysisGenerator
 
-        latest_sampling_time = max(
-            analysis.analysis_time.time
-            for analysis in analyses
+        current_analysis = AnalysisGenerator.get_current_analysis(
+            treatment_plant=treatment_plant
         )
 
-        current_analyses = [
-            analysis
-            for analysis in analyses
-            if analysis.analysis_time.time
-               == latest_sampling_time
-        ]
-
-        # --------------------------------------------------
-        # Build single dashboard card
-        # --------------------------------------------------
+        current_analyses = []
+        if current_analysis and current_analysis.analysis_time:
+            current_sampling_time = current_analysis.analysis_time.time
+            current_analyses = [
+                a for a in analyses
+                if a.analysis_time.time == current_sampling_time
+            ]
+        elif analyses:
+            latest_time = max(a.analysis_time.time for a in analyses)
+            current_analyses = [
+                a for a in analyses
+                if a.analysis_time.time == latest_time
+            ]
+            current_analysis = current_analyses[0]
 
         card = cls.build_time_card(
             analyses=current_analyses,
@@ -659,21 +732,231 @@ class ResultCardService:
             plant_has_phases=plant_has_phases,
         )
 
-        cards = []
-
-        if card:
-            cards.append(card)
+        cards = [card] if card else []
+        completion = cls.compute_completion(cards)
+        is_completely_filled = (
+            completion["total"] > 0
+            and completion["pending"] == 0
+        )
+        has_expired = False
+        dismiss_countdown = None
 
         # --------------------------------------------------
         # Return dashboard context
         # --------------------------------------------------
+
+        raw_snapshot = cls.get_raw_water_snapshot(
+            treatment_plant=treatment_plant,
+            analyses=current_analyses,
+            result_map=result_map,
+        )
+
+        current_analysis = (
+            current_analyses[0]
+            if current_analyses
+            else None
+        )
 
         return {
             "cards": cards,
             "plant": treatment_plant,
             "generated_at": generated_at,
             "current_only": True,
+            "raw_water_snapshot": raw_snapshot,
+            "current_analysis": current_analysis,
+            "current_time_label": (
+                cards[0].time_label if cards else None
+            ),
+            "analysis_count": len(current_analyses),
+            "completion": completion,
+            "is_completely_filled": is_completely_filled,
+            "has_expired": has_expired,
+            "dismiss_countdown": dismiss_countdown,
         }
+
+    @classmethod
+    def get_raw_water_snapshot(
+        cls,
+        *,
+        treatment_plant,
+        analyses=None,
+        result_map=None,
+    ):
+        """
+        Latest raw-water parameter values for the live topbar.
+        Prefers the current sampling cycle; falls back to the most
+        recent raw analysis for the selected day.
+        """
+        if analyses is None:
+            analyses = list(
+                cls.get_active_analyses(
+                    treatment_plant=treatment_plant,
+                )
+            )
+
+        raw_analyses = [
+            analysis
+            for analysis in analyses
+            if analysis.water_type == SamplingSchedule.RAW
+        ]
+
+        if not raw_analyses:
+            return {
+                "available": False,
+                "time_label": None,
+                "analysis_id": None,
+                "parameters": [],
+                "abnormal_count": 0,
+                "entered_count": 0,
+                "total_count": 0,
+            }
+
+        latest_time = max(
+            analysis.analysis_time.time
+            for analysis in raw_analyses
+        )
+
+        current_raw = [
+            analysis
+            for analysis in raw_analyses
+            if analysis.analysis_time.time == latest_time
+        ]
+
+        if result_map is None:
+            result_map = cls.preload_results(current_raw)
+
+        parameters = []
+        abnormal_count = 0
+        entered_count = 0
+
+        for analysis in current_raw:
+            for result in result_map.get(analysis.id, []):
+                parameter = cls.resolve_parameter(result)
+                if not parameter:
+                    continue
+
+                cell = cls.make_cell(result)
+                if cell.entered:
+                    entered_count += 1
+                if cell.abnormal:
+                    abnormal_count += 1
+
+                parameters.append(
+                    {
+                        "id": parameter.pk,
+                        "name": parameter.name,
+                        "unit": cell.unit or "",
+                        "value": cell.display_value,
+                        "raw_value": (
+                            float(cell.value)
+                            if cell.value is not None
+                            else None
+                        ),
+                        "limit": cell.display_limit,
+                        "entered": cell.entered,
+                        "abnormal": cell.abnormal,
+                        "phase": (
+                            result.phase.name
+                            if getattr(result, "phase", None)
+                            else None
+                        ),
+                    }
+                )
+
+        parameters.sort(
+            key=lambda item: (
+                0 if item["abnormal"] else 1,
+                item["name"].lower(),
+            )
+        )
+
+        return {
+            "available": bool(parameters),
+            "time_label": latest_time.strftime("%H:%M"),
+            "analysis_id": current_raw[0].pk,
+            "parameters": parameters,
+            "abnormal_count": abnormal_count,
+            "entered_count": entered_count,
+            "total_count": len(parameters),
+        }
+
+    @staticmethod
+    def compute_completion(cards):
+        total = 0
+        entered = 0
+        abnormal = 0
+
+        for card in cards:
+            for group in card.groups:
+                for row in group.rows:
+                    for cell in row.results.values():
+                        total += 1
+                        if cell.entered:
+                            entered += 1
+                        if cell.abnormal:
+                            abnormal += 1
+
+        percent = (
+            round((entered / total) * 100)
+            if total
+            else 0
+        )
+
+        return {
+            "total": total,
+            "entered": entered,
+            "pending": max(total - entered, 0),
+            "abnormal": abnormal,
+            "percent": percent,
+        }
+
+    @classmethod
+    def serialize_live_payload(cls, context):
+        raw = context.get("raw_water_snapshot") or {}
+        completion = context.get("completion") or {}
+        cards = context.get("cards") or []
+        plant = context.get("plant")
+        current = context.get("current_analysis")
+
+        return {
+            "ok": True,
+            "generated_at": (
+                context.get("generated_at").isoformat()
+                if context.get("generated_at")
+                else timezone.localtime().isoformat()
+            ),
+            "plant": {
+                "id": getattr(plant, "pk", None),
+                "name": getattr(plant, "name", None),
+            },
+            "current_time_label": context.get("current_time_label"),
+            "analysis_id": getattr(current, "pk", None),
+            "analysis_count": context.get("analysis_count", 0),
+            "completion": completion,
+            "raw_water": raw,
+            "card_count": len(cards),
+            "fingerprint": cls.build_fingerprint(context),
+        }
+
+    @classmethod
+    def build_fingerprint(cls, context):
+        raw = context.get("raw_water_snapshot") or {}
+        completion = context.get("completion") or {}
+        parts = [
+            str(context.get("current_time_label") or ""),
+            str(getattr(context.get("current_analysis"), "pk", "") or ""),
+            str(completion.get("entered", 0)),
+            str(completion.get("total", 0)),
+            str(completion.get("abnormal", 0)),
+            str(raw.get("time_label") or ""),
+            str(raw.get("entered_count", 0)),
+            str(raw.get("abnormal_count", 0)),
+        ]
+        for item in raw.get("parameters") or []:
+            parts.append(
+                f"{item.get('id')}:{item.get('value')}:{int(bool(item.get('abnormal')))}"
+            )
+        return "|".join(parts)
 
     @classmethod
     def for_request(

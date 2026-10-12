@@ -238,9 +238,6 @@ class SamplingSchedule(models.Model):
 
     @transaction.atomic
     def generate_times(self):
-
-        self.sampling_times.all().delete()
-
         current = datetime.combine(
             timezone.localdate(),
             self.start_time,
@@ -248,25 +245,40 @@ class SamplingSchedule(models.Model):
 
         end = current + timedelta(days=1)
 
-        rows = []
-
+        desired_times = set()
         while current < end:
-
-            rows.append(
-                SamplingTime(
-                    schedule=self,
-                    time=current.time(),
-                )
-            )
-
+            desired_times.add(current.time())
             current += timedelta(
                 minutes=self.interval_minutes
             )
 
-        SamplingTime.objects.bulk_create(
-            rows,
-            batch_size=1000,
+        existing_times = set(
+            self.sampling_times.values_list("time", flat=True)
         )
+
+        # Delete obsolete times only if they are not referenced by any WaterAnalysis
+        self.sampling_times.filter(
+            water_analyses__isnull=True
+        ).exclude(
+            time__in=desired_times
+        ).delete()
+
+        # Create new times that don't exist yet
+        times_to_create = desired_times - existing_times
+        rows = [
+            SamplingTime(
+                schedule=self,
+                time=t,
+            )
+            for t in sorted(times_to_create)
+        ]
+
+        if rows:
+            SamplingTime.objects.bulk_create(
+                rows,
+                batch_size=1000,
+                ignore_conflicts=True,
+            )
 
         self.last_generated_at = timezone.now()
 
@@ -326,7 +338,7 @@ class SamplingSchedule(models.Model):
                 self.generate_times()
 
             else:
-                self.sampling_times.all().delete()
+                self.sampling_times.filter(water_analyses__isnull=True).delete()
 class SamplingTime(models.Model):
 
     schedule = models.ForeignKey(

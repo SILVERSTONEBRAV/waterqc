@@ -8,11 +8,18 @@ from decimal import Decimal, InvalidOperation
 from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
+from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views import View
 
 from core.mixins import WanjalaMixin
+
+try:
+    from sc.models import ShiftAssignment
+    _HAS_SC = True
+except ImportError:
+    _HAS_SC = False
 
 from t.models import TreatmentPlant
 
@@ -39,6 +46,10 @@ class ResultCardEntryView(
 
     partial_template_name = (
         "qc/results/_result_cards.html"
+    )
+
+    topbar_template_name = (
+        "qc/results/_result_topbar.html"
     )
 
     permission_required_view = (
@@ -86,6 +97,15 @@ class ResultCardEntryView(
             **kwargs
         )
 
+    def check_idle_timeout(self):
+        """
+        Bypass idle timeout logout on the live analytical dashboard so cards
+        never disappear and operator sessions never expire due to inactivity.
+        """
+        if hasattr(self, "request") and self.request and hasattr(self.request, "session"):
+            self.request.session[self.last_activity_session_key] = timezone.now().timestamp()
+        return None
+
 
     def get(
         self,
@@ -105,7 +125,7 @@ class ResultCardEntryView(
 
         if not plant:
 
-            return self.render_context({
+            empty = {
 
                 "cards": [],
 
@@ -116,10 +136,38 @@ class ResultCardEntryView(
 
                 "entry_mode": True,
 
+                "auto_refresh": True,
+
                 "message":
                     "No treatment plant assigned.",
 
-            })
+                "available_plants":
+                    self.get_available_plants(),
+
+                "raw_water_snapshot": {
+                    "available": False,
+                    "parameters": [],
+                    "abnormal_count": 0,
+                    "entered_count": 0,
+                    "total_count": 0,
+                },
+
+                "completion": {
+                    "total": 0,
+                    "entered": 0,
+                    "pending": 0,
+                    "abnormal": 0,
+                    "percent": 0,
+                },
+
+            }
+
+            if self.wants_json():
+                return JsonResponse(
+                    ResultCardService.serialize_live_payload(empty)
+                )
+
+            return self.render_context(empty)
 
 
         context = (
@@ -127,15 +175,61 @@ class ResultCardEntryView(
             .get_context(
                 treatment_plant=plant,
                 selected_date=self.resolve_date(),
+                dismiss_completed=(request.GET.get("dismiss_completed") == "true"),
             )
         )
 
+
+        # Build flat raw water params for topbar template
+        raw_snapshot = context.get(
+            "raw_water_snapshot", {}
+        )
+        raw_water_params = []
+        for p in raw_snapshot.get("parameters", []):
+            # Create a short_name (first word or abbreviation)
+            name = p.get("name", "")
+            short = name.split("[")[0].strip()
+            if len(short) > 12:
+                short = short[:10] + "…"
+            raw_water_params.append({
+                "name": name,
+                "short_name": short,
+                "value": p.get("raw_value"),
+                "display_value": p.get("value", "—"),
+                "unit": p.get("unit", ""),
+                "spec": p.get("limit", ""),
+                "abnormal": p.get("abnormal", False),
+                "entered": p.get("entered", False),
+            })
+
+        # Resolve current shift & supervisor for topbar display
+        current_shift = None
+        shift_supervisor = None
+        if _HAS_SC:
+            try:
+                today = timezone.localdate()
+                now_time = timezone.localtime().time()
+                sa = (
+                    ShiftAssignment.objects
+                    .select_related("shift", "supervisor")
+                    .filter(date=today)
+                    .first()
+                )
+                if sa:
+                    current_shift = sa.shift
+                    sup = sa.supervisor
+                    if sup:
+                        shift_supervisor = sup.get_full_name() or sup.username
+            except Exception:
+                pass
 
         context.update({
 
             "entry_mode": True,
 
             "auto_refresh": True,
+
+            "poll_seconds": 60,
 
             "current_time":
                 timezone.localtime(),
@@ -146,12 +240,61 @@ class ResultCardEntryView(
             "laboratory":
                 laboratory,
 
+            "available_plants":
+                self.get_available_plants(),
+
+            "live_url":
+                self.build_live_url(plant),
+
+            "raw_water_params":
+                raw_water_params,
+
+            "current_shift":
+                current_shift,
+
+            "shift_supervisor":
+                shift_supervisor,
+
         })
 
+        if self.wants_json():
+            return JsonResponse(
+                ResultCardService.serialize_live_payload(context)
+            )
 
         return self.render_context(
             context
         )
+
+    def wants_json(self):
+        accept = self.request.headers.get("Accept", "")
+        return (
+            self.request.GET.get("format") == "json"
+            or self.request.GET.get("partial") == "live"
+            or "application/json" in accept
+        )
+
+    def get_available_plants(self):
+        user = self.request.user
+        if user.is_superuser:
+            return list(
+                TreatmentPlant.objects
+                .order_by("name")
+                .values("id", "name")
+            )
+        plant = getattr(user, "assigned_treatment_plant", None)
+        if not plant:
+            return []
+        return [{"id": plant.pk, "name": plant.name}]
+
+    def build_live_url(self, plant):
+        url = f"{self.request.path}?partial=live&format=json"
+        if plant:
+            url += f"&plant={plant.pk}"
+        date = self.request.GET.get("date")
+        if date:
+            url += f"&date={date}"
+        return url
 
 
     def resolve_user_assignment(
@@ -162,70 +305,32 @@ class ResultCardEntryView(
 
 
         if user.is_superuser:
-
-            plant_id = (
-                self.request.GET.get(
-                    "plant"
-                )
-            )
-
+            plant_id = self.request.GET.get("plant")
+            if not plant_id and hasattr(self.request, "session"):
+                plant_id = self.request.session.get("qc_selected_plant")
 
             plant = None
-
-
             if plant_id:
-
-                plant = (
-                    TreatmentPlant.objects
-                    .filter(
-                        pk=plant_id
-                    )
-                    .first()
-                )
-
+                try:
+                    plant = TreatmentPlant.objects.filter(pk=int(plant_id)).first()
+                except (ValueError, TypeError):
+                    plant = None
 
             if plant is None:
+                plant = TreatmentPlant.objects.order_by("name").first()
 
-                plant = (
-                    TreatmentPlant.objects
-                    .order_by(
-                        "name"
-                    )
-                    .first()
-                )
-
+            if plant and hasattr(self.request, "session"):
+                self.request.session["qc_selected_plant"] = plant.pk
 
             return {
-
-                "plant":
-                    plant,
-
-                "laboratory":
-                    getattr(
-                        user,
-                        "assigned_lab",
-                        None,
-                    ),
-
+                "plant": plant,
+                "laboratory": getattr(user, "assigned_lab", None),
             }
 
-
+        plant = getattr(user, "assigned_treatment_plant", None) or TreatmentPlant.objects.order_by("name").first()
         return {
-
-            "plant":
-                getattr(
-                    user,
-                    "assigned_treatment_plant",
-                    None,
-                ),
-
-            "laboratory":
-                getattr(
-                    user,
-                    "assigned_lab",
-                    None,
-                ),
-
+            "plant": plant,
+            "laboratory": getattr(user, "assigned_lab", None),
         }
     @transaction.atomic
     def post(
@@ -243,6 +348,8 @@ class ResultCardEntryView(
 
 
         if not submitted:
+            if self.is_htmx():
+                return self.render_htmx_partial_response(0)
 
             messages.warning(
                 request,
@@ -335,7 +442,35 @@ class ResultCardEntryView(
 
 
 
+        if self.is_htmx():
+            return self.render_htmx_partial_response(updated)
+
         return self.redirect_back()
+
+    def render_htmx_partial_response(self, updated=0):
+        assignments = self.resolve_user_assignment()
+        plant = assignments["plant"]
+        laboratory = assignments["laboratory"]
+        if plant is None:
+            context = ResultCardService.get_empty_context()
+        else:
+            context = ResultCardService.get_context(
+                treatment_plant=plant,
+                selected_date=self.resolve_date(),
+            )
+        context.update({
+            "entry_mode": True,
+            "auto_refresh": True,
+            "poll_seconds": 60,
+            "current_time": timezone.localtime(),
+            "plant": plant,
+            "laboratory": laboratory,
+            "available_plants": self.get_available_plants(),
+            "live_url": self.build_live_url(plant),
+        })
+        resp = render(self.request, self.partial_template_name, context)
+        resp["HX-Trigger"] = '{"resultsSaved": true, "updated": %d}' % updated
+        return resp
 
 
 
@@ -383,32 +518,37 @@ class ResultCardEntryView(
                 )
 
 
+                event_data = {
+                    "type":
+                        "qc_results_updated",
+                    "analysis_id":
+                        analysis.pk,
+                    "plant_id":
+                        plant.pk,
+                    "water_type":
+                        (
+                            analysis
+                            .analysis_time
+                            .schedule
+                            .get_water_type_display()
+                        ),
+                    "timestamp":
+                        timezone.now()
+                        .isoformat(),
+                }
+
                 async_to_sync(
                     channel_layer.group_send
                 )(
                     f"qc-plant-{plant.pk}",
-                    {
-                        "type":
-                            "qc_results_updated",
+                    event_data,
+                )
 
-                        "analysis_id":
-                            analysis.pk,
-
-                        "plant_id":
-                            plant.pk,
-
-                        "water_type":
-                            (
-                                analysis
-                                .analysis_time
-                                .schedule
-                                .get_water_type_display()
-                            ),
-
-                        "timestamp":
-                            timezone.now()
-                            .isoformat(),
-                    },
+                async_to_sync(
+                    channel_layer.group_send
+                )(
+                    "qc-dashboard",
+                    event_data,
                 )
 
 
@@ -443,8 +583,10 @@ class ResultCardEntryView(
         )
 
 
-        if plant:
+        if not plant and hasattr(self.request, "session"):
+            plant = self.request.session.get("qc_selected_plant")
 
+        if plant:
             params.append(
                 f"plant={plant}"
             )
@@ -626,25 +768,19 @@ class ResultCardEntryView(
         context,
     ):
 
-        template = (
-
-            self.partial_template_name
-
-            if (
-                self.is_htmx()
-
-                or
-
-                self.request.GET.get(
-                    "partial"
-                )
-                ==
-                "cards"
-            )
-
-            else self.template_name
-
+        partial = self.request.GET.get(
+            "partial"
         )
+
+        if partial == "topbar":
+            template = self.topbar_template_name
+        elif (
+            self.is_htmx()
+            or partial == "cards"
+        ):
+            template = self.partial_template_name
+        else:
+            template = self.template_name
 
 
         response = render(

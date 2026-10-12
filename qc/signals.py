@@ -1,7 +1,7 @@
 # qc/signals.py
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from django.apps import apps
 from django.core.exceptions import ValidationError
@@ -14,24 +14,13 @@ logger = logging.getLogger("qc.signals")
 
 
 # ============================================================
-# Deferred Alert Engine Import
-# ============================================================
-
-def get_alert_engine():
-    """Lazy import to avoid circular imports."""
-    from alerts.engine import AlertEngine
-    return AlertEngine
-
-
-# ============================================================
-# Bootstrap QC Sampling Schedules
+# Bootstrap QC Sampling Schedules & Periodic Tasks
 # ============================================================
 
 @receiver(post_migrate, dispatch_uid="qc.bootstrap_sampling_system")
 def bootstrap_sampling_system(sender, **kwargs):
     """
-    Create default sampling schedules after migrations.
-
+    Create default sampling schedules and periodic task after migrations.
     Safe to run multiple times.
     """
 
@@ -40,6 +29,7 @@ def bootstrap_sampling_system(sender, **kwargs):
 
     try:
         Schedule = apps.get_model("qc", "SamplingSchedule")
+        TreatmentPlant = apps.get_model("t", "TreatmentPlant")
     except LookupError:
         return
 
@@ -47,6 +37,24 @@ def bootstrap_sampling_system(sender, **kwargs):
 
     if Schedule._meta.db_table not in table_names:
         return
+
+    # Ensure periodic task for celery-beat
+    try:
+        from django_celery_beat.models import PeriodicTask, IntervalSchedule
+        interval, _ = IntervalSchedule.objects.get_or_create(
+            every=1,
+            period=IntervalSchedule.MINUTES,
+        )
+        PeriodicTask.objects.get_or_create(
+            name="qc.generate_due_analyses",
+            defaults={
+                "task": "qc.generate_due_analyses",
+                "interval": interval,
+                "enabled": True,
+            },
+        )
+    except Exception as exc:
+        logger.warning("Could not register PeriodicTask in beat: %s", exc)
 
     defaults = [
         {
@@ -71,29 +79,33 @@ def bootstrap_sampling_system(sender, **kwargs):
         },
     ]
 
-    for item in defaults:
-
-        schedule, created = Schedule.objects.get_or_create(
-            water_type=item["water_type"],
-            defaults=item,
-        )
-
-        if created:
-            logger.info(
-                "Created default schedule for %s",
-                schedule.water_type,
+    plants = TreatmentPlant.objects.all()
+    for plant in plants:
+        for item in defaults:
+            data = dict(item)
+            data["treatment_plant"] = plant
+            schedule, created = Schedule.objects.get_or_create(
+                treatment_plant=plant,
+                water_type=item["water_type"],
+                defaults=data,
             )
 
-    for schedule in Schedule.objects.filter(enabled=True):
+            if created:
+                logger.info(
+                    "Created default schedule for %s plant=%s",
+                    schedule.water_type,
+                    plant.name,
+                )
 
-        try:
-            schedule.generate_times()
-
-        except Exception:
-            logger.exception(
-                "Failed generating sampling times for %s",
-                schedule.water_type,
-            )
+            if schedule.enabled and schedule.sampling_times.count() == 0:
+                try:
+                    schedule.generate_times()
+                except Exception:
+                    logger.exception(
+                        "Failed generating sampling times for %s plant=%s",
+                        schedule.water_type,
+                        plant.name,
+                    )
 
 
 # ============================================================
@@ -106,21 +118,9 @@ def bootstrap_sampling_system(sender, **kwargs):
     dispatch_uid="qc.reference_id",
 )
 def ensure_reference_id(sender, instance, **kwargs):
-
-    if instance.reference_id:
-        return
-
-    if hasattr(sender, "generate_reference_id"):
-
-        for _ in range(50):
-
-            ref = sender.generate_reference_id()
-
-            if not sender.objects.filter(reference_id=ref).exists():
-                instance.reference_id = ref
-                return
-
-    raise ValueError("Unable to generate unique reference ID.")
+    if not instance.reference_id:
+        if hasattr(instance, "generate_reference"):
+            instance.reference_id = instance.generate_reference()
 
 
 # ============================================================
@@ -133,28 +133,22 @@ def ensure_reference_id(sender, instance, **kwargs):
     dispatch_uid="qc.unique_analysis",
 )
 def enforce_unique_analysis_time(sender, instance, **kwargs):
-
-    if not instance.analysis_time:
+    if not instance.analysis_time or not instance.treatment_plant:
         return
 
-    water_type = getattr(instance.analysis_time, "water_type", None)
-
-    if not water_type:
-        return
-
-    since = timezone.now() - timedelta(hours=24)
+    water_type = getattr(instance.analysis_time, "water_type", None) or "Water"
 
     existing = sender.objects.filter(
+        treatment_plant=instance.treatment_plant,
+        analysis_date=instance.analysis_date,
         analysis_time=instance.analysis_time,
-        created_at__gte=since,
     ).exclude(pk=instance.pk)
 
     if existing.exists():
-
         raise ValidationError(
             f"{water_type.title()} analysis for "
-            f"{instance.analysis_time.time.strftime('%I:%M %p')} "
-            f"already exists within the last 24 hours."
+            f"{instance.analysis_time.time.strftime('%I:%M %p')} on {instance.analysis_date} "
+            f"already exists."
         )
 
 
@@ -168,96 +162,17 @@ def enforce_unique_analysis_time(sender, instance, **kwargs):
     dispatch_uid="qc.populate_results",
 )
 def auto_populate_results(sender, instance, created, **kwargs):
-
     if not created:
         return
 
     if not instance.analysis_time:
         return
 
-    water_type = getattr(instance.analysis_time, "water_type", None)
-
-    mapping = {
-
-        "raw": (
-            "RawWaterResult",
-            "RawWaterLimit",
-        ),
-
-        "treated": (
-            "TreatedWaterResult",
-            "TreatedWaterLimit",
-        ),
-
-        "coagulated": (
-            "CoagulatedWaterResult",
-            "CoagulatedWaterLimit",
-        ),
-
-        "clarified": (
-            "ClarifiedWaterResult",
-            "ClarifiedWaterLimit",
-        ),
-
-    }
-
-    if water_type not in mapping:
-        return
-
-    result_name, limit_name = mapping[water_type]
-
+    from qc.services.result_generator import AnalysisResultGenerator
     try:
-
-        ResultModel = apps.get_model("qc", result_name)
-
-        LimitModel = apps.get_model("t", limit_name)
-
-    except LookupError:
-
+        AnalysisResultGenerator.generate_for_analysis(instance)
+    except Exception:
         logger.exception(
-            "Unable to load models for %s",
-            water_type,
+            "Failed generating results for analysis=%s",
+            instance.pk,
         )
-
-        return
-
-    limits = LimitModel.objects.all()
-
-    if not limits.exists():
-
-        logger.warning(
-            "No limits configured for %s water",
-            water_type,
-        )
-
-        return
-
-    with transaction.atomic():
-
-        for parameter in limits:
-
-            ResultModel.objects.get_or_create(
-
-                analysis=instance,
-
-                parameter=parameter,
-
-                defaults={
-
-                    "value": None,
-
-                    # replace with your default state if required
-                    "state": getattr(
-                        ResultModel,
-                        "DEFAULT_STATE",
-                        "pending",
-                    ),
-
-                },
-
-            )
-
-    logger.info(
-        "%s parameter results generated.",
-        water_type.title(),
-    )

@@ -14,9 +14,13 @@ from .ProfileView import (
     ProfilePictureUpdateView,
     UserListView,
     UserCreateView,
+    UserDetailView,
     UserUpdateView,
     UserDeleteView,
     SectionListView,
+    SectionCreateView,
+    SectionUpdateView,
+    SectionDeleteView,
     GroupListView,
     PermissionListView,
     SessionListView,
@@ -58,10 +62,14 @@ urlpatterns = [
     # =========================
     path("admin/users/", UserListView.as_view(), name="user_list"),
     path("admin/users/create/", UserCreateView.as_view(), name="user_create"),
+    path("admin/users/<int:pk>/", UserDetailView.as_view(), name="user_detail"),
     path("admin/users/<int:pk>/edit/", UserUpdateView.as_view(), name="user_update"),
     path("admin/users/<int:pk>/delete/", UserDeleteView.as_view(), name="user_delete"),
 
     path("admin/sections/", SectionListView.as_view(), name="section_list"),
+    path("admin/sections/create/", SectionCreateView.as_view(), name="section_create"),
+    path("admin/sections/<int:pk>/edit/", SectionUpdateView.as_view(), name="section_update"),
+    path("admin/sections/<int:pk>/delete/", SectionDeleteView.as_view(), name="section_delete"),
     path("admin/groups/", GroupListView.as_view(), name="group_list"),
     path("admin/permissions/", PermissionListView.as_view(), name="permission_list"),
 

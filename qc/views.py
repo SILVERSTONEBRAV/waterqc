@@ -74,13 +74,10 @@ class AnalysisWorksheetView(
                 "treatment_plant",
                 "analysis_time",
                 "shift",
-                "analysed_by",
-                "verified_by",
-                "approved_by",
             )
             .order_by(
                 "analysis_time__time",
-                "analysis_time__water_type",
+                "analysis_time__schedule__water_type",
                 "treatment_plant__name",
             )
         )
@@ -92,6 +89,23 @@ class AnalysisWorksheetView(
         qs = qs.filter(
             analysis_date=date,
         )
+
+        if date == timezone.localdate() and not qs.exists():
+            from qc.services.analysis_generator import AnalysisGenerator
+            AnalysisGenerator.generate_due_analyses()
+            qs = self.filter_by_user_plant(
+                WaterAnalysis.objects
+                .select_related(
+                    "treatment_plant",
+                    "analysis_time",
+                    "shift",
+                )
+                .order_by(
+                    "analysis_time__time",
+                    "analysis_time__schedule__water_type",
+                    "treatment_plant__name",
+                )
+            ).filter(analysis_date=date)
 
         plant = self.request.GET.get("plant")
 
@@ -105,13 +119,6 @@ class AnalysisWorksheetView(
         if shift:
             qs = qs.filter(
                 shift_id=shift
-            )
-
-        state = self.request.GET.get("state")
-
-        if state:
-            qs = qs.filter(
-                state=state
             )
 
         return qs
@@ -143,22 +150,17 @@ class AnalysisWorksheetView(
                     "parameter"
                 )
                 .order_by(
-                    "parameter__display_order",
-                    "parameter__name",
+                    "parameter__parameter__name",
                 )
             )
 
             total = results.count()
 
             completed = results.exclude(
-                result__isnull=True,
-            ).exclude(
-                result=""
+                value__isnull=True,
             ).count()
 
-            abnormal = results.filter(
-                is_abnormal=True
-            ).count()
+            abnormal = 0  # computed in template via limit comparison
 
             worksheets.append(
                 {
@@ -242,7 +244,7 @@ class AnalysisWorksheetSaveView(
                     continue
 
                 try:
-                    result.result = Decimal(
+                    result.value = Decimal(
                         str(value)
                     )
                 except (
@@ -252,7 +254,7 @@ class AnalysisWorksheetSaveView(
                 ):
                     continue
 
-                fields = ["result"]
+                fields = ["value"]
 
                 if hasattr(
                     result,
@@ -295,8 +297,6 @@ class AnalysisWorksheetSaveView(
             )
 
             for analysis in analyses:
-
-                analysis.state = "entered"
 
                 if hasattr(
                     analysis,

@@ -1,0 +1,1913 @@
+/* ==============================================================================
+   QCA ANALYTICAL DASHBOARD V2 — ADVANCED FULL-SCREEN PWA STYLESHEET
+   ==============================================================================
+   Features:
+   - 100% Viewport Locked (Zero vertical scrollbars)
+   - Sidebar-Free Maximized Full-Width Analytical Workspace
+   - High Contrast Dark Mode & Complete Light Mode Engine
+   - Superuser Scope Dropdown & Assigned Lab / Plant Badges
+   - Futuristic Glassmorphism, Micro-Animations & Holographic HUD
+   ============================================================================== */
+
+/* ==============================================================================
+   1. VIEWPORT & RESET
+   ============================================================================== */
+html.dashboard-locked,
+body.dashboard-fullscreen {
+    height: 100vh !important;
+    max-height: 100vh !important;
+    width: 100vw !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box;
+    font-family: "Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Eliminate All Vertical & Horizontal Scrollbars */
+html.dashboard-locked,
+body.dashboard-fullscreen,
+.dashboard-page,
+.main-dashboard,
+.dashboard-workspace,
+#cards-container,
+.excel-wrapper {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+
+::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+}
+
+/* Base Flex Shell */
+body.dashboard-fullscreen .dashboard-page {
+    height: 100vh;
+    max-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg-surface-dark, #080d1a);
+    color: var(--text-high-contrast, #f8fafc);
+}
+
+/* ==============================================================================
+   2. HIGH CONTRAST THEME VARIABLES
+   ============================================================================== */
+:root,
+[data-theme="dark"],
+[data-theme="oled"] {
+    --bg-page: #070c17;
+    --bg-card: #0d1527;
+    --bg-card-alt: #111c34;
+    --bg-header: linear-gradient(135deg, #090e1b 0%, #111a2e 50%, #090e1b 100%);
+    --bg-topbar: linear-gradient(90deg, #050912 0%, #0c1424 50%, #050912 100%);
+    --bg-input: #080e1a;
+    --border-subtle: rgba(51, 65, 85, 0.6);
+    --border-active: rgba(99, 102, 241, 0.6);
+    --border-contrast: #334155;
+    --text-primary: #ffffff;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
+    --text-accent: #818cf8;
+    --chip-bg: rgba(30, 41, 59, 0.85);
+    --table-header-bg: #141e33;
+    --table-row-bg: #0b1220;
+    --table-row-alt: #0d1627;
+    --table-row-hover: #16223b;
+    --accent-glow: 0 0 15px rgba(99, 102, 241, 0.25);
+}
+
+[data-theme="light"] {
+    --bg-page: #f1f5f9;
+    --bg-card: #ffffff;
+    --bg-card-alt: #f8fafc;
+    --bg-header: linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #ffffff 100%);
+    --bg-topbar: linear-gradient(90deg, #f8fafc 0%, #e2e8f0 50%, #f8fafc 100%);
+    --bg-input: #ffffff;
+    --border-subtle: #cbd5e1;
+    --border-active: #6366f1;
+    --border-contrast: #94a3b8;
+    --text-primary: #0f172a;
+    --text-secondary: #334155;
+    --text-muted: #64748b;
+    --text-accent: #4f46e5;
+    --chip-bg: #ffffff;
+    --table-header-bg: #e2e8f0;
+    --table-row-bg: #ffffff;
+    --table-row-alt: #f8fafc;
+    --table-row-hover: #eff6ff;
+    --accent-glow: 0 0 10px rgba(79, 70, 229, 0.15);
+}
+
+/* ==============================================================================
+   3. SLEEK HEADER (Compact 48px)
+   ============================================================================== */
+.qc-header {
+    flex-shrink: 0;
+    height: 48px;
+    min-height: 48px;
+    max-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1rem;
+    background: var(--bg-header);
+    border-bottom: 1px solid var(--border-contrast);
+    color: var(--text-primary);
+    z-index: 100;
+}
+
+.header-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+
+.header-brand .brand-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #6366f1, #38bdf8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    font-size: 0.85rem;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+}
+
+.header-brand .brand-info {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.header-brand .brand-title {
+    font-weight: 800;
+    font-size: 0.95rem;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+}
+
+.header-brand .brand-badge {
+    font-size: 0.62rem;
+    font-weight: 700;
+    padding: 0.1rem 0.35rem;
+    background: rgba(99, 102, 241, 0.18);
+    border: 1px solid rgba(99, 102, 241, 0.4);
+    border-radius: 4px;
+    color: #818cf8;
+}
+
+/* Header Center: Scope Select / User Badges & Live Status */
+.header-center {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+}
+
+/* Superuser Scope Dropdown (NO 'ALL' option) */
+.scope-selector-container {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid rgba(99, 102, 241, 0.4);
+    padding: 0.2rem 0.6rem;
+    border-radius: 8px;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="light"] .scope-selector-container {
+    background: #ffffff;
+    border-color: #cbd5e1;
+}
+
+.scope-selector-container .scope-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #818cf8;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.plant-scope-dropdown {
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    outline: none;
+    padding: 0.15rem 0.35rem;
+}
+
+.plant-scope-dropdown option {
+    background: #0f172a;
+    color: #f8fafc;
+}
+
+[data-theme="light"] .plant-scope-dropdown option {
+    background: #ffffff;
+    color: #0f172a;
+}
+
+/* Non-Superuser Assigned Plant & Lab Badges */
+.user-assignments-strip {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+
+.assignment-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    padding: 0.22rem 0.65rem;
+    border-radius: 6px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.plant-badge {
+    background: rgba(99, 102, 241, 0.14);
+    border: 1px solid rgba(99, 102, 241, 0.35);
+    color: #a5b4fc;
+}
+
+.plant-badge i { color: #818cf8; }
+
+.lab-badge {
+    background: rgba(14, 165, 233, 0.14);
+    border: 1px solid rgba(14, 165, 233, 0.35);
+    color: #7dd3fc;
+}
+
+.lab-badge i { color: #38bdf8; }
+
+.assignment-badge .badge-label {
+    font-weight: 500;
+    opacity: 0.8;
+}
+
+.assignment-badge .badge-val {
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+/* WebSocket Live Stream Indicator */
+.ws-status {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 9999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: rgba(30, 41, 59, 0.5);
+    border: 1px solid rgba(51, 65, 85, 0.6);
+}
+
+.ws-status .ws-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #94a3b8;
+}
+
+.ws-status.connected {
+    border-color: rgba(34, 197, 94, 0.5);
+    color: #4ade80;
+    background: rgba(34, 197, 94, 0.1);
+}
+
+.ws-status.connected .ws-dot {
+    background: #22c55e;
+    box-shadow: 0 0 8px #22c55e;
+    animation: pulse-glow 2s infinite ease-in-out;
+}
+
+.ws-status.reconnecting {
+    border-color: rgba(234, 179, 8, 0.5);
+    color: #facc15;
+}
+
+.ws-status.reconnecting .ws-dot {
+    background: #eab308;
+    animation: pulse-glow 1s infinite ease-in-out;
+}
+
+.ws-status.disconnected {
+    border-color: rgba(239, 68, 68, 0.4);
+    color: #f87171;
+}
+
+.ws-status.disconnected .ws-dot { background: #ef4444; }
+
+@keyframes pulse-glow {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+/* Header Controls & Theme Toggle */
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.hdr-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid var(--border-contrast);
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    outline: none;
+}
+
+.hdr-btn:hover {
+    background: rgba(99, 102, 241, 0.2);
+    border-color: rgba(99, 102, 241, 0.5);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+}
+
+.theme-toggle {
+    color: #facc15;
+}
+
+[data-theme="light"] .theme-toggle {
+    color: #4f46e5;
+    background: #ffffff;
+}
+
+.user-pill {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.6rem;
+    background: rgba(30, 41, 59, 0.5);
+    border: 1px solid var(--border-contrast);
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+/* ==============================================================================
+   4. FULLWIDTH WORKSPACE (Zero Sidebars)
+   ============================================================================== */
+.main-dashboard.fullwidth-workspace {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.dashboard-workspace {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg-page);
+}
+
+.dashboard-stack.excel-form {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* ==============================================================================
+   5. REAL-TIME TELEMETRY TOPBARS (Compact & High Contrast)
+   ============================================================================== */
+.dashboard-topbars-wrapper {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    z-index: 40;
+}
+
+.raw-water-topbar {
+    height: 38px;
+    min-height: 38px;
+    display: flex;
+    align-items: center;
+    background: var(--bg-topbar);
+    border-bottom: 1px solid var(--border-contrast);
+    padding: 0 1rem;
+    overflow: hidden;
+}
+
+.raw-water-topbar .topbar-label {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.2rem 0.6rem;
+    background: rgba(99, 102, 241, 0.18);
+    border: 1px solid rgba(99, 102, 241, 0.35);
+    border-radius: 6px;
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #c7d2fe;
+    margin-right: 0.75rem;
+}
+
+.raw-water-topbar .pulse-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 0 6px #22c55e;
+}
+
+.raw-water-topbar .topbar-ticker {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    overflow-x: auto;
+}
+
+.param-chip {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.22rem 0.55rem;
+    border-radius: 6px;
+    background: var(--chip-bg);
+    border: 1px solid var(--border-contrast);
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.param-chip:hover {
+    border-color: var(--border-active);
+    transform: translateY(-1px);
+}
+
+.param-chip .param-label {
+    font-weight: 700;
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    text-transform: uppercase;
+}
+
+.param-chip .param-value {
+    font-weight: 800;
+    font-family: "JetBrains Mono", monospace;
+    color: var(--text-primary);
+    font-size: 0.78rem;
+}
+
+.param-chip .param-unit {
+    font-size: 0.62rem;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.param-chip.abnormal {
+    background: rgba(239, 68, 68, 0.18);
+    border-color: rgba(239, 68, 68, 0.5);
+}
+
+.param-chip.abnormal .param-value {
+    color: #fca5a5;
+    font-weight: 800;
+}
+
+.topbar-time {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-left: 0.75rem;
+    padding-left: 0.75rem;
+    border-left: 1px solid var(--border-contrast);
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+.topbar-time .time-value {
+    font-family: "JetBrains Mono", monospace;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+/* Cycle Meta Topbar */
+.analysis-meta-topbar {
+    height: 32px;
+    min-height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1rem;
+    background: rgba(15, 23, 42, 0.95);
+    border-bottom: 1px solid var(--border-contrast);
+}
+
+[data-theme="light"] .analysis-meta-topbar {
+    background: #e2e8f0;
+}
+
+.analysis-meta-topbar .meta-left,
+.analysis-meta-topbar .meta-center,
+.analysis-meta-topbar .meta-right {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+
+.analysis-meta-topbar .analysis-badge {
+    font-size: 0.82rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.analysis-meta-topbar .analysis-badge i { color: #818cf8; }
+
+.analysis-meta-topbar .ref-pill {
+    font-size: 0.65rem;
+    font-weight: 700;
+    font-family: "JetBrains Mono", monospace;
+    padding: 0.12rem 0.45rem;
+    background: rgba(99, 102, 241, 0.15);
+    border: 1px solid rgba(99, 102, 241, 0.35);
+    border-radius: 4px;
+    color: #a5b4fc;
+}
+
+.analysis-meta-topbar .water-type-pill {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 0.12rem 0.45rem;
+    background: rgba(56, 189, 248, 0.15);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    border-radius: 4px;
+    color: #38bdf8;
+}
+
+.analysis-meta-topbar .completion-pill {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.68rem;
+    color: var(--text-secondary);
+}
+
+.analysis-meta-topbar .completion-bar-mini {
+    width: 70px;
+    height: 5px;
+    border-radius: 3px;
+    background: rgba(51, 65, 85, 0.6);
+    overflow: hidden;
+}
+
+.analysis-meta-topbar .completion-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #6366f1, #38bdf8);
+}
+
+.analysis-meta-topbar .date-pill {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+/* ==============================================================================
+   6. CARDS CONTAINER & STRICT VISIBILITY (Zero Disappearing Cards)
+   ============================================================================== */
+#cards-container,
+.cards-grid-workspace {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden !important;
+    padding: 0.35rem;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Card permanence: ABSOLUTELY GUARANTEED NON-ZERO OPACITY + VISIBILITY */
+#cards-container .card,
+#cards-container .result-card,
+#cards-container .excel-card,
+#cards-container .permanent-card {
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1;
+    min-height: 0;
+    border-radius: 10px !important;
+    border: 1px solid var(--border-contrast) !important;
+    background: var(--bg-card) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25) !important;
+    margin: 0 !important;
+    overflow: hidden;
+    /* Neutralize any upstream transition:opacity that causes fade-out */
+    transition: none !important;
+    animation: none !important;
+}
+
+/* Guarantee card body sections are also permanently visible */
+#cards-container .card-cycle-body {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    transition: none !important;
+}
+
+/* Override any .results-cards opacity transition from result.css */
+.results-cards,
+.cards-grid-workspace {
+    transition: none !important;
+}
+
+[data-theme="light"] #cards-container .card,
+[data-theme="light"] #cards-container .result-card {
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Card Header */
+.card-header.excel-header {
+    background: var(--table-header-bg) !important;
+    border-bottom: 1px solid var(--border-contrast);
+    padding: 0.45rem 0.85rem !important;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.card-header.excel-header .header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.card-header.excel-header .header-left i {
+    color: #818cf8;
+    font-size: 0.85rem;
+}
+
+.card-header.excel-header .card-title {
+    font-size: 0.82rem !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.05em;
+    color: var(--text-primary) !important;
+    margin: 0;
+    text-transform: uppercase;
+}
+
+.card-header.excel-header .card-subtitle {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+/* ==============================================================================
+   7. HIGH CONTRAST EXCEL TABLE & INPUTS
+   ============================================================================== */
+.excel-wrapper {
+    overflow-x: auto;
+    background: var(--bg-card);
+}
+
+.excel-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+}
+
+.excel-th {
+    background: var(--table-header-bg) !important;
+    color: var(--text-secondary) !important;
+    font-weight: 700 !important;
+    font-size: 0.68rem !important;
+    padding: 0.15rem 0.25rem !important;
+    border: 1px solid var(--border-contrast) !important;
+    text-align: center;
+    white-space: nowrap;
+    line-height: 1.1 !important;
+}
+
+.excel-th.phase-col {
+    text-align: left;
+    width: 95px !important;
+    min-width: 95px !important;
+    background: var(--table-header-bg) !important;
+    color: var(--text-primary) !important;
+}
+
+.param-name {
+    font-weight: 700;
+    font-size: 0.68rem;
+    color: var(--text-primary);
+}
+
+.param-unit-tag {
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    font-weight: normal;
+}
+
+.excel-row {
+    background: var(--table-row-bg);
+    transition: background 0.15s ease;
+}
+
+.excel-row:nth-child(even) {
+    background: var(--table-row-alt);
+}
+
+.excel-row:hover,
+.excel-row.excel-row-active {
+    background: var(--table-row-hover) !important;
+}
+
+.excel-cell {
+    border: 1px solid var(--border-contrast) !important;
+    padding: 0.1rem 0.2rem !important;
+    vertical-align: middle;
+}
+
+.excel-cell.phase-cell {
+    font-weight: 700;
+    font-size: 0.72rem;
+    color: var(--text-primary);
+    background: var(--table-header-bg);
+    white-space: nowrap;
+}
+
+.input-cell-wrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+}
+
+/* ULTRA-COMPACT HIGH CONTRAST EXCEL INPUTS */
+.excel-input {
+    width: 100% !important;
+    height: 22px !important;
+    background: var(--bg-input) !important;
+    border: 1px solid var(--border-contrast) !important;
+    color: var(--text-primary) !important;
+    font-weight: 700 !important;
+    font-family: "JetBrains Mono", monospace !important;
+    font-size: 0.74rem !important;
+    border-radius: 3px !important;
+    padding: 0 0.25rem !important;
+    text-align: center;
+    transition: all 0.15s ease;
+}
+
+.excel-input:focus {
+    background: rgba(99, 102, 241, 0.1) !important;
+    border-color: #818cf8 !important;
+    box-shadow: 0 0 6px rgba(129, 140, 248, 0.5) !important;
+    color: #ffffff !important;
+    outline: none !important;
+}
+
+.excel-input.form-control-success {
+    border-color: #22c55e !important;
+    background: rgba(34, 197, 94, 0.08) !important;
+    color: #4ade80 !important;
+}
+
+.excel-input.form-control-danger {
+    border-color: #ef4444 !important;
+    background: rgba(239, 68, 68, 0.12) !important;
+    color: #f87171 !important;
+}
+
+.cell-sub-spec {
+    font-size: 0.58rem;
+    color: var(--text-muted);
+    font-family: "JetBrains Mono", monospace;
+    line-height: 1;
+    margin-top: 1px;
+    white-space: nowrap;
+}
+
+.spec-text {
+    font-size: 0.58rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-top: 1px;
+}
+
+.status-indicator {
+    font-size: 0.6rem;
+    font-weight: 700;
+    padding: 0.05rem 0.3rem;
+    border-radius: 3px;
+    margin-top: 1px;
+    display: inline-block;
+}
+
+.status-indicator.tag-danger {
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.status-indicator.tag-success {
+    background: rgba(34, 197, 94, 0.15);
+    color: #4ade80;
+}
+
+.cell-blank {
+    color: var(--text-muted);
+    text-align: center;
+    font-weight: 700;
+}
+
+/* Empty Dashboard State */
+.empty-dashboard-card {
+    padding: 3rem 1.5rem;
+    text-align: center;
+    border: 1px dashed var(--border-contrast) !important;
+}
+
+.empty-glow-icon {
+    font-size: 2.2rem;
+    color: #818cf8;
+    margin-bottom: 0.75rem;
+    animation: pulse-glow 2.5s infinite;
+}
+
+.empty-title {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.empty-desc {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 0.35rem;
+}
+
+/* ==============================================================================
+   8. COMPACT FOOTER (36px) & HUD DIALOG
+   ============================================================================== */
+.dashboard-panel-footer {
+    flex-shrink: 0;
+    height: 36px;
+    min-height: 36px;
+    max-height: 36px;
+    display: flex;
+    align-items: center;
+    padding: 0 1rem;
+    background: var(--bg-header);
+    border-top: 1px solid var(--border-contrast);
+    z-index: 50;
+}
+
+.dashboard-panel-footer .toolbar {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.footer-hints {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.hint-badge kbd {
+    background: rgba(30, 41, 59, 0.8);
+    border: 1px solid var(--border-contrast);
+    border-radius: 4px;
+    padding: 0.1rem 0.3rem;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.65rem;
+    font-weight: 700;
+}
+
+.hint-status {
+    color: #818cf8;
+    font-weight: 600;
+}
+
+.btn-futuristic {
+    background: linear-gradient(135deg, #4f46e5, #06b6d4) !important;
+    border: none !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    font-size: 0.75rem !important;
+    padding: 0.25rem 0.75rem !important;
+    border-radius: 6px !important;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(79, 70, 229, 0.35);
+}
+
+.btn-glass {
+    background: rgba(30, 41, 59, 0.7) !important;
+    border: 1px solid var(--border-contrast) !important;
+    color: var(--text-secondary) !important;
+    font-weight: 600 !important;
+    font-size: 0.75rem !important;
+    padding: 0.25rem 0.65rem !important;
+    border-radius: 6px !important;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    cursor: pointer;
+}
+
+/* Real-Time Sync Indicator Pill */
+.realtime-loading-pill {
+    position: fixed;
+    bottom: 45px;
+    right: 15px;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid #818cf8;
+    color: #c7d2fe;
+    padding: 0.35rem 0.85rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: none;
+    align-items: center;
+    gap: 0.5rem;
+    z-index: 999;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+}
+
+.htmx-request.realtime-loading-pill,
+.htmx-request .realtime-loading-pill {
+    display: flex !important;
+}
+
+.loading-spinner {
+    width: 12px;
+    height: 12px;
+    border: 2px solid #818cf8;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Shortcuts HUD Dialog */
+.shortcuts-hud-dialog {
+    border: none;
+    background: transparent;
+    padding: 0;
+    outline: none;
+}
+
+.shortcuts-hud-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(4px);
+}
+
+.hud-box {
+    background: #0d1527;
+    border: 1px solid #6366f1;
+    border-radius: 12px;
+    padding: 1.5rem;
+    width: 440px;
+    max-width: 90vw;
+    box-shadow: 0 0 25px rgba(99, 102, 241, 0.35);
+    color: #f8fafc;
+}
+
+[data-theme="light"] .hud-box {
+    background: #ffffff;
+    color: #0f172a;
+}
+
+.hud-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+}
+
+.hud-header h3 {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 800;
+}
+
+.close-hud-btn {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 1.1rem;
+    cursor: pointer;
+}
+
+.hud-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+}
+
+.hud-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.78rem;
+    padding: 0.35rem 0.5rem;
+    background: rgba(30, 41, 59, 0.5);
+    border-radius: 6px;
+}
+
+[data-theme="light"] .hud-item {
+    background: #f1f5f9;
+}
+
+.hud-item kbd {
+    background: #1e293b;
+    border: 1px solid #475569;
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    font-family: inherit;
+    font-weight: 700;
+    color: #38bdf8;
+}
+
+/* ==============================================================================
+   12. CURRENT ANALYSIS HUD STRIP (Strict Single Active Cycle)
+   ============================================================================== */
+.current-analysis-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.45rem 0.85rem;
+    background: linear-gradient(135deg, rgba(13, 21, 39, 0.95), rgba(7, 12, 23, 0.98));
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    border-radius: 10px;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(8px);
+    margin-bottom: 0.25rem;
+    flex-shrink: 0;
+}
+
+[data-theme="light"] .current-analysis-strip {
+    background: linear-gradient(135deg, #ffffff, #f8fafc);
+    border: 1px solid #cbd5e1;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.current-analysis-strip .strip-left {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+
+.current-analysis-strip .strip-title {
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    color: var(--text-primary);
+}
+
+.current-analysis-strip .strip-cycle-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: #070c17;
+    border: 1px solid #38bdf8;
+    color: #38bdf8;
+    padding: 0.22rem 0.55rem;
+    border-radius: 5px;
+    font-size: 0.76rem;
+    font-weight: 800;
+    box-shadow: 0 0 8px rgba(56, 189, 248, 0.25);
+}
+
+[data-theme="light"] .current-analysis-strip .strip-cycle-badge {
+    background: #e0f2fe;
+    border-color: #0284c7;
+    color: #0369a1;
+}
+
+.current-analysis-strip .strip-plant-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.current-analysis-strip .strip-right {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+
+.current-analysis-strip .strip-stages-pill,
+.current-analysis-strip .strip-progress-pill,
+.current-analysis-strip .strip-sync-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    background: rgba(30, 41, 59, 0.75);
+    border: 1px solid var(--border-contrast);
+    padding: 0.22rem 0.55rem;
+    border-radius: 5px;
+    color: var(--text-secondary);
+}
+
+[data-theme="light"] .current-analysis-strip .strip-stages-pill,
+[data-theme="light"] .current-analysis-strip .strip-progress-pill,
+[data-theme="light"] .current-analysis-strip .strip-sync-tag {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+    color: #334155;
+}
+
+.current-analysis-strip .strip-sync-tag {
+    color: #38bdf8;
+    border-color: rgba(56, 189, 248, 0.4);
+}
+
+/* ==============================================================================
+   13. ULTRA-ADVANCED CYBER CYCLE RIBBON & PROMINENT CARD BANNERS
+   ============================================================================== */
+.cycle-ribbon-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.45rem 0.85rem;
+    background: linear-gradient(135deg, rgba(13, 21, 39, 0.95), rgba(7, 12, 23, 0.98));
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(8px);
+    margin-bottom: 0.25rem;
+    flex-shrink: 0;
+}
+
+[data-theme="light"] .cycle-ribbon-bar {
+    background: linear-gradient(135deg, #ffffff, #f8fafc);
+    border: 1px solid #cbd5e1;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.ribbon-prefix {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.pulse-emerald {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 10px #10b981;
+    animation: pulse-emerald-anim 1.8s infinite;
+}
+
+@keyframes pulse-emerald-anim {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.3); opacity: 0.6; }
+}
+
+.ribbon-tabs {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+    flex: 1;
+}
+
+.ribbon-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.cycle-tab-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.65rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    background: rgba(30, 41, 59, 0.7);
+    border: 1px solid rgba(71, 85, 105, 0.5);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+}
+
+[data-theme="light"] .cycle-tab-btn {
+    background: #f1f5f9;
+    border-color: #e2e8f0;
+    color: #334155;
+}
+
+.cycle-tab-btn:hover {
+    background: rgba(56, 189, 248, 0.15);
+    border-color: #38bdf8;
+    color: #ffffff;
+    transform: translateY(-1px);
+}
+
+[data-theme="light"] .cycle-tab-btn:hover {
+    background: #e0f2fe;
+    border-color: #0284c7;
+    color: #0369a1;
+}
+
+.cycle-tab-btn.active {
+    background: linear-gradient(135deg, #4f46e5, #0284c7);
+    border-color: #38bdf8;
+    color: #ffffff;
+    box-shadow: 0 0 14px rgba(56, 189, 248, 0.45);
+}
+
+.cycle-tab-btn .tab-count {
+    font-size: 0.65rem;
+    opacity: 0.8;
+    background: rgba(0, 0, 0, 0.25);
+    padding: 0.1rem 0.35rem;
+    border-radius: 4px;
+}
+
+.ribbon-summary {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-shrink: 0;
+}
+
+.ribbon-progress-pill {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    background: rgba(30, 41, 59, 0.85);
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-contrast);
+    color: var(--text-primary);
+}
+
+[data-theme="light"] .ribbon-progress-pill {
+    background: #e2e8f0;
+}
+
+.btn-ribbon-expand-all {
+    background: transparent;
+    border: 1px solid var(--border-contrast);
+    color: var(--text-secondary);
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.75rem;
+    transition: all 0.2s;
+}
+
+.btn-ribbon-expand-all:hover {
+    border-color: #38bdf8;
+    color: #38bdf8;
+    transform: scale(1.05);
+}
+
+/* Prominent Card Cycle Banner */
+.card-cycle-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.6rem 1rem;
+    background: linear-gradient(90deg, #111a2f 0%, #15223e 50%, #0d1527 100%);
+    border-bottom: 2px solid #38bdf8;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+}
+
+[data-theme="light"] .card-cycle-banner {
+    background: linear-gradient(90deg, #e0e7ff 0%, #f1f5f9 50%, #ffffff 100%);
+    border-bottom: 2px solid #6366f1;
+}
+
+.banner-left {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+}
+
+.cycle-time-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    background: #070c17;
+    border: 1px solid #38bdf8;
+    color: #38bdf8;
+    padding: 0.35rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.88rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+}
+
+[data-theme="light"] .cycle-time-tag {
+    background: #ffffff;
+    border-color: #4f46e5;
+    color: #4f46e5;
+    box-shadow: 0 0 8px rgba(79, 70, 229, 0.2);
+}
+
+.cycle-ping-ring {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #38bdf8;
+    box-shadow: 0 0 6px #38bdf8;
+}
+
+.cycle-meta-info {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.cycle-meta-info .cycle-name {
+    color: var(--text-primary);
+    font-weight: 700;
+}
+
+.banner-right {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.cycle-badges-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.cycle-badge-stages,
+.cycle-badge-date {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    background: rgba(30, 41, 59, 0.6);
+    padding: 0.25rem 0.55rem;
+    border-radius: 5px;
+    border: 1px solid var(--border-contrast);
+}
+
+[data-theme="light"] .cycle-badge-stages,
+[data-theme="light"] .cycle-badge-date {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #475569;
+}
+
+.cycle-card-toggle {
+    background: transparent;
+    border: 1px solid var(--border-contrast);
+    color: var(--text-secondary);
+    width: 26px;
+    height: 26px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.75rem;
+    transition: all 0.2s;
+}
+
+.cycle-card-toggle:hover {
+    border-color: #38bdf8;
+    color: #38bdf8;
+}
+
+/* ==============================================================================
+   7. WATER TYPES ON THE LEFT (HORIZONTAL STAGE SECTIONS)
+   ============================================================================== */
+.stage-section {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: stretch;
+    border-bottom: 1px solid var(--border-contrast);
+    background: var(--bg-card);
+    transition: all 0.25s ease;
+    overflow: hidden;
+}
+
+.stage-section:last-child {
+    border-bottom: none;
+}
+
+/* Completed water types remain fully visible on the dashboard */
+.stage-section.stage-completed-done {
+    display: flex !important;
+    border-left: 3px solid #10b981;
+}
+
+/* Left Water Type Rail */
+.stage-left-rail {
+    width: 125px;
+    min-width: 125px;
+    max-width: 125px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--table-header-bg);
+    border-right: 1px solid var(--border-contrast);
+    padding: 0.25rem 0.4rem;
+}
+
+.stage-pill-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 0.2rem;
+    width: 100%;
+}
+
+.stage-tag-pill {
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.2rem 0.45rem;
+    border-radius: 5px;
+    display: block;
+    width: 100%;
+    text-align: center;
+    white-space: normal;
+    line-height: 1.15;
+}
+
+.stage-rail-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.1rem;
+}
+
+.stage-params-count {
+    font-size: 0.58rem;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.stage-done-tag {
+    font-size: 0.58rem;
+    font-weight: 700;
+    color: #4ade80;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+}
+
+/* Right Table Grid */
+.stage-right-grid {
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+}
+
+/* Completed Stages Collapsed Strip */
+.completed-stages-strip {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.25rem 0.75rem;
+    background: rgba(16, 185, 129, 0.08);
+    border-bottom: 1px solid rgba(16, 185, 129, 0.25);
+    flex-shrink: 0;
+    overflow-x: auto;
+}
+
+.completed-stages-strip:empty,
+.completed-stages-strip:not(:has(button)) {
+    display: none !important;
+}
+
+.completed-stages-strip .strip-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #34d399;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    white-space: nowrap;
+}
+
+.completed-chips-list {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.completed-stage-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    color: #6ee7b7;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.completed-stage-chip:hover {
+    background: rgba(16, 185, 129, 0.35);
+    border-color: #34d399;
+    transform: translateY(-1px);
+}
+
+.chip-edit-icon {
+    font-size: 0.58rem;
+    opacity: 0.75;
+}
+
+/* Stage color badges */
+.stage-pill-raw,
+.stage-raw .stage-tag-pill {
+    background: rgba(16, 185, 129, 0.2);
+    border: 1px solid #10b981;
+    color: #34d399;
+}
+
+.stage-pill-coagulated,
+.stage-coagulated .stage-tag-pill {
+    background: rgba(245, 158, 11, 0.2);
+    border: 1px solid #f59e0b;
+    color: #fbbf24;
+}
+
+.stage-pill-clarified,
+.stage-clarified .stage-tag-pill {
+    background: rgba(56, 189, 248, 0.2);
+    border: 1px solid #38bdf8;
+    color: #38bdf8;
+}
+
+.stage-pill-treated,
+.stage-treated .stage-tag-pill {
+    background: rgba(129, 140, 248, 0.2);
+    border: 1px solid #818cf8;
+    color: #a5b4fc;
+}
+
+/* Process Phase Cell Dot */
+.phase-label-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.phase-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #6366f1;
+}
+
+/* High Contrast Glowing Cell Input Wrappers */
+.cell-danger-glow input {
+    border-color: #ef4444 !important;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.45) !important;
+    background: rgba(239, 68, 68, 0.08) !important;
+}
+
+.cell-success-glow input {
+    border-color: #10b981 !important;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.3) !important;
+}
+
+/* Guaranteed Non-Zero Opacity & Display under ALL circumstances */
+.visible-cycle-card,
+.permanent-card {
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: flex !important;
+    flex-direction: column !important;
+    transition: none !important;
+    animation: none !important;
+}
+
+/* Kill any upstream .result-card transition that causes disappearing */
+.result-card:not(.dismissing) {
+    transition: none !important;
+}
+
+/* ==============================================================================
+   12. 1-MINUTE COMPLETION GRACE TIMER HUD
+   ============================================================================== */
+.cycle-completed-hud {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 1rem;
+    background: linear-gradient(90deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.25) 50%, rgba(16, 185, 129, 0.2) 100%);
+    border-bottom: 1px solid rgba(16, 185, 129, 0.45);
+    box-shadow: 0 2px 10px rgba(16, 185, 129, 0.2);
+    z-index: 20;
+}
+
+.completed-hud-left {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.completed-hud-icon {
+    font-size: 1.3rem;
+    color: #34d399;
+    filter: drop-shadow(0 0 6px rgba(52, 211, 153, 0.6));
+    animation: pulse-glow 2s infinite ease-in-out;
+}
+
+.completed-hud-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.completed-hud-title {
+    font-size: 0.85rem;
+    font-weight: 800;
+    color: #6ee7b7;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.completed-hud-subtitle {
+    font-size: 0.74rem;
+    color: #e2e8f0;
+}
+
+.completed-hud-subtitle strong {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.88rem;
+    color: #a7f3d0;
+    background: rgba(16, 185, 129, 0.25);
+    padding: 0.1rem 0.35rem;
+    border-radius: 4px;
+    border: 1px solid rgba(52, 211, 153, 0.4);
+}
+
+.completed-hud-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-dismiss-now {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.75rem;
+    border-radius: 6px;
+    background: rgba(16, 185, 129, 0.25);
+    border: 1px solid rgba(52, 211, 153, 0.5);
+    color: #f0fdf4;
+    font-size: 0.74rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-dismiss-now:hover {
+    background: rgba(16, 185, 129, 0.45);
+    border-color: #34d399;
+    box-shadow: 0 0 10px rgba(52, 211, 153, 0.5);
+    transform: translateY(-1px);
+}
+
+/* Dismiss animation */
+.card.dismissing {
+    opacity: 0 !important;
+    transform: translateY(-12px) !important;
+    transition: opacity 0.4s ease, transform 0.4s ease !important;
+}
+
+
+/* ==============================================================================
+   13. OUT-OF-RANGE SPEC BUBBLE
+   ============================================================================== */
+/* Appears below an input only when value is outside allowed limits */
+.oor-spec-bubble {
+    display: none; /* Hidden by default — JS shows when OOR */
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.1rem 0.35rem;
+    margin-top: 2px;
+    font-size: 0.58rem;
+    font-weight: 700;
+    font-family: "JetBrains Mono", monospace;
+    color: #fca5a5;
+    background: rgba(239, 68, 68, 0.18);
+    border: 1px solid rgba(239, 68, 68, 0.5);
+    border-radius: 4px;
+    white-space: nowrap;
+    animation: oor-flash 0.4s ease;
+    z-index: 5;
+}
+
+.oor-spec-bubble i {
+    font-size: 0.55rem;
+    color: #f87171;
+}
+
+@keyframes oor-flash {
+    0% { opacity: 0; transform: translateY(-3px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Extra red punch on danger input */
+.excel-input.form-control-danger {
+    border-color: #ef4444 !important;
+    background: rgba(239, 68, 68, 0.15) !important;
+    color: #fca5a5 !important;
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.35), inset 0 0 6px rgba(239, 68, 68, 0.2) !important;
+    animation: danger-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes danger-pulse {
+    0%, 100% { box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.35), inset 0 0 6px rgba(239, 68, 68, 0.2); }
+    50% { box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.6), inset 0 0 10px rgba(239, 68, 68, 0.35); }
+}
+
+/* ==============================================================================
+   14. SHIFT INFO PILL (Topbar)
+   ============================================================================== */
+.shift-info-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    background: rgba(129, 140, 248, 0.15);
+    border: 1px solid rgba(129, 140, 248, 0.4);
+    color: #c7d2fe;
+    white-space: nowrap;
+    margin-left: 0.5rem;
+}
+
+.shift-info-pill i {
+    font-size: 0.65rem;
+    color: #818cf8;
+}
+
+.shift-info-pill .shift-name {
+    font-weight: 800;
+    color: #a5b4fc;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.shift-info-pill .shift-sep {
+    color: rgba(129, 140, 248, 0.5);
+    margin: 0 0.1rem;
+}
+
+.shift-info-pill .shift-supervisor {
+    font-weight: 600;
+    color: #e0e7ff;
+}
+
+[data-theme="light"] .shift-info-pill {
+    background: rgba(99, 102, 241, 0.1);
+    border-color: rgba(99, 102, 241, 0.35);
+    color: #3730a3;
+}
+
+[data-theme="light"] .shift-info-pill .shift-name {
+    color: #4f46e5;
+}
+
+[data-theme="light"] .shift-info-pill .shift-supervisor {
+    color: #312e81;
+}
+
+/* ==============================================================================
+   15. VIEWPORT-FIT CARD BODY (Resizable Height)
+   ============================================================================== */
+/* The card-cycle-body is a flex column that fills remaining space.
+   Allow a resize handle so operators can adjust height on desktop. */
+.card-cycle-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    resize: vertical;
+    overflow: auto;
+    min-height: 120px;
+}
+
+/* Ensure all stage-sections together fit the available height evenly */
+.card-cycle-body .stage-section {
+    flex-shrink: 0;
+}
+
+/* Hide cell-sub-spec entirely — we now use oor-spec-bubble instead */
+.cell-sub-spec {
+    display: none !important;
+}
+
+/* Stop result cards from disappearing before any entry is made.
+   Only cards with .dismissing class are allowed to fade out. */
+#cards-container .result-card:not(.dismissing),
+#cards-container .excel-card:not(.dismissing),
+#cards-container .card:not(.dismissing) {
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+}
+
+/* ==============================================================================

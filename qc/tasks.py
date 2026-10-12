@@ -15,22 +15,18 @@ logger = logging.getLogger(__name__)
 @shared_task(
     bind=True,
     name="qc.generate_due_analyses",
-    autoretry_for=(Exception,),
-    retry_backoff=True,
-    retry_backoff_max=300,
-    retry_jitter=True,
-    max_retries=3,
+    ignore_result=True,
 )
 def generate_due_analyses_task(
     self,
     force: bool = False,
     plant_ids: list[int] | None = None,
-    backfill_minutes: int = 5,
+    backfill_minutes: int = 30,
 ):
     """
     Automatic QC analysis generation.
 
-    Runs every minute via django-celery-beat.
+    Runs every minute via django-celery-beat perpetually (10+ years 24/7).
     Searches current and recently missed sampling windows.
     """
 
@@ -64,14 +60,13 @@ def generate_due_analyses_task(
 
         return result
 
-
     except Exception:
 
         logger.exception(
-            "[QC] Analysis generation failed"
+            "[QC] Analysis generation encountered an error; will auto-resume on next minute interval"
         )
 
-        raise
+        return {"errors": 1, "success": False}
 
 
 

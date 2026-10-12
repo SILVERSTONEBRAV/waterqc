@@ -135,7 +135,8 @@ class CaWanjalaMixin(WanjalaMixin):
         user = self.request.user
 
         if self.is_ca_superuser():
-            plant_id = self.request.session.get(self.plant_session_key)
+            session = getattr(self.request, "session", None)
+            plant_id = session.get(self.plant_session_key) if session else None
             if not plant_id:
                 return None
             return TreatmentPlant.objects.filter(pk=plant_id).first()

@@ -1,0 +1,39 @@
+{
+  "name": "Quality Control Analytical Dashboard",
+  "short_name": "QC Analytics",
+  "description": "NCWSC Water Quality Control - Real-time Analytical Results & Telemetry Dashboard",
+  "start_url": "/qc/cards/",
+  "scope": "/qc/",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone", "window-controls-overlay"],
+  "orientation": "landscape-primary",
+  "background_color": "#0a0f1a",
+  "theme_color": "#0f172a",
+  "categories": ["utilities", "productivity", "analytics"],
+  "icons": [
+    {
+      "src": "/static/core/img/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/core/img/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "QC Live Cards",
+      "url": "/qc/cards/",
+      "description": "Open Real-time Analytical Worksheet"
+    },
+    {
+      "name": "QC Dashboard",
+      "url": "/qc/",
+      "description": "Quality Control Operations Overview"
+    }
+  ]
+}

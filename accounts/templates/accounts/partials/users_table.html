@@ -237,6 +237,9 @@
                             href="{% url 'core:section_create' %}"
                             class="btn btn-outline-success"
                             title="Add Section"
+                            data-bs-toggle="modal"
+                            data-bs-target="#sectionModal"
+                            data-url="{% url 'core:section_create' %}"
                         >
                             <i class="fa fa-plus"></i>
                         </a>

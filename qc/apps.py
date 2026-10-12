@@ -6,3 +6,4 @@ class QcConfig(AppConfig):
 
     def ready(self):
         import qc.tasks  # noqa
+        import qc.signals  # noqa

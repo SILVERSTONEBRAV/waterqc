@@ -1,0 +1,70 @@
+<!-- Universal Dashboard Chart Expansion Modal -->
+<div class="modal fade" id="chartExpandModal" tabindex="-1" aria-labelledby="chartExpandModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header border-bottom py-3 px-4">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="rounded-3 p-2 bg-primary bg-opacity-10 text-primary">
+                        <i class="fa fa-chart-line fa-lg"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title fw-bold mb-0" id="chartExpandModalLabel">Analytics Expanded View</h5>
+                        <small class="text-muted" id="chartExpandModalSubtitle">Interactive high-resolution data inspection</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <div class="btn-group btn-group-sm" role="group" aria-label="Time period filters">
+                        <button type="button" class="btn btn-outline-secondary active" data-period="7d">7D</button>
+                        <button type="button" class="btn btn-outline-secondary" data-period="30d">30D</button>
+                        <button type="button" class="btn btn-outline-secondary" data-period="90d">90D</button>
+                        <button type="button" class="btn btn-outline-secondary" data-period="all">All</button>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="chartExportPngBtn" title="Export as PNG Image">
+                        <i class="fa fa-download me-1"></i> Export Image
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="chartExportCsvBtn" title="Export as CSV">
+                        <i class="fa fa-file-csv me-1"></i> CSV
+                    </button>
+                    <button type="button" class="btn-close ms-2" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+            </div>
+            <div class="modal-body p-4">
+                <!-- Expanded Canvas -->
+                <div class="position-relative" style="height: 480px; width: 100%;">
+                    <canvas id="expandedChartCanvas"></canvas>
+                </div>
+                <!-- Summary Metrics Bar -->
+                <div class="row g-3 mt-3 pt-3 border-top" id="chartExpandSummaryRow">
+                    <div class="col-6 col-md-3">
+                        <div class="p-2 rounded bg-body-tertiary">
+                            <small class="text-muted d-block">Data Samples</small>
+                            <span class="fw-bold" id="expandStatSamples">—</span>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="p-2 rounded bg-body-tertiary">
+                            <small class="text-muted d-block">Peak / Max</small>
+                            <span class="fw-bold text-success" id="expandStatPeak">—</span>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="p-2 rounded bg-body-tertiary">
+                            <small class="text-muted d-block">Minimum</small>
+                            <span class="fw-bold text-danger" id="expandStatMin">—</span>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="p-2 rounded bg-body-tertiary">
+                            <small class="text-muted d-block">Average Mean</small>
+                            <span class="fw-bold text-primary" id="expandStatMean">—</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-top py-2 px-4 bg-body-tertiary">
+                <small class="text-muted me-auto"><i class="fa fa-info-circle me-1"></i> Pan &amp; hover to view precise telemetry data points.</small>
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>

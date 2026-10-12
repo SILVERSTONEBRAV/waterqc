@@ -1,17 +1,90 @@
-<header class="bg-white border-b border-slate-200 shadow-sm">
-    <div class="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
-        <h1 class="text-xl font-bold text-blue-700">Water Quality Control</h1>
-           <div class="text-sm text-slate-600">
-            Current Plant: {{ plant.name|default:"—" }}<br>
+<header class="qc-header" role="banner">
+    <!-- Brand / System Title -->
+    <div class="header-brand">
+        <div class="brand-icon">
+            <i class="fa-solid fa-droplet"></i>
         </div>
-        <div class="flex items-center gap-4">
-            <span class="text-sm text-slate-600">Logged in as {{ request.user.username }}</span>
-            <a href="{% url 'logout' %}" class="text-sm font-medium text-blue-600 hover:underline">Logout</a>
-            <!-- Mobile sidebar toggle -->
-            <button @click="sidebarOpen = !sidebarOpen"
-                    class="md:hidden px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold">
-                Menu
-            </button>
+        <div class="brand-info">
+            <span class="brand-title">QCA Analytics</span>
+            <span class="brand-badge">PWA</span>
         </div>
+    </div>
+
+    <!-- Center Control Zone: Scope Selector / Lab Assignment & Live Status -->
+    <div class="header-center">
+        {% if request.user.is_superuser %}
+            <!-- Superuser Treatment Plant Scope Selector (strictly NO 'All' option) -->
+            <div class="scope-selector-container">
+                <label for="plantScopeSelect" class="scope-label">
+                    <i class="fa-solid fa-industry"></i>
+                    <span>Plant:</span>
+                </label>
+                <select id="plantScopeSelect"
+                        name="plant"
+                        class="plant-scope-dropdown"
+                        aria-label="Select Treatment Plant">
+                    {% for p in available_plants %}
+                    <option value="{{ p.id }}" {% if plant and plant.pk == p.id %}selected{% endif %}>
+                        {{ p.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        {% else %}
+            <!-- Non-Superuser: Assigned Treatment Plant and Assigned Laboratory -->
+            <div class="user-assignments-strip">
+                <div class="assignment-badge plant-badge" title="Assigned Treatment Plant">
+                    <i class="fa-solid fa-industry"></i>
+                    <span class="badge-label">Plant:</span>
+                    <span class="badge-val">{{ plant.name|default:"Unassigned" }}</span>
+                </div>
+                <div class="assignment-badge lab-badge" title="Assigned Laboratory">
+                    <i class="fa-solid fa-flask-vial"></i>
+                    <span class="badge-label">Lab:</span>
+                    <span class="badge-val">{{ laboratory.name|default:"Unassigned Lab" }}</span>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Live Telemetry / Stream Status Indicator -->
+        <div class="ws-status" id="ws-status-indicator" title="Real-time WebSocket Data Link">
+            <span class="ws-dot"></span>
+            <span class="ws-label">Live Stream</span>
+        </div>
+    </div>
+
+    <!-- Futuristic Header Controls & Theme Toggle -->
+    <div class="header-actions">
+        <!-- Audio Effects Toggle -->
+        <button id="soundToggle" class="hdr-btn" type="button" title="Audio Chimes (M)" aria-label="Toggle Sound Effects">
+            <i class="fa-solid fa-volume-high"></i>
+        </button>
+
+        <!-- Keyboard Shortcuts Drawer -->
+        <button id="shortcutsToggle" class="hdr-btn" type="button" title="Shortcuts (?)" aria-label="Keyboard Shortcuts">
+            <i class="fa-solid fa-keyboard"></i>
+        </button>
+
+        <!-- Theme Toggle -->
+        <button id="themeToggle"
+                class="theme-toggle hdr-btn"
+                type="button"
+                aria-label="Toggle dark/light theme"
+                title="Toggle Theme">
+            <i class="fas fa-moon" aria-hidden="true"></i>
+        </button>
+
+        <div class="user-pill" title="Active Operator">
+            <i class="fa-solid fa-user-circle"></i>
+            <span class="username">{{ request.user.username }}</span>
+        </div>
+
+        <a href="{% url 'qc:dashboard' %}" class="hdr-btn" title="QC Central Registry">
+            <i class="fa-solid fa-gauge-high"></i>
+        </a>
+
+        <a href="{% url 'accounts:logout' %}" class="hdr-btn logout-btn" title="Sign Out">
+            <i class="fa-solid fa-right-from-bracket"></i>
+        </a>
     </div>
 </header>

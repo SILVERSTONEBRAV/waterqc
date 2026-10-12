@@ -430,6 +430,18 @@ CELERY_TASK_TIME_LIMIT = env(
     int,
 )
 
+CELERY_WORKER_MAX_TASKS_PER_CHILD = env(
+    "CELERY_WORKER_MAX_TASKS_PER_CHILD",
+    1000,
+    int,
+)
+
+CELERY_WORKER_MAX_MEMORY_PER_CHILD = env(
+    "CELERY_WORKER_MAX_MEMORY_PER_CHILD",
+    300000,  # 300 MB max before worker child recycling
+    int,
+)
+
 CELERY_BEAT_MAX_LOOP_INTERVAL = env(
     "CELERY_BEAT_MAX_LOOP_INTERVAL",
     60,
@@ -440,7 +452,12 @@ CELERY_BEAT_SCHEDULER = (
     "django_celery_beat.schedulers:DatabaseScheduler"
 )
 
-CELERY_BEAT_SCHEDULE = {}
+CELERY_BEAT_SCHEDULE = {
+    "qc.generate_due_analyses": {
+        "task": "qc.generate_due_analyses",
+        "schedule": 60.0,
+    },
+}
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": env(

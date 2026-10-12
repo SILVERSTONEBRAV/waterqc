@@ -52,8 +52,16 @@ chemical-analysis
     data-is-staff="{% if request.user.is_staff %}true{% else %}false{% endif %}"
 >
     <div class="ca-app-layout">
-        <header id="ca-topbar" class="ca-topbar" role="banner">
-            <div class="ca-topbar-left">
+        <!-- =====================================================
+        UNIFIED PLATFORM HEADER (Matches All Apps)
+        ===================================================== -->
+        {% include "accounts/partials/header.html" %}
+
+        <!-- =====================================================
+        CHEMICAL ANALYSIS MODULE SUB-BAR
+        ===================================================== -->
+        <header id="ca-context-topbar" class="ca-context-topbar" role="region" aria-label="Chemical Analysis Navigation">
+            <div class="ca-context-topbar__left">
                 <button
                     type="button"
                     class="ca-icon-button ca-sidebar-toggle-button"
@@ -64,85 +72,52 @@ chemical-analysis
                     title="Toggle navigation"
                     data-action="toggle-sidebar"
                 >
-                    <span class="ca-icon-button__glyph" aria-hidden="true">☰</span>
+                    <i class="fa fa-bars" aria-hidden="true"></i>
                 </button>
 
-                <a href="{% url 'ca:dashboard' %}" class="ca-brand" aria-label="Chemical Analysis dashboard">
-                    <span class="ca-brand-mark" aria-hidden="true">CA</span>
-                    <span class="ca-brand-content">
-                        <span class="ca-brand-name">Chemical Analysis</span>
-                        <span class="ca-brand-module">Quality Assurance</span>
-                    </span>
-                </a>
+                <div class="ca-context-brand">
+                    <span class="ca-context-brand__badge">CA</span>
+                    <div class="ca-context-brand__text">
+                        <span class="ca-context-brand__title">Chemical Analysis</span>
+                        <span class="ca-context-brand__meta">Water Treatment Chemical Quality Assurance</span>
+                    </div>
+                </div>
 
-                <nav class="ca-dashboard-switcher" aria-label="Chemical Analysis dashboards">
-                    <a
-                        href="{% url 'ca:dashboard' %}"
-                        class="ca-dashboard-switcher__item{% if request.resolver_match.url_name == 'dashboard' or request.resolver_match.url_name == 'dashboard-view' %} is-active{% endif %}"
-                        {% if request.resolver_match.url_name == 'dashboard' or request.resolver_match.url_name == 'dashboard-view' %}aria-current="page"{% endif %}
-                    >
-                        <span>01</span>
-                        Command
-                    </a>
-                    <a
-                        href="{% url 'ca:dashboard2' %}"
-                        class="ca-dashboard-switcher__item{% if request.resolver_match.url_name == 'dashboard2' %} is-active{% endif %}"
-                        {% if request.resolver_match.url_name == 'dashboard2' %}aria-current="page"{% endif %}
-                    >
-                        <span>02</span>
-                        Operations
-                    </a>
-                    <a
-                        href="{% url 'ca:dashboard3' %}"
-                        class="ca-dashboard-switcher__item{% if request.resolver_match.url_name == 'dashboard3' %} is-active{% endif %}"
-                        {% if request.resolver_match.url_name == 'dashboard3' %}aria-current="page"{% endif %}
-                    >
-                        <span>03</span>
-                        Analytics
-                    </a>
+                <nav class="ca-context-breadcrumbs" aria-label="Breadcrumb">
+                    <span class="ca-crumb-sep">/</span>
+                    <a href="{% url 'ca:dashboard' %}" class="ca-crumb-active">Command Center</a>
                 </nav>
             </div>
 
-            <div class="ca-topbar-right">
-                <div
-                    id="ca-live-status"
-                    class="ca-live-status"
-                    data-state="online"
-                    aria-live="polite"
-                    aria-label="Live updates enabled"
-                >
-                    <span class="ca-live-status__indicator" aria-hidden="true"></span>
-                    <span class="ca-live-status__text">Live</span>
+            <div class="ca-context-topbar__right">
+                {% if plant_context.is_superuser and plant_context.available_plants %}
+                <form id="ca-plant-scope-form" class="ca-scope-form" method="get" action="">
+                    <label for="ca-plant-scope-select" class="ca-scope-label">Plant:</label>
+                    <select id="ca-plant-scope-select" name="{{ plant_context.query_param }}" class="ca-scope-select" onchange="this.form.submit()">
+                        <option value="all" {% if not plant_context.plant_id %}selected{% endif %}>All Treatment Plants</option>
+                        {% for p in plant_context.available_plants %}
+                        <option value="{{ p.id }}" {% if plant_context.plant_id == p.id %}selected{% endif %}>{{ p.name }}</option>
+                        {% endfor %}
+                    </select>
+                </form>
+                {% endif %}
+
+                <div class="ca-context-actions">
+                    <a href="{% url 'ca:my-tasks' %}" class="ca-btn-context ca-btn-context--outline">
+                        <i class="fa fa-tasks"></i>
+                        <span>My Tasks</span>
+                    </a>
+                    {% if request.user.is_superuser or perms.ca.receive_chemical_batch %}
+                    <a href="{% url 'ca:batch-create' %}" class="ca-btn-context ca-btn-context--primary">
+                        <i class="fa fa-plus"></i>
+                        <span>Receive Batch</span>
+                    </a>
+                    {% endif %}
                 </div>
 
-                {% if request.user.is_superuser or perms.ca.view_chemicalanalysisprocess %}
-                    <a
-                        href="{% url 'ca:my-tasks' %}"
-                        class="ca-topbar-link{% if request.resolver_match.url_name == 'my-tasks' %} is-active{% endif %}"
-                    >
-                        Tasks
-                    </a>
-                {% endif %}
-
-                {% if request.user.is_superuser or perms.ca.receive_chemical_batch %}
-                    <a href="{% url 'ca:batch-create' %}" class="ca-button ca-button--primary ca-button--sm">
-                        Receive Batch
-                    </a>
-                {% endif %}
-
-                <div class="ca-user-menu" id="ca-user-menu">
-                    <div class="ca-user-menu__identity">
-                        <span class="ca-user-menu__name">
-                            {% if request.user.get_full_name %}
-                                {{ request.user.get_full_name }}
-                            {% else %}
-                                {{ request.user.get_username }}
-                            {% endif %}
-                        </span>
-                        <span class="ca-user-menu__username">
-                            {{ request.user.get_username }}
-                        </span>
-                    </div>
+                <div id="ca-live-status" class="ca-live-chip" data-state="online" title="Live laboratory status">
+                    <span class="ca-live-chip__dot" aria-hidden="true"></span>
+                    <span class="ca-live-chip__label">LIVE</span>
                 </div>
             </div>
         </header>
@@ -153,7 +128,7 @@ chemical-analysis
             <div class="ca-content-wrapper">
                 <main id="ca-main" class="ca-main" tabindex="-1" role="main">
                     <div class="ca-main__inner">
-                        <div class="ca-context-bar">
+                        <div class="ca-context-bar" style="display:none;">
                             <nav class="ca-breadcrumbs" aria-label="Breadcrumb">
                                 <a href="{% url 'ca:dashboard' %}">Chemical Analysis</a>
                                 {% block breadcrumbs %}{% endblock %}

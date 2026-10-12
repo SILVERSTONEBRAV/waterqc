@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections import Counter, OrderedDict
 from datetime import datetime, timedelta, timezone as dt_timezone
 from importlib.metadata import PackageNotFoundError, version as package_version
@@ -9,6 +10,7 @@ from typing import Any
 from .mixins import CaWanjalaMixin
 
 from django.core.exceptions import FieldError, PermissionDenied
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import Avg, Count, Max, Min, Q
 from django.http import JsonResponse
 from django.urls import NoReverseMatch, reverse
@@ -501,6 +503,59 @@ class DashboardView(CaWanjalaMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update(self._dashboard_data())
+
+        active_tab = self.request.GET.get("tab", "command")
+        context["active_tab"] = active_tab
+
+        # Build Dashboard 2 (Operational Intelligence) data
+        try:
+            from .dashboard2 import Dashboard2View
+            d2_view = Dashboard2View()
+            d2_view.request = self.request
+            d2_view.now = timezone.now()
+            d2_view.user = self.request.user
+            d2_view.params = d2_view._read_filters()
+            d2_view.models = d2_view._resolve_models()
+            d2_view.scope = d2_view._build_scope()
+            d2_view.data = d2_view._load_data()
+            d2_analysis = d2_view._build_analysis()
+            context["d2"] = d2_analysis
+            context["d2_json"] = json.dumps(
+                d2_analysis,
+                cls=DjangoJSONEncoder,
+                default=str,
+            )
+            context["d2_filters"] = d2_view.params
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).exception("Failed to build Dashboard2 context: %s", e)
+            context["d2"] = {}
+            context["d2_json"] = "{}"
+            context["d2_filters"] = {}
+
+        # Build Dashboard 3 (Predictive Analytics & ML) data
+        try:
+            from .dashboard3 import Dashboard3View
+            d3_view = Dashboard3View()
+            d3_view.request = self.request
+            d3_view._now = timezone.now()
+            d3_view._filters = d3_view._get_filters()
+            d3_qs = d3_view.get_queryset()
+            d3_payload = d3_view._build_dashboard(d3_qs)
+            context["d3"] = d3_payload
+            context["d3_json"] = json.dumps(
+                d3_payload,
+                cls=DjangoJSONEncoder,
+                default=str,
+            )
+            context["d3_filters"] = d3_view._filters
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).exception("Failed to build Dashboard3 context: %s", e)
+            context["d3"] = {}
+            context["d3_json"] = "{}"
+            context["d3_filters"] = {}
+
         return context
 
     def _dashboard_data(self):
@@ -605,6 +660,10 @@ class DashboardView(CaWanjalaMixin, TemplateView):
             "coas": len(coas),
             "checklists": len(checklists),
             "inputs": len(inputs),
+            "active_batches": operations.get("active_processes", len(batches)),
+            "completed_batches": operations.get("completed_batches", 0),
+            "approved_batches": coa_metrics.get("approved", len(coas)),
+            "rejected_batches": sum(1 for b in batches if getattr(b, "status", None) == "REJECTED"),
         }
 
         workflow_health = self.get_workflow_health(
@@ -701,6 +760,10 @@ class DashboardView(CaWanjalaMixin, TemplateView):
             "parameter_analytics": parameter_analytics,
             "risk_register": risk_register,
             "analysis_inputs": self._serialize_inputs(inputs),
+            "batches": batches[:25],
+            "requests": requests[:25],
+            "processes": processes[:25],
+            "coas": coas[:25],
         }
 
     def get_permissions(self):

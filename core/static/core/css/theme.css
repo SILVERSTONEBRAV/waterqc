@@ -1,513 +1,517 @@
 /* =========================================================
-   ADVANCED MULTI-THEME DESIGN SYSTEM (CLEAN VERSION)
+   NCWSCwaterLAB - UNIFIED MULTI-THEME DESIGN SYSTEM
+   Professional Laboratory Information Management System (LIMS)
+   Consistent Typography, Clean Palettes & High-Readability Dark/Light Modes
 ========================================================= */
 
-/* ---------------- BASE TOKENS ---------------- */
+/* ---------------- GLOBAL TYPOGRAPHY & BASE TOKENS ---------------- */
 :root {
-    --ease-fluid: cubic-bezier(.22,1,.36,1);
-    --ease-spring: cubic-bezier(.34,1.56,.64,1);
-    --ease-smooth: cubic-bezier(.4,0,.2,1);
-    --ease-snap: cubic-bezier(.83,0,.17,1);
+    --font-sans: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: 'JetBrains Mono', SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
 
-    --t-instant: 80ms;
-    --t-fast: 140ms;
-    --t-med: 280ms;
-    --t-slow: 520ms;
-    --t-ultra: 1000ms;
+    --ease-fluid: cubic-bezier(.22, 1, .36, 1);
+    --ease-smooth: cubic-bezier(.4, 0, .2, 1);
 
-    --blur-xs: 4px;
-    --blur-sm: 10px;
-    --blur-md: 18px;
-    --blur-lg: 28px;
-    --blur-xl: 40px;
-    --blur-xxl: 70px;
+    --radius-xs: 4px;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 20px;
+    --radius-pill: 9999px;
 
-    --radius-xs: 8px;
-    --radius-sm: 12px;
-    --radius-md: 18px;
-    --radius-lg: 24px;
-    --radius-xl: 32px;
-    --radius-xxl: 42px;
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.08), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
+    --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
 
-    --shadow-xs: 0 2px 8px rgba(0,0,0,.08);
-    --shadow-sm: 0 8px 24px rgba(0,0,0,.10);
-    --shadow-md: 0 18px 40px rgba(0,0,0,.14);
-    --shadow-lg: 0 28px 70px rgba(0,0,0,.20);
-    --shadow-xl: 0 50px 140px rgba(0,0,0,.28);
+    --color-success: #10b981;
+    --color-warning: #f59e0b;
+    --color-danger: #ef4444;
+    --color-info: #0284c7;
 
-    --z-background: -10;
-    --z-particles: -5;
-    --z-content: 10;
-    --z-sidebar: 500;
-    --z-header: 1000;
-    --z-modal: 5000;
-    --z-overlay: 10000;
+    /* ---------------- LIGHT MODE (DEFAULT NCWSC BLUE) ---------------- */
+    --theme-bg: #f8fafc;
+    --theme-surface: #ffffff;
+    --theme-surface-strong: #ffffff;
+    --theme-surface-muted: #f1f5f9;
+    --theme-text: #0f172a;
+    --theme-text-secondary: #334155;
+    --theme-muted: #64748b;
+    --theme-border: #e2e8f0;
+    --theme-border-strong: #cbd5e1;
 
-    --color-success:#22c55e;
-    --color-warning:#f59e0b;
-    --color-danger:#ef4444;
-    --color-info:#3b82f6;
+    --theme-accent: #0284c7;
+    --theme-accent-hover: #0369a1;
+    --theme-accent-soft: rgba(2, 132, 199, 0.10);
+    --theme-accent-glow: rgba(2, 132, 199, 0.25);
 
-    /* DEFAULT THEME */
-    --theme-bg:#edf4ff;
-    --theme-surface:rgba(255,255,255,.72);
-    --theme-surface-strong:rgba(255,255,255,.92);
-    --theme-text:#0f172a;
-    --theme-muted:#64748b;
-    --theme-border:rgba(255,255,255,.65);
-
-    --theme-accent:#2563eb;
-    --theme-accent-soft:rgba(37,99,235,.20);
-    --theme-accent-glow:rgba(37,99,235,.35);
-
-    --nebula-1:rgba(37,99,235,.20);
-    --nebula-2:rgba(168,85,247,.15);
-    --nebula-3:rgba(34,211,238,.15);
-
-    --theme-gradient: linear-gradient(135deg, var(--theme-accent), rgba(255,255,255,.1));
-    --theme-depth: linear-gradient(180deg, rgba(255,255,255,.08), transparent);
+    --topbar-bg: #ffffff;
+    --topbar-border: #e2e8f0;
+    --sidebar-bg: #ffffff;
+    --sidebar-border: #e2e8f0;
 }
 
 /* =========================================================
-   GLOBAL LAYOUT ENHANCEMENTS
+   THEMES PALETTES
 ========================================================= */
+
+/* ---------------- 1. DARK MODE (CHARCOAL SLATE) ---------------- */
+html[data-theme="dark"],
+html[data-theme="oled"],
+html[data-theme="amoled"] {
+    --theme-bg: #0b1329;
+    --theme-surface: #162238;
+    --theme-surface-strong: #0f172a;
+    --theme-surface-muted: #1e293b;
+    --theme-text: #f8fafc;
+    --theme-text-secondary: #cbd5e1;
+    --theme-muted: #94a3b8;
+    --theme-border: #293548;
+    --theme-border-strong: #334155;
+
+    --theme-accent: #38bdf8;
+    --theme-accent-hover: #7dd3fc;
+    --theme-accent-soft: rgba(56, 189, 248, 0.16);
+    --theme-accent-glow: rgba(56, 189, 248, 0.35);
+
+    --topbar-bg: #111c30;
+    --topbar-border: #293548;
+    --sidebar-bg: #0f172a;
+    --sidebar-border: #293548;
+
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 12px 30px rgba(0, 0, 0, 0.6);
+}
+
+/* ---------------- 2. EMERALD THEME (ENVIRONMENTAL / WATER LAB) ---------------- */
+html[data-theme="emerald"] {
+    --theme-bg: #f0fdf4;
+    --theme-surface: #ffffff;
+    --theme-surface-strong: #ffffff;
+    --theme-surface-muted: #dcfce7;
+    --theme-text: #064e3b;
+    --theme-text-secondary: #065f46;
+    --theme-muted: #047857;
+    --theme-border: #bbf7d0;
+    --theme-border-strong: #86efac;
+
+    --theme-accent: #059669;
+    --theme-accent-hover: #047857;
+    --theme-accent-soft: rgba(5, 150, 105, 0.12);
+    --theme-accent-glow: rgba(5, 150, 105, 0.28);
+
+    --topbar-bg: #ffffff;
+    --topbar-border: #bbf7d0;
+    --sidebar-bg: #ffffff;
+    --sidebar-border: #bbf7d0;
+}
+
+html[data-theme="emerald-dark"] {
+    --theme-bg: #022c22;
+    --theme-surface: #064e3b;
+    --theme-surface-strong: #022c22;
+    --theme-surface-muted: #065f46;
+    --theme-text: #ecfdf5;
+    --theme-text-secondary: #a7f3d0;
+    --theme-muted: #6ee7b7;
+    --theme-border: #047857;
+    --theme-border-strong: #059669;
+
+    --theme-accent: #10b981;
+    --theme-accent-hover: #34d399;
+    --theme-accent-soft: rgba(16, 185, 129, 0.18);
+    --theme-accent-glow: rgba(16, 185, 129, 0.35);
+
+    --topbar-bg: #03362a;
+    --topbar-border: #047857;
+    --sidebar-bg: #022c22;
+    --sidebar-border: #047857;
+}
+
+/* ---------------- 3. OCEAN THEME (DEEP MARINE WATER) ---------------- */
+html[data-theme="ocean"] {
+    --theme-bg: #f0f9ff;
+    --theme-surface: #ffffff;
+    --theme-surface-strong: #ffffff;
+    --theme-surface-muted: #e0f2fe;
+    --theme-text: #082f49;
+    --theme-text-secondary: #0369a1;
+    --theme-muted: #0284c7;
+    --theme-border: #bae6fd;
+    --theme-border-strong: #7dd3fc;
+
+    --theme-accent: #0284c7;
+    --theme-accent-hover: #0369a1;
+    --theme-accent-soft: rgba(2, 132, 199, 0.12);
+    --theme-accent-glow: rgba(2, 132, 199, 0.28);
+
+    --topbar-bg: #ffffff;
+    --topbar-border: #bae6fd;
+    --sidebar-bg: #ffffff;
+    --sidebar-border: #bae6fd;
+}
+
+/* ---------------- 4. AURORA & CELESTIAL ALIASES ---------------- */
+html[data-theme="aurora"],
+html[data-theme="celestial"] {
+    --theme-bg: #0c1222;
+    --theme-surface: #141e34;
+    --theme-surface-strong: #0c1222;
+    --theme-surface-muted: #1c2947;
+    --theme-text: #f1f5f9;
+    --theme-text-secondary: #cbd5e1;
+    --theme-muted: #94a3b8;
+    --theme-border: #233354;
+    --theme-border-strong: #334b79;
+
+    --theme-accent: #38bdf8;
+    --theme-accent-hover: #818cf8;
+    --theme-accent-soft: rgba(56, 189, 248, 0.18);
+    --theme-accent-glow: rgba(129, 140, 248, 0.35);
+
+    --topbar-bg: #0f172a;
+    --topbar-border: #233354;
+    --sidebar-bg: #0c1222;
+    --sidebar-border: #233354;
+}
+
+/* =========================================================
+   GLOBAL RESET & TYPOGRAPHY ENFORCEMENT
+========================================================= */
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
 html, body {
-    min-height: 100%;
-    background: var(--theme-bg);
-    color: var(--theme-text);
-    transition: background var(--t-ultra) var(--ease-fluid),
-                color var(--t-slow) var(--ease-fluid);
-    overflow-x: hidden;
+    font-family: var(--font-sans) !important;
+    font-size: 14.5px;
+    line-height: 1.55;
+    background-color: var(--theme-bg) !important;
+    color: var(--theme-text) !important;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.2s var(--ease-smooth), color 0.2s var(--ease-smooth);
 }
 
-.surface,.card,.panel,.widget,.modal,.dropdown-menu{
-    background: var(--theme-depth), var(--theme-surface);
-    backdrop-filter: blur(32px) saturate(180%);
+h1, h2, h3, h4, h5, h6,
+.h1, .h2, .h3, .h4, .h5, .h6 {
+    font-family: var(--font-sans) !important;
+    font-weight: 700;
+    color: var(--theme-text) !important;
+    letter-spacing: -0.02em;
 }
 
-.glow-theme{
-    box-shadow:
-        0 0 30px var(--theme-accent-soft),
-        0 0 80px var(--theme-accent-soft);
+p, span, label, small {
+    font-family: var(--font-sans);
 }
 
-.hero-panel::after{
-    background: var(--theme-accent-soft);
-    opacity: .85;
-    filter: blur(140px);
-}
-
-.border-glow{
-    box-shadow:
-        0 0 18px var(--theme-accent-soft),
-        inset 0 0 10px rgba(255,255,255,.04);
-}
-
-::selection{
-    background: var(--theme-accent-soft);
-    color: var(--theme-text);
-}
-
-@media (prefers-reduced-motion: reduce){
-    *{ animation:none !important; transition:none !important; }
+code, pre, kbd, samp, .font-mono {
+    font-family: var(--font-mono) !important;
 }
 
 /* =========================================================
-   THEMES
+   UNIFIED COMPONENT STYLING ACROSS APPS
 ========================================================= */
 
-/* ---------------- OLED ---------------- */
-html[data-theme="oled"]{
-    --theme-bg:#000;
-    --theme-surface:rgba(10,10,10,.82);
-    --theme-surface-strong:rgba(18,18,18,.96);
-    --theme-text:#fff;
-    --theme-muted:#a1a1aa;
-    --theme-border:rgba(255,255,255,.06);
-
-    --theme-accent:#00e5ff;
-    --theme-accent-soft:rgba(0,229,255,.25);
-    --theme-accent-glow:rgba(0,229,255,.55);
-
-    --nebula-1:rgba(0,229,255,.18);
-    --nebula-2:rgba(120,80,255,.12);
-    --nebula-3:rgba(255,255,255,.06);
-
-    --theme-gradient: radial-gradient(circle at 30% 20%, #00e5ff22, transparent 60%);
-    --theme-depth: linear-gradient(180deg, rgba(0,229,255,.08), transparent);
+/* Cards & Surfaces */
+.card, .surface, .panel, .ca-cyber-card, .ca-chart-box {
+    background-color: var(--theme-surface) !important;
+    color: var(--theme-text) !important;
+    border: 1px solid var(--theme-border) !important;
+    border-radius: var(--radius-md) !important;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 0.2s var(--ease-smooth), border-color 0.2s var(--ease-smooth);
 }
 
-/* ---------------- AURORA ---------------- */
-html[data-theme="aurora"]{
-    --theme-bg:#120018;
-    --theme-surface:rgba(60,0,90,.55);
-    --theme-surface-strong:rgba(90,0,130,.75);
-    --theme-text:#fff;
-    --theme-muted:#f5d0fe;
-    --theme-border:rgba(255,255,255,.08);
-
-    --theme-accent:#ff00ff;
-    --theme-accent-soft:rgba(255,0,255,.22);
-    --theme-accent-glow:rgba(255,0,255,.50);
-
-    --nebula-1:rgba(255,0,255,.35);
-    --nebula-2:rgba(0,255,255,.18);
-    --nebula-3:rgba(255,120,200,.22);
-
-    --theme-gradient: linear-gradient(120deg,#ff00ff33,#00ffff22);
-    --theme-depth: radial-gradient(circle at 70% 30%, rgba(255,0,255,.12), transparent 60%);
+.card-header {
+    background-color: var(--theme-surface-strong) !important;
+    border-bottom: 1px solid var(--theme-border) !important;
+    color: var(--theme-text) !important;
+    font-weight: 600;
 }
 
-/* ---------------- CELESTIAL ---------------- */
-html[data-theme="celestial"]{
-    --theme-bg:#01040f;
-    --theme-surface:rgba(10,20,60,.55);
-    --theme-surface-strong:rgba(20,40,90,.85);
-    --theme-text:#eaf7ff;
-    --theme-muted:#93c5fd;
-
-    --theme-accent:#38bdf8;
-    --theme-accent-soft:rgba(56,189,248,.22);
-    --theme-accent-glow:rgba(56,189,248,.45);
-
-    --nebula-1:rgba(59,130,246,.25);
-    --nebula-2:rgba(34,211,238,.18);
-    --nebula-3:rgba(255,255,255,.08);
-
-    --theme-gradient: radial-gradient(circle at 50% 20%, rgba(56,189,248,.18), transparent 70%);
+.card-footer {
+    background-color: var(--theme-surface-muted) !important;
+    border-top: 1px solid var(--theme-border) !important;
+    color: var(--theme-muted) !important;
 }
 
-/* ---------------- OCEAN ---------------- */
-html[data-theme="ocean"]{
-    --theme-bg:#00181c;
-    --theme-surface:rgba(0,60,70,.55);
-    --theme-surface-strong:rgba(0,90,110,.85);
-    --theme-text:#e6fffb;
-    --theme-muted:#5eead4;
-
-    --theme-accent:#14b8a6;
-    --theme-accent-soft:rgba(20,184,166,.25);
-    --theme-accent-glow:rgba(20,184,166,.45);
-
-    --nebula-1:rgba(20,184,166,.30);
-    --nebula-2:rgba(34,211,238,.22);
-    --nebula-3:rgba(59,130,246,.18);
-
-    --theme-gradient: linear-gradient(180deg,#002b33,#001014);
+/* Topbar & Header */
+.topbar, header.topbar, header.bg-white {
+    background-color: var(--topbar-bg) !important;
+    border-bottom: 1px solid var(--topbar-border) !important;
+    color: var(--theme-text) !important;
 }
 
-/* ---------------- EMERALD ---------------- */
-html[data-theme="emerald"]{
-    --theme-bg:#02150a;
-    --theme-surface:rgba(0,60,25,.55);
-    --theme-surface-strong:rgba(0,90,40,.85);
-    --theme-text:#ecfdf5;
-    --theme-muted:#86efac;
-
-    --theme-accent:#22c55e;
-    --theme-accent-soft:rgba(34,197,94,.22);
-    --theme-accent-glow:rgba(34,197,94,.45);
-
-    --nebula-1:rgba(34,197,94,.30);
-    --nebula-2:rgba(16,185,129,.20);
-    --nebula-3:rgba(255,255,255,.06);
-
-    --theme-gradient: radial-gradient(circle at 20% 10%, rgba(34,197,94,.15), transparent 70%);
+.company-name, .brand {
+    color: var(--theme-text) !important;
+    font-family: var(--font-sans) !important;
+    font-weight: 700;
 }
 
-/* ---------------- INFERNO ---------------- */
-html[data-theme="inferno"]{
-    --theme-bg:#1a0302;
-    --theme-surface:rgba(90,20,10,.60);
-    --theme-surface-strong:rgba(120,30,15,.85);
-    --theme-text:#fff7ed;
-    --theme-muted:#fdba74;
-
-    --theme-accent:#f97316;
-    --theme-accent-soft:rgba(249,115,22,.25);
-    --theme-accent-glow:rgba(249,115,22,.55);
-
-    --nebula-1:rgba(249,115,22,.35);
-    --nebula-2:rgba(239,68,68,.25);
-    --nebula-3:rgba(251,191,36,.18);
-
-    --theme-gradient: radial-gradient(circle at 40% 30%, rgba(255,100,0,.20), transparent 70%);
+.company-subtitle, .text-slate-600 {
+    color: var(--theme-muted) !important;
 }
 
-/* ---------------- GOLD ---------------- */
-html[data-theme="gold"]{
-    --theme-bg:#0b0a08;
-    --theme-surface:rgba(60,45,15,.60);
-    --theme-surface-strong:rgba(90,70,25,.85);
-    --theme-text:#fff8dc;
-    --theme-muted:#fcd34d;
-
-    --theme-accent:#ffd700;
-    --theme-accent-soft:rgba(255,215,0,.25);
-    --theme-accent-glow:rgba(255,215,0,.55);
-
-    --nebula-1:rgba(255,215,0,.22);
-    --nebula-2:rgba(251,191,36,.18);
-    --nebula-3:rgba(255,255,255,.10);
-
-    --theme-gradient: linear-gradient(135deg,#2b1d00,#0b0a08);
+/* Sidebars */
+.sidebar, .dashboard-sidebar, .ca-sidebar {
+    background-color: var(--sidebar-bg) !important;
+    border-right: 1px solid var(--sidebar-border) !important;
+    color: var(--theme-text) !important;
 }
 
-/* ---------------- DAWN ---------------- */
-html[data-theme="dawn"]{
-    --theme-bg:#fff1e6;
-    --theme-surface:rgba(255,255,255,.78);
-    --theme-surface-strong:rgba(255,255,255,.96);
-    --theme-text:#431407;
-    --theme-muted:#9a3412;
-
-    --theme-accent:#fb923c;
-    --theme-accent-soft:rgba(251,146,60,.25);
-    --theme-accent-glow:rgba(251,146,60,.45);
-
-    --nebula-1:rgba(255,180,120,.35);
-    --nebula-2:rgba(255,120,120,.18);
-    --nebula-3:rgba(255,220,120,.20);
-
-    --theme-gradient: linear-gradient(180deg,#fff7ed,#ffe4c7);
+/* Tables */
+.table {
+    --bs-table-bg: transparent;
+    --bs-table-color: var(--theme-text);
+    color: var(--theme-text) !important;
+    border-color: var(--theme-border) !important;
 }
 
-/* ---------------- DAYLIGHT ---------------- */
-html[data-theme="daylight"]{
-    --theme-bg:#eef6ff;
-    --theme-surface:rgba(255,255,255,.80);
-    --theme-surface-strong:rgba(255,255,255,.96);
-    --theme-text:#0f172a;
-    --theme-muted:#64748b;
-
-    --theme-accent:#2563eb;
-    --theme-accent-soft:rgba(37,99,235,.18);
-    --theme-accent-glow:rgba(37,99,235,.35);
-
-    --nebula-1:rgba(59,130,246,.18);
-    --nebula-2:rgba(34,211,238,.12);
-    --nebula-3:rgba(255,255,255,.25);
-
-    --theme-gradient: linear-gradient(180deg,#ffffff,#eef6ff);
+.table th {
+    background-color: var(--theme-surface-muted) !important;
+    color: var(--theme-muted) !important;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--theme-border) !important;
 }
 
-/* ---------------- GLITCH ---------------- */
-html[data-theme="glitch"]{
-    --theme-bg:#050011;
-    --theme-surface:rgba(40,0,60,.50);
-    --theme-surface-strong:rgba(70,0,90,.80);
-    --theme-text:#ffffff;
-    --theme-muted:#f0abfc;
-
-    --theme-accent:#00ffd5;
-    --theme-accent-soft:rgba(0,255,213,.22);
-    --theme-accent-glow:rgba(0,255,213,.50);
-
-    --nebula-1:rgba(255,0,128,.20);
-    --nebula-2:rgba(0,255,213,.20);
-    --nebula-3:rgba(255,255,255,.05);
-
-    --theme-gradient: linear-gradient(90deg, rgba(255,0,128,.12), rgba(0,255,213,.10));
+.table td {
+    color: var(--theme-text) !important;
+    border-bottom: 1px solid var(--theme-border) !important;
 }
 
-html[data-theme="glitch"] body{
-    animation: glitchFlicker 6s infinite;
+.table-hover tbody tr:hover td {
+    background-color: var(--theme-surface-muted) !important;
 }
 
-@keyframes glitchFlicker{
-    0%,100%{ filter:none; }
-    48%{ filter:contrast(1.1) saturate(1.2); }
-    49%{ transform:translateX(1px); }
-    50%{ transform:translateX(-1px); }
-    51%{ transform:translateX(0); }
+/* Form Controls */
+.form-control, .form-select, .input-group-text {
+    background-color: var(--theme-surface-strong) !important;
+    border: 1px solid var(--theme-border-strong) !important;
+    color: var(--theme-text) !important;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-sans);
 }
 
-/* ---------------- SUNSET NEBULA ---------------- */
-html[data-theme="sunset_nebula"]{
-    --theme-bg:#12070a;
-    --theme-surface:rgba(70,25,35,.55);
-    --theme-surface-strong:rgba(110,40,55,.85);
-    --theme-text:#fff1eb;
-    --theme-muted:#fecaca;
-
-    --theme-accent:#ff6b6b;
-    --theme-accent-soft:rgba(255,107,107,.25);
-    --theme-accent-glow:rgba(255,107,107,.50);
-
-    --nebula-1:rgba(255,90,120,.30);
-    --nebula-2:rgba(255,140,60,.20);
-    --nebula-3:rgba(255,220,120,.15);
-
-    --theme-gradient: radial-gradient(circle at 30% 20%, rgba(255,120,90,.20), transparent 70%);
+.form-control:focus, .form-select:focus {
+    border-color: var(--theme-accent) !important;
+    box-shadow: 0 0 0 3px var(--theme-accent-soft) !important;
 }
 
-/* ---------------- FROSTBYTE ---------------- */
-html[data-theme="frostbyte"]{
-    --theme-bg:#0a1220;
-    --theme-surface:rgba(20,40,70,.55);
-    --theme-surface-strong:rgba(30,60,100,.85);
-    --theme-text:#e6f6ff;
-    --theme-muted:#93c5fd;
-
-    --theme-accent:#3dd5f3;
-    --theme-accent-soft:rgba(61,213,243,.22);
-    --theme-accent-glow:rgba(61,213,243,.45);
-
-    --nebula-1:rgba(61,213,243,.25);
-    --nebula-2:rgba(99,102,241,.18);
-    --nebula-3:rgba(255,255,255,.06);
-
-    --theme-gradient: linear-gradient(180deg,#0a1220,#08101a);
+.form-control::placeholder {
+    color: var(--theme-muted) !important;
 }
 
-/* ---------------- LAVENDER STATIC ---------------- */
-html[data-theme="lavender_static"]{
-    --theme-bg:#120a1a;
-    --theme-surface:rgba(60,40,80,.55);
-    --theme-surface-strong:rgba(90,60,120,.85);
-    --theme-text:#f5e9ff;
-    --theme-muted:#d8b4fe;
-
-    --theme-accent:#c084fc;
-    --theme-accent-soft:rgba(192,132,252,.22);
-    --theme-accent-glow:rgba(192,132,252,.45);
-
-    --nebula-1:rgba(192,132,252,.25);
-    --nebula-2:rgba(244,114,182,.18);
-    --nebula-3:rgba(255,255,255,.05);
-
-    --theme-gradient: radial-gradient(circle at 50% 30%, rgba(192,132,252,.18), transparent 70%);
+/* Modals */
+.modal-content {
+    background-color: var(--theme-surface) !important;
+    color: var(--theme-text) !important;
+    border: 1px solid var(--theme-border) !important;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
 }
 
-/* ---------------- TITANIUM ---------------- */
-html[data-theme="titanium"]{
-    --theme-bg:#0f1115;
-    --theme-surface:rgba(35,38,45,.60);
-    --theme-surface-strong:rgba(55,60,70,.85);
-    --theme-text:#e5e7eb;
-    --theme-muted:#9ca3af;
-
-    --theme-accent:#a1a1aa;
-    --theme-accent-soft:rgba(161,161,170,.20);
-    --theme-accent-glow:rgba(161,161,170,.35);
-
-    --nebula-1:rgba(148,163,184,.10);
-    --nebula-2:rgba(100,116,139,.10);
-    --nebula-3:rgba(255,255,255,.04);
-
-    --theme-gradient: linear-gradient(135deg,#0f1115,#1a1d24);
+.modal-header {
+    border-bottom: 1px solid var(--theme-border) !important;
 }
 
-/* ---------------- ACID GREEN ---------------- */
-html[data-theme="acid_green"]{
-    --theme-bg:#050b05;
-    --theme-surface:rgba(20,60,20,.55);
-    --theme-surface-strong:rgba(30,90,30,.85);
-    --theme-text:#eaffea;
-    --theme-muted:#86efac;
-
-    --theme-accent:#39ff14;
-    --theme-accent-soft:rgba(57,255,20,.25);
-    --theme-accent-glow:rgba(57,255,20,.55);
-
-    --nebula-1:rgba(57,255,20,.20);
-    --nebula-2:rgba(0,255,128,.15);
-    --nebula-3:rgba(255,255,255,.05);
-
-    --theme-gradient: radial-gradient(circle at 40% 20%, rgba(57,255,20,.15), transparent 70%);
+.modal-footer {
+    border-top: 1px solid var(--theme-border) !important;
 }
 
-/* ---------------- MIDNIGHT SAPPHIRE ---------------- */
-html[data-theme="midnight_sapphire"]{
-    --theme-bg:#050a18;
-    --theme-surface:rgba(20,30,70,.55);
-    --theme-surface-strong:rgba(30,45,100,.85);
-    --theme-text:#e0f2ff;
-    --theme-muted:#93c5fd;
-
-    --theme-accent:#1e40af;
-    --theme-accent-soft:rgba(30,64,175,.25);
-    --theme-accent-glow:rgba(30,64,175,.45);
-
-    --nebula-1:rgba(59,130,246,.25);
-    --nebula-2:rgba(147,197,253,.18);
-    --nebula-3:rgba(255,255,255,.05);
-
-    --theme-gradient: radial-gradient(circle at 60% 30%, rgba(30,64,175,.20), transparent 70%);
+/* Dropdowns */
+.dropdown-menu {
+    background-color: var(--theme-surface-strong) !important;
+    color: var(--theme-text) !important;
+    border: 1px solid var(--theme-border) !important;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
 }
 
-/* ---------------- ROSE QUARTZ ---------------- */
-html[data-theme="rose_quartz"]{
-    --theme-bg:#fff0f5;
-    --theme-surface:rgba(255,255,255,.75);
-    --theme-surface-strong:rgba(255,255,255,.95);
-    --theme-text:#3b0a1e;
-    --theme-muted:#9d174d;
-
-    --theme-accent:#fb7185;
-    --theme-accent-soft:rgba(251,113,133,.25);
-    --theme-accent-glow:rgba(251,113,133,.40);
-
-    --nebula-1:rgba(251,113,133,.25);
-    --nebula-2:rgba(244,114,182,.18);
-    --nebula-3:rgba(255,255,255,.30);
-
-    --theme-gradient: linear-gradient(180deg,#fff0f5,#ffe4ec);
+.dropdown-item {
+    color: var(--theme-text) !important;
 }
 
-/* ---------------- CARBON ---------------- */
-html[data-theme="carbon"]{
-    --theme-bg:#0a0a0a;
-    --theme-surface:rgba(25,25,25,.60);
-    --theme-surface-strong:rgba(40,40,40,.85);
-    --theme-text:#f5f5f5;
-    --theme-muted:#a3a3a3;
-
-    --theme-accent:#ffffff;
-    --theme-accent-soft:rgba(255,255,255,.10);
-    --theme-accent-glow:rgba(255,255,255,.20);
-
-    --nebula-1:rgba(255,255,255,.04);
-    --nebula-2:rgba(120,120,120,.06);
-    --nebula-3:rgba(200,200,200,.03);
-
-    --theme-gradient: linear-gradient(135deg,#0a0a0a,#141414);
+.dropdown-item:hover, .dropdown-item:focus {
+    background-color: var(--theme-accent-soft) !important;
+    color: var(--theme-accent) !important;
 }
 
-/* ---------------- MATRIX CORE ---------------- */
-html[data-theme="matrix_core"]{
-    --theme-bg:#020403;
-    --theme-surface:rgba(0,40,20,.55);
-    --theme-surface-strong:rgba(0,70,35,.85);
-    --theme-text:#b6ffda;
-    --theme-muted:#34d399;
-
-    --theme-accent:#00ff66;
-    --theme-accent-soft:rgba(0,255,102,.22);
-    --theme-accent-glow:rgba(0,255,102,.55);
-
-    --nebula-1:rgba(0,255,102,.20);
-    --nebula-2:rgba(0,200,120,.15);
-    --nebula-3:rgba(255,255,255,.04);
-
-    --theme-gradient: radial-gradient(circle at 50% 50%, rgba(0,255,102,.10), transparent 70%);
+/* Badges */
+.badge {
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    border-radius: var(--radius-pill);
 }
 
-/* ---------------- OBSIDIAN ICE ---------------- */
-html[data-theme="obsidian_ice"]{
-    --theme-bg:#07080c;
-    --theme-surface:rgba(20,25,35,.65);
-    --theme-surface-strong:rgba(30,35,50,.88);
-    --theme-text:#f8fafc;
-    --theme-muted:#94a3b8;
+/* =========================================================
+   TIME-OF-DAY THEMES — DAWN · DAY · DUSK · NIGHT
+========================================================= */
 
-    --theme-accent:#38bdf8;
-    --theme-accent-soft:rgba(56,189,248,.20);
-    --theme-accent-glow:rgba(56,189,248,.45);
+/* ---------------- DAWN (05:00–09:00) Warm Amber Sunrise ---------------- */
+html[data-theme="dawn"] {
+    --theme-bg: #fffbeb;
+    --theme-surface: #ffffff;
+    --theme-surface-strong: #fef9c3;
+    --theme-surface-muted: #fef3c7;
+    --theme-text: #451a03;
+    --theme-text-secondary: #78350f;
+    --theme-muted: #92400e;
+    --theme-border: #fde68a;
+    --theme-border-strong: #fbbf24;
+    --theme-accent: #d97706;
+    --theme-accent-hover: #b45309;
+    --theme-accent-soft: rgba(217, 119, 6, 0.12);
+    --theme-accent-glow: rgba(251, 191, 36, 0.35);
+    --topbar-bg: #fffbeb;
+    --topbar-border: #fde68a;
+    --sidebar-bg: #fef9c3;
+    --sidebar-border: #fde68a;
+}
 
-    --nebula-1:rgba(56,189,248,.20);
-    --nebula-2:rgba(148,163,184,.12);
-    --nebula-3:rgba(255,255,255,.05);
+/* ---------------- DAY (09:00–17:00) Crisp Blue-White ---------------- */
+html[data-theme="day"] {
+    --theme-bg: #f8fafc;
+    --theme-surface: #ffffff;
+    --theme-surface-strong: #ffffff;
+    --theme-surface-muted: #f1f5f9;
+    --theme-text: #0f172a;
+    --theme-text-secondary: #334155;
+    --theme-muted: #64748b;
+    --theme-border: #e2e8f0;
+    --theme-border-strong: #cbd5e1;
+    --theme-accent: #0284c7;
+    --theme-accent-hover: #0369a1;
+    --theme-accent-soft: rgba(2, 132, 199, 0.10);
+    --theme-accent-glow: rgba(2, 132, 199, 0.25);
+    --topbar-bg: #ffffff;
+    --topbar-border: #e2e8f0;
+    --sidebar-bg: #ffffff;
+    --sidebar-border: #e2e8f0;
+}
 
-    --theme-gradient: linear-gradient(180deg,#07080c,#0f172a);
+/* Alias 'light' → same as 'day' for backwards compatibility */
+html[data-theme="light"] {
+    --theme-bg: #f8fafc;
+    --theme-surface: #ffffff;
+    --theme-surface-strong: #ffffff;
+    --theme-surface-muted: #f1f5f9;
+    --theme-text: #0f172a;
+    --theme-text-secondary: #334155;
+    --theme-muted: #64748b;
+    --theme-border: #e2e8f0;
+    --theme-border-strong: #cbd5e1;
+    --theme-accent: #0284c7;
+    --theme-accent-hover: #0369a1;
+    --theme-accent-soft: rgba(2, 132, 199, 0.10);
+    --theme-accent-glow: rgba(2, 132, 199, 0.25);
+    --topbar-bg: #ffffff;
+    --topbar-border: #e2e8f0;
+    --sidebar-bg: #ffffff;
+    --sidebar-border: #e2e8f0;
+}
+
+/* ---------------- DUSK (17:00–21:00) Warm Violet Sunset ---------------- */
+html[data-theme="dusk"] {
+    --theme-bg: #1e1128;
+    --theme-surface: #2d1b3d;
+    --theme-surface-strong: #1e1128;
+    --theme-surface-muted: #3b2252;
+    --theme-text: #fdf4ff;
+    --theme-text-secondary: #e9d5ff;
+    --theme-muted: #c084fc;
+    --theme-border: #4c1d6a;
+    --theme-border-strong: #7c3aed;
+    --theme-accent: #a855f7;
+    --theme-accent-hover: #c084fc;
+    --theme-accent-soft: rgba(168, 85, 247, 0.18);
+    --theme-accent-glow: rgba(168, 85, 247, 0.40);
+    --topbar-bg: #271036;
+    --topbar-border: #4c1d6a;
+    --sidebar-bg: #1e1128;
+    --sidebar-border: #4c1d6a;
+}
+
+/* ---------------- NIGHT (21:00–05:00) Deep Dark OLED ---------------- */
+html[data-theme="night"],
+html[data-theme="dark"],
+html[data-theme="oled"],
+html[data-theme="amoled"] {
+    --theme-bg: #040810;
+    --theme-surface: #0d1524;
+    --theme-surface-strong: #07101e;
+    --theme-surface-muted: #111d30;
+    --theme-text: #f1f5f9;
+    --theme-text-secondary: #cbd5e1;
+    --theme-muted: #94a3b8;
+    --theme-border: #1e2d42;
+    --theme-border-strong: #2d4060;
+    --theme-accent: #38bdf8;
+    --theme-accent-hover: #7dd3fc;
+    --theme-accent-soft: rgba(56, 189, 248, 0.16);
+    --theme-accent-glow: rgba(56, 189, 248, 0.35);
+    --topbar-bg: #060c18;
+    --topbar-border: #1e2d42;
+    --sidebar-bg: #040810;
+    --sidebar-border: #1e2d42;
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.6);
+    --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.7);
+    --shadow-lg: 0 12px 30px rgba(0, 0, 0, 0.8);
+}
+
+/* Clean Overrides for Utility Classes in dark themes */
+html[data-theme="dark"] .bg-white,
+html[data-theme="dark"] .bg-light,
+html[data-theme="oled"] .bg-white,
+html[data-theme="oled"] .bg-light,
+html[data-theme="night"] .bg-white,
+html[data-theme="night"] .bg-light,
+html[data-theme="dusk"] .bg-white,
+html[data-theme="dusk"] .bg-light {
+    background-color: var(--theme-surface) !important;
+    color: var(--theme-text) !important;
+}
+
+html[data-theme="dark"] .text-muted,
+html[data-theme="oled"] .text-muted,
+html[data-theme="night"] .text-muted,
+html[data-theme="dusk"] .text-muted {
+    color: var(--theme-muted) !important;
+}
+
+html[data-theme="dark"] .border,
+html[data-theme="dark"] .border-top,
+html[data-theme="dark"] .border-bottom,
+html[data-theme="oled"] .border,
+html[data-theme="night"] .border,
+html[data-theme="night"] .border-top,
+html[data-theme="night"] .border-bottom,
+html[data-theme="dusk"] .border,
+html[data-theme="dusk"] .border-top,
+html[data-theme="dusk"] .border-bottom {
+    border-color: var(--theme-border) !important;
+}
+
+/* =========================================================
+   FULLSCREEN-ALWAYS — All apps run fullscreen at all times
+   Fullscreen toggle button is removed; auto-enter on load.
+========================================================= */
+
+/* Prevent any scrollbars on fullscreen pages */
+html.fullscreen-app,
+html.fullscreen-app body {
+    overflow: hidden !important;
+    height: 100vh !important;
+    width: 100vw !important;
+}
+
+/* Theme Flash Removal */
+.theme-flash {
+    display: none !important;
 }

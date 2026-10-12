@@ -107,6 +107,13 @@ class Dashboard3View(CaWanjalaMixin, TemplateView):
 
     cache_timeout = 60
 
+    def _get_model(self, name):
+        from django.apps import apps
+        try:
+            return apps.get_model("ca", name)
+        except LookupError:
+            return None
+
     def dispatch(self, request, *args, **kwargs):
         self._now = timezone.now()
         self._filters = self._get_filters()
@@ -253,6 +260,11 @@ class Dashboard3View(CaWanjalaMixin, TemplateView):
         return context
 
     def _build_dashboard(self, processes):
+        if not hasattr(self, "_now") or self._now is None:
+            self._now = timezone.now()
+        if not hasattr(self, "_filters") or self._filters is None:
+            self._filters = self._get_filters()
+
         cache_key = self._cache_key()
 
         if not self.request.GET.get("export"):
@@ -282,10 +294,178 @@ class Dashboard3View(CaWanjalaMixin, TemplateView):
 
         payload["charts"] = payload["figures"]
 
+        # -----------------------------------------------------------
+        # Derived top-level keys expected by the template
+        # -----------------------------------------------------------
+
+        # risk_register – elevated-risk processes
+        payload["risk_register"] = self._build_risk_register(process_list)
+
+        # qa_queue / approval_queue – processes in QA/CAPA or APPROVED
+        payload["qa_queue"] = self._build_queue(process_list, {"QA", "CAPA"})
+        payload["approval_queue"] = self._build_queue(process_list, {"APPROVED"})
+
+        # active_processes – all non-terminal processes
+        terminal = {"COMPLETED", "REJECTED", "RETURNED", "UTILIZED"}
+        payload["active_processes"] = self._build_active_processes(
+            process_list, terminal,
+        )
+
+        # supplier_performance / analyst_performance tables
+        payload["supplier_performance"] = self._build_supplier_performance(
+            process_list,
+        )
+        payload["analyst_performance"] = self._build_analyst_performance(
+            process_list,
+        )
+
+        # forecast availability flag
+        payload["forecast"] = {"available": bool(process_list)}
+
+        # comparisons (period-over-period deltas) – placeholder
+        payload["comparisons"] = {}
+
+        # comparative_statistics – placeholder so template |default works
+        payload["comparative_statistics"] = {}
+
         if not self.request.GET.get("export"):
             cache.set(cache_key, payload, self.cache_timeout)
 
         return payload
+
+    # -----------------------------------------------------------------
+    # Helpers for derived template context
+    # -----------------------------------------------------------------
+
+    def _build_risk_register(self, processes):
+        rows = []
+        for p in processes:
+            age = self._age_hours(p)
+            rework = getattr(p, "rework_count", 0) or 0
+            overdue = self._is_overdue(p)
+
+            risk_score = 0
+            if overdue:
+                risk_score += 40
+            if rework > 0:
+                risk_score += 20 * rework
+            if age > 48:
+                risk_score += min(int(age / 12), 40)
+
+            if risk_score <= 0:
+                continue
+
+            rows.append({
+                "id": p.pk,
+                "chemical": self._chemical_name(p),
+                "status": p.status,
+                "age_hours": round(age, 1),
+                "rework_count": rework,
+                "escalation_count": 0,
+                "risk_score": risk_score,
+            })
+
+        rows.sort(key=lambda r: r["risk_score"], reverse=True)
+        return rows
+
+    def _build_queue(self, processes, statuses):
+        rows = []
+        for p in processes:
+            if p.status not in statuses:
+                continue
+            age = self._age_hours(p)
+            risk = "HIGH" if age > 24 else ("MEDIUM" if age > 12 else "LOW")
+            rows.append({
+                "id": p.pk,
+                "status": p.status,
+                "age_hours": round(age, 1),
+                "date": getattr(p, "created_at", None),
+                "risk": risk,
+            })
+        return rows
+
+    def _build_active_processes(self, processes, terminal):
+        rows = []
+        for p in processes:
+            if p.status in terminal:
+                continue
+            age = self._age_hours(p)
+            overdue = self._is_overdue(p)
+            rework = getattr(p, "rework_count", 0) or 0
+
+            if age > 48 or overdue:
+                risk = "CRITICAL" if (overdue and rework > 0) else "HIGH"
+            elif age > 24:
+                risk = "MEDIUM"
+            else:
+                risk = "LOW"
+
+            rows.append({
+                "id": p.pk,
+                "chemical": self._chemical_name(p),
+                "status": p.status,
+                "age_hours": round(age, 1),
+                "rework_count": rework,
+                "overdue": overdue,
+                "risk": risk,
+            })
+        return rows
+
+    def _build_supplier_performance(self, processes):
+        groups = defaultdict(lambda: Counter())
+        for p in processes:
+            name = self._supplier_name(p)
+            groups[name][p.status] += 1
+
+        rows = []
+        for supplier, statuses in groups.items():
+            total = sum(statuses.values())
+            approved = statuses.get("APPROVED", 0) + statuses.get("COMPLETED", 0) + statuses.get("UTILIZED", 0)
+            rejected = statuses.get("REJECTED", 0) + statuses.get("RETURNED", 0)
+            acceptance = round(approved / total * 100, 1) if total else 0
+            risk_score = round(100 - acceptance, 1)
+            rows.append({
+                "supplier": supplier,
+                "total": total,
+                "approved": approved,
+                "rejected": rejected,
+                "acceptance_rate": acceptance,
+                "risk_score": risk_score,
+            })
+        rows.sort(key=lambda r: r["total"], reverse=True)
+        return rows
+
+    def _build_analyst_performance(self, processes):
+        groups = defaultdict(lambda: Counter())
+        terminal = {"COMPLETED", "REJECTED", "RETURNED", "UTILIZED"}
+        for p in processes:
+            name = self._user_name(getattr(p, "assigned_analyst", None))
+            groups[name][p.status] += 1
+
+        rows = []
+        for analyst, statuses in groups.items():
+            total = sum(statuses.values())
+            active = sum(c for s, c in statuses.items() if s not in terminal)
+            completed = statuses.get("COMPLETED", 0)
+            retest = statuses.get("RETEST", 0)
+            qa = statuses.get("QA", 0) + statuses.get("CAPA", 0)
+            rows.append({
+                "analyst": analyst,
+                "total": total,
+                "active": active,
+                "completed": completed,
+                "retest": retest,
+                "qa": qa,
+                "capa": statuses.get("CAPA", 0),
+            })
+        rows.sort(key=lambda r: r["total"], reverse=True)
+        return rows
+
+    def _age_hours(self, process):
+        created = getattr(process, "created_at", None)
+        if created is None:
+            return 0
+        return max((self._now - created).total_seconds() / 3600, 0)
 
     def _cache_key(self):
         user = self.request.user
@@ -377,17 +557,27 @@ class Dashboard3View(CaWanjalaMixin, TemplateView):
             else 0
         )
 
+        fail_rate = (
+            fail_count / result_total * 100
+            if result_total
+            else 0
+        )
+
         return {
             "total_processes": total,
             "total_batches": len({p.batch_id for p in processes}),
             "active_processes": active,
+            "active_analyses": active,
             "completed_processes": completed,
+            "completed": completed,
             "overdue_processes": overdue,
             "pass_count": pass_count,
             "fail_count": fail_count,
             "na_count": na_count,
             "pass_rate": round(pass_rate, 2),
+            "fail_rate": round(fail_rate, 2),
             "retest_rate": round(retest_rate, 2),
+            "retest_count": retested,
             "sla_rate": round(sla_rate, 2),
             "avg_turnaround": self._mean(turnaround),
             "median_turnaround": self._median(turnaround),
@@ -446,21 +636,25 @@ class Dashboard3View(CaWanjalaMixin, TemplateView):
         }
 
     def _queues(self, processes):
-        sampling = list(
-            SystematicRandomSampling.objects
-            .filter(batch__in=[p.batch_id for p in processes])
-        )
+        SamplingModel = self._get_model("SystematicRandomSampling")
+        if SamplingModel:
+            sampling = list(
+                SamplingModel.objects
+                .filter(batch__in=[p.batch_id for p in processes])
+            )
+        else:
+            sampling = []
 
         sampling_pending = sum(
-            1 for s in sampling if s.status == "PENDING"
+            1 for s in sampling if getattr(s, "status", None) == "PENDING"
         )
 
         counter_check = sum(
-            1 for s in sampling if s.status == "COUNTER_CHECK"
+            1 for s in sampling if getattr(s, "status", None) == "COUNTER_CHECK"
         )
 
         sampling_qa = sum(
-            1 for s in sampling if s.status == "QA_REVIEW"
+            1 for s in sampling if getattr(s, "status", None) == "QA_REVIEW"
         )
 
         pending_results = 0
@@ -530,8 +724,18 @@ class Dashboard3View(CaWanjalaMixin, TemplateView):
                     supplier[supplier_name][status] += 1
                     analyst[analyst_name][status] += 1
 
+        retested = sum(
+            1
+            for p in processes
+            if getattr(p, "rework_count", 0) and p.rework_count > 0
+        )
+
         return {
             "results": dict(result_counts),
+            "pass": result_counts.get("PASS", 0),
+            "fail": result_counts.get("FAIL", 0),
+            "na": result_counts.get("NA", 0),
+            "retest_count": retested,
             "chemical": self._counter_dict(chemical),
             "supplier": self._counter_dict(supplier),
             "analyst": self._counter_dict(analyst),
@@ -643,13 +847,17 @@ class Dashboard3View(CaWanjalaMixin, TemplateView):
     def _sampling(self, processes):
         batch_ids = [p.batch_id for p in processes]
 
-        records = list(
-            SystematicRandomSampling.objects
-            .filter(batch_id__in=batch_ids)
-            .prefetch_related("samples")
-        )
+        SamplingModel = self._get_model("SystematicRandomSampling")
+        if SamplingModel:
+            records = list(
+                SamplingModel.objects
+                .filter(batch_id__in=batch_ids)
+                .prefetch_related("samples")
+            )
+        else:
+            records = []
 
-        status_counts = Counter(r.status for r in records)
+        status_counts = Counter(getattr(r, "status", "") for r in records)
 
         package_variances = []
 

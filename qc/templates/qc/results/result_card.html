@@ -1,6 +1,6 @@
 {% extends "qc/results/base.html" %}
 {% load custom_filters %}
-{% block title %}QC Results{% endblock %}
+{% block title %}QC Analytical Worksheet{% endblock %}
 
 {% block content %}
 <form
@@ -8,7 +8,6 @@
     action=""
     hx-post="{{ request.get_full_path }}"
     hx-target="#cards-container"
-    hx-select="#cards-container"
     hx-swap="outerHTML"
     hx-indicator="#loading-indicator"
     class="dashboard-stack excel-form"
@@ -24,31 +23,57 @@
     <input type="hidden" name="analysis_id" value="{{ current_analysis.pk }}">
     {% endif %}
 
+    <!-- Real-time Topbars (Telemetry & Current Cycle Metadata) -->
     {% include "qc/results/_result_topbar.html" %}
 
-    <!-- Cards container -->
-    <div id="cards-container"
-         class="dashboard-workspace"
-         data-refresh-url="{{ request.path }}?partial=cards{% if plant %}&plant={{ plant.pk }}{% endif %}{% if request.GET.date %}&date={{ request.GET.date }}{% endif %}">
-        {% include "qc/results/_result_cards.html" %}
+    <!-- Cards container (Rooted inside _result_cards.html for unbreakable partial swaps) -->
+    {% include "qc/results/_result_cards.html" %}
+
+    <!-- Loading status indicator -->
+    <div id="loading-indicator" class="htmx-indicator realtime-loading-pill">
+        <span class="loading-spinner"></span>
+        <span>Synchronizing analytical results…</span>
     </div>
 
-    <!-- Loading indicator -->
-    <div id="loading-indicator" class="alert alert-info htmx-indicator">
-        Refreshing analytical results...
-    </div>
-
-    <!-- Sticky footer actions -->
-    <div class="dashboard-panel-footer position-sticky bottom-0 z-sticky bg-alt">
+    <!-- Futuristic Keyboard & Action Footer -->
+    <div class="dashboard-panel-footer">
         <div class="toolbar flex items-center justify-between">
-            <p class="fs-sm text-muted">
-                Results auto‑save after 3 seconds of inactivity, or instantly when pressing Enter.
-            </p>
+            <div class="footer-hints">
+                <span class="hint-badge"><kbd>Enter</kbd> Save &amp; Advance</span>
+                <span class="hint-badge"><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd><kbd>←</kbd> Navigate</span>
+                <span class="hint-badge"><kbd>?</kbd> Shortcuts</span>
+                <span class="hint-status" id="autosave-status-text">Auto-save on 10s idle</span>
+            </div>
             <div class="actions flex gap-2">
-                <button type="submit" class="btn btn-primary">Save Results</button>
-                <button type="reset" class="btn btn-secondary">Reset Values</button>
+                <button type="submit" class="btn btn-primary btn-futuristic" id="manualSaveBtn">
+                    <i class="fa-solid fa-floppy-disk"></i>
+                    <span>Save Results</span>
+                </button>
+                <button type="reset" class="btn btn-secondary btn-glass" id="resetBtn">
+                    <i class="fa-solid fa-rotate-left"></i>
+                    <span>Reset</span>
+                </button>
             </div>
         </div>
     </div>
 </form>
+
+<!-- Futuristic Keyboard Shortcuts Modal Dialog -->
+<dialog id="shortcutsModal" class="shortcuts-hud-dialog">
+    <div class="hud-box">
+        <div class="hud-header">
+            <h3><i class="fa-solid fa-keyboard text-accent"></i> Analytical Workspace Shortcuts</h3>
+            <button type="button" class="close-hud-btn" onclick="document.getElementById('shortcutsModal').close()">✕</button>
+        </div>
+        <div class="hud-grid">
+            <div class="hud-item"><kbd>Enter</kbd> <span>Instantly save cell &amp; advance to next</span></div>
+            <div class="hud-item"><kbd>Arrow Keys</kbd> <span>Navigate seamlessly between cells</span></div>
+            <div class="hud-item"><kbd>Ctrl + S</kbd> <span>Save all worksheet entries immediately</span></div>
+            <div class="hud-item"><kbd>F</kbd> <span>Toggle Fullscreen HUD mode</span></div>
+            <div class="hud-item"><kbd>M</kbd> <span>Toggle Sound Feedback effects</span></div>
+            <div class="hud-item"><kbd>?</kbd> <span>Toggle this shortcuts HUD</span></div>
+            <div class="hud-item"><kbd>Esc</kbd> <span>Close dialogs / Cancel input</span></div>
+        </div>
+    </div>
+</dialog>
 {% endblock %}

@@ -43,32 +43,26 @@ class DashboardConsumer(
             return
 
 
-        self.group_name = None
+        query_string = self.scope.get("query_string", b"").decode("utf-8")
+        from urllib.parse import parse_qs
+        qs = parse_qs(query_string)
+        url_plant = qs.get("plant", [None])[0]
 
-
+        self.groups_joined = []
         if plant:
+            self.groups_joined.append(f"qc-plant-{plant.pk}")
+        if url_plant and f"qc-plant-{url_plant}" not in self.groups_joined:
+            self.groups_joined.append(f"qc-plant-{url_plant}")
+        if user.is_superuser and "qc-dashboard" not in self.groups_joined:
+            self.groups_joined.append("qc-dashboard")
 
-            self.group_name = (
-                f"qc-plant-{plant.pk}"
-            )
-
-        elif user.is_superuser:
-
-            self.group_name = (
-                "qc-dashboard"
-            )
-
-
-        if self.group_name:
-
+        for g in self.groups_joined:
             await self.channel_layer.group_add(
-                self.group_name,
+                g,
                 self.channel_name,
             )
 
-
         await self.accept()
-
 
         await self.send_json(
             {
@@ -76,38 +70,32 @@ class DashboardConsumer(
                 "plant_id": getattr(
                     plant,
                     "pk",
-                    None,
+                    url_plant,
                 ),
-                "group": self.group_name,
+                "groups": self.groups_joined,
             }
         )
 
-
         logger.info(
-            "[QC WS] Connected user=%s plant=%s group=%s",
+            "[QC WS] Connected user=%s plant=%s groups=%s",
             user.username,
             getattr(
                 plant,
                 "pk",
-                None,
+                url_plant,
             ),
-            self.group_name,
+            self.groups_joined,
         )
-
 
     async def disconnect(
         self,
         close_code,
     ):
-
-
-        if self.group_name:
-
+        for g in getattr(self, "groups_joined", []):
             await self.channel_layer.group_discard(
-                self.group_name,
+                g,
                 self.channel_name,
             )
-
 
         logger.info(
             "[QC WS] Disconnected code=%s user=%s",

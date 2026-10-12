@@ -13,6 +13,7 @@ from channels.layers import get_channel_layer
 
 from django.core.cache import cache
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from qc.models import (
@@ -51,59 +52,82 @@ class AnalysisGenerator:
         cls,
         target_datetime=None,
         force=False,
-        backfill_minutes=5,
+        backfill_minutes=30,
         plant_ids=None,
+        all_day=False,
     ):
 
         now = cls._normalize_datetime(
             target_datetime or timezone.now()
         )
+        target_date = now.date()
 
         stats = cls._result()
 
-
-        cursor = (
-            now -
-            timedelta(
-                minutes=backfill_minutes
-            )
-        ).replace(
-            second=0,
-            microsecond=0,
+        logger.info(
+            "[QC] Generation started %s (backfill=%s, force=%s, all_day=%s)",
+            now,
+            backfill_minutes,
+            force,
+            all_day,
         )
 
+        queryset = (
+            SamplingTime.objects
+            .filter(
+                schedule__enabled=True,
+            )
+            .select_related(
+                "schedule",
+                "schedule__treatment_plant",
+            )
+        )
+
+        if plant_ids:
+            queryset = queryset.filter(
+                schedule__treatment_plant_id__in=plant_ids
+            )
+
+        if all_day or (backfill_minutes is not None and backfill_minutes >= 1440):
+            due_samples = list(queryset.order_by("schedule__treatment_plant_id", "time"))
+        elif backfill_minutes is None:
+            window_end = (now + timedelta(minutes=cls.SAMPLE_WINDOW_MINUTES)).time()
+            due_samples = list(queryset.filter(time__lte=window_end).order_by("schedule__treatment_plant_id", "time"))
+        else:
+            window_start_dt = now - timedelta(minutes=backfill_minutes + cls.SAMPLE_WINDOW_MINUTES)
+            window_end_dt = now + timedelta(minutes=cls.SAMPLE_WINDOW_MINUTES)
+            if window_start_dt.date() == target_date:
+                start_time = window_start_dt.time()
+                end_time = window_end_dt.time()
+                if start_time <= end_time:
+                    queryset = queryset.filter(time__gte=start_time, time__lte=end_time)
+                else:
+                    queryset = queryset.filter(Q(time__gte=start_time) | Q(time__lte=end_time))
+            else:
+                queryset = queryset.filter(time__lte=window_end_dt.time())
+            due_samples = list(queryset.order_by("schedule__treatment_plant_id", "time"))
 
         logger.info(
-            "[QC] Generation started %s",
-            now,
+            "[QC] Due samples to process: %s",
+            len(due_samples),
         )
 
-
-        while cursor <= now:
-
-            result = cls.generate_for_time(
-                current_datetime=cursor,
+        for sample in due_samples:
+            result = cls._generate_sample(
+                sample=sample,
+                current_datetime=now,
                 force=force,
-                plant_ids=plant_ids,
             )
-
 
             cls._merge(
                 stats,
                 result,
             )
 
-
-            cursor += timedelta(
-                minutes=1
-            )
-
-
         logger.info(
             "[QC] Generation completed %s",
             stats,
         )
-
 
         return stats
 
@@ -223,45 +247,45 @@ class AnalysisGenerator:
 
 
             with transaction.atomic():
-
-                analysis = WaterAnalysis.objects.create(
+                analysis, created = WaterAnalysis.objects.get_or_create(
                     treatment_plant=plant,
                     analysis_date=current_datetime.date(),
                     analysis_time=sample,
-                    shift=shift,
+                    defaults={
+                        "shift": shift,
+                    },
                 )
 
-
-                cls._create_log(
-                    analysis,
-                    sample,
-                )
-
-
-            stats["created"] += 1
-
-
-
-            cls._generate_results(
-                analysis,
-                stats,
-            )
-
-
-            cls._broadcast(
-                analysis,
-                plant,
-                sample,
-            )
-
+                if created:
+                    cls._create_log(
+                        analysis,
+                        sample,
+                    )
+                    stats["created"] += 1
+                    cls._generate_results(
+                        analysis,
+                        stats,
+                    )
+                    cls._broadcast(
+                        analysis,
+                        plant,
+                        sample,
+                    )
+                else:
+                    stats["existing"] += 1
+                    if force:
+                        cls._generate_results(
+                            analysis,
+                            stats,
+                        )
 
             logger.info(
-                "[QC] Created analysis=%s plant=%s shift=%s",
+                "[QC] %s analysis=%s plant=%s shift=%s",
+                "Created" if created else "Existing",
                 analysis.pk,
                 plant.name,
                 shift.name if shift else None,
             )
-
 
             return stats
 
@@ -595,7 +619,28 @@ class AnalysisGenerator:
 
 
         if not analyses:
-            return None
+            cls.generate_due_analyses(
+                target_datetime=now,
+                plant_ids=[treatment_plant.pk] if hasattr(treatment_plant, 'pk') else None,
+                backfill_minutes=None,
+            )
+            analyses = list(
+                WaterAnalysis.objects
+                .filter(
+                    treatment_plant=treatment_plant,
+                    analysis_date=now.date(),
+                )
+                .select_related(
+                    "analysis_time",
+                    "analysis_time__schedule",
+                    "shift",
+                )
+                .order_by(
+                    "analysis_time__time"
+                )
+            )
+            if not analyses:
+                return None
 
 
 

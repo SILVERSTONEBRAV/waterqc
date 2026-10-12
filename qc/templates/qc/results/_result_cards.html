@@ -1,114 +1,178 @@
 {% load custom_filters %}
 
-{% for card in cards %}
-<div id="card-{{ card.sampling_time.pk }}"
-     class="card excel-card mb-6 elevation-2 result-card"
-     data-water-type="{{ card.water_type|default:'generic' }}">
+<div id="cards-container"
+     class="cards-grid-workspace"
+     data-refresh-url="{{ request.path }}?partial=cards{% if plant %}&plant={{ plant.pk }}{% endif %}{% if request.GET.date %}&date={{ request.GET.date }}{% endif %}">
 
-    {% for group in card.groups %}
-    <section class="card-section">
+    {% if cards %}
+    {% with card=cards.0 %}
+    <!-- ═══════════════════════════════════════════════════════════
+         CURRENT ANALYSIS — Clean Viewport-Fit Card (No Redundancy)
+         ═══════════════════════════════════════════════════════════ -->
+    <article id="card-{{ card.sampling_time.pk }}"
+             class="card excel-card result-card permanent-card visible-cycle-card"
+             data-cycle-id="card-{{ card.sampling_time.pk }}"
+             data-sampling-time="{{ card.time_label }}"
+             style="opacity:1!important;visibility:visible!important;display:flex!important;flex-direction:column;flex:1;min-height:0;">
 
-        <!-- Group Header -->
-        <div class="card-header excel-header flex items-center justify-between">
-            <h3 class="card-title text-uppercase tracking-wide">
-                {{ group.title }}
-            </h3>
-            <span class="card-subtitle">
-                {{ group.parameters|length }} parameter{{ group.parameters|length|pluralize }}
-            </span>
+        {% if is_completely_filled %}
+        <!-- Current Analysis Completion Status (Stays visible until next analysis) -->
+        <div class="current-cycle-status-strip" style="padding:0.4rem 0.8rem;background:rgba(16,185,129,0.12);border-bottom:1px solid rgba(16,185,129,0.3);display:flex;align-items:center;gap:0.5rem;font-size:0.8rem;color:#10b981;font-weight:600;">
+            <i class="fa-solid fa-circle-check"></i>
+            <span>Current Analysis ({{ card.time_label }}) Complete — Active until next scheduled analysis</span>
         </div>
+        {% endif %}
 
-        <!-- Results Table -->
-        <div class="excel-wrapper">
-            <table class="excel-table w-full">
-                <thead>
-                    <tr>
-                        <th class="excel-th sticky left-0 z-sticky">Phase</th>
-                        {% for parameter in group.parameters %}
-                        <th class="excel-th text-center">
-                            {% with parts=parameter.name|split_brackets %}
-                                <div class="param-name">
-                                    {{ parts.0 }}{% if parameter.unit %} ({{ parameter.unit }}){% endif %}
-                                </div>
-                                {% if parts.1 %}
-                                <div class="param-extra fs-xs text-muted">
-                                    {{ parts.1 }}
-                                </div>
-                                {% endif %}
-                            {% endwith %}
-                        </th>
-                        {% endfor %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in group.rows %}
-                    <tr class="excel-row">
-                        <!-- Phase -->
-                        <td class="excel-cell sticky left-0 z-sticky fw-medium text-muted">
-                            {{ row.name }}
-                        </td>
-                        {% for parameter in group.parameters %}
-                        <td class="excel-cell">
-                            {% with cell=row.results|get_item:parameter.name %}
-                                {% if cell %}
-                                <div class="form-group text-center">
-                                    <input
-                                        type="number"
-                                        step="0.001"
-                                        min="-999999"
-                                        max="999999"
-                                        inputmode="decimal"
-                                        autocomplete="off"
-                                        spellcheck="false"
-                                        name="result_{{ cell.result.pk }}"
-                                        value="{{ cell.value|default_if_none:'' }}"
-                                        class="form-control excel-input text-center fs-sm fw-medium
-                                        {% if cell.abnormal %}
-                                            form-control-danger
-                                        {% elif cell.entered %}
-                                            form-control-success
-                                        {% endif %}"
-                                        data-autosave="true"
-                                        data-navigation="true"
-                                        aria-label="Result for {{ parameter.name }}">
-                                    <div class="spec-text fs-xs text-muted">
-                                        Spec: {{ cell.display_limit }}
+        <!-- Stage Groups — Water Types on the LEFT, Compact Zero-Scroll Grid -->
+        <div id="card-body-{{ card.sampling_time.pk }}" class="card-cycle-body"
+             style="display:flex!important;flex-direction:column;flex:1;min-height:0;overflow-y:auto;">
+            {% for group in card.groups %}
+            <section class="card-section stage-section stage-{{ group.water_type|lower|default:'generic' }} {% if group.is_completed %}stage-completed-done{% endif %}"
+                     id="stage-section-{{ group.water_type|lower }}"
+                     data-water-type="{{ group.water_type|lower }}"
+                     data-total="{{ group.total_cells }}"
+                     data-entered="{{ group.entered_cells }}"
+                     data-completed="{% if group.is_completed %}true{% else %}false{% endif %}">
+
+                <!-- Left Water Type Rail / Anchor -->
+                <div class="stage-left-rail">
+                    <div class="stage-pill-wrap">
+                        <span class="stage-tag-pill stage-pill-{{ group.water_type|lower|default:'generic' }}">
+                            {{ group.title }}
+                        </span>
+                        <div class="stage-rail-meta">
+                            <span class="stage-params-count">{{ group.parameters|length }} params</span>
+                            {% if group.is_completed %}
+                            <span class="stage-done-tag"><i class="fa-solid fa-circle-check"></i> Done</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Table Grid -->
+                <div class="excel-wrapper stage-right-grid">
+                    <table class="excel-table w-full" role="grid" aria-label="{{ group.title }} Table">
+                        <thead>
+                            <tr>
+                                <th class="excel-th phase-col sticky left-0 z-sticky" scope="col">
+                                    <span>Phase</span>
+                                </th>
+                                {% for parameter in group.parameters %}
+                                <th class="excel-th text-center param-head-col" scope="col"
+                                    title="{{ parameter.name }}{% if parameter.unit %} ({{ parameter.unit }}){% endif %}">
+                                    {% with parts=parameter.name|split_brackets %}
+                                        <div class="param-name">
+                                            {{ parts.0 }}{% if parameter.unit %} <span class="param-unit-tag">({{ parameter.unit }})</span>{% endif %}
+                                        </div>
+                                        {% if parts.1 %}
+                                        <div class="param-extra">
+                                            {{ parts.1 }}
+                                        </div>
+                                        {% endif %}
+                                    {% endwith %}
+                                </th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in group.rows %}
+                            <tr class="excel-row">
+                                <!-- Phase Cell -->
+                                <td class="excel-cell phase-cell sticky left-0 z-sticky">
+                                    <div class="phase-label-wrap">
+                                        <span class="phase-dot"></span>
+                                        <span class="phase-name">{{ row.name }}</span>
                                     </div>
-                                    <!-- Inline status indicator -->
-                                    {% if cell.abnormal %}
-                                        <span class="status-indicator text-danger fs-xs">⚠️ Out of range</span>
-                                    {% elif cell.entered %}
-                                        <span class="status-indicator text-success fs-xs">✅ Saved</span>
-                                    {% endif %}
-                                </div>
-                                {% else %}
-                                <div class="text-muted text-center fs-sm">—</div>
-                                {% endif %}
-                            {% endwith %}
-                        </td>
-                        {% endfor %}
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="100%" class="text-center fs-sm text-muted p-6">
-                            No analytical results available.
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                                </td>
+
+                                <!-- Parameter Cells -->
+                                {% for parameter in group.parameters %}
+                                <td class="excel-cell input-cell">
+                                    {% with cell=row.results|get_item:parameter.name %}
+                                        {% if cell %}
+                                        <div class="input-cell-wrapper {% if cell.abnormal %}cell-danger-glow{% elif cell.entered %}cell-success-glow{% endif %}">
+                                            <input
+                                                type="number"
+                                                step="0.001"
+                                                min="-999999"
+                                                max="999999"
+                                                inputmode="decimal"
+                                                autocomplete="off"
+                                                spellcheck="false"
+                                                name="result_{{ cell.result.pk }}"
+                                                value="{{ cell.value|default_if_none:'' }}"
+                                                class="form-control excel-input text-center
+                                                {% if cell.abnormal %}
+                                                    form-control-danger
+                                                {% elif cell.entered %}
+                                                    form-control-success
+                                                {% endif %}"
+                                                data-autosave="true"
+                                                data-navigation="true"
+                                                data-result-id="{{ cell.result.pk }}"
+                                                data-water-type="{{ group.water_type|lower }}"
+                                                data-cycle="{{ card.time_label }}"
+                                                data-spec="{{ cell.display_limit|default:'' }}"
+                                                title="{{ parameter.name }}{% if parameter.unit %} ({{ parameter.unit }}){% endif %}"
+                                                aria-label="{{ card.time_label }} - {{ row.name }} - {{ parameter.name }}">
+                                            <!-- Out-of-range spec bubble (hidden until value is outside limits) -->
+                                            {% if cell.display_limit %}
+                                            <div class="oor-spec-bubble" aria-hidden="true" style="display:none;">
+                                                <i class="fa-solid fa-triangle-exclamation"></i>
+                                                Allowed: {{ cell.display_limit }}
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                        {% else %}
+                                        <div class="cell-blank" title="Parameter not applicable in this phase">—</div>
+                                        {% endif %}
+                                    {% endwith %}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="100%" class="text-center p-3 empty-table-msg">
+                                    No analytical parameters mapped for this phase.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+            </section>
+            {% endfor %}
         </div>
 
-    </section>
-    {% endfor %}
+    </article>
+    {% endwith %}
+    {% else %}
+    <!-- Clean Empty State -->
+    <div class="card excel-card empty-dashboard-card text-center" style="opacity:1!important;visibility:visible!important;display:block!important;">
+        {% if has_expired or is_completely_filled %}
+        <div class="completed-glow-icon" style="color:#22c55e;font-size:2.2rem;margin-bottom:0.6rem;">
+            <i class="fa-solid fa-circle-check"></i>
+        </div>
+        <h2 class="empty-title">Sampling Cycle Archived &amp; Completed</h2>
+        <p class="empty-desc">
+            All analytical results for the {{ current_time_label|default:"scheduled" }} cycle have been completely recorded and saved. The worksheet has been archived. Awaiting the next scheduled sampling cycle.
+        </p>
+        {% else %}
+        <div class="empty-glow-icon">
+            <i class="fa-solid fa-flask-vial"></i>
+        </div>
+        <h2 class="empty-title">Awaiting Scheduled Sampling Cycle</h2>
+        <p class="empty-desc">
+            Analytical worksheets stream in automatically as scheduled cycles trigger for {{ plant.name|default:"this treatment plant" }}.
+        </p>
+        {% endif %}
+        <div class="empty-actions mt-2">
+            <button type="button" class="btn btn-secondary btn-glass" onclick="window.location.reload()">
+                <i class="fa-solid fa-arrows-rotate"></i> Check For Due Cycles
+            </button>
+        </div>
+    </div>
+    {% endif %}
 
 </div>
-
-{% empty %}
-<div class="card excel-card card-bordered bg-alt text-center p-8">
-    <h2 class="fs-md fw-bold text-muted">No Current Analysis</h2>
-    <p class="fs-sm text-muted mt-2">
-        Analytical worksheets will appear automatically when the next scheduled sampling event is generated.
-    </p>
-</div>
-{% endfor %}

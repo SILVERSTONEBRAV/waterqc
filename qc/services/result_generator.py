@@ -129,6 +129,7 @@ class AnalysisResultGenerator:
                     ResultModel.objects.bulk_create(
                         rows,
                         batch_size=cls.BATCH_SIZE,
+                        ignore_conflicts=True,
                     )
 
                 after = (
@@ -228,7 +229,7 @@ class AnalysisResultGenerator:
                         phase.pk,
                     )
 
-                    if not force and key in existing:
+                    if key in existing:
                         continue
 
                     rows.append(
@@ -249,7 +250,7 @@ class AnalysisResultGenerator:
                     None,
                 )
 
-                if not force and key in existing:
+                if key in existing:
                     continue
 
                 rows.append(

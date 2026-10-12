@@ -21,11 +21,16 @@ from django.views.generic import (
     ListView,
     CreateView,
     DeleteView,
+    DetailView,
+    View,
 )
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 
 from accounts.forms import (
     CustomUserForm,
     ProfilePictureForm,
+    SectionForm,
 )
 from accounts.models import (
     CustomUser,
@@ -433,6 +438,36 @@ class UserDeleteView(
         )
 
 
+class UserDetailView(
+    WanjalaMixin,
+    SuperUserRequiredMixin,
+    DetailView,
+):
+    model = CustomUser
+    template_name = "accounts/profile/user_detail.html"
+    context_object_name = "user_obj"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        u = self.get_object()
+        context["target_user"] = u
+        context["user_fields"] = {
+            "Username": u.username,
+            "Full Name": (u.first_name + " " + u.last_name).strip() or u.username,
+            "Email": u.email or "—",
+            "Mobile Number": getattr(u, "mobile_number", "—") or "—",
+            "Section": getattr(u.section, "name", "—") if getattr(u, "section", None) else "—",
+            "Assigned Plant": str(getattr(u, "assigned_treatment_plant", "—") or "—"),
+            "Assigned Lab": str(getattr(u, "assigned_lab", "—") or "—"),
+            "Status": "Active" if u.is_active else "Inactive",
+            "Role": "Superuser" if u.is_superuser else ("Staff" if u.is_staff else "Regular User"),
+            "MFA Enabled": "Yes" if getattr(u, "mfa_enabled", False) else "No",
+            "Date Joined": u.date_joined.strftime("%d %b %Y, %H:%M") if getattr(u, "date_joined", None) else "—",
+            "Last Login": u.last_login.strftime("%d %b %Y, %H:%M") if getattr(u, "last_login", None) else "Never",
+        }
+        return context
+
+
 # ==========================================================
 # SUPPORTING LIST VIEWS
 # ==========================================================
@@ -443,6 +478,103 @@ class SectionListView(
 ):
     model = Section
     context_object_name = "sections"
+
+
+class SectionCreateView(
+    WanjalaMixin,
+    SuperUserRequiredMixin,
+    CreateView,
+):
+    model = Section
+    form_class = SectionForm
+    template_name = "accounts/profile/section_form.html"
+    success_url = reverse_lazy("accounts:profile")
+
+    def get_template_names(self):
+        if self.request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return ["accounts/partials/section_form_modal.html"]
+        return [self.template_name]
+
+    def form_valid(self, form):
+        self.object = form.save()
+        messages.success(
+            self.request,
+            f"Section '{self.object.name}' created successfully.",
+        )
+        if self.request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return HttpResponse("SUCCESS")
+        return super().form_valid(form)
+
+    def form_invalid(self, form):
+        if self.request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return render(
+                self.request,
+                "accounts/partials/section_form_modal.html",
+                {
+                    "form": form,
+                    "action_url": self.request.path,
+                },
+            )
+        return super().form_invalid(form)
+
+
+class SectionUpdateView(
+    WanjalaMixin,
+    SuperUserRequiredMixin,
+    UpdateView,
+):
+    model = Section
+    form_class = SectionForm
+    template_name = "accounts/profile/section_form.html"
+    success_url = reverse_lazy("accounts:profile")
+
+    def get_template_names(self):
+        if self.request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return ["accounts/partials/section_form_modal.html"]
+        return [self.template_name]
+
+    def form_valid(self, form):
+        self.object = form.save()
+        messages.success(
+            self.request,
+            f"Section '{self.object.name}' updated successfully.",
+        )
+        if self.request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return HttpResponse("SUCCESS")
+        return super().form_valid(form)
+
+    def form_invalid(self, form):
+        if self.request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return render(
+                self.request,
+                "accounts/partials/section_form_modal.html",
+                {
+                    "form": form,
+                    "action_url": self.request.path,
+                },
+            )
+        return super().form_invalid(form)
+
+
+class SectionDeleteView(
+    WanjalaMixin,
+    SuperUserRequiredMixin,
+    View,
+):
+    def get(self, request, pk, *args, **kwargs):
+        section = get_object_or_404(Section, pk=pk)
+        name = section.name
+        section.delete()
+        messages.success(
+            request,
+            f"Section '{name}' deleted successfully.",
+        )
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"status": "success", "message": f"Section '{name}' deleted successfully."})
+        return redirect("accounts:profile")
+
+    def post(self, request, pk, *args, **kwargs):
+        return self.get(request, pk, *args, **kwargs)
 
 
 class GroupListView(
