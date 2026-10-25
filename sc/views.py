@@ -4,6 +4,8 @@ from django.http import HttpResponse
 from django.views.decorators.http import require_GET
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from django.core.exceptions import PermissionDenied
+from .models import ShiftAssignment
 from .models import ShiftHandover
 
 def render_to_pdf(template_src, context_dict={}):
@@ -23,6 +25,18 @@ def export_shift_handover_pdf(request, pk):
             'shift', 'outgoing_supervisor', 'incoming_supervisor'
         ).prefetch_related('apparatus_conditions__apparatus').get(pk=pk)
 
+        user = request.user
+        if not user.is_superuser:
+            if not user.has_perm("sc.view_shifthandover"):
+                raise PermissionDenied
+            is_related = (
+                handover.outgoing_supervisor_id == user.pk
+                or handover.incoming_supervisor_id == user.pk
+                or ShiftAssignment.objects.filter(user=user, shift=handover.shift).exists()
+            )
+            if not is_related:
+                raise PermissionDenied
+
         pdf = render_to_pdf('pdf/handover_template.html', {
             'handover': handover,
             'request': request  # allows use of {{ request.user }} in template
@@ -32,3 +46,5 @@ def export_shift_handover_pdf(request, pk):
         return pdf
     except ShiftHandover.DoesNotExist:
         return HttpResponse("Handover not found", status=404)
+    except PermissionDenied:
+        return HttpResponse("Forbidden", status=403)

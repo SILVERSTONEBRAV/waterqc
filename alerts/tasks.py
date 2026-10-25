@@ -54,19 +54,16 @@ def filter_recipients(recipients, message_type="email", treatment_plant=None, gr
 # =========================================
 # 🔹 Async multi-channel alert dispatcher
 # =========================================
-async def _dispatch_alerts_async(subject, body, recipients, treatment_plant=None, group=None, section=None, context=None):
+async def _dispatch_alerts_async(subject, body, filtered_recipients, context=None, voice_url=None):
     """
     Asynchronously dispatch alerts across multiple channels.
-    Respects user preferences and scopes.
+    Recipients must already be pre-filtered (synchronously) before calling this.
     """
+    channel_layer = get_channel_layer()
     tasks = []
 
-    for user in recipients:
-        # Filter by scope
-        if user not in filter_recipients([user], "email", treatment_plant, group, section):
-            continue
-
-        # Optional safe condition check
+    for user in filtered_recipients:
+        # Optional safe condition check (pure in-memory, no ORM)
         if context and not SafeConditionEvaluator.evaluate(user, context):
             continue
 
@@ -86,11 +83,15 @@ async def _dispatch_alerts_async(subject, body, recipients, treatment_plant=None
         if getattr(user, "slack_channel", None):
             tasks.append(SlackNotifier.send_message(user.slack_channel, body))
 
-        # Push/WebSocket
-        channel_layer = get_channel_layer()
-        tasks.append(asyncio.to_thread(async_to_sync, channel_layer.group_send)(
+        # Push/WebSocket — use native async group_send
+        tasks.append(channel_layer.group_send(
             f"user_{user.id}_alerts",
-            {"type": "alert.message", "message": body}
+            {
+                "type": "alert.message",
+                "title": subject,
+                "message": body,
+                "voice_url": voice_url,
+            }
         ))
 
     results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -104,14 +105,27 @@ async def _dispatch_alerts_async(subject, body, recipients, treatment_plant=None
 # 🔹 WebSocket Alerts
 # =========================================
 @shared_task
-def send_websocket_notification(message, group="alerts_group"):
+def send_websocket_notification(message, group="alerts_group", title="System Notification", voice_url=None):
     try:
+        if not voice_url:
+            from alerts.models import VoiceAlert
+            voice_alert = VoiceAlert.generate_persistent_voice_alert(message=message, title=title)
+            voice_url = voice_alert.audio_file.url if voice_alert and voice_alert.audio_file else None
+
         channel_layer = get_channel_layer()
-        async_to_sync(channel_layer.group_send)(
-            group,
-            {"type": "alert.message", "message": message}
-        )
-        logger.info(f"WebSocket alert sent to group {group}")
+        if channel_layer:
+            payload = {
+                "type": "alert.message",
+                "title": title,
+                "message": message,
+                "voice_url": voice_url,
+            }
+            async_to_sync(channel_layer.group_send)(group, payload)
+            if group != "alerts_stream":
+                async_to_sync(channel_layer.group_send)("alerts_stream", payload)
+            if group != "alerts_group":
+                async_to_sync(channel_layer.group_send)("alerts_group", payload)
+        logger.info(f"WebSocket alert and voice sent to group {group}")
     except Exception as e:
         logger.error(f"Failed to send WebSocket alert: {e}")
 
@@ -125,6 +139,9 @@ def dispatch_alerts(subject=None, body=None, recipients=None,
     """
     Celery entrypoint for dispatching alerts.
     Required args: subject, body, recipients (list of User objects).
+    All notifications and alerts generate corresponding voice messages.
+    Pre-filters recipients synchronously before entering the async event loop
+    to avoid SynchronousOnlyOperation errors.
     """
     if not subject or not body or not recipients:
         logger.warning("dispatch_alerts called without required arguments: "
@@ -132,11 +149,29 @@ def dispatch_alerts(subject=None, body=None, recipients=None,
         return
 
     try:
-        asyncio.run(
-            _dispatch_alerts_async(subject, body, recipients,
-                                   treatment_plant, group, section, context)
+        # ── 1. Synchronous pre-filtering (safe: no async context yet) ──────────
+        filtered = filter_recipients(
+            recipients, "email", treatment_plant, group, section
         )
-        logger.info(f"Dispatched alerts to {len(recipients)} recipients "
+        if not filtered:
+            logger.info("dispatch_alerts: no recipients passed filter; skipping.")
+            return
+
+        # ── 2. Generate persistent voice message (sync ORM, safe here) ─────────
+        voice_url = None
+        try:
+            from alerts.models import VoiceAlert
+            v_alert = VoiceAlert.generate_persistent_voice_alert(message=body, title=subject)
+            if v_alert and v_alert.audio_file:
+                voice_url = v_alert.audio_file.url
+        except Exception as v_err:
+            logger.warning(f"Voice generation task dispatch error: {v_err}")
+
+        # ── 3. Run async dispatcher with already-filtered recipients ───────────
+        asyncio.run(
+            _dispatch_alerts_async(subject, body, filtered, context, voice_url=voice_url)
+        )
+        logger.info(f"Dispatched alerts to {len(filtered)} recipients "
                     f"(plant={treatment_plant}, group={group}, section={section})")
     except Exception as e:
         logger.exception(f"Failed to dispatch alerts: {e}")
@@ -146,27 +181,49 @@ def dispatch_alerts(subject=None, body=None, recipients=None,
 # 🔹 Voice notification
 # =========================================
 @shared_task
-def generate_voice_notification(message):
+def generate_voice_notification(message, alert_config_id=None, title=None, forced_voice_id=None):
     try:
+        from alerts.models import VoiceAlert, AlertConfig, VoiceOver
+        cfg = AlertConfig.objects.filter(pk=alert_config_id).first() if alert_config_id else None
+        forced_voice = VoiceOver.objects.filter(pk=forced_voice_id).first() if forced_voice_id else None
+        voice_alert = VoiceAlert.generate_persistent_voice_alert(
+            message=message,
+            title=title or (cfg.alert_type if cfg else "Alert Notification"),
+            alert_config=cfg,
+            forced_voice=forced_voice,
+        )
+        if voice_alert and voice_alert.audio_file:
+            logger.info(f"Persistent VoiceAlert generated at {voice_alert.audio_file.url}")
+            return voice_alert.audio_file.url
         file_path = generate_voice_notification_pyttsx3(message)
-        logger.info(f"Voice notification generated at {file_path}")
+        logger.info(f"Voice notification fallback generated at {file_path}")
         return file_path
     except Exception as e:
         logger.exception(f"Failed to generate voice notification: {e}")
+
 
 # =========================================
 # 🔹 Alarm trigger
 # =========================================
 @shared_task
 def trigger_alarm(user_id, message, alarm_sound_path=None):
-    alarm_sound_path = alarm_sound_path or "/static/path/to/alarm_sound.mp3"
     try:
+        from alerts.models import VoiceAlert
+        voice_alert = VoiceAlert.generate_persistent_voice_alert(message=message, title="Critical Alarm")
+        voice_url = voice_alert.audio_file.url if voice_alert and voice_alert.audio_file else None
+        alarm_sound_path = voice_url or alarm_sound_path or "/static/path/to/alarm_sound.mp3"
+
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(
             f"user_{user_id}_alerts",
-            {"type": "trigger_alarm", "message": message, "alarm_sound": alarm_sound_path}
+            {
+                "type": "trigger_alarm",
+                "message": message,
+                "alarm_sound": alarm_sound_path,
+                "voice_url": voice_url,
+            }
         )
-        logger.info(f"Alarm triggered for user {user_id}")
+        logger.info(f"Alarm and voice triggered for user {user_id}")
     except Exception as e:
         logger.exception(f"Failed to trigger alarm for user {user_id}: {e}")
 
@@ -210,7 +267,7 @@ def repeat_alarm_until_acknowledged(self, user_id, alert_config_id, instance_mod
             alert_config.save(update_fields=['priority'])
 
         # Contextual info
-        context = GeoContextAnalyzer.enrich(serialized)
+        context = GeoContextAnalyzer.detect(serialized)
 
         # Scope
         treatment_plant = getattr(instance, "treatment_plant", None)

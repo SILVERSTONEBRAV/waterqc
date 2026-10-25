@@ -1,0 +1,119 @@
+<section class="workflow-results-dashboard" aria-labelledby="workflow-dashboard-title">
+    <header class="workflow-dashboard-heading">
+        <div>
+            <span class="workflow-eyebrow"><i class="fa-solid fa-chart-line" aria-hidden="true"></i> Treatment quality workspace</span>
+            <h1 id="workflow-dashboard-title">{{ dashboard_title }}</h1>
+            <p>{{ dashboard_subtitle }}</p>
+        </div>
+        <div class="workflow-heading-scope">
+            <span class="workflow-live-dot" aria-hidden="true"></span>
+            {% if plant %}<span>{{ plant.name }}</span>{% elif request.user.is_superuser %}<span>All treatment plants</span>{% else %}<span>Plant not assigned</span>{% endif %}
+            {% if request.user.is_superuser and available_plants %}
+                <form method="get" class="workflow-plant-picker">
+                    <label class="visually-hidden" for="workflowPlantSelect">Filter by treatment plant</label>
+                    <select id="workflowPlantSelect" name="plant" onchange="this.form.submit()">
+                        <option value="">All plants</option>
+                        {% for item in available_plants %}<option value="{{ item.id }}" {% if plant and plant.pk == item.id %}selected{% endif %}>{{ item.name }}</option>{% endfor %}
+                    </select>
+                </form>
+            {% endif %}
+        </div>
+    </header>
+
+    {% if not has_analysis_permission %}
+        <div class="workflow-empty-state" role="status">
+            <span class="workflow-empty-icon"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i></span>
+            <h2>No result cards are available</h2>
+            <p>Your account does not have view permission for the analysis records in this workspace.</p>
+        </div>
+    {% elif not has_plant_scope %}
+        <div class="workflow-empty-state" role="status">
+            <span class="workflow-empty-icon"><i class="fa-solid fa-location-dot" aria-hidden="true"></i></span>
+            <h2>Treatment plant assignment required</h2>
+            <p>There is no plant assigned to your account, so plant results are not shown.</p>
+        </div>
+    {% else %}
+        <div class="workflow-summary-grid" aria-label="Analysis summary">
+            {% for item in summary_cards %}
+                <article class="workflow-summary-card tone-{{ item.tone }}">
+                    <span class="workflow-summary-icon"><i class="fa-solid {{ item.icon }}" aria-hidden="true"></i></span>
+                    <span class="workflow-summary-label">{{ item.label }}</span>
+                    <strong>{{ item.value }}</strong>
+                    <span class="workflow-summary-caption">Current authorized scope</span>
+                </article>
+            {% endfor %}
+        </div>
+
+        <section class="workflow-stage-panel" aria-labelledby="workflow-stage-title">
+            <div class="workflow-section-heading">
+                <div><span class="workflow-eyebrow">Lifecycle overview</span><h2 id="workflow-stage-title">Analysis workflow</h2></div>
+                <span class="workflow-card-count">{{ cards|length }} recent result cards</span>
+            </div>
+            <div class="workflow-stage-grid">
+                {% for stage in stage_cards %}
+                    <div class="workflow-stage-card {% if stage.count %}has-items{% endif %}">
+                        <span class="workflow-stage-index">0{{ forloop.counter }}</span>
+                        <span class="workflow-stage-label">{{ stage.label }}</span>
+                        <strong>{{ stage.count }}</strong>
+                    </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="workflow-result-section" aria-labelledby="workflow-results-title">
+            <div class="workflow-section-heading">
+                <div><span class="workflow-eyebrow">Quality records</span><h2 id="workflow-results-title">Analysis result cards</h2></div>
+                <span class="workflow-card-count">Latest records by permitted analysis type</span>
+            </div>
+
+            {% if cards %}
+                <div class="workflow-result-grid">
+                    {% for card in cards %}
+                        <article class="workflow-result-card status-{{ card.status|lower }}">
+                            <div class="workflow-result-card-top">
+                                <div class="workflow-result-type-icon"><i class="fa-solid fa-flask-vial" aria-hidden="true"></i></div>
+                                <div class="workflow-result-title-wrap"><span class="workflow-result-type">{{ card.title }}</span><h3>{{ card.reference }}</h3></div>
+                                <span class="workflow-status-pill"><span></span>{{ card.status_label }}</span>
+                            </div>
+
+                            <div class="workflow-result-meta">
+                                {% for field in card.sample_fields %}
+                                    <div class="workflow-meta-item"><span>{{ field.label }}</span><strong title="{{ field.value }}">{{ field.value }}</strong></div>
+                                {% endfor %}
+                                <div class="workflow-meta-item"><span>Treatment plant</span><strong title="{{ card.plant_name }}">{{ card.plant_name }}</strong></div>
+                            </div>
+
+                            <div class="workflow-progress" aria-label="Workflow progress">
+                                {% for stage in stage_cards %}<span class="{% if forloop.counter0 <= card.stage_index %}is-complete{% endif %}" title="{{ stage.label }}"></span>{% endfor %}
+                            </div>
+
+                            <div class="workflow-result-list">
+                                <div class="workflow-result-list-heading"><span>Measured parameters</span><span>{{ card.result_count }} recorded</span></div>
+                                {% for result in card.results %}
+                                    <div class="workflow-parameter-row {% if result.failed %}is-failed{% endif %}">
+                                        <div class="workflow-parameter-name"><strong>{{ result.name }}</strong><span>Limit {{ result.limit }}</span></div>
+                                        <div class="workflow-parameter-value"><strong>{{ result.value }} <small>{{ result.unit }}</small></strong><span>{{ result.compliance }}</span></div>
+                                    </div>
+                                {% empty %}
+                                    <div class="workflow-result-empty">{% if card.results_permitted %}No parameter results have been recorded.{% else %}Result values are hidden because your account lacks permission to view them.{% endif %}</div>
+                                {% endfor %}
+                                {% if card.result_count > 6 %}<p class="workflow-more-results">Showing 6 of {{ card.result_count }} parameters</p>{% endif %}
+                            </div>
+
+                            <footer class="workflow-result-footer">
+                                <div><span>Analyst</span><strong>{{ card.analyst }}</strong></div>
+                                <a href="{{ card.detail_url }}" class="workflow-open-card" aria-label="Open analysis {{ card.reference }}">View analysis <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+                            </footer>
+                        </article>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="workflow-empty-state workflow-empty-state--compact" role="status">
+                    <span class="workflow-empty-icon"><i class="fa-solid fa-flask" aria-hidden="true"></i></span>
+                    <h2>No analyses in this scope yet</h2>
+                    <p>When permitted analysis records are created for this treatment plant, they will appear here.</p>
+                </div>
+            {% endif %}
+        </section>
+    {% endif %}
+</section>

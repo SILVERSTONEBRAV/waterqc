@@ -1,20 +1,36 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="day">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="NCWSCwaterLAB">
     <title>Login | Nairobi City Water & Sewerage</title>
+    <link rel="manifest" href="/manifest.json?v=20261020-enterprise-theme">
+    <meta name="theme-color" content="#417690">
+    <script src="{% static 'core/js/theme.js' %}?v=20261020-enterprise-theme"></script>
+    <script>document.documentElement.classList.remove('fullscreen-app');</script>
 
     <!-- FontAwesome -->
-    <link rel="stylesheet"
-          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'css/font_awesome/all.min.css' %}">
 
     <!-- Favicon -->
-    <link rel="icon" href="{% static 'image/favicon.ico' %}" type="image/x-icon">
+    {% if company.logo %}
+    <link rel="apple-touch-icon" href="{{ company.logo.url }}">
+    <link rel="icon" href="{{ company.logo.url }}">
+    {% elif company.favicon %}
+    <link rel="apple-touch-icon" href="{{ company.favicon.url }}">
+    <link rel="icon" href="{{ company.favicon.url }}" type="image/png">
+    {% else %}
+    <link rel="apple-touch-icon" href="{% static 'image/apple-touch-icon.png' %}">
+    <link rel="icon" href="{% static 'image/logo.ico' %}" type="image/x-icon">
+    {% endif %}
 
-    <!-- Login-specific styles -->
-    <link rel="stylesheet" href="{% static 'accounts/css/login.css' %}">
+    <link rel="stylesheet" href="{% static 'core/css/theme.css' %}?v=20261020-enterprise-theme">
+    <!-- Login-specific layout, using the shared theme tokens. -->
+    <link rel="stylesheet" href="{% static 'accounts/css/login.css' %}?v=20261020-enterprise-theme">
 </head>
 <body>
 
@@ -36,7 +52,7 @@
     <div class="login-container">
 
         <!-- Company Branding / Logo -->
-        <div id="companyBrandingWrapper" data-logo="{% static 'accounts/images/ncwsc_logo.png' %}">
+        <div id="companyBrandingWrapper" data-logo="{% if company.logo %}{{ company.logo.url }}{% else %}{% static 'accounts/images/ncwsc_logo.png' %}{% endif %}">
             {% include 'accounts/components/company_branding.html' %}
         </div>
 
@@ -105,12 +121,15 @@
             </button>
         </form>
 
-        <!-- Forgot Password -->
+        <!-- Forgot Password (AJAX trigger) -->
         <div class="forgot-password" id="forgotDiv" style="display:none;">
-            <a href="{% url 'accounts:reset_password_request' %}">
+            <a href="#" id="forgotPasswordLink"
+               data-url="{% url 'accounts:reset_password_request' %}">
                 Forgot your password?
             </a>
         </div>
+        <!-- Reset email status message -->
+        <div id="resetMessage" class="reset-status" style="display:none;"></div>
 
     </div>
 </div>
@@ -153,5 +172,6 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 {% endif %}
 
+<script src="{% static 'core/js/pwa.js' %}?v=20261020-pwa" defer></script>
 </body>
 </html>

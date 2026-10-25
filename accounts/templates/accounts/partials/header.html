@@ -1,3 +1,4 @@
+{% load static %}
 <header class="topbar" role="banner">
 
     <!-- =====================================================
@@ -39,8 +40,45 @@
 
         </a>
 
+        <span class="header-app-context" role="note" aria-label="Current application: {{ header_app_label|default:'Workspace' }}">
+            <i class="fas fa-cubes" aria-hidden="true"></i>
+            <span>{{ header_app_label|default:"Workspace" }}</span>
+        </span>
+
     </div>
 
+    <!-- =====================================================
+    SHIFT TELEMETRY & HANDOVER / TAKEOVER BAR (ALL DASHBOARDS EXCEPT HOMEVIEW)
+    ===================================================== -->
+    {% if request.user.is_authenticated and request.path != '/' and request.resolver_match.url_name != 'home' %}
+    <div class="header-shift-bar" id="headerShiftBar">
+        <div class="shift-info-pill" title="Current Treatment Plant Shift & Supervisor">
+            <span class="shift-name-tag">
+                <i class="fa-solid fa-clock"></i>
+                <strong id="headerShiftName">{{ current_shift.name|default:"General Shift" }}</strong>
+                {% if current_shift %}<small class="shift-hours">({{ current_shift.start_time|time:"H:i" }} - {{ current_shift.end_time|time:"H:i" }})</small>{% endif %}
+            </span>
+            <span class="shift-divider">|</span>
+            <span class="shift-supervisor-tag">
+                <i class="fa-solid fa-user-shield"></i>
+                <span class="shift-sup-label">Supervisor:</span>
+                <strong id="headerShiftSupervisor">{{ current_shift_supervisor.get_full_name|default:current_shift_supervisor.username|default:"Unassigned" }}</strong>
+            </span>
+        </div>
+
+        <button type="button"
+                id="shiftHandoverBtn"
+                class="shift-handover-btn {% if is_handover_window_active %}is-window-open{% else %}is-window-closed{% endif %}"
+                {% if not is_handover_window_active %}disabled title="Handover active during transition window ({{ handover_window_time|default:'±15 min of shift end' }})"{% else %}title="Initiate Shift Handover & Takeover"{% endif %}
+                data-open-handover-modal>
+            <i class="fa-solid fa-handshake"></i>
+            <span>Handover / Takeover</span>
+            {% if is_handover_window_active %}
+            <span class="window-pulse-indicator"></span>
+            {% endif %}
+        </button>
+    </div>
+    {% endif %}
 
     <!-- =====================================================
     RIGHT CONTROLS (GLOBAL ACTIONS)
@@ -56,54 +94,28 @@
                 id="themeToggle"
                 class="theme-toggle"
                 type="button"
-                aria-label="Toggle dark/light theme"
-                title="Toggle Theme">
+                aria-label="Change display theme"
+                title="Cycle display themes">
 
                 <i class="fas fa-moon" aria-hidden="true"></i>
+            </button>
+
+            <button
+                class="header-window-close"
+                type="button"
+                data-close-app-window
+                title="Close window"
+                aria-label="Close window">
+                <i class="fas fa-xmark" aria-hidden="true"></i>
             </button>
 
 
             <!-- =================================================
             NOTIFICATIONS
             ================================================= -->
-            <div class="notification-container">
-
-                <button
-                    id="notificationBtn"
-                    class="notification-btn"
-                    type="button"
-                    aria-haspopup="true"
-                    aria-expanded="false"
-                    aria-controls="notificationDropdown">
-
-                    <i class="fas fa-bell" aria-hidden="true"></i>
-
-                    <span
-                        id="notificationBadge"
-                        class="notification-badge"
-                        style="display:none;"
-                        aria-label="New notifications count">
-                    </span>
-
-                </button>
-
-                <ul
-                    id="notificationDropdown"
-                    class="notification-dropdown"
-                    role="menu"
-                    aria-label="Notifications">
-
-                    <li class="notification-header" role="presentation">
-                        Notifications
-                    </li>
-
-                    <li class="notification-empty" role="presentation">
-                        No new notifications
-                    </li>
-
-                </ul>
-
-            </div>
+            {% if request.resolver_match.namespace == "ca" or request.resolver_match.namespace == "qc" or request.resolver_match.namespace == "qc_analytics" and request.resolver_match.url_name == "dashboard" %}
+            {% include "accounts/partials/notification_center.html" %}
+            {% endif %}
 
 
             <!-- =================================================
@@ -111,8 +123,25 @@
             ================================================= -->
             {% include "accounts/partials/user_dropdown.html" %}
 
+        {% else %}
+
+            <a href="{% url 'accounts:login' %}" class="header-login-btn">
+                <i class="fas fa-right-to-bracket" aria-hidden="true"></i>
+                <span>Sign in</span>
+            </a>
+
         {% endif %}
 
     </div>
 
 </header>
+{% if request.user.is_authenticated %}
+    {% include "accounts/partials/user_menu_dialog.html" %}
+{% endif %}
+{% if request.user.is_authenticated and request.path != '/' and request.resolver_match.url_name != 'home' %}
+    <link rel="stylesheet" href="{% static 'sc/css/shift-handover.css' %}?v=20261024-sc-shift">
+    {% include "sc/partials/handover_modal.html" %}
+    <script src="{% static 'sc/js/shift-handover.js' %}?v=20261024-sc-shift" defer></script>
+{% endif %}
+<script src="{% static 'core/js/global_notifications.js' %}?v=20261023-standard-alert-center" defer></script>
+{% if request.user.is_authenticated %}<script src="{% static 'core/js/live_updates.js' %}?v=20261022-live-v1" defer></script>{% endif %}

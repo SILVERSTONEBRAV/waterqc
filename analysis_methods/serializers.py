@@ -36,6 +36,7 @@ class DynamicFieldMixin:
 # -------------------------
 class ChemicalAnalysisMethodSerializer(DynamicFieldMixin, serializers.ModelSerializer):
     created_by = serializers.StringRelatedField(read_only=True)
+    updated_by = serializers.StringRelatedField(read_only=True)
     input_field_names = serializers.SerializerMethodField()
     example_inputs = serializers.SerializerMethodField()
     input_labels = serializers.SerializerMethodField()
@@ -46,12 +47,12 @@ class ChemicalAnalysisMethodSerializer(DynamicFieldMixin, serializers.ModelSeria
         model = ChemicalAnalysisMethod
         fields = [
             'id', 'method', 'kebs_reference', 'formula', 'inputs_structure',
-            'unit', 'rounding_precision', 'description', 'category', 'tags',
-            'version', 'is_active', 'formula_hash', 'created_by',
+            'unit', 'rounding_precision', 'rounding_mode', 'description', 'category', 'tags',
+            'version', 'is_active', 'formula_hash', 'created_by', 'updated_by',
             'created_at', 'updated_at',
             'input_field_names', 'example_inputs', 'input_labels', 'description_text', 'result_example'
         ]
-        read_only_fields = ['formula_hash', 'created_by', 'created_at', 'updated_at']
+        read_only_fields = ['formula_hash', 'created_by', 'updated_by', 'created_at', 'updated_at']
 
     def get_input_field_names(self, obj):
         return obj.get_input_fields()
@@ -60,7 +61,7 @@ class ChemicalAnalysisMethodSerializer(DynamicFieldMixin, serializers.ModelSeria
         return obj.example_input_payload()
 
     def get_input_labels(self, obj):
-        return {i['name']: i['label'] for i in obj.inputs_structure if 'name' in i and 'label' in i}
+        return {i['name']: i['label'] for i in obj.inputs_structure if isinstance(i, dict) and 'name' in i and 'label' in i}
 
     def get_description_text(self, obj):
         return obj.describe_inputs()
@@ -81,13 +82,21 @@ class ChemicalAnalysisMethodSerializer(DynamicFieldMixin, serializers.ModelSeria
         request = self.context.get('request')
         if request and hasattr(request, 'user'):
             validated_data['created_by'] = request.user
+            validated_data['updated_by'] = request.user
         return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['updated_by'] = request.user
+        return super().update(instance, validated_data)
 
 # -------------------------
 # Microbial Method Serializer
 # -------------------------
 class MicrobialMethodSerializer(DynamicFieldMixin, serializers.ModelSerializer):
     created_by = serializers.StringRelatedField(read_only=True)
+    updated_by = serializers.StringRelatedField(read_only=True)
     confirmatory_tests_list = serializers.SerializerMethodField()
     incubation_hours = serializers.SerializerMethodField()
     is_deprecated = serializers.BooleanField(read_only=True)
@@ -97,10 +106,10 @@ class MicrobialMethodSerializer(DynamicFieldMixin, serializers.ModelSerializer):
         fields = [
             'id', 'name', 'kebs_reference', 'description', 'incubation_time',
             'confirmatory_tests', 'status', 'change_log', 'version', 'is_active',
-            'created_by', 'created_at', 'updated_at',
+            'created_by', 'updated_by', 'created_at', 'updated_at',
             'confirmatory_tests_list', 'incubation_hours', 'is_deprecated'
         ]
-        read_only_fields = ['created_by', 'created_at', 'updated_at', 'is_deprecated']
+        read_only_fields = ['created_by', 'updated_by', 'created_at', 'updated_at', 'is_deprecated']
 
     def get_confirmatory_tests_list(self, obj):
         return obj.get_confirmatory_tests_list()
@@ -112,20 +121,67 @@ class MicrobialMethodSerializer(DynamicFieldMixin, serializers.ModelSerializer):
         request = self.context.get('request')
         if request and hasattr(request, 'user'):
             validated_data['created_by'] = request.user
+            validated_data['updated_by'] = request.user
         return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['updated_by'] = request.user
+        return super().update(instance, validated_data)
 
 # -------------------------
 # WasteWater Analysis Method Serializer
 # -------------------------
-class WWAnalysisMethodSerializer(serializers.ModelSerializer):
+class WWAnalysisMethodSerializer(DynamicFieldMixin, serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField(read_only=True)
+    updated_by = serializers.StringRelatedField(read_only=True)
+
     class Meta:
         model = WWAnalysisMethod
-        fields = ['id', 'name', 'reference']
+        fields = [
+            'id', 'name', 'reference', 'version', 'is_active',
+            'created_by', 'updated_by', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['created_by', 'updated_by', 'created_at', 'updated_at', 'version']
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['created_by'] = request.user
+            validated_data['updated_by'] = request.user
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['updated_by'] = request.user
+        return super().update(instance, validated_data)
 
 # -------------------------
 # CleanWater Analysis Method Serializer
 # -------------------------
-class CWAnalysisMethodSerializer(serializers.ModelSerializer):
+class CWAnalysisMethodSerializer(DynamicFieldMixin, serializers.ModelSerializer):
+    created_by = serializers.StringRelatedField(read_only=True)
+    updated_by = serializers.StringRelatedField(read_only=True)
+
     class Meta:
         model = CWAnalysisMethod
-        fields = ['id', 'name', 'reference']
+        fields = [
+            'id', 'name', 'reference', 'version', 'is_active',
+            'created_by', 'updated_by', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['created_by', 'updated_by', 'created_at', 'updated_at', 'version']
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['created_by'] = request.user
+            validated_data['updated_by'] = request.user
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['updated_by'] = request.user
+        return super().update(instance, validated_data)

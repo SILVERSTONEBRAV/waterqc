@@ -619,6 +619,7 @@ class ResultCardService:
                 "current_analysis": None,
                 "current_time_label": None,
                 "analysis_count": 0,
+                "analysis_watermark": 0,
                 "completion": {
                     "total": 0,
                     "entered": 0,
@@ -674,6 +675,10 @@ class ResultCardService:
                 "current_analysis": None,
                 "current_time_label": None,
                 "analysis_count": 0,
+                "analysis_watermark": max(
+                    (analysis.pk for analysis in analyses),
+                    default=0,
+                ),
                 "completion": {
                     "total": 0,
                     "entered": 0,
@@ -768,6 +773,10 @@ class ResultCardService:
                 cards[0].time_label if cards else None
             ),
             "analysis_count": len(current_analyses),
+            "analysis_watermark": max(
+                (analysis.pk for analysis in analyses),
+                default=0,
+            ),
             "completion": completion,
             "is_completely_filled": is_completely_filled,
             "has_expired": has_expired,
@@ -932,8 +941,11 @@ class ResultCardService:
             "current_time_label": context.get("current_time_label"),
             "analysis_id": getattr(current, "pk", None),
             "analysis_count": context.get("analysis_count", 0),
+            "analysis_watermark": context.get("analysis_watermark", 0),
             "completion": completion,
             "raw_water": raw,
+            "current_dosages": context.get("current_dosages") or [],
+            "phase_concentrations": context.get("phase_concentrations") or [],
             "card_count": len(cards),
             "fingerprint": cls.build_fingerprint(context),
         }
@@ -945,6 +957,7 @@ class ResultCardService:
         parts = [
             str(context.get("current_time_label") or ""),
             str(getattr(context.get("current_analysis"), "pk", "") or ""),
+            str(context.get("analysis_watermark", 0)),
             str(completion.get("entered", 0)),
             str(completion.get("total", 0)),
             str(completion.get("abnormal", 0)),
@@ -956,6 +969,16 @@ class ResultCardService:
             parts.append(
                 f"{item.get('id')}:{item.get('value')}:{int(bool(item.get('abnormal')))}"
             )
+        for dosage in context.get("current_dosages") or []:
+            parts.append(
+                f"dose:{dosage.get('label')}:{dosage.get('value_display')}:{dosage.get('detail')}"
+            )
+        for phase in context.get("phase_concentrations") or []:
+            parts.append(f"phase:{phase.get('id')}:{phase.get('name')}")
+            for item in phase.get("items") or []:
+                parts.append(
+                    f"concentration:{item.get('chemical')}:{item.get('tank')}:{item.get('value_display')}"
+                )
         return "|".join(parts)
 
     @classmethod

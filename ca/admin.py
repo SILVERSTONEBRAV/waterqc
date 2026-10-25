@@ -13,20 +13,72 @@ from django.utils.html import format_html
 
 from .models import (
     BatchTestResult,
+    BatchTestResultRevision,
     Chemical,
     ChemicalAnalysisInput,
     ChemicalAnalysisProcess,
     ChemicalAnalysisRequest,
     ChemicalBatch,
+    ChemicalBatchHold,
+    ChemicalCorrectiveAction,
+    ChemicalCustodyEvent,
+    ChemicalInventoryMovement,
     ChemicalCertApprover,
     ChemicalCoA,
+    ChemicalCoAAuditEvent,
+    ChemicalOutboxEvent,
+    ChemicalSuperuserPurgeAudit,
     ChemicalLocation,
     ChemicalSpecification,
     ChemicalSpecificationRemark,
+    ChemicalWorkflowAlert,
+    ChemicalWorkflowEvent,
     ChecklistForWaterTreatmentChemicalAnalysis,
     PackagingStatus,
     Supplier,
 )
+
+
+class CaSuperuserDeletionAdminMixin:
+    """Keep CA records protected while giving superusers explicit delete access."""
+
+    def has_delete_permission(self, request, obj=None):
+        if (
+            getattr(request.user, "is_active", False)
+            and getattr(request.user, "is_superuser", False)
+        ):
+            return True
+        # CA records and their Viewflow-linked audit history are destructive
+        # operations reserved exclusively for active superusers.
+        return False
+
+    def get_deleted_objects(self, objs, request):
+        if not getattr(request.user, "is_superuser", False):
+            return super().get_deleted_objects(objs, request)
+
+        objects = list(objs)
+        deleted_objects = [
+            "The selected CA records and their dependent workflow, result, movement, and audit records will be permanently deleted.",
+            [str(obj) for obj in objects],
+        ]
+        model_count = {str(self.opts.verbose_name_plural): len(objects)}
+        return deleted_objects, model_count, set(), []
+
+    def delete_model(self, request, obj):
+        if getattr(request.user, "is_superuser", False):
+            from .services.superuser_deletion import delete_ca_objects
+
+            delete_ca_objects([obj], actor=request.user)
+            return
+        return super().delete_model(request, obj)
+
+    def delete_queryset(self, request, queryset):
+        if getattr(request.user, "is_superuser", False):
+            from .services.superuser_deletion import delete_ca_objects
+
+            delete_ca_objects(queryset, actor=request.user)
+            return
+        return super().delete_queryset(request, queryset)
 
 
 class PlantScopedAdminMixin:
@@ -57,6 +109,9 @@ class PlantScopedAdminMixin:
             return qs.filter(
                 chemical_analysis_request__batch__treatment_plant_id=plant_id
             )
+
+        if field == "coa__batch__treatment_plant":
+            return qs.filter(coa__batch__treatment_plant_id=plant_id)
 
         return qs
 
@@ -313,7 +368,7 @@ class StatusBadgeMixin:
         )
 
     status_badge.short_description = "Status"
-class ChemicalAdmin(admin.ModelAdmin):
+class ChemicalAdmin(CaSuperuserDeletionAdminMixin, admin.ModelAdmin):
     list_display = (
         "code",
         "name",
@@ -417,7 +472,7 @@ class ChemicalAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
 
 
-class SupplierAdmin(admin.ModelAdmin):
+class SupplierAdmin(CaSuperuserDeletionAdminMixin, admin.ModelAdmin):
     list_display = (
         "name",
         "contract_number",
@@ -498,14 +553,14 @@ class SupplierAdmin(admin.ModelAdmin):
         )
 
 
-class ChemicalLocationAdmin(PlantScopedAdminMixin, admin.ModelAdmin):
+class ChemicalLocationAdmin(CaSuperuserDeletionAdminMixin, PlantScopedAdminMixin, admin.ModelAdmin):
     plant_field = "treatment_plant"
     plant_filter_field = "treatment_plant"
 
     list_display = (
         "name",
         "treatment_plant",
-        "request_count",
+        "batch_count",
     )
     search_fields = (
         "name",
@@ -523,23 +578,29 @@ class ChemicalLocationAdmin(PlantScopedAdminMixin, admin.ModelAdmin):
     )
     list_per_page = 50
 
-    @admin.display(description="Analysis Requests")
-    def request_count(self, obj):
-        return getattr(obj, "_request_count", 0)
+    @admin.display(description="Chemical Batches")
+    def batch_count(self, obj):
+        return getattr(obj, "_batch_count", 0)
 
     def get_queryset(self, request):
         return (
             super()
             .get_queryset(request)
             .annotate(
-                _request_count=Count(
-                    "analysis_requests",
+                _batch_count=Count(
+                    "chemical_batches",
                     distinct=True,
                 )
             )
         )
 
-class ChemicalSpecificationAdmin(PlantScopedAdminMixin, admin.ModelAdmin):
+class ChemicalSpecificationRemarkInline(admin.StackedInline):
+    model = ChemicalSpecificationRemark
+    extra = 0
+    fields = ("on_pass", "on_fail")
+
+
+class ChemicalSpecificationAdmin(CaSuperuserDeletionAdminMixin, PlantScopedAdminMixin, admin.ModelAdmin):
     plant_field = "treatment_plant"
     plant_filter_field = "treatment_plant"
 
@@ -549,6 +610,7 @@ class ChemicalSpecificationAdmin(PlantScopedAdminMixin, admin.ModelAdmin):
         "unit",
         "limit_range",
         "is_required",
+        "is_active",
         "version",
         "method",
         "treatment_plant",
@@ -558,11 +620,12 @@ class ChemicalSpecificationAdmin(PlantScopedAdminMixin, admin.ModelAdmin):
         "chemical__code",
         "parameter_name",
         "unit",
-        "method__name",
+        "method__method",
     )
     list_filter = (
         PlantFilter,
         "is_required",
+        "is_active",
         "version",
         "unit",
     )
@@ -576,8 +639,42 @@ class ChemicalSpecificationAdmin(PlantScopedAdminMixin, admin.ModelAdmin):
         "parameter_name",
         "-version",
     )
+    readonly_fields = (
+        "version",
+        "created_at",
+    )
+    fieldsets = (
+        (None, {
+            "fields": (
+                "treatment_plant",
+                "chemical",
+                "parameter_name",
+                "unit",
+                "method",
+            )
+        }),
+        ("Limits & Requirements", {
+            "fields": (
+                ("min_limit", "max_limit"),
+                ("is_required", "requires_instrument", "is_active"),
+            )
+        }),
+        ("Audit & Versioning", {
+            "fields": (
+                "version",
+                "created_at",
+            )
+        }),
+    )
+    inlines = [ChemicalSpecificationRemarkInline]
     list_per_page = 50
     save_on_top = True
+
+    def has_delete_permission(self, request, obj=None):
+        return bool(
+            getattr(request.user, "is_active", False)
+            and getattr(request.user, "is_superuser", False)
+        )
 
     @admin.display(description="Specification Range")
     def limit_range(self, obj):
@@ -596,7 +693,7 @@ class ChemicalSpecificationAdmin(PlantScopedAdminMixin, admin.ModelAdmin):
         return format_html("{} – {}", minimum, maximum)
 
 
-class ChemicalSpecificationRemarkAdmin(admin.ModelAdmin):
+class ChemicalSpecificationRemarkAdmin(CaSuperuserDeletionAdminMixin, admin.ModelAdmin):
     list_display = (
         "specification",
         "on_pass_preview",
@@ -622,7 +719,7 @@ class ChemicalSpecificationRemarkAdmin(admin.ModelAdmin):
         return (obj.on_fail or "")[:100]
 
 
-class PackagingStatusAdmin(admin.ModelAdmin):
+class PackagingStatusAdmin(CaSuperuserDeletionAdminMixin, admin.ModelAdmin):
     list_display = (
         "name",
         "description",
@@ -652,7 +749,7 @@ class PackagingStatusAdmin(admin.ModelAdmin):
         )
 
 
-class ChemicalCertApproverAdmin(admin.ModelAdmin):
+class ChemicalCertApproverAdmin(CaSuperuserDeletionAdminMixin, admin.ModelAdmin):
     list_display = (
         "user",
         "signature_status",
@@ -679,6 +776,7 @@ class ChemicalCertApproverAdmin(admin.ModelAdmin):
 
 
 class ChemicalBatchAdmin(
+    CaSuperuserDeletionAdminMixin,
     PlantScopedAdminMixin,
     StatusBadgeMixin,
     admin.ModelAdmin,
@@ -692,6 +790,7 @@ class ChemicalBatchAdmin(
         "chemical",
         "supplier",
         "treatment_plant",
+        "location",
         "received_date",
         "quantity_received",
         "package_count",
@@ -708,6 +807,7 @@ class ChemicalBatchAdmin(
         "chemical__code",
         "supplier__name",
         "treatment_plant__name",
+        "location__name",
     )
     list_filter = (
         PlantFilter,
@@ -720,6 +820,7 @@ class ChemicalBatchAdmin(
         "chemical",
         "supplier",
         "treatment_plant",
+        "location",
         "received_by",
     )
     readonly_fields = (
@@ -740,6 +841,11 @@ class ChemicalBatchAdmin(
     list_per_page = 50
     save_on_top = True
     actions = (
+        # Explicit action lists replace Django's defaults. Keep the native
+        # confirmation flow available; delete permission and the installed
+        # superuser handler restrict execution to active superusers and route
+        # it through the cascading CA hard-delete service.
+        "delete_selected",
         "transition_to_rejected",
         "transition_to_approved",
         "transition_to_utilized",
@@ -764,6 +870,7 @@ class ChemicalBatchAdmin(
                     "chemical",
                     "supplier",
                     "treatment_plant",
+                    "location",
                 )
             },
         ),
@@ -1025,6 +1132,7 @@ class ChemicalBatchAdmin(
 
 
 class ChemicalAnalysisRequestAdmin(
+    CaSuperuserDeletionAdminMixin,
     PlantScopedAdminMixin,
     StatusBadgeMixin,
     admin.ModelAdmin,
@@ -1050,7 +1158,7 @@ class ChemicalAnalysisRequestAdmin(
         "batch__batch_number",
         "batch__chemical__name",
         "batch__chemical__code",
-        "location__name",
+        "batch__location__name",
         "requested_by__username",
         "requested_by__first_name",
         "requested_by__last_name",
@@ -1068,7 +1176,6 @@ class ChemicalAnalysisRequestAdmin(
         "batch",
         "requested_by",
         "received_by",
-        "location",
         "assigned_analysts",
         "completed_by",
     )
@@ -1111,7 +1218,6 @@ class ChemicalAnalysisRequestAdmin(
                 "fields": (
                     "request_id",
                     "batch",
-                    "location",
                     "delivery_date",
                 )
             },
@@ -1378,8 +1484,7 @@ class ChemicalAnalysisRequestAdmin(
                 "batch__chemical",
                 "batch__supplier",
                 "batch__treatment_plant",
-                "location",
-                "location__treatment_plant",
+                "batch__location",
                 "requested_by",
                 "received_by",
                 "completed_by",
@@ -1464,6 +1569,7 @@ class ChemicalAnalysisRequestAdmin(
 
 
 class ChecklistAdmin(
+    CaSuperuserDeletionAdminMixin,
     PlantScopedAdminMixin,
     admin.ModelAdmin,
 ):
@@ -1700,6 +1806,7 @@ class ChecklistAdmin(
 
 
 class BatchTestResultAdmin(
+    CaSuperuserDeletionAdminMixin,
     PlantScopedAdminMixin,
     admin.ModelAdmin,
 ):
@@ -1746,6 +1853,11 @@ class BatchTestResultAdmin(
         "auto_remark",
         "input_link",
         "batch_context",
+        "instrument_snapshot",
+        "specification_snapshot",
+        "method_snapshot",
+        "quality_flags",
+        "revision_number",
     )
     ordering = (
         "batch__sample_id",
@@ -1754,6 +1866,12 @@ class BatchTestResultAdmin(
     )
     list_per_page = 100
     save_on_top = True
+
+    def has_delete_permission(self, request, obj=None):
+        return bool(
+            getattr(request.user, "is_active", False)
+            and getattr(request.user, "is_superuser", False)
+        )
 
     fieldsets = (
         (
@@ -1773,6 +1891,7 @@ class BatchTestResultAdmin(
                     "value",
                     "textual_result",
                     "status",
+                    "revision_reason",
                     "auto_remark",
                 )
             },
@@ -1783,6 +1902,7 @@ class BatchTestResultAdmin(
                 "fields": (
                     "analyst",
                     "tested_at",
+                    "instrument_snapshot",
                     "input_link",
                 )
             },
@@ -1894,6 +2014,7 @@ class BatchTestResultAdmin(
 
 
 class ChemicalAnalysisInputAdmin(
+    CaSuperuserDeletionAdminMixin,
     PlantScopedAdminMixin,
     admin.ModelAdmin,
 ):
@@ -1933,6 +2054,12 @@ class ChemicalAnalysisInputAdmin(
         "-pk",
     )
     list_per_page = 100
+
+    def get_readonly_fields(self, request, obj=None):
+        readonly = tuple(super().get_readonly_fields(request, obj))
+        if obj is not None:
+            return readonly + ("inputs", "method_snapshot")
+        return readonly
 
     fieldsets = (
         (
@@ -2048,6 +2175,7 @@ class ChemicalAnalysisInputAdmin(
 
 
 class ChemicalAnalysisProcessAdmin(
+    CaSuperuserDeletionAdminMixin,
     PlantScopedAdminMixin,
     StatusBadgeMixin,
     admin.ModelAdmin,
@@ -2116,6 +2244,12 @@ class ChemicalAnalysisProcessAdmin(
     )
     list_per_page = 50
     save_on_top = True
+
+    def has_delete_permission(self, request, obj=None):
+        return bool(
+            getattr(request.user, "is_active", False)
+            and getattr(request.user, "is_superuser", False)
+        )
 
     fieldsets = (
         (
@@ -2327,6 +2461,7 @@ class ChemicalAnalysisProcessAdmin(
 
 
 class ChemicalCoAAdmin(
+    CaSuperuserDeletionAdminMixin,
     PlantScopedAdminMixin,
     admin.ModelAdmin,
 ):
@@ -2400,7 +2535,6 @@ class ChemicalCoAAdmin(
         "approve_selected_coas",
         "verify_selected_coas",
         "revoke_selected_approvals",
-        "refresh_selected_hashes",
     )
 
     fieldsets = (
@@ -2668,7 +2802,10 @@ class ChemicalCoAAdmin(
 
         for coa in queryset:
             try:
-                coa.revoke_approval()
+                coa.revoke_approval(
+                    revoked_by=request.user,
+                    reason="Approval revoked by Django administrator action.",
+                )
                 revoked += 1
             except ValidationError as exc:
                 self.message_user(
@@ -2682,28 +2819,6 @@ class ChemicalCoAAdmin(
             f"{revoked} CoA approval(s) revoked.",
             messages.SUCCESS,
         )
-
-    @admin.action(description="Refresh verification hashes")
-    def refresh_selected_hashes(self, request, queryset):
-        refreshed = 0
-
-        for coa in queryset:
-            try:
-                coa.refresh_hash()
-                refreshed += 1
-            except ValidationError as exc:
-                self.message_user(
-                    request,
-                    f"CoA #{coa.pk}: {exc}",
-                    messages.ERROR,
-                )
-
-        self.message_user(
-            request,
-            f"{refreshed} verification hash(es) refreshed.",
-            messages.SUCCESS,
-        )
-
 
 class ChemicalAdminForm(forms.ModelForm):
     class Meta:
@@ -2733,22 +2848,32 @@ class ChemicalAnalysisRequestAdminForm(forms.ModelForm):
 
         batch = self.instance.batch
 
-        if not batch or not batch.treatment_plant_id:
-            return users
-
-        invalid = users.exclude(
-            assigned_treatment_plant_id=batch.treatment_plant_id
-        )
-
-        if invalid.exists():
-            names = ", ".join(
-                str(user)
-                for user in invalid[:10]
+        invalid = [
+            user
+            for user in (users or [])
+            if not user.has_perm("ca.start_chemical_analysis")
+            or not user.has_perm("ca.record_chemical_result")
+            or (
+                batch
+                and batch.treatment_plant_id
+                and not user.is_superuser
+                and user.assigned_treatment_plant_id
+                != batch.treatment_plant_id
             )
+        ]
+
+        if batch and users:
+            eligible_ids = set(
+                self.instance.eligible_analysts(users).values_list("pk", flat=True)
+            )
+            invalid.extend(user for user in users if user.pk not in eligible_ids and user not in invalid)
+
+        if invalid:
+            names = ", ".join(str(user) for user in invalid[:10])
 
             raise ValidationError(
-                f"The following analysts are not assigned to "
-                f"the batch treatment plant: {names}"
+                f"The following users lack chemical-analysis permission "
+                f"or plant access: {names}"
             )
 
         return users
@@ -2804,6 +2929,121 @@ class ChemicalCoAAdminForm(forms.ModelForm):
 
 
 ChemicalCoAAdmin.form = ChemicalCoAAdminForm
+
+
+class PlantScopedAppendOnlyAdmin(CaSuperuserDeletionAdminMixin, PlantScopedAdminMixin, admin.ModelAdmin):
+    """Read-only admin views for audit, custody and stock ledgers."""
+    plant_field = "batch__treatment_plant"
+    plant_filter_field = "batch__treatment_plant"
+    list_per_page = 100
+
+    def get_readonly_fields(self, request, obj=None):
+        return tuple(field.name for field in self.model._meta.fields)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return bool(
+            getattr(request.user, "is_active", False)
+            and getattr(request.user, "is_superuser", False)
+        )
+
+
+@admin.register(ChemicalBatchHold)
+class ChemicalBatchHoldAdmin(PlantScopedAppendOnlyAdmin):
+    list_display = ("batch", "issue", "status", "opened_at", "opened_by", "resolved_at", "resolved_by")
+    list_filter = (PlantFilter, "status", "issue", "opened_at")
+    search_fields = ("batch__sample_id", "batch__batch_number", "details", "resolution")
+
+
+@admin.register(ChemicalWorkflowEvent)
+class ChemicalWorkflowEventAdmin(PlantScopedAppendOnlyAdmin):
+    list_display = ("occurred_at", "batch", "event_type", "action", "from_status", "to_status", "actor")
+    list_filter = (PlantFilter, "event_type", "occurred_at")
+    search_fields = ("batch__sample_id", "batch__batch_number", "action", "details")
+
+
+@admin.register(ChemicalCustodyEvent)
+class ChemicalCustodyEventAdmin(PlantScopedAppendOnlyAdmin):
+    list_display = ("occurred_at", "batch", "event_type", "from_location", "to_location", "seal_number", "actor")
+    list_filter = (PlantFilter, "event_type", "occurred_at")
+    search_fields = ("batch__sample_id", "batch__batch_number", "seal_number", "remarks")
+
+
+@admin.register(ChemicalInventoryMovement)
+class ChemicalInventoryMovementAdmin(PlantScopedAppendOnlyAdmin):
+    list_display = ("created_at", "batch", "movement_type", "quantity_delta", "quantity_after", "unit", "actor")
+    list_filter = (PlantFilter, "movement_type", "created_at")
+    search_fields = ("batch__sample_id", "batch__batch_number", "idempotency_key", "notes")
+
+
+@admin.register(BatchTestResultRevision)
+class BatchTestResultRevisionAdmin(PlantScopedAppendOnlyAdmin):
+    list_display = ("created_at", "batch", "parameter", "revision_number", "actor", "revision_reason")
+    list_filter = (PlantFilter, "created_at")
+    search_fields = ("batch__sample_id", "batch__batch_number", "parameter__parameter_name", "revision_reason")
+
+
+@admin.register(ChemicalWorkflowAlert)
+class ChemicalWorkflowAlertAdmin(PlantScopedAppendOnlyAdmin):
+    plant_field = "batch__treatment_plant"
+    plant_filter_field = "batch__treatment_plant"
+    list_display = ("created_at", "recipient", "batch", "alert_type", "severity", "acknowledged_at")
+    list_filter = (PlantFilter, "alert_type", "severity", "acknowledged_at", "created_at")
+    search_fields = ("recipient__username", "title", "message", "batch__sample_id")
+
+
+@admin.register(ChemicalCorrectiveAction)
+class ChemicalCorrectiveActionAdmin(PlantScopedAppendOnlyAdmin):
+    list_display = ("submitted_at", "batch", "status", "submitted_by", "reviewed_by", "reviewed_at")
+    list_filter = (PlantFilter, "status", "submitted_at", "reviewed_at")
+    search_fields = (
+        "batch__sample_id", "batch__batch_number", "qa_observation",
+        "corrective_action", "preventive_action", "review_notes",
+    )
+
+
+@admin.register(ChemicalCoAAuditEvent)
+class ChemicalCoAAuditEventAdmin(PlantScopedAppendOnlyAdmin):
+    plant_field = "coa__batch__treatment_plant"
+    plant_filter_field = "coa__batch__treatment_plant"
+    list_display = ("occurred_at", "coa", "action", "actor", "content_hash")
+    list_filter = ("action", "occurred_at")
+    search_fields = ("coa__batch__sample_id", "content_hash", "details")
+
+
+class SuperuserOnlyAuditAdmin(CaSuperuserDeletionAdminMixin, admin.ModelAdmin):
+    def has_view_permission(self, request, obj=None):
+        return bool(request.user.is_active and request.user.is_superuser)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def get_readonly_fields(self, request, obj=None):
+        return tuple(field.name for field in self.model._meta.fields)
+
+
+@admin.register(ChemicalOutboxEvent)
+class ChemicalOutboxEventAdmin(SuperuserOnlyAuditAdmin):
+    list_display = ("created_at", "event_type", "aggregate_type", "aggregate_id", "attempt_count", "available_at", "delivered_at")
+    list_filter = ("event_type", "delivered_at", "created_at")
+    search_fields = ("idempotency_key", "aggregate_id", "last_error")
+
+
+@admin.register(ChemicalSuperuserPurgeAudit)
+class ChemicalSuperuserPurgeAuditAdmin(SuperuserOnlyAuditAdmin):
+    list_display = ("occurred_at", "actor", "root_model", "deleted_counts")
+    list_filter = ("root_model", "occurred_at")
+    search_fields = ("root_model", "root_ids", "root_labels")
+
+
 
 
 @admin.register(Chemical)

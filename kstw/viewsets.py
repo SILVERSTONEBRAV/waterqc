@@ -2,6 +2,7 @@ from datetime import timedelta
 from django.utils import timezone
 from django.db import transaction
 from rest_framework import viewsets, permissions, status
+from core.permissions import ViewModelPermissions
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from .choices import WaterAnalysisState
@@ -75,16 +76,16 @@ class AutoTransitionMixin:
 class WasteWaterSamplingSiteViewSet(OptionalTreatmentPlantShiftMixin, viewsets.ModelViewSet):
     queryset = WasteWaterSamplingSite.objects.all()
     serializer_class = WasteWaterSamplingSiteSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
 class WasteWaterSampleViewSet(OptionalTreatmentPlantShiftMixin, viewsets.ModelViewSet):
     queryset = WasteWaterSample.objects.all()
     serializer_class = WasteWaterSampleSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
 class WasteWaterAnalysisViewSet(OptionalTreatmentPlantShiftMixin, AutoTransitionMixin, viewsets.ModelViewSet):
     serializer_class = WasteWaterAnalysisSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
     def get_queryset(self):
         return super().filter_queryset(WasteWaterAnalysis.objects.prefetch_related('logs').select_related('treatment_plant', 'operator', 'shift'))
@@ -100,7 +101,7 @@ class WasteWaterAnalysisViewSet(OptionalTreatmentPlantShiftMixin, AutoTransition
         self._apply_auto_transition(instance, request.user)
         return super().retrieve(request, *args, **kwargs)
 
-    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    @action(detail=True, methods=['post'], permission_classes=[ViewModelPermissions])
     def transition(self, request, pk=None):
         instance = self.get_object()
         new_state = request.data.get("new_state")
@@ -121,19 +122,19 @@ class WasteWaterAnalysisViewSet(OptionalTreatmentPlantShiftMixin, AutoTransition
 class WasteWaterParameterResultViewSet(viewsets.ModelViewSet):
     queryset = WasteWaterParameterResult.objects.all()
     serializer_class = WasteWaterParameterResultSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
 class IndustrialSampleViewSet(OptionalTreatmentPlantShiftMixin, viewsets.ModelViewSet):
     queryset = IndustrialSample.objects.all()
     serializer_class = IndustrialSampleSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
 class IndustrialSampleAnalysisViewSet(OptionalTreatmentPlantShiftMixin, AutoTransitionMixin, viewsets.ModelViewSet):
     queryset = IndustrialSampleAnalysis.objects.all()
     serializer_class = IndustrialSampleAnalysisSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
-    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    @action(detail=True, methods=['post'], permission_classes=[ViewModelPermissions])
     def transition(self, request, pk=None):
         instance = self.get_object()
         new_state = request.data.get("new_state")
@@ -154,19 +155,19 @@ class IndustrialSampleAnalysisViewSet(OptionalTreatmentPlantShiftMixin, AutoTran
 class IndustrialSampleParameterResultViewSet(viewsets.ModelViewSet):
     queryset = IndustrialSampleParameterResult.objects.all()
     serializer_class = IndustrialSampleParameterResultSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
 class TreatmentPlantSampleViewSet(OptionalTreatmentPlantShiftMixin, viewsets.ModelViewSet):
     queryset = TreatmentPlantSample.objects.all()
     serializer_class = TreatmentPlantSampleSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
 class TreatmentPlantSampleAnalysisViewSet(OptionalTreatmentPlantShiftMixin, AutoTransitionMixin, viewsets.ModelViewSet):
     queryset = TreatmentPlantSampleAnalysis.objects.all()
     serializer_class = TreatmentPlantSampleAnalysisSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
-    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    @action(detail=True, methods=['post'], permission_classes=[ViewModelPermissions])
     def transition(self, request, pk=None):
         instance = self.get_object()
         new_state = request.data.get("new_state")
@@ -187,19 +188,19 @@ class TreatmentPlantSampleAnalysisViewSet(OptionalTreatmentPlantShiftMixin, Auto
 class TreatmentPlantSampleParameterResultViewSet(viewsets.ModelViewSet):
     queryset = TreatmentPlantSampleParameterResult.objects.all()
     serializer_class = TreatmentPlantSampleParameterResultSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
 class ExhausterSampleViewSet(OptionalTreatmentPlantShiftMixin, viewsets.ModelViewSet):
     queryset = ExhausterSample.objects.all()
     serializer_class = ExhausterSampleSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
 class ExhausterSampleAnalysisViewSet(OptionalTreatmentPlantShiftMixin, AutoTransitionMixin, viewsets.ModelViewSet):
     queryset = ExhausterSampleAnalysis.objects.all()
     serializer_class = ExhausterSampleAnalysisSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
-    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    @action(detail=True, methods=['post'], permission_classes=[ViewModelPermissions])
     def transition(self, request, pk=None):
         instance = self.get_object()
         new_state = request.data.get("new_state")
@@ -220,4 +221,4 @@ class ExhausterSampleAnalysisViewSet(OptionalTreatmentPlantShiftMixin, AutoTrans
 class ExhausterSampleParameterResultViewSet(viewsets.ModelViewSet):
     queryset = ExhausterSampleParameterResult.objects.all()
     serializer_class = ExhausterSampleParameterResultSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]

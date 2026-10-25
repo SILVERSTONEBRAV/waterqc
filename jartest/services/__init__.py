@@ -1,0 +1,1 @@
+"""Jar-test domain services."""

@@ -19,6 +19,7 @@ class SuperUserEngine:
         return bool(
             user
             and getattr(user, "is_authenticated", False)
+            and getattr(user, "is_active", False)
             and getattr(user, "is_superuser", False)
         )
 

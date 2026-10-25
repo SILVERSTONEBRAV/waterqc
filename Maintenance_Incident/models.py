@@ -1,5 +1,4 @@
 # Maintenance_Incident/models.py
-
 import hashlib
 import uuid
 from datetime import timedelta
@@ -11,43 +10,20 @@ from django.db.models import Q
 from django.utils import timezone
 
 
-# =========================================================
-# AUDIT BASE
-# =========================================================
-
 class AuditModel(models.Model):
-    created_at = models.DateTimeField(
-        auto_now_add=True,
-        db_index=True,
-    )
-
-    updated_at = models.DateTimeField(
-        auto_now=True,
-    )
-
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name="%(class)s_created",
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="%(class)s_created",
     )
-
     updated_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name="%(class)s_updated",
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="%(class)s_updated",
     )
-
     class Meta:
         abstract = True
 
-
-# =========================================================
-# ENUMS
-# =========================================================
 
 class IncidentSeverity(models.TextChoices):
     LOW = "low", "Low"
@@ -270,6 +246,21 @@ class MaintenanceIncident(AuditModel):
         related_name="reported_incidents",
     )
 
+    offline_submission_key = models.UUIDField(
+        null=True,
+        blank=True,
+        unique=True,
+        editable=False,
+    )
+
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="assigned_maintenance_incidents",
+    )
+
     target_type = models.CharField(
         max_length=20,
         db_index=True,
@@ -330,6 +321,26 @@ class MaintenanceIncident(AuditModel):
     sla_breach_time = models.DateTimeField(
         null=True,
         blank=True,
+    )
+
+    resolved_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    closed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    root_cause = models.TextField(
+        blank=True,
+        default="",
+    )
+
+    resolution_summary = models.TextField(
+        blank=True,
+        default="",
     )
 
     work_request = models.OneToOneField(
@@ -476,9 +487,7 @@ class MaintenanceIncident(AuditModel):
         if self.severity != IncidentSeverity.CRITICAL:
             return None
 
-        from maintenance.models import (
-            WorkRequest,
-        )
+        from maintenance.models import WorkRequest
 
         request = WorkRequest.objects.create(
             title=self.title,

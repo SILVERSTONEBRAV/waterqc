@@ -1,0 +1,169 @@
+{% load custom_filters %}
+
+<div class="cl-matrix-container">
+    <div class="cl-matrix-header">
+        <div class="d-flex align-items-center gap-2">
+            <i class="fa-solid fa-flask-vial text-emerald"></i>
+            <h5 class="m-0 fw-bold">6-Jar Breakpoint Demand Matrix</h5>
+            <span class="text-muted small">(30-Min Disinfection Incubation Standard)</span>
+        </div>
+
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <!-- Seed Ladder Preset — base_dosage / step_dosage → ChlorineJarResult.dosage_mg_per_l -->
+            <label class="small text-muted mb-0 d-flex align-items-center gap-1" title="Starting dosage (mg/L)">
+                <span>Base</span>
+                <input type="number" step="0.1" min="0.1" name="base_dosage" value="1.0"
+                       class="cl-input" style="width:3.2rem;height:1.55rem;padding:0.1rem 0.25rem;font-size:0.7rem;">
+            </label>
+            <label class="small text-muted mb-0 d-flex align-items-center gap-1" title="Step between jars (mg/L)">
+                <span>Step</span>
+                <input type="number" step="0.1" min="0.1" name="step_dosage" value="0.5"
+                       class="cl-input" style="width:3.2rem;height:1.55rem;padding:0.1rem 0.25rem;font-size:0.7rem;">
+            </label>
+            <button type="submit" name="action" value="seed_ladder" class="cl-btn-secondary" title="Apply dosage ladder from base + step across 6 jars">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                <span>Seed Ladder</span>
+            </button>
+
+            <!-- Save Bench Observations -->
+            <button type="submit" name="action" value="save_jars" class="cl-btn-primary" id="save-chlorine-btn">
+                <i class="fa-solid fa-floppy-disk"></i>
+                <span>Save & Rank Breakpoint</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 6-Jar Grid Cards -->
+    <div class="cl-matrix-grid">
+        {% for jar in jars %}
+        <div class="cl-jar-card {% if jar.is_optimal %}is-optimal-card{% endif %}" id="jar-card-{{ jar.jar_number }}">
+            
+            <!-- Card Header: Jar Number & Rank Badge -->
+            <div class="jar-card-top">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="jar-badge">JAR {{ jar.jar_number }}</span>
+                    {% if jar.is_optimal %}
+                    <span class="optimal-tag">
+                        <i class="fa-solid fa-crown"></i> OPTIMAL #1
+                    </span>
+                    {% else %}
+                    <span class="rank-tag">Rank #{{ jar.rank|default:jar.jar_number }}</span>
+                    {% endif %}
+                </div>
+
+                <!-- Status Pill -->
+                <span class="cl-status-badge status-{{ jar.status_class }}">
+                    {{ jar.status_label }}
+                </span>
+            </div>
+
+            <!-- Beaker Visual with dynamic level & bubbles -->
+            <div class="jar-beaker-visual">
+                <div class="beaker-container">
+                    <div class="beaker-glass">
+                        <div class="beaker-liquid" style="height: {{ jar.retention_pct|default:'50' }}%;">
+                            <div class="beaker-bubble b1"></div>
+                            <div class="beaker-bubble b2"></div>
+                            <div class="beaker-bubble b3"></div>
+                        </div>
+                        <div class="beaker-graduations">
+                            <span>1000 mL</span>
+                            <span>750 mL</span>
+                            <span>500 mL</span>
+                            <span>250 mL</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="beaker-stats">
+                    <div class="stat-row">
+                        <span class="stat-name">Consumed (Demand):</span>
+                        <span class="stat-num text-danger fw-bold" id="consumed-display-{{ jar.jar_number }}">
+                            {{ jar.consumed }} mg/L
+                        </span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-name">Residual Retention:</span>
+                        <span class="stat-num text-cyan" id="retention-display-{{ jar.jar_number }}">
+                            {{ jar.retention_pct }}%
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inputs Bench Form -->
+            <div class="jar-inputs-wrapper">
+                <!-- Applied Dose Input -->
+                <div class="input-group-custom">
+                    <label class="input-lbl">
+                        <span>Chlorine Dose</span>
+                        <span class="unit">(mg/L Cl₂)</span>
+                    </label>
+                    <div class="stepper-wrapper">
+                        <button type="button" class="btn-step" onclick="stepChlorineDose({{ jar.jar_number }}, -0.5)">-</button>
+                        <input type="number"
+                               step="0.01"
+                               min="0"
+                               name="jar_{{ jar.jar_number }}_dosage"
+                               id="input-dose-{{ jar.jar_number }}"
+                               value="{{ jar.dosage }}"
+                               class="cl-input dose-field"
+                               oninput="recalcChlorineJar({{ jar.jar_number }});">
+                        <button type="button" class="btn-step" onclick="stepChlorineDose({{ jar.jar_number }}, 0.5)">+</button>
+                    </div>
+                </div>
+
+                <!-- Measured Residual Input -->
+                <div class="input-group-custom">
+                    <label class="input-lbl">
+                        <span>Residual Chlorine</span>
+                        <span class="unit">(mg/L after 30m)</span>
+                    </label>
+                    <div class="stepper-wrapper">
+                        <button type="button" class="btn-step" onclick="stepChlorineResidual({{ jar.jar_number }}, -0.05)">-</button>
+                        <input type="number"
+                               step="0.001"
+                               min="0"
+                               name="jar_{{ jar.jar_number }}_residual"
+                               id="input-res-{{ jar.jar_number }}"
+                               value="{{ jar.residual }}"
+                               class="cl-input res-field {% if jar.is_optimal %}res-optimal-highlight{% endif %}"
+                               oninput="recalcChlorineJar({{ jar.jar_number }});">
+                        <button type="button" class="btn-step" onclick="stepChlorineResidual({{ jar.jar_number }}, 0.05)">+</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Target Deviation Gauge -->
+            <div class="jar-target-gauge">
+                <div class="d-flex justify-content-between small text-muted mb-1">
+                    <span>Deviation from Target (0.20 mg/L)</span>
+                    <span class="fw-bold" id="dev-display-{{ jar.jar_number }}">
+                        {% widthratio jar.residual 1 1 as dummy %}
+                        {{ jar.residual|floatformat:3 }} mg/L
+                    </span>
+                </div>
+                <div class="progress-bar-wrap">
+                    <div class="progress-indicator {% if jar.is_optimal %}ind-green{% else %}ind-amber{% endif %}"
+                         id="gauge-bar-{{ jar.jar_number }}"
+                         style="width: {% if jar.residual %}{{ jar.residual|floatformat:2 }}{% else %}10{% endif %}%;"></div>
+                </div>
+            </div>
+
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Analytical Bench Remarks Footer -->
+    <div class="cl-remarks-card">
+        <label for="cl-remarks" class="small fw-semibold text-muted mb-1 d-flex align-items-center gap-1">
+            <i class="fa-solid fa-comment-dots text-emerald"></i>
+            <span>Disinfection Observations & Breakpoint Notes</span>
+        </label>
+        <textarea id="cl-remarks"
+                  name="remarks"
+                  rows="2"
+                  class="cl-textarea"
+                  placeholder="Note contact time conditions, raw ammonia interference, odor threshold, or temperature variations...">{{ chlorine_test.remarks }}</textarea>
+    </div>
+</div>

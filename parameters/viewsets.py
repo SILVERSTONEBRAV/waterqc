@@ -1,4 +1,5 @@
 from rest_framework import viewsets, permissions, status, filters
+from core.permissions import ViewModelPermissions
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django_filters.rest_framework import DjangoFilterBackend
@@ -19,7 +20,7 @@ from .serializers import (
 
 # --- Base Parameter ViewSet ---
 class BaseParameterViewSet(viewsets.ModelViewSet):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['is_active', 'unit']
     search_fields = ['name']

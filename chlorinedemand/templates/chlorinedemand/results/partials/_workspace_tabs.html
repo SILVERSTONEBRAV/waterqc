@@ -1,0 +1,8 @@
+<nav class="cd-workspace-tabs" role="tablist" aria-label="Chlorine demand workspace">
+    <a class="cd-workspace-tab {% if request.GET.tab != 'reports' %}is-active{% endif %}" role="tab" aria-selected="{% if request.GET.tab != 'reports' %}true{% else %}false{% endif %}" href="{% url 'chlorinedemand:dashboard' %}?plant={{ plant.pk }}&amp;tab=bench">
+        <i class="fa-solid fa-flask-vial" aria-hidden="true"></i><span>Chlorine bench</span>
+    </a>
+    <a class="cd-workspace-tab {% if request.GET.tab == 'reports' %}is-active{% endif %}" role="tab" aria-selected="{% if request.GET.tab == 'reports' %}true{% else %}false{% endif %}" href="{% url 'chlorinedemand:dashboard' %}?plant={{ plant.pk }}&amp;tab=reports">
+        <i class="fa-solid fa-chart-column" aria-hidden="true"></i><span>Demand reports</span>
+    </a>
+</nav>

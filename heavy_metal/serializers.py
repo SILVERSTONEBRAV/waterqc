@@ -19,10 +19,21 @@ class HeavyMetalLimitSerializer(serializers.ModelSerializer):
 
 class HeavyMetalParameterSerializer(serializers.ModelSerializer):
     parameter_name = serializers.CharField(source='parameter.parameter.name', read_only=True)
+    result_value = serializers.FloatField(source='value')
+    entry_status = serializers.CharField(read_only=True)
 
     class Meta:
         model = HeavyMetalParameter
-        fields = ['id', 'parameter', 'parameter_name', 'result_value']
+        fields = ['id', 'parameter', 'parameter_name', 'result_value', 'entry_status']
+
+    def create(self, validated_data):
+        validated_data['entry_status'] = HeavyMetalParameter.EntryStatus.RECORDED
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        if 'value' in validated_data:
+            instance.entry_status = HeavyMetalParameter.EntryStatus.RECORDED
+        return super().update(instance, validated_data)
 
 
 class HeavyMetalAnalysisListSerializer(serializers.ModelSerializer):

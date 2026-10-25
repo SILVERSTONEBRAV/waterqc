@@ -1,4 +1,5 @@
 from rest_framework import viewsets, status, filters
+from core.permissions import ViewModelPermissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -31,7 +32,7 @@ class WaterFilterViewSet(viewsets.ModelViewSet):
     """
     queryset = WaterFilter.objects.all()
     serializer_class = WaterFilterSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['status']
     search_fields = ['name']
@@ -45,7 +46,7 @@ class FilteredWaterLimitViewSet(viewsets.ModelViewSet):
     """
     queryset = FilteredWaterLimit.objects.all()
     serializer_class = FilteredWaterLimitSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['parameter', 'unit']
     ordering_fields = ['parameter', 'min_value', 'max_value']
@@ -59,7 +60,7 @@ class FilteredWaterResultsViewSet(viewsets.ModelViewSet):
     """
     queryset = FilteredWaterResults.objects.select_related('parameter', 'water_filter').all()
     serializer_class = FilteredWaterResultsSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['parameter', 'water_filter']
     ordering_fields = ['result_value']
@@ -86,7 +87,7 @@ class ShiftViewSet(viewsets.ReadOnlyModelViewSet):
     """
     queryset = Shift.objects.all()
     serializer_class = ShiftSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['treatment_plant']
     ordering_fields = ['start_time', 'end_time']
@@ -101,7 +102,7 @@ class FilteredWaterAnalysisViewSet(viewsets.ModelViewSet):
         'treatment_plant', 'analysed_by', 'verified_by'
     ).prefetch_related('results__parameter', 'results__water_filter')
     serializer_class = FilteredWaterAnalysisSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
     filterset_fields = [
         'treatment_plant',

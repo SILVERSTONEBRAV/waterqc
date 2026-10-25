@@ -5,10 +5,10 @@ from typing import Callable, Optional, Any, Dict
 from django.apps import apps
 from django.db import models, transaction
 from django.views import View
-from django.core.exceptions import ImproperlyConfigured
+from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 from core.engine.export_engine import export_engine
 from django.views.generic import TemplateView
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, render, redirect
 from django.db.models import Q
 from django.db.models.fields.related import ForeignKey, OneToOneField, ManyToManyField
 from core.mixins import WanjalaMixin
@@ -81,7 +81,7 @@ LAUNCHER_APPS = [
     ("Duty House", "/duty_house/"),
     ("WSP", "/wsp/"),
     ("Maintenance", "/maintenance/"),
-    ("Maintenance Incident", "/Maintenance_Incident/"),
+    ("Self Monitoring", "/monitoring/"),
     ("Chlorine Demand", "/chlorinedemand/"),
     ("Jar Test", "/jartest/"),
     ("DESTW", "/destw/"),
@@ -99,9 +99,49 @@ LAUNCHER_APPS = [
 class HomeView(WanjalaMixin, TemplateView):
     template_name = "core/home/index.html"
 
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+
+        if not request.user.is_superuser:
+            from accounts.utils import get_user_landing_url
+            target = get_user_landing_url(request.user)
+            if target and target != "/" and target != request.path:
+                return redirect(target)
+            raise PermissionDenied("The Home View is restricted to system administrators.")
+
+        return super().dispatch(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        return self.get(request, *args, **kwargs)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["launcher_apps"] = LAUNCHER_APPS
+        user = self.request.user
+        entries_by_app = {}
+        for entry in registry.all():
+            model = entry.model
+            entries_by_app.setdefault(model._meta.app_label.lower(), []).append(model)
+
+        visible_apps = []
+        for name, url in LAUNCHER_APPS:
+            if url == "/admin/":
+                if user.is_staff or user.is_superuser:
+                    visible_apps.append((name, url))
+                continue
+            if url == "/accounts/":
+                visible_apps.append((name, url))
+                continue
+
+            app_label = url.strip("/").split("/", 1)[0].lower()
+            models_for_app = entries_by_app.get(app_label, [])
+            if user.is_superuser or any(
+                user.has_perm(f"{model._meta.app_label}.view_{model._meta.model_name}")
+                for model in models_for_app
+            ):
+                visible_apps.append((name, url))
+
+        context["launcher_apps"] = visible_apps
         return context
 
 
@@ -285,6 +325,12 @@ class NAMUBUYA(WanjalaMixin, View):
         return "list"
 
     def _authorize(self, action: str):
+        if (
+            self.model._meta.app_label == "ca"
+            and self.request.user.is_superuser
+            and action in {"delete", "bulk_delete"}
+        ):
+            return True
         registry.check_policy(self.request, action, self.entry)
 
     def _get_handler(self, action: str) -> Optional[Callable]:
@@ -551,7 +597,12 @@ class NAMUBUYA(WanjalaMixin, View):
         self._hook("before_delete", ctx, obj)
 
         obj_id = obj.pk
-        obj.delete()
+        if self.request.user.is_superuser:
+            from core.engine.superuser_authorization import force_delete_objects
+
+            force_delete_objects([obj], actor=self.request.user)
+        else:
+            obj.delete()
 
         self._hook("after_delete", ctx, obj_id)
         self._emit("delete", obj_id)
@@ -562,7 +613,15 @@ class NAMUBUYA(WanjalaMixin, View):
         ids = ctx["request"].POST.getlist("ids")
 
         with transaction.atomic():
-            deleted, _ = self.model.objects.filter(pk__in=ids).delete()
+            queryset = self.model.objects.filter(pk__in=ids)
+            if ctx["request"].user.is_superuser:
+                from core.engine.superuser_authorization import force_delete_objects
+
+                deleted = force_delete_objects(
+                    queryset, actor=ctx["request"].user
+                )
+            else:
+                deleted, _ = queryset.delete()
 
         self._emit("bulk_delete", deleted)
         return self._success(deleted=deleted)
@@ -960,7 +1019,11 @@ class NAMUBUYA(WanjalaMixin, View):
                 try:
                     with transaction.atomic():
                         setattr(instance, field_name, value)
-                        instance.save(update_fields=[field_name])
+                        update_fields = [field_name]
+                        if field_name == "value" and hasattr(instance, "entry_status"):
+                            instance.entry_status = instance.EntryStatus.RECORDED
+                            update_fields.append("entry_status")
+                        instance.save(update_fields=update_fields)
 
                 except Exception as e:
                     logger.exception("Inline update failed")
@@ -991,7 +1054,12 @@ class NAMUBUYA(WanjalaMixin, View):
 
             try:
                 with transaction.atomic():
-                    instance.delete()
+                    if ctx["request"].user.is_superuser:
+                        from core.engine.superuser_authorization import force_delete_objects
+
+                        force_delete_objects([instance], actor=ctx["request"].user)
+                    else:
+                        instance.delete()
             except Exception as e:
                 return self._error(str(e), 500)
 

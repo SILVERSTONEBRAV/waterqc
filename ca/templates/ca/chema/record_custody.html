@@ -1,0 +1,18 @@
+{% extends "ca/dashboard/layout/app.html" %}
+{% block title %}Record batch transfer · {{ batch.sample_id }}{% endblock %}
+{% block content %}
+<main class="ca-page" style="max-width:900px;margin-inline:auto">
+    <header class="page-header">
+        <div><p class="eyebrow">Chain of custody · {{ batch.sample_id }}</p><h1>Record batch transfer</h1><p>{{ batch.chemical }} · Current location: {{ batch.location }}</p></div>
+        <a class="btn btn-secondary" href="{% url 'ca:batch-detail' batch.pk %}">Back to batch</a>
+    </header>
+    <section class="card"><div class="card-body">
+        <form method="post" enctype="multipart/form-data">{% csrf_token %}
+            {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+            <div class="ca-workflow-fields">{% for field in form.visible_fields %}<div class="ca-workflow-field"><label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span aria-hidden="true">*</span>{% endif %}</label>{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{% if field.errors %}<div class="field-errors">{{ field.errors }}</div>{% endif %}</div>{% endfor %}</div>
+            <div class="page-actions" style="margin-top:1rem"><a class="btn btn-secondary" href="{% url 'ca:batch-detail' batch.pk %}">Cancel</a><button class="btn btn-primary" type="submit">Record transfer</button></div>
+        </form>
+    </div></section>
+</main>
+<style>.ca-workflow-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}.ca-workflow-field{display:flex;flex-direction:column;gap:.4rem}.ca-workflow-field:last-child{grid-column:1/-1}@media(max-width:700px){.ca-workflow-fields{grid-template-columns:1fr}}</style>
+{% endblock %}

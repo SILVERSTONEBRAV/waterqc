@@ -1,20 +1,31 @@
 # ca/urls.py
 from __future__ import annotations
 
-from django.urls import path
+from django.urls import include, path
+from django.views.generic import RedirectView
 from viewflow.workflow.flow import FlowViewset
-from . dashboard2 import *
-from . dashboard3 import *
-from . dashboard import *
+from .dashboard import (
+    ChemicalAnalyticsDataView,
+    ChemicalNotificationAckView,
+    ChemicalNotificationsView,
+    ChemicalReportExportView,
+    ChemicalReportPreviewView,
+)
+from .dashboard_home import ChemicalAnalysisDashboardView, ChemicalBatchRegisterExportView
 from .chemical_flow import ChemicalAnalysisFlow
 from .views import (
     ChemicalAnalysisInputDetailView,
     ChemicalAnalysisRequestDetailView,
     ChemicalAnalysisRequestListView,
+    ChemicalAnalysisRequestAssignAnalystView,
+    ChemicalBatchCustodyRecordView,
+    ChemicalBatchHoldResolutionView,
     ChemicalBatchCreateView,
     ChemicalBatchDetailView,
     ChemicalBatchListView,
     ChemicalBatchUpdateView,
+    ChemicalBatchWorkflowActionView,
+    ChemicalBatchTaskClaimView,
     ChemicalCoADetailView,
     ChemicalCoAListView,
     ChemicalSpecificationFilterView,
@@ -43,19 +54,40 @@ from .views import (
 app_name = "ca"
 
 workflow = FlowViewset(ChemicalAnalysisFlow)
+workflow_namespace = "chemicalanalysis"
+# Viewflow clears the Flow class' ``app_name`` after attaching it to this
+# viewset. Preserve the namespace used by the nested URL include explicitly so
+# task-level reverse() calls resolve to ca:chemicalanalysis:<node>:<action>.
+workflow.namespace = workflow_namespace
+workflow.parent_namespace = "ca"
 
 urlpatterns = [
-    path("", DashboardView.as_view(), name="dashboard"),
-    path("dashboard/", DashboardView.as_view(), name="dashboard-view"),
-    path("dashboard2/", Dashboard2View.as_view(), name="dashboard2"),
-    path("dashboard3/", Dashboard3View.as_view(), name="dashboard3"),
+    path("", ChemicalAnalysisDashboardView.as_view(), name="dashboard"),
+    path("dashboard/", ChemicalAnalysisDashboardView.as_view(), name="dashboard-view"),
+    # Keep old bookmarks working while maintaining one canonical dashboard.
+    path("dashboard2/", RedirectView.as_view(pattern_name="ca:dashboard", permanent=False), name="dashboard2"),
+    path("dashboard3/", RedirectView.as_view(pattern_name="ca:dashboard", permanent=False), name="dashboard3"),
     path("batches/", ChemicalBatchListView.as_view(), name="batch-list"),
+    path("batches/register-export/", ChemicalBatchRegisterExportView.as_view(), name="batch-register-export"),
     path("batches/add/", ChemicalBatchCreateView.as_view(), name="batch-create"),
+    path(
+        "batches/<int:pk>/workflow/<str:node_name>/",
+        ChemicalBatchWorkflowActionView.as_view(),
+        name="batch-workflow-action",
+    ),
+    path(
+        "batches/<int:pk>/tasks/<int:task_pk>/claim/",
+        ChemicalBatchTaskClaimView.as_view(),
+        name="batch-task-claim",
+    ),
     path("batches/<int:pk>/", ChemicalBatchDetailView.as_view(), name="batch-detail"),
     path("batches/<int:pk>/edit/", ChemicalBatchUpdateView.as_view(), name="batch-update"),
+    path("batches/<int:pk>/holds/<int:hold_id>/resolve/", ChemicalBatchHoldResolutionView.as_view(), name="batch-hold-resolve"),
+    path("batches/<int:pk>/custody/", ChemicalBatchCustodyRecordView.as_view(), name="batch-custody-record"),
 
     path("requests/", ChemicalAnalysisRequestListView.as_view(), name="request-list"),
     path("requests/<int:pk>/", ChemicalAnalysisRequestDetailView.as_view(), name="request-detail"),
+    path("requests/<int:pk>/assign-analyst/", ChemicalAnalysisRequestAssignAnalystView.as_view(), name="request-assign-analyst"),
     path("requests/<int:pk>/transition/", ChemicalAnalysisRequestDetailView.as_view(), name="request-transition"),
 
     path("processes/", ProcessListView.as_view(), name="process-list"),
@@ -140,5 +172,22 @@ urlpatterns = [
         name="pending-coa-approval",
     ),
 
-    path("workflow/", workflow.urls),
+    # Reports & Analytics API
+    path("reports/export/", ChemicalReportExportView.as_view(), name="report-export"),
+    path("reports/preview/", ChemicalReportPreviewView.as_view(), name="report-preview"),
+    path("analytics/data/", ChemicalAnalyticsDataView.as_view(), name="analytics-data"),
+
+    # Alerts & Notifications Integration (channelled through alerts app)
+    path("notifications/", ChemicalNotificationsView.as_view(), name="notifications"),
+    path("notifications/<str:pk>/ack/", ChemicalNotificationAckView.as_view(), name="notification-ack"),
+
+    # FlowViewset clears the flow app_name while attaching nodes, so supply the
+    # app name explicitly for Django's nested namespace include.
+    path(
+        "workflow/",
+        include(
+            (workflow.urls[0], workflow_namespace),
+            namespace=workflow_namespace,
+        ),
+    ),
 ]

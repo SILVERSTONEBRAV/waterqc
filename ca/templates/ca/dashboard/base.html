@@ -4,8 +4,9 @@
 
 <html
     lang="en"
-    data-theme="default"
+    data-theme="day"
     data-app="chemical-analysis"
+    class="app-fullscreen"
 >
 <head>
     <meta charset="utf-8">
@@ -13,7 +14,6 @@
     name="viewport"
     content="width=device-width, initial-scale=1"
 >
-
 <meta
     name="application-name"
     content="Chemical Analysis Management System"
@@ -21,12 +21,22 @@
 
 <meta
     name="theme-color"
-    content="#0f172a"
+    content="#417690"
 >
+<script src="{% static 'core/js/theme.js' %}?v=20261020-enterprise-theme"></script>
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="manifest" href="{% static 'manifest.json' %}">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="/manifest.json?v=20261020-enterprise-theme">
+{% if company.logo %}
+<link rel="apple-touch-icon" href="{{ company.logo.url }}">
+<link rel="icon" href="{{ company.logo.url }}">
+{% elif company.favicon %}
+<link rel="apple-touch-icon" href="{{ company.favicon.url }}">
+<link rel="icon" href="{{ company.favicon.url }}" type="image/png">
+{% else %}
+<link rel="apple-touch-icon" href="{% static 'image/apple-touch-icon.png' %}">
+{% endif %}
 
 <meta
     name="description"
@@ -51,29 +61,21 @@
 
 {% block meta %}{% endblock %}
 {% block preload %}{% endblock %}
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
-<link rel="stylesheet" href="{% static 'core/css/theme.css' %}">
-<link rel="stylesheet" href="{% static 'core/css/header.css' %}">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+<link rel="stylesheet" href="{% static 'css/font_awesome/all.min.css' %}">
+
+<!-- Platform Core Framework Styles -->
+<link rel="stylesheet" href="{% static 'core/css/base.css' %}">
+<link rel="stylesheet" href="{% static 'core/css/theme.css' %}?v=20261020-enterprise-theme">
+<link rel="stylesheet" href="{% static 'core/css/app-fullscreen.css' %}?v=20261018-fullscreen">
+<link rel="stylesheet" href="{% static 'core/css/header.css' %}?v=20261023-standard-alert-center">
 <link rel="stylesheet" href="{% static 'core/css/dropdown.css' %}">
+<link rel="stylesheet" href="{% static 'core/css/sidebar.css' %}">
+
+<!-- CA Design System Tokens & Base -->
+<link rel="stylesheet" href="{% static 'ca/css/base/tokens.css' %}">
+<link rel="stylesheet" href="{% static 'ca/css/base/base.css' %}">
 <link rel="stylesheet" href="{% static 'ca/css/ca_unified.css' %}">
-
-<link
-    rel="stylesheet"
-    href="{% static 'ca/css/base/reset.css' %}"
->
-
-<link
-    rel="stylesheet"
-    href="{% static 'ca/css/base/tokens.css' %}"
->
-
-<link
-    rel="stylesheet"
-    href="{% static 'ca/css/base/base.css' %}"
->
 
 <link
     rel="stylesheet"
@@ -144,16 +146,24 @@
     rel="stylesheet"
     href="{% static 'ca/css/dialogs/dialogs.css' %}"
 >
+<link
+    rel="stylesheet"
+    href="{% static 'ca/css/components/futuristic_forms_modal.css' %}"
+>
 
 {% block vendor_css %}{% endblock %}
 {% block page_css %}{% endblock %}
+{% block styles %}{% endblock %}
 {% block extra_css %}{% endblock %}
 {% block head %}{% endblock %}
+<link rel="stylesheet" href="{% static 'core/css/ca-theme-bridge.css' %}?v=20261020-enterprise-theme">
+<link rel="stylesheet" href="{% static 'ca/css/components/advanced-forms.css' %}?v=20261020-focused-form">
+<link rel="stylesheet" href="{% static 'ca/css/components/analyst_assignment_dialog.css' %}?v=20261023-assignment-dialog-v2">
 
 </head>
 
 <body
-    class="ca-app"
+    class="ca-app app-fullscreen-shell"
     data-app="chemical-analysis"
     data-module="{% block app_module %}dashboard{% endblock %}"
     data-authenticated="{% if request.user.is_authenticated %}true{% else %}false{% endif %}"
@@ -165,9 +175,8 @@
 
 {% include "ca/dashboard/navigation/command_palette.html" %}
 {% include "ca/dashboard/navigation/search_overlay.html" %}
-{% include "ca/dashboard/layout/notifications.html" %}
-
 {% include "ca/dashboard/dialogs/modal.html" %}
+{% include "ca/dashboard/partials/_receive_batch_modal.html" %}
 {% include "ca/dashboard/dialogs/drawer.html" %}
 {% include "ca/dashboard/dialogs/toast.html" %}
 {% include "ca/dashboard/dialogs/loading.html" %}
@@ -576,9 +585,9 @@
     src="{% static 'ca/js/core/app.js' %}"
     defer
 ></script>
-<script src="{% static 'core/js/theme.js' %}"></script>
-<script src="{% static 'core/js/header.js' %}"></script>
-<script src="{% static 'core/js/fullscreen.js' %}"></script>
+<script src="{% static 'core/js/header.js' %}?v=20261023-standard-alert-center"></script>
+<script src="{% static 'core/js/fullscreen.js' %}?v=20261018-first-interaction"></script>
+<script src="{% static 'core/js/pwa.js' %}?v=20261020-pwa" defer></script>
 
 {% block vendor_js %}{% endblock %}
 {% block layout_js %}{% endblock %}
@@ -586,6 +595,30 @@
 {% block page_js %}{% endblock %}
 {% block scripts %}{% endblock %}
 {% block body_scripts %}{% endblock %}
+
+<dialog
+    class="ca-analyst-assignment-dialog"
+    id="ca-analyst-assignment-dialog"
+    aria-labelledby="ca-analyst-assignment-title"
+    aria-describedby="ca-analyst-assignment-content"
+>
+    <div class="ca-assignment-dialog-shell">
+        <header class="ca-assignment-dialog-header">
+            <div>
+                <p class="ca-assignment-eyebrow">CHEMICAL ANALYSIS · WORKFLOW</p>
+                <h2 id="ca-analyst-assignment-title">Assign analysts</h2>
+            </div>
+            <button type="button" class="ca-assignment-close" aria-label="Close analyst assignment" data-ca-assignment-close>&times;</button>
+        </header>
+        <div id="ca-analyst-assignment-content" class="ca-assignment-dialog-content" aria-live="polite">
+            <p class="ca-assignment-loading">Select analysts with permission to perform this chemical analysis.</p>
+        </div>
+    </div>
+</dialog>
+
+<script src="{% static 'ca/js/analyst-assignment-dialog.js' %}?v=20261023-assignment-dialog-v2" defer></script>
+<script src="{% static 'core/js/global_notifications.js' %}?v=20261023-standard-alert-center" defer></script>
+<script src="{% static 'core/js/notification_updates.js' %}?v=20261023-event-notifications" defer></script>
 
 <noscript>
     <div

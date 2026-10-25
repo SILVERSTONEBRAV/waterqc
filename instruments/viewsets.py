@@ -6,6 +6,7 @@ from django.db.models import Max, Prefetch
 from django.core.exceptions import ObjectDoesNotExist
 
 from rest_framework import viewsets, status
+from core.permissions import ViewModelPermissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -35,7 +36,7 @@ class InstrumentViewSet(viewsets.ModelViewSet):
         Prefetch('sensors', queryset=Sensor.objects.filter(is_active=True))
     ).all()
     serializer_class = InstrumentSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
     filter_backends = [DjangoFilterBackend, OrderingFilter, SearchFilter]
     filterset_fields = ['treatment_plant', 'phase', 'status', 'is_active']
     search_fields = ['name', 'serial_number', 'manufacturer', 'model']
@@ -96,7 +97,7 @@ class InstrumentViewSet(viewsets.ModelViewSet):
 class SensorViewSet(viewsets.ModelViewSet):
     queryset = Sensor.objects.select_related('instrument', 'treatment_plant', 'phase').all()
     serializer_class = SensorSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
     filter_backends = [DjangoFilterBackend, OrderingFilter, SearchFilter]
     filterset_fields = ['instrument', 'parameter', 'stage', 'is_active', 'is_primary']
     search_fields = ['name']
@@ -126,7 +127,7 @@ class SensorViewSet(viewsets.ModelViewSet):
 class OnlineMeasurementViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = OnlineMeasurement.objects.select_related('sensor', 'sensor__instrument').all()
     serializer_class = OnlineMeasurementSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = ['sensor', 'sensor__instrument', 'treatment_plant', 'phase', 'quality_flag']
     ordering_fields = ['measured_at', 'received_at', 'value']
@@ -139,7 +140,7 @@ class OnlineMeasurementViewSet(viewsets.ReadOnlyModelViewSet):
 class DerivedMetricViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = DerivedMetric.objects.select_related('sensor', 'sensor__instrument').all()
     serializer_class = DerivedMetricSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = ['sensor', 'metric_type', 'treatment_plant', 'phase']
     ordering_fields = ['computed_at', 'value']
@@ -163,7 +164,7 @@ class DerivedMetricViewSet(viewsets.ReadOnlyModelViewSet):
 class InstrumentCalibrationViewSet(viewsets.ModelViewSet):
     queryset = InstrumentCalibration.objects.select_related('instrument').all()
     serializer_class = InstrumentCalibrationSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = ['instrument', 'performed_by']
     ordering_fields = ['performed_at', 'valid_until']
@@ -182,7 +183,7 @@ class InstrumentCalibrationViewSet(viewsets.ModelViewSet):
 class SensorHealthSnapshotViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = SensorHealthSnapshot.objects.select_related('sensor').all()
     serializer_class = SensorHealthSnapshotSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = ['sensor', 'health_score']
     ordering_fields = ['assessed_at', 'health_score']

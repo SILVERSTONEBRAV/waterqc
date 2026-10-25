@@ -1,6 +1,6 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="en" data-theme="default">
+<html lang="en" data-theme="day" class="app-fullscreen">
 <head>
 <meta charset="UTF-8">
 <title>
@@ -9,34 +9,43 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#0f172a">
-<link rel="manifest" href="{% static 'manifest.json' %}">
-{% if company.favicon %}
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#417690">
+<meta name="application-name" content="NCWSCwaterLAB">
+<meta name="format-detection" content="telephone=no">
+<meta name="csrf-token" content="{{ csrf_token }}">
+<link rel="manifest" href="/manifest.json?v=20261020-enterprise-theme">
+{% if company.logo %}
+    <link rel="apple-touch-icon" href="{{ company.logo.url }}">
+    <link rel="icon" href="{{ company.logo.url }}">
+{% elif company.favicon %}
+    <link rel="apple-touch-icon" href="{{ company.favicon.url }}">
     <link rel="icon" href="{{ company.favicon.url }}" type="image/png">
 {% else %}
-    <link rel="icon" href="{% static 'accounts/favicon.ico' %}" type="image/x-icon">
+    <link rel="apple-touch-icon" href="{% static 'image/apple-touch-icon.png' %}">
+    <link rel="icon" href="{% static 'image/logo.ico' %}" type="image/x-icon">
 {% endif %}
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+<script src="{% static 'core/js/theme.js' %}?v=20261020-enterprise-theme"></script>
+<link rel="stylesheet" href="{% static 'vendor/bootstrap/bootstrap.min.css' %}">
+<link rel="stylesheet" href="{% static 'css/font_awesome/all.min.css' %}">
 <link rel="stylesheet" href="{% static 'core/css/base.css' %}">
-<link rel="stylesheet" href="{% static 'core/css/theme.css' %}">
-<link rel="stylesheet" href="{% static 'core/css/layout.css' %}">
-<link rel="stylesheet" href="{% static 'core/css/header.css' %}">
+<link rel="stylesheet" href="{% static 'core/css/theme.css' %}?v=20261020-enterprise-theme">
+<link rel="stylesheet" href="{% static 'core/css/app-fullscreen.css' %}?v=20261018-fullscreen">
+<link rel="stylesheet" href="{% static 'core/css/header.css' %}?v=20261023-standard-alert-center">
 <link rel="stylesheet" href="{% static 'core/css/dropdown.css' %}">
 <link rel="stylesheet" href="{% static 'core/css/graphical.css' %}">
 <link rel="stylesheet" href="{% static 'core/css/modal.css' %}">
 <link rel="stylesheet" href="{% static 'core/css/dashboard.css' %}">
+<link rel="stylesheet" href="{% static 'core/css/cockpit.css' %}">
+<link rel="stylesheet" href="{% static 'core/css/cockpit-fullscreen.css' %}">
 <link rel="stylesheet" href="{% static 'accounts/css/change_password.css' %}">
 <link rel="stylesheet" href="{% static 'core/css/sidebar.css' %}">
 {% block extra_styles %}{% endblock %}
+<link rel="stylesheet" href="{% static 'core/css/ca-theme-bridge.css' %}?v=20261020-enterprise-theme">
 </head>
-<body>
+<body class="app-fullscreen-shell">
 <div class="theme-flash"></div>
-{% block header %}{% endblock %}
+{% block header %}{% include "accounts/partials/header.html" %}{% endblock %}
 <div class="layout">
     {% block sidebar %}{% endblock %}
     <div class="content-wrapper">
@@ -49,18 +58,14 @@
     {% include "core/partials/chart_expand_modal.html" %}
     {% block modals %}{% endblock %}
 </div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="{% static 'js/chart.js' %}"></script>
-<script src="{% static 'core/js/dashboard_charts.js' %}"></script>
+<script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
 <script src="{% static 'core/js/base.js' %}"></script>
-<script src="{% static 'core/js/theme.js' %}"></script>
-<script src="{% static 'core/js/header.js' %}"></script>
-<script src="{% static 'core/js/change_password.js' %}"></script>
-<script src="{% static 'core/js/modal.js' %}"></script>
-<script src="{% static 'core/js/sidebar.js' %}"></script>
-<script src="{% static 'core/js/dashboard.js' %}"></script>
-<script src="{% static 'core/js/autoupdate.js' %}"></script>
-<script src="{% static 'core/js/fullscreen.js' %}"></script>
+<script src="{% static 'core/js/header.js' %}?v=20261023-standard-alert-center" defer></script>
+<script src="{% static 'core/js/modal.js' %}" defer></script>
+<script src="{% static 'core/js/sidebar.js' %}" defer></script>
+<script src="{% static 'core/js/fullscreen.js' %}?v=20261018-first-interaction" defer></script>
+<script src="{% static 'core/js/offline-queue.js' %}?v=20261024-offline" defer></script>
+<script src="{% static 'core/js/pwa.js' %}?v=20261024-pwa" defer></script>
 {% block extra_scripts %}{% endblock %}
 </body>
 </html>

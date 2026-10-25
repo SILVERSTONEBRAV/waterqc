@@ -7,6 +7,7 @@ from django.core.exceptions import ImproperlyConfigured
 
 from core.mixins import WanjalaMixin
 from core.registry import registry
+from core.dashboard_result_cards import build_result_dashboard, permission_scoped_sidebar
 
 logger = logging.getLogger(__name__)
 
@@ -34,17 +35,9 @@ class DashboardView(WanjalaMixin, View):
     # CONTEXT PIPELINE
     # =====================================================
     def get_context(self, request):
-        entries = self.get_entries()
-
-        return {
-            "app_groups": registry.sidebar(self.app_label),
-            "app": {
-                "name": self.app_label,
-                "label": "Dashboard",
-            },
-            "models": self.serialize_models(entries),
-            "stats": self.build_stats(entries),
-        }
+        context = build_result_dashboard(request, self.app_label)
+        context.update({"app_groups": permission_scoped_sidebar(request, registry, self.app_label), "app": {"name": self.app_label, "label": "Dashboard"}})
+        return context
 
     # =====================================================
     # REGISTRY ACCESS

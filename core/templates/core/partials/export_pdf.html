@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <style>
+        @page { size: landscape; margin: 16mm 12mm; }
+        body { color: #172033; font-family: Helvetica, Arial, sans-serif; font-size: 8pt; }
+        h1 { color: #17385b; font-size: 16pt; margin: 0 0 4pt; }
+        .meta { color: #5b6b82; font-size: 8pt; margin: 0 0 12pt; }
+        table { border-collapse: collapse; width: 100%; }
+        th { background: #17385b; color: #fff; font-size: 7pt; text-align: left; }
+        th, td { border: .5pt solid #ccd5e1; padding: 4pt; vertical-align: top; }
+        tr:nth-child(even) td { background: #f2f6fa; }
+        td { word-wrap: break-word; }
+    </style>
+</head>
+<body>
+    <h1>{{ title }}</h1>
+    <p class="meta">Filtered report export · {{ rows|length }} records · generated {% now "Y-m-d H:i" %}</p>
+    <table>
+        <thead><tr>{% for field in fields %}<th>{{ field }}</th>{% endfor %}</tr></thead>
+        <tbody>{% for row in rows %}<tr>{% for value in row %}<td>{{ value|default:"" }}</td>{% endfor %}</tr>{% empty %}<tr><td colspan="{{ fields|length }}">No records match the selected filters.</td></tr>{% endfor %}</tbody>
+    </table>
+</body>
+</html>

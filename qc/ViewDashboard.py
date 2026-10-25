@@ -35,6 +35,22 @@ class DashboardView(WanjalaMixin, View):
     # =====================================================
     def get_context(self, request):
         entries = self.get_entries()
+        models = self.serialize_models(entries)
+        capability_chart = {
+            "labels": ["Create", "Export", "Inline edit"],
+            "values": [
+                sum(bool(model["capabilities"][key]) for model in models)
+                for key in ("create", "export", "inline")
+            ],
+        }
+        tag_counts = {}
+        for model in models:
+            for tag in model["tags"] or ["Untagged"]:
+                tag_counts[tag] = tag_counts.get(tag, 0) + 1
+        tag_chart = {
+            "labels": [tag for tag, _count in sorted(tag_counts.items(), key=lambda item: (-item[1], item[0]))[:8]],
+            "values": [count for _tag, count in sorted(tag_counts.items(), key=lambda item: (-item[1], item[0]))[:8]],
+        }
 
         return {
             "app_groups": registry.sidebar(self.app_label),
@@ -42,8 +58,10 @@ class DashboardView(WanjalaMixin, View):
                 "name": self.app_label,
                 "label": "Dashboard",
             },
-            "models": self.serialize_models(entries),
+            "models": models,
             "stats": self.build_stats(entries),
+            "capability_chart": capability_chart,
+            "tag_chart": tag_chart,
         }
 
     # =====================================================

@@ -194,7 +194,8 @@ class HeavyMetalAnalysis(TimeStampedModel):
                 analysis=self,
                 parameter=limit,
                 value=0.0,
-                manually_editable=True
+                manually_editable=True,
+                entry_status=HeavyMetalParameter.EntryStatus.PENDING,
             )
             for limit in limits if limit.id not in existing
         ]
@@ -208,6 +209,11 @@ class HeavyMetalAnalysis(TimeStampedModel):
 # ==========================================================
 
 class HeavyMetalParameter(TimeStampedModel):
+    class EntryStatus(models.TextChoices):
+        RECORDED = "recorded", _("Recorded")
+        PENDING = "pending", _("Pending entry")
+        LEGACY_UNVERIFIED = "legacy_unverified", _("Verify historical value")
+
     analysis = models.ForeignKey(
         HeavyMetalAnalysis,
         on_delete=models.CASCADE,
@@ -216,6 +222,12 @@ class HeavyMetalParameter(TimeStampedModel):
     parameter = models.ForeignKey(HeavyMetalLimit, on_delete=models.CASCADE)
     value = models.FloatField(default=0.0)
     manually_editable = models.BooleanField(default=False)
+    entry_status = models.CharField(
+        max_length=24,
+        choices=EntryStatus.choices,
+        default=EntryStatus.RECORDED,
+        db_index=True,
+    )
 
     class Meta:
         unique_together = ("analysis", "parameter")
@@ -224,7 +236,23 @@ class HeavyMetalParameter(TimeStampedModel):
         return f"{self.parameter.parameter.name}: {self.value}"
 
     def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        update_fields = kwargs.get("update_fields")
+        status_changed = bool(update_fields and "entry_status" in update_fields)
+        value_updated = bool(update_fields and "value" in update_fields)
+        if self.pk and update_fields is None:
+            previous_value = type(self).objects.filter(pk=self.pk).values_list("value", flat=True).first()
+            if previous_value != self.value:
+                value_updated = True
+        if value_updated:
+            self.entry_status = self.EntryStatus.RECORDED
+            if update_fields is not None:
+                kwargs["update_fields"] = tuple(set(update_fields) | {"entry_status"})
         super().save(*args, **kwargs)
+        if self.entry_status != self.EntryStatus.RECORDED:
+            return
+        if not (is_new or value_updated or status_changed):
+            return
         from .utils import detect_heavymetal_nonconformity
         detect_heavymetal_nonconformity(
             self.parameter,

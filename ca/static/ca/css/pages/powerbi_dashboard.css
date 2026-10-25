@@ -1,0 +1,1558 @@
+/* ca/static/ca/css/pages/powerbi_dashboard.css */
+/* ==========================================================================
+   POWER BI CHEMICAL MANUFACTURING & QUALITY ASSURANCE DASHBOARD THEME
+   Recreated faithfully to match the reference Power BI visual styling.
+   ========================================================================== */
+
+:root {
+    --pbi-canvas-bg: var(--theme-bg, #dbe6f5);
+    --pbi-canvas-gradient: linear-gradient(135deg, var(--theme-bg, #e4edf8) 0%, var(--theme-surface-muted, #d8e5f5) 55%, var(--theme-bg, #cddff3) 100%);
+    --pbi-sidebar-bg: linear-gradient(180deg, color-mix(in srgb, var(--theme-accent, #09376e) 78%, #082a4c) 0%, color-mix(in srgb, var(--theme-accent, #0c4384) 68%, #082a4c) 45%, color-mix(in srgb, var(--theme-accent, #093468) 78%, #082a4c) 100%);
+    --pbi-sidebar-active: var(--theme-surface, #e2edfa);
+    --pbi-sidebar-active-text: var(--theme-accent, #093366);
+    --pbi-sidebar-text: rgba(255, 255, 255, .88);
+    --pbi-header-pill-bg: linear-gradient(180deg, color-mix(in srgb, var(--theme-accent, #0b4584) 78%, #082a4c) 0%, color-mix(in srgb, var(--theme-accent-hover, #072e5c) 78%, #082a4c) 100%);
+    --pbi-slicer-header-bg: color-mix(in srgb, var(--theme-accent, #0d2746) 78%, #082a4c);
+    --pbi-slicer-border: var(--theme-border, #c8daf0);
+    --pbi-card-bg: var(--theme-surface, #ffffff);
+    --pbi-card-border: var(--theme-border, #d4e2f2);
+    --pbi-card-shadow: var(--shadow-md, 0 4px 16px rgba(10, 40, 90, 0.08));
+    --pbi-navy-text: var(--theme-text, #0c2340);
+    --pbi-sub-text: var(--theme-muted, #4a5c73);
+    --pbi-bar-blue: color-mix(in srgb, var(--theme-accent, #1e88e5) 48%, white);
+    --pbi-bar-hover: var(--theme-accent, #6ea4e0);
+    --pbi-accent-blue: var(--theme-accent, #1e88e5);
+    --pbi-gauge-fill: var(--theme-accent, #3a86ff);
+    --pbi-gauge-track: var(--theme-surface-muted, #e5effa);
+}
+
+/* ── Parent Shell Overrides for Power BI Full Canvas Experience ── */
+.ca-app-shell:has(.pbi-dashboard-root) .ca-sidebar,
+.is-pbi-active .ca-sidebar {
+    display: none !important;
+}
+
+.ca-app-shell:has(.pbi-dashboard-root) .ca-sidebar-backdrop,
+.is-pbi-active .ca-sidebar-backdrop {
+    display: none !important;
+}
+
+.ca-app-shell:has(.pbi-dashboard-root) .ca-content-wrapper,
+.is-pbi-active .ca-content-wrapper {
+    margin-left: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+.ca-app-shell:has(.pbi-dashboard-root) .ca-main__inner,
+.is-pbi-active .ca-main__inner {
+    padding: 0 !important;
+    max-width: 100% !important;
+}
+
+.ca-app-shell:has(.pbi-dashboard-root) .ca-page,
+.is-pbi-active .ca-page {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+}
+
+.ca-app-shell:has(.pbi-dashboard-root) .ca-context-topbar,
+.is-pbi-active .ca-context-topbar {
+    border-bottom: 1px solid #c8d9ee;
+}
+
+/* ── Container Layout ────────────────────────────────────────── */
+.pbi-dashboard-root {
+    display: flex;
+    width: 100%;
+    min-height: calc(100vh - var(--header-height, 62px));
+    background: var(--pbi-canvas-gradient);
+    font-family: "Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--pbi-navy-text);
+    box-sizing: border-box;
+    overflow-x: hidden;
+}
+
+/* ── Power BI Deep Navy Sidebar ───────────────────────────────── */
+/* ── Power BI Deep Navy Sidebar ───────────────────────────────── */
+.pbi-sidebar {
+    width: 220px;
+    flex: 0 0 220px;
+    background: var(--pbi-sidebar-bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px 0 20px;
+    box-shadow: 4px 0 20px rgba(7, 35, 70, 0.18);
+    z-index: 20;
+    box-sizing: border-box;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), flex-basis 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s ease;
+    position: relative;
+}
+
+/* Sidebar Dynamic Header Controls */
+.pbi-sidebar-ctrl {
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+    padding: 0 14px 10px;
+    box-sizing: border-box;
+}
+
+.pbi-sidebar-toggle-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: #e2e8f0;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all 0.2s ease;
+    outline: none;
+}
+
+.pbi-sidebar-toggle-btn:hover {
+    background: rgba(0, 242, 254, 0.2);
+    border-color: #00f2fe;
+    color: #ffffff;
+    box-shadow: 0 0 10px rgba(0, 242, 254, 0.4);
+}
+
+/* Collapsed Sidebar State */
+.pbi-sidebar.is-collapsed {
+    width: 68px !important;
+    flex: 0 0 68px !important;
+    padding: 14px 6px 18px !important;
+}
+
+.pbi-sidebar.is-collapsed .pbi-sidebar-ctrl {
+    justify-content: center;
+    padding: 0 0 8px;
+}
+
+.pbi-sidebar.is-collapsed .pbi-brand-emblem {
+    margin-bottom: 16px;
+}
+
+.pbi-sidebar.is-collapsed .pbi-emblem-circle {
+    width: 42px !important;
+    height: 42px !important;
+    border-width: 2px !important;
+}
+
+.pbi-sidebar.is-collapsed .pbi-emblem-logo-text {
+    font-size: 0.92rem !important;
+}
+
+.pbi-sidebar.is-collapsed .pbi-emblem-subtext {
+    display: none !important;
+}
+
+.pbi-sidebar.is-collapsed .pbi-nav-list {
+    padding: 0 4px !important;
+}
+
+.pbi-sidebar.is-collapsed .pbi-nav-link {
+    justify-content: center !important;
+    padding: 11px 0 !important;
+    position: relative;
+}
+
+.pbi-sidebar.is-collapsed .pbi-nav-link span {
+    display: none !important;
+}
+
+.pbi-sidebar.is-collapsed .pbi-nav-link i {
+    font-size: 1.15rem !important;
+    width: auto !important;
+    margin: 0 !important;
+    opacity: 0.95;
+}
+
+.pbi-sidebar.is-collapsed .pbi-nav-link:hover::after {
+    content: attr(data-label);
+    position: absolute;
+    left: 64px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #072346;
+    color: #ffffff;
+    padding: 7px 12px;
+    border-radius: 6px;
+    font-size: 0.76rem;
+    font-weight: 600;
+    white-space: nowrap;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+    z-index: 999;
+    pointer-events: none;
+    border: 1px solid rgba(0, 242, 254, 0.3);
+    animation: pbiFadeIn 0.15s ease-out;
+}
+
+.pbi-sidebar.is-collapsed .pbi-sidebar-footer .pbi-social-links {
+    flex-direction: column !important;
+    gap: 8px !important;
+}
+
+.pbi-sidebar.is-collapsed .pbi-social-icon {
+    width: 26px !important;
+    height: 26px !important;
+    font-size: 0.72rem !important;
+}
+
+.pbi-sidebar.is-collapsed .pbi-status-chip {
+    padding: 4px !important;
+    width: 26px !important;
+    height: 26px !important;
+    border-radius: 50% !important;
+    justify-content: center !important;
+}
+
+.pbi-sidebar.is-collapsed .pbi-status-chip span:not(.pbi-status-dot) {
+    display: none !important;
+}
+
+.pbi-brand-emblem {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 24px;
+    text-decoration: none;
+}
+
+.pbi-emblem-circle {
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    background: var(--theme-surface, #ffffff);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+    border: 3px solid rgba(255, 255, 255, 0.85);
+    transition: transform 0.25s ease;
+}
+
+.pbi-emblem-circle:hover {
+    transform: scale(1.05);
+}
+
+.pbi-emblem-logo-text {
+    font-size: 1.35rem;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    color: #0b4584;
+    line-height: 1;
+}
+
+.pbi-emblem-subtext {
+    font-size: 0.52rem;
+    font-weight: 700;
+    color: #0088cc;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-top: 3px;
+}
+
+/* ── Sidebar Nav Items ───────────────────────────────────────── */
+.pbi-nav-list {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 0 12px;
+    box-sizing: border-box;
+    list-style: none;
+    margin: 0;
+}
+
+.pbi-nav-item {
+    width: 100%;
+}
+
+.pbi-nav-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--pbi-sidebar-text);
+    text-decoration: none;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+}
+
+.pbi-nav-link i {
+    font-size: 0.95rem;
+    width: 18px;
+    text-align: center;
+    opacity: 0.85;
+}
+
+.pbi-nav-link:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+    transform: translateX(3px);
+}
+
+.pbi-nav-link.is-active {
+    background: var(--pbi-sidebar-active);
+    color: var(--pbi-sidebar-active-text);
+    font-weight: 800;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+}
+
+.pbi-nav-link.is-active i {
+    color: #0b4584;
+    opacity: 1;
+}
+
+/* ── Sidebar Footer Social & Live Icons ──────────────────────── */
+.pbi-sidebar-footer {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    padding-top: 20px;
+    width: 100%;
+}
+
+.pbi-social-links {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.pbi-social-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    font-size: 0.85rem;
+    text-decoration: none;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
+    transition: transform 0.2s ease;
+}
+
+.pbi-social-icon:hover {
+    transform: scale(1.1);
+}
+
+.pbi-social-icon--yt {
+    background: #e62117;
+}
+
+.pbi-social-icon--in {
+    background: #0077b5;
+}
+
+.pbi-status-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    color: #6ee7b7;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.pbi-status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 8px #10b981;
+}
+
+/* ── Main Canvas ─────────────────────────────────────────────── */
+.pbi-canvas {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 16px 24px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    box-sizing: border-box;
+}
+
+/* ── Top Header Pill Capsule ─────────────────────────────────── */
+.pbi-header-container {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    margin-bottom: 4px;
+}
+
+.pbi-header-pill {
+    background: var(--pbi-header-pill-bg);
+    border-radius: 14px;
+    padding: 12px 36px;
+    box-shadow: 0 4px 18px rgba(9, 45, 85, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    text-align: center;
+}
+
+.pbi-header-title {
+    margin: 0;
+    font-size: 1.35rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: #ffffff;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+}
+
+/* ── Horizontal Filter Slicers Bar ────────────────────────────── */
+.pbi-slicers-bar {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 12px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+@media (max-width: 1200px) {
+    .pbi-slicers-bar {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .pbi-slicers-bar {
+        grid-template-columns: 1fr;
+    }
+}
+
+.pbi-slicer-card {
+    display: flex;
+    flex-direction: column;
+    background: var(--theme-surface, #ffffff);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm, 0 3px 10px rgba(10, 40, 85, 0.06));
+    border: 1px solid var(--pbi-slicer-border);
+}
+
+.pbi-slicer-header {
+    background: var(--pbi-slicer-header-bg);
+    color: #ffffff;
+    padding: 6px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.pbi-slicer-header i {
+    font-size: 0.65rem;
+    opacity: 0.7;
+}
+
+.pbi-slicer-select-wrap {
+    position: relative;
+    padding: 4px 8px;
+    background: var(--theme-surface, #ffffff);
+}
+
+.pbi-slicer-select {
+    width: 100%;
+    border: 1px solid var(--theme-border-strong, #d0deec);
+    border-radius: 4px;
+    padding: 4px 24px 4px 8px;
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: var(--pbi-navy-text);
+    background: var(--theme-surface-strong, #ffffff);
+    outline: none;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+.pbi-slicer-select:focus {
+    border-color: var(--theme-accent, #1e88e5);
+    box-shadow: 0 0 0 2px var(--theme-accent-soft, rgba(30, 136, 229, 0.2));
+}
+
+.pbi-slicer-chevron {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.62rem;
+    color: var(--theme-muted, #4a6382);
+    pointer-events: none;
+}
+
+/* ── Top Executive KPI Strip ─────────────────────────────────── */
+.pbi-kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+@media (max-width: 1200px) {
+    .pbi-kpi-strip {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .pbi-kpi-strip {
+        grid-template-columns: 1fr;
+    }
+}
+
+.pbi-kpi-card {
+    background: var(--pbi-card-bg);
+    border-radius: 12px;
+    padding: 16px 18px;
+    box-shadow: var(--pbi-card-shadow);
+    border: 1px solid var(--pbi-card-border);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.pbi-kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(10, 45, 90, 0.12);
+}
+
+.pbi-kpi-card::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    top: 20%;
+    height: 60%;
+    width: 1px;
+    background: #e2ecf7;
+}
+
+.pbi-kpi-card:last-child::after {
+    display: none;
+}
+
+.pbi-kpi-value {
+    font-size: 1.85rem;
+    font-weight: 850;
+    letter-spacing: -0.02em;
+    color: var(--pbi-navy-text);
+    line-height: 1.1;
+    margin-bottom: 4px;
+}
+
+.pbi-kpi-label {
+    font-size: 0.76rem;
+    font-weight: 700;
+    color: var(--pbi-navy-text);
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pbi-kpi-sub {
+    font-size: 0.65rem;
+    color: #64748b;
+    margin-top: 4px;
+    font-weight: 500;
+}
+
+/* ── Visualization Grid Canvas ───────────────────────────────── */
+.pbi-visuals-grid {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr 1.4fr;
+    gap: 16px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+@media (max-width: 1100px) {
+    .pbi-visuals-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.pbi-card {
+    background: var(--pbi-card-bg);
+    border-radius: 12px;
+    padding: 16px 20px;
+    box-shadow: var(--pbi-card-shadow);
+    border: 1px solid var(--pbi-card-border);
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+}
+
+.pbi-card-title {
+    margin: 0 0 14px;
+    font-size: 0.88rem;
+    font-weight: 750;
+    color: var(--pbi-navy-text);
+    text-align: center;
+    line-height: 1.3;
+}
+
+/* ── Chart 1: Horizontal Bar Chart ───────────────────────────── */
+.pbi-hbar-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 8px 4px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.pbi-hbar-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+}
+
+.pbi-hbar-label {
+    width: 80px;
+    flex: 0 0 80px;
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: var(--pbi-navy-text);
+    text-align: right;
+}
+
+.pbi-hbar-track {
+    flex: 1 1 auto;
+    height: 48px;
+    background: #f1f5fa;
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+}
+
+.pbi-hbar-fill {
+    height: 100%;
+    background: var(--pbi-bar-blue);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 12px;
+    transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pbi-hbar-fill:hover {
+    background: var(--pbi-bar-hover);
+}
+
+.pbi-hbar-value {
+    font-size: 0.78rem;
+    font-weight: 750;
+    color: var(--pbi-navy-text);
+}
+
+/* ── Chart 2: Radial Gauge Chart ─────────────────────────────── */
+.pbi-gauge-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    width: 100%;
+    height: 190px;
+}
+
+.pbi-gauge-svg {
+    width: 220px;
+    height: 125px;
+    overflow: visible;
+}
+
+.pbi-gauge-track-arc {
+    fill: none;
+    stroke: var(--pbi-gauge-track);
+    stroke-width: 24;
+    stroke-linecap: round;
+}
+
+.pbi-gauge-fill-arc {
+    fill: none;
+    stroke: var(--pbi-gauge-fill);
+    stroke-width: 24;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1s ease;
+}
+
+.pbi-gauge-center-text {
+    position: absolute;
+    bottom: 22px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.pbi-gauge-pct {
+    font-size: 2.1rem;
+    font-weight: 900;
+    color: var(--pbi-navy-text);
+    line-height: 1;
+    letter-spacing: -0.02em;
+}
+
+.pbi-gauge-sub {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #10b981;
+    margin-top: 4px;
+}
+
+/* ── Chart 3: Donut Chart with Leader Lines ─────────────────── */
+.pbi-donut-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 190px;
+    position: relative;
+}
+
+.pbi-donut-svg {
+    width: 100%;
+    height: 100%;
+    max-width: 380px;
+    overflow: visible;
+}
+
+.pbi-donut-segment {
+    transition: transform 0.2s ease, opacity 0.2s ease;
+    cursor: pointer;
+}
+
+.pbi-donut-segment:hover {
+    transform: scale(1.03);
+    opacity: 0.9;
+}
+
+.pbi-donut-label-text {
+    font-size: 10px;
+    font-weight: 700;
+    fill: var(--pbi-navy-text);
+}
+
+.pbi-donut-leader-line {
+    fill: none;
+    stroke: #8ba0b8;
+    stroke-width: 1;
+}
+
+/* ── Row 2: Full Width Column Chart ─────────────────────────── */
+.pbi-bottom-row {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.pbi-colchart-container {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    height: 180px;
+    padding: 10px 10px 0;
+    position: relative;
+    border-bottom: 2px solid #cbdbee;
+    box-sizing: border-box;
+}
+
+.pbi-col-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 12%;
+    height: 100%;
+    justify-content: flex-end;
+    position: relative;
+}
+
+.pbi-col-val-label {
+    font-size: 0.74rem;
+    font-weight: 750;
+    color: var(--pbi-navy-text);
+    margin-bottom: 6px;
+}
+
+.pbi-col-bar {
+    width: 100%;
+    background: var(--pbi-bar-blue);
+    border-radius: 3px 3px 0 0;
+    transition: height 0.6s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s ease;
+    cursor: pointer;
+}
+
+.pbi-col-bar:hover {
+    background: var(--pbi-bar-hover);
+}
+
+.pbi-col-axis-label {
+    position: absolute;
+    bottom: -24px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #4a5c73;
+    white-space: nowrap;
+}
+
+/* ── Content Panes for Other Tabs in Power BI Style ───────────── */
+.pbi-tab-pane {
+    display: none;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.pbi-tab-pane.is-active {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* ── Telemetry & Table Enhancements in Power BI Theme ────────── */
+.pbi-table-card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 18px;
+    box-shadow: var(--pbi-card-shadow);
+    border: 1px solid var(--pbi-card-border);
+}
+
+.pbi-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+}
+
+.pbi-table th {
+    background: #0d2746;
+    color: #ffffff;
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 700;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.pbi-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #e5edf5;
+    color: var(--pbi-navy-text);
+}
+
+.pbi-table tr:hover td {
+    background: #f4f8fd;
+}
+
+.pbi-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 700;
+}
+
+.pbi-pill--success { background: #dcfce7; color: #15803d; }
+.pbi-pill--warning { background: #fef3c7; color: #b45309; }
+.pbi-pill--danger  { background: #fee2e2; color: #b91c1c; }
+.pbi-pill--info    { background: #e0f2fe; color: #0369a1; }
+
+/* ── ADVANCED SCIENTIFIC BI PRESENTATIONS & ULTRA-MODERN VISUALS ── */
+
+/* ── Animation Keyframes ─────────────────────────────────────── */
+@keyframes pbiFadeIn {
+    from { opacity: 0; transform: translateY(-45%) scale(0.95); }
+    to { opacity: 1; transform: translateY(-50%) scale(1); }
+}
+
+@keyframes pbiPulseBeacon {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 242, 254, 0.7); }
+    70% { transform: scale(1.05); box-shadow: 0 0 0 6px rgba(0, 242, 254, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 242, 254, 0); }
+}
+
+@keyframes pbiSparkDotPulse {
+    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 2px currentColor); }
+    50% { transform: scale(1.35); filter: drop-shadow(0 0 6px currentColor); }
+}
+
+/* ── Mini Sparklines in KPI Cards ────────────────────────────── */
+.pbi-kpi-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.pbi-spark-box {
+    width: 95px;
+    height: 26px;
+    flex-shrink: 0;
+    margin-left: 8px;
+}
+
+.pbi-spark-svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.pbi-spark-dot {
+    animation: pbiSparkDotPulse 2s infinite ease-in-out;
+    transform-origin: center;
+}
+
+/* ── Primary Visuals Grid (Dual Column Ratio) ─────────────────── */
+.pbi-visuals-grid--primary {
+    grid-template-columns: 2fr 1fr !important;
+}
+
+@media (max-width: 1100px) {
+    .pbi-visuals-grid--primary {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+/* ── Card Header Groups & Cyberpunk Live Badges ──────────────── */
+.pbi-card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.pbi-card-title-group {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.pbi-card-subtitle {
+    font-size: 0.72rem;
+    color: #64748b;
+    margin: 0;
+    font-weight: 500;
+}
+
+.pbi-live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    background: rgba(2, 132, 199, 0.12);
+    border: 1px solid rgba(2, 132, 199, 0.35);
+    color: #0284c7;
+    width: fit-content;
+    margin-bottom: 3px;
+}
+
+.pbi-live-badge--emerald {
+    background: rgba(16, 185, 129, 0.12);
+    border-color: rgba(16, 185, 129, 0.35);
+    color: #059669;
+}
+
+/* ── Legend Groups ───────────────────────────────────────────── */
+.pbi-legend-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #475569;
+}
+
+.pbi-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.pbi-legend-pill {
+    width: 14px;
+    height: 6px;
+    border-radius: 3px;
+    display: inline-block;
+}
+
+.pbi-legend-pill--bar {
+    background: linear-gradient(90deg, #0284c7, #00f2fe);
+}
+
+.pbi-legend-pill--line {
+    background: linear-gradient(90deg, #38f9d7, #8b5cf6);
+}
+
+.pbi-legend-pill--target {
+    background: #ef4444;
+}
+
+/* ── Progressive Compound Line & Bar Canvas ──────────────────── */
+.pbi-compound-chart-container {
+    width: 100%;
+    height: 195px;
+    position: relative;
+    padding: 4px 0;
+}
+
+.pbi-compound-svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.pbi-axis-text {
+    font-size: 9.5px;
+    font-weight: 600;
+    fill: #64748b;
+    font-family: "JetBrains Mono", monospace;
+}
+
+.pbi-axis-month {
+    font-size: 10px;
+    font-weight: 700;
+    fill: #334155;
+    text-transform: uppercase;
+}
+
+.pbi-compound-bar {
+    cursor: pointer;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.pbi-compound-bar:hover {
+    opacity: 0.85;
+    filter: drop-shadow(0 4px 10px rgba(0, 242, 254, 0.5));
+}
+
+.pbi-vertex-node {
+    cursor: pointer;
+    transition: transform 0.2s ease, r 0.2s ease;
+}
+
+.pbi-vertex-node:hover {
+    r: 6.5px;
+    fill: #00f2fe;
+    stroke: #ffffff;
+    filter: drop-shadow(0 0 8px #00f2fe);
+}
+
+/* ── Compound Chart Footer Ribbon ────────────────────────────── */
+.pbi-compound-footer {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 12px;
+    margin-top: 14px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, rgba(248, 250, 252, 0.85) 0%, rgba(241, 245, 249, 0.85) 100%);
+    border: 1px solid #e2e8f0;
+}
+
+.pbi-compound-metric {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.pbi-metric-sub {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.pbi-metric-val {
+    font-size: 0.86rem;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+/* ── Concentric Polar Donut & Wheel ──────────────────────────── */
+.pbi-concentric-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    gap: 18px;
+    padding: 10px 0;
+    min-height: 180px;
+    flex-wrap: wrap;
+}
+
+.pbi-polar-wheel {
+    position: relative;
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 8px 24px rgba(7, 35, 70, 0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pbi-polar-outer-ring {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.pbi-polar-mid-ring {
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.pbi-polar-core {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #072346 0%, #0b4584 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    box-shadow: 0 4px 14px rgba(7, 35, 70, 0.35);
+    position: relative;
+}
+
+.pbi-core-beacon {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #00f2fe;
+    position: absolute;
+    top: 7px;
+    animation: pbiPulseBeacon 2s infinite ease-in-out;
+}
+
+.pbi-core-value {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: #00f2fe;
+    line-height: 1;
+    letter-spacing: -0.02em;
+}
+
+.pbi-core-label {
+    font-size: 0.52rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #94a3b8;
+    margin-top: 2px;
+}
+
+.pbi-polar-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 150px;
+}
+
+.pbi-polar-legend-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.76rem;
+    font-weight: 500;
+}
+
+.pbi-polar-legend-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.pbi-polar-legend-name {
+    color: #334155;
+    font-weight: 600;
+}
+
+.pbi-polar-legend-pct {
+    margin-left: auto;
+    font-weight: 800;
+    color: #0f172a;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.72rem;
+}
+
+/* ── Scientific 6-Axis Radar Polygon ─────────────────────────── */
+.pbi-radar-container {
+    width: 100%;
+    height: 220px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pbi-radar-svg {
+    width: 100%;
+    max-width: 290px;
+    height: 220px;
+    overflow: visible;
+}
+
+.pbi-radar-label {
+    font-size: 8.5px;
+    font-weight: 700;
+    fill: #475569;
+    letter-spacing: 0.02em;
+}
+
+.pbi-radar-vertex {
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.pbi-radar-vertex:hover {
+    r: 5px;
+    fill: #00f2fe;
+    filter: drop-shadow(0 0 6px #00f2fe);
+}
+
+/* ── Multidimensional Stacked Horizon Plant Matrix ───────────── */
+.pbi-matrix-container {
+    display: flex;
+    flex-direction: column;
+    gap: 13px;
+    padding-top: 4px;
+}
+
+.pbi-matrix-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.pbi-matrix-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.76rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.pbi-matrix-count {
+    color: #64748b;
+    font-weight: 600;
+    font-size: 0.72rem;
+}
+
+.pbi-matrix-track {
+    display: flex;
+    width: 100%;
+    height: 12px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #e2e8f0;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.pbi-matrix-segment {
+    height: 100%;
+    transition: width 0.4s ease;
+    cursor: pointer;
+}
+
+.pbi-matrix-segment:hover {
+    filter: brightness(1.15);
+}
+
+.pbi-matrix-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 8px;
+    font-size: 0.72rem;
+    color: #475569;
+    font-weight: 600;
+    border-top: 1px solid #f1f5f9;
+    padding-top: 8px;
+}
+
+.pbi-matrix-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.pbi-matrix-swatch {
+    width: 9px;
+    height: 9px;
+    border-radius: 3px;
+}
+
+/* ── Laboratory Instrumentation Telemetry Stream ─────────────── */
+.pbi-telemetry-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;
+}
+
+.pbi-telemetry-tile {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: linear-gradient(135deg, rgba(248, 250, 252, 0.95) 0%, rgba(241, 245, 249, 0.95) 100%);
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+    transition: all 0.2s ease;
+}
+
+.pbi-telemetry-tile:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 14px rgba(7, 35, 70, 0.08);
+    border-color: #cbd5e1;
+}
+
+.pbi-tile-icon-box {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #0284c7 0%, #00f2fe 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    font-size: 0.95rem;
+    flex-shrink: 0;
+    box-shadow: 0 3px 8px rgba(2, 132, 199, 0.25);
+}
+
+.pbi-tile-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
+
+.pbi-tile-name {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #0f172a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pbi-tile-code {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: #64748b;
+    font-family: "JetBrains Mono", monospace;
+}
+
+.pbi-tile-metrics {
+    margin-left: auto;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.pbi-tile-badge {
+    display: inline-block;
+    font-size: 0.6rem;
+    font-weight: 800;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(16, 185, 129, 0.14);
+    color: #059669;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.pbi-tile-accuracy {
+    display: block;
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: #475569;
+    margin-top: 2px;
+    font-family: "JetBrains Mono", monospace;
+}
+
+/* ── Dashboard layout refinements ──────────────────────────────
+   The overview's standard visualization rows contain two cards. Use both
+   available tracks instead of leaving an empty third column at desktop widths.
+   Keep the denser executive row on its own 2:1 layout above. */
+.pbi-overview-canvas,
+.pbi-body-content,
+.pbi-tab-pane {
+    width: 100%;
+    min-width: 0;
+}
+
+.pbi-overview-canvas {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.pbi-visuals-grid:not(.pbi-visuals-grid--primary) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+}
+
+.pbi-visuals-grid > .pbi-card {
+    min-width: 0;
+    height: 100%;
+}
+
+.pbi-card-title-group,
+.pbi-card-title,
+.pbi-card-subtitle {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+}
+
+.pbi-hbar-row {
+    align-items: stretch;
+    gap: 14px;
+}
+
+.pbi-hbar-label {
+    width: clamp(112px, 24%, 170px);
+    flex: 0 0 clamp(112px, 24%, 170px);
+    display: -webkit-box;
+    align-self: center;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+
+.pbi-hbar-track {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+}
+
+.pbi-hbar-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    min-width: 0;
+    padding: 0;
+    border-radius: inherit;
+}
+
+.pbi-hbar-value {
+    position: absolute;
+    z-index: 1;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    max-width: calc(100% - 24px);
+    overflow: hidden;
+    color: var(--pbi-navy-text);
+    font-variant-numeric: tabular-nums;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Match the dashboard surfaces to the application's selected theme. */
+html.theme-dark .pbi-dashboard-root {
+    --pbi-canvas-bg: var(--theme-bg);
+    --pbi-canvas-gradient: linear-gradient(135deg, var(--theme-bg) 0%, var(--theme-surface-muted) 52%, var(--theme-bg) 100%);
+    --pbi-card-bg: var(--theme-surface);
+    --pbi-card-border: var(--theme-border);
+    --pbi-card-shadow: var(--shadow-md);
+    --pbi-navy-text: var(--theme-text);
+    --pbi-sub-text: var(--theme-muted);
+    --pbi-bar-blue: color-mix(in srgb, var(--theme-accent) 48%, var(--theme-surface));
+    --pbi-bar-hover: var(--theme-accent-hover);
+    --pbi-gauge-track: var(--theme-surface-muted);
+}
+
+html.theme-dark .pbi-dashboard-root .pbi-hbar-track {
+    background: var(--theme-surface-muted);
+}
+
+html.theme-dark .pbi-dashboard-root .pbi-telemetry-tile {
+    background: linear-gradient(135deg, var(--theme-surface-muted), var(--theme-surface));
+    border-color: var(--theme-border);
+}
+
+html.theme-dark .pbi-dashboard-root .pbi-tile-name {
+    color: var(--theme-text);
+}
+
+html.theme-dark .pbi-dashboard-root .pbi-tile-code,
+html.theme-dark .pbi-dashboard-root .pbi-tile-accuracy {
+    color: var(--theme-muted);
+}
+
+@media (max-width: 1100px) {
+    .pbi-visuals-grid:not(.pbi-visuals-grid--primary) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 760px) {
+    .pbi-canvas {
+        padding: 12px;
+    }
+
+    .pbi-visuals-grid:not(.pbi-visuals-grid--primary),
+    .pbi-visuals-grid--primary {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+
+    .pbi-hbar-label {
+        width: clamp(92px, 32%, 130px);
+        flex-basis: clamp(92px, 32%, 130px);
+        font-size: .7rem;
+    }
+}
+

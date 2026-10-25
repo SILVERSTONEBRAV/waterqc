@@ -15,6 +15,7 @@ from .models import (
     NonConformity,
     NonConformityLog,
     WaterAnalysisLog,
+    QCRealtimeOutboxEvent,
 )
 
 
@@ -543,3 +544,42 @@ class WaterAnalysisLogAdmin(admin.ModelAdmin):
         "auto_generated",
         "created_at",
     )
+
+
+@admin.register(QCRealtimeOutboxEvent)
+class QCRealtimeOutboxEventAdmin(admin.ModelAdmin):
+    list_display = (
+        "event_id",
+        "event_type",
+        "plant_id",
+        "aggregate_id",
+        "attempt_count",
+        "created_at",
+        "available_at",
+        "delivered_at",
+    )
+    list_filter = ("event_type", "delivered_at", "created_at")
+    search_fields = ("aggregate_id", "last_error")
+    readonly_fields = (
+        "event_id",
+        "event_type",
+        "aggregate_type",
+        "aggregate_id",
+        "plant_id",
+        "payload",
+        "created_at",
+        "available_at",
+        "attempt_count",
+        "delivered_at",
+        "last_error",
+    )
+    ordering = ("-created_at",)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

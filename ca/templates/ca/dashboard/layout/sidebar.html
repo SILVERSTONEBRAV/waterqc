@@ -61,19 +61,6 @@
                 </a>
                 {% endfor %}
             </section>
-            {% empty %}
-            {# Fallback: user has no accessible CA sections #}
-            <section class="ca-sidebar-section" data-section="empty">
-                <div class="ca-sidebar-section-heading">Navigation</div>
-                <a href="{% url 'ca:dashboard' %}" class="ca-sidebar-item{% if url_name == 'dashboard' or url_name == 'dashboard-view' %} is-active{% endif %}" data-route="dashboard">
-                    <span class="ca-sidebar-item-icon" aria-hidden="true">
-                        <span class="ca-sidebar-icon ca-sidebar-icon-dashboard"><span></span><span></span><span></span><span></span></span>
-                    </span>
-                    <span class="ca-sidebar-item-content">
-                        <span class="ca-sidebar-item-label">Dashboard</span>
-                    </span>
-                </a>
-            </section>
             {% endfor %}
         </nav>
 

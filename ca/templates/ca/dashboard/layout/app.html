@@ -20,13 +20,10 @@ chemical-analysis
 
 <div
     id="app-shell"
-    class="ca-app-shell is-sidebar-expanded"
+    class="ca-app-shell is-sidebar-collapsed"
     data-app="chemical-analysis"
     data-module="ca"
     data-dashboard-url="{% url 'ca:dashboard' %}"
-    data-dashboard-alt-url="{% url 'ca:dashboard-view' %}"
-    data-dashboard2-url="{% url 'ca:dashboard2' %}"
-    data-dashboard3-url="{% url 'ca:dashboard3' %}"
     data-dashboard-view="{{ request.resolver_match.url_name|default:'dashboard' }}"
     data-batch-create-url="{% url 'ca:batch-create' %}"
     data-batches-url="{% url 'ca:batch-list' %}"
@@ -40,7 +37,7 @@ chemical-analysis
     data-overdue-url="{% url 'ca:overdue-analysis' %}"
     data-specifications-url="{% url 'ca:specification-list' %}"
     data-live-enabled="true"
-    data-sidebar-state="expanded"
+    data-sidebar-state="collapsed"
     data-current-route="{{ request.resolver_match.url_name|default:'' }}"
     data-current-path="{{ request.path|escape }}"
     data-user-id="{% if request.user.is_authenticated %}{{ request.user.pk|default:'' }}{% endif %}"
@@ -68,7 +65,7 @@ chemical-analysis
                     id="sidebar-toggle"
                     aria-label="Toggle navigation"
                     aria-controls="ca-sidebar"
-                    aria-expanded="true"
+                    aria-expanded="false"
                     title="Toggle navigation"
                     data-action="toggle-sidebar"
                 >
@@ -103,12 +100,14 @@ chemical-analysis
                 {% endif %}
 
                 <div class="ca-context-actions">
+                    {% if can_view_my_tasks %}
                     <a href="{% url 'ca:my-tasks' %}" class="ca-btn-context ca-btn-context--outline">
                         <i class="fa fa-tasks"></i>
                         <span>My Tasks</span>
                     </a>
-                    {% if request.user.is_superuser or perms.ca.receive_chemical_batch %}
-                    <a href="{% url 'ca:batch-create' %}" class="ca-btn-context ca-btn-context--primary">
+                    {% endif %}
+                    {% if plant_context.is_superuser or perms.ca.receive_chemical_batch %}
+                    <a href="{% url 'ca:batch-create' %}" class="ca-btn-context ca-btn-context--primary" data-open-modal="receive-batch-modal">
                         <i class="fa fa-plus"></i>
                         <span>Receive Batch</span>
                     </a>

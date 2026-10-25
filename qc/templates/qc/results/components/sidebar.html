@@ -1,0 +1,119 @@
+<div id="qcaSidebarBackdrop" class="qca-sidebar-backdrop" hidden></div>
+
+<aside
+    id="qcaSidebar"
+    class="qca-sidebar"
+    aria-label="QCA navigation"
+    aria-hidden="true"
+    inert
+>
+    <div class="qca-sidebar-heading">
+        <div>
+            <span class="qca-sidebar-eyebrow">PROCESS CONTROL</span>
+        </div>
+        <button
+            id="qcaSidebarClose"
+            class="hdr-btn qca-sidebar-close"
+            type="button"
+            aria-label="Close navigation"
+        >
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+    </div>
+
+    <nav class="qca-sidebar-nav" aria-label="Applications">
+        {% if request.user.is_superuser or perms.qc.view_wateranalysis or perms.filtered_water.view_filteredwateranalysis or perms.microbial.view_microbialanalysis or perms.heavy_metal.view_heavymetalanalysis %}
+        <a class="qca-sidebar-link{% if is_noncompliance_page %} is-active{% endif %}" href="{% url 'qc:noncompliance' %}{% if plant %}?plant={{ plant.pk }}{% endif %}" {% if is_noncompliance_page %}aria-current="page"{% endif %}>
+            <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span>Non-compliance</span>
+        </a>
+        {% endif %}
+
+        <a
+            class="qca-sidebar-link{% if request.resolver_match.namespace == 'qc_analytics' %} is-active{% endif %}"
+            href="{% url 'qc_analytics:dashboard' %}"
+            {% if request.resolver_match.namespace == 'qc_analytics' %}aria-current="page"{% endif %}
+        >
+            <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+            <span>QCA Results</span>
+        </a>
+
+        {% if request.user.is_superuser or perms.ca.view_chemicalbatch or perms.ca.view_chemicalanalysisrequest or perms.ca.view_chemicalanalysisprocess or perms.ca.view_batchtestresult or perms.ca.view_chemicalcoa %}
+        <a class="qca-sidebar-link" href="{% url 'ca:dashboard' %}{% if plant %}?plant={{ plant.pk }}{% endif %}">
+            <i class="fa-solid fa-flask-vial" aria-hidden="true"></i>
+            <span>Chemical Analysis</span>
+        </a>
+        {% endif %}
+
+        <a
+            class="qca-sidebar-link{% if request.resolver_match.namespace == 'filtered_water' %} is-active{% endif %}"
+            href="{% url 'filtered_water:dashboard' %}"
+            {% if request.resolver_match.namespace == 'filtered_water' %}aria-current="page"{% endif %}
+        >
+            <i class="fa-solid fa-water" aria-hidden="true"></i>
+            <span>Filtered Water</span>
+        </a>
+
+        <a
+            class="qca-sidebar-link{% if 'jartest' in request.path %} is-active{% endif %}"
+            href="{% url 'jartest:dashboard' %}"
+            title="Jar Test Optimization"
+            aria-label="Jar Test Optimization"
+            {% if 'jartest' in request.path %}aria-current="page"{% endif %}
+        >
+            <i class="fas fa-vial-circle-check sidebar-icon" aria-hidden="true"></i>
+            <span>Jar Testing</span>
+        </a>
+        <a
+            class="qca-sidebar-link{% if 'chlorinedemand' in request.path %} is-active{% endif %}"
+            href="{% url 'chlorinedemand:dashboard' %}"
+            title="Chlorine Demand &amp; Breakpoint"
+            aria-label="Chlorine Demand &amp; Breakpoint"
+            {% if 'chlorinedemand' in request.path %}aria-current="page"{% endif %}
+        >
+            <i class="fas fa-shield-virus sidebar-icon" aria-hidden="true"></i>
+            <span>Chlorine Demand</span>
+        </a>
+        <a
+            class="qca-sidebar-link{% if 'PHadjustment' in request.path %} is-active{% endif %}"
+            href="{% url 'PHadjustment:dashboard' %}"
+            title="pH Adjustment &amp; Titration"
+            aria-label="pH Adjustment &amp; Titration"
+            {% if 'PHadjustment' in request.path %}aria-current="page"{% endif %}
+        >
+            <i class="fas fa-flask sidebar-icon" aria-hidden="true"></i>
+            <span>pH Adjustment</span>
+        </a>
+         <a
+            class="qca-sidebar-link{% if 'heavy_metal' in request.path %} is-active{% endif %}"
+            href="{% url 'heavy_metal:dashboard' %}"
+            title="Heavy Metal Analysis"
+            aria-label="Heavy Metal Analysis"
+            {% if 'heavy_metal' in request.path %}aria-current="page"{% endif %}
+        >
+            <i class="fas fa-atom sidebar-icon" aria-hidden="true"></i>
+            <span>Heavy Metal</span>
+        </a>
+        <a
+            class="qca-sidebar-link{% if 'microbial' in request.path %} is-active{% endif %}"
+            href="{% url 'microbial:dashboard' %}"
+            title="Microbial Analysis"
+            aria-label="Microbial Analysis"
+            {% if 'microbial' in request.path %}aria-current="page"{% endif %}
+        >
+            <i class="fas fa-bacteria sidebar-icon" aria-hidden="true"></i>
+            <span>Microbial</span>
+        </a>
+
+        <a
+            class="qca-sidebar-link{% if 'xmicalconcentration' in request.path %} is-active{% endif %}"
+            href="{% url 'xmicalconcentration:dashboard' %}"
+            title="Chemical Concentration"
+            aria-label="Chemical Concentration"
+            {% if 'xmicalconcentration' in request.path %}aria-current="page"{% endif %}
+        >
+            <i class="fas fa-vials sidebar-icon" aria-hidden="true"></i>
+            <span>Chemical Concentration</span>
+        </a>
+
+    </nav>
+</aside>

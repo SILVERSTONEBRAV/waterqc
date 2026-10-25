@@ -1,0 +1,58 @@
+{% load static custom_filters %}
+
+<div class="scada-tab-pane" id="pane-cards">
+    <div style="background: var(--scada-panel); border: 1px solid var(--scada-border); border-radius: 8px; padding: 0.85rem 1.25rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+        <div>
+            <h4 style="font-size: 0.95rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--scada-text-main); margin: 0 0 0.2rem 0;">
+                <i class="fa-solid fa-flask" style="color: var(--scada-cyan); margin-right: 0.4rem;"></i> Laboratory Analytical Worksheet (Manual Result Entry)
+            </h4>
+            <div style="font-size: 0.74rem; color: var(--scada-text-muted);">
+                Scheduled sampling cycle entries recorded by laboratory analysts. Values entered here are dynamically reconciled against online sensors.
+            </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <a href="{% url 'qc:quality_control' %}{% if selected_plant %}?plant={{ selected_plant.pk }}{% endif %}{% if selected_date %}&date={{ selected_date|date:'Y-m-d' }}{% endif %}"
+               target="_blank"
+               class="scada-btn-icon"
+               style="color: #38bdf8; border-color: #38bdf8;">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                <span>Open Dedicated Fullscreen Worksheet</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Active Cycle Meta Banner -->
+    <div style="display: flex; align-items: center; justify-content: space-between; background: #090e1a; padding: 0.6rem 1rem; border-radius: 6px; border: 1px solid var(--scada-border); margin-bottom: 1rem;">
+        <div style="display: flex; align-items: center; gap: 0.75rem; font-size: 0.8rem;">
+            <span style="font-weight: 700; color: #ffffff;">
+                <i class="fa-solid fa-clock-rotate-left" style="color: var(--scada-cyan);"></i> Active Cycle: {{ current_time_label|default:"Current Scheduled Cycle" }}
+            </span>
+            {% if current_analysis %}
+            <span style="background: rgba(56,189,248,0.15); color: #38bdf8; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.72rem; font-family: var(--scada-mono-font);">
+                REF: {{ current_analysis.reference_id|default:"AUTOGEN" }}
+            </span>
+            {% endif %}
+        </div>
+
+        <div style="font-size: 0.75rem; color: var(--scada-text-muted);">
+            Completion: <strong style="color: #34d399; font-family: var(--scada-mono-font);">{{ completion.entered|default:0 }}/{{ completion.total|default:0 }} ({{ completion.percent|default:0 }}%)</strong>
+        </div>
+    </div>
+
+    <!-- Cards Body Container -->
+    <div style="background: var(--scada-panel); border: 1px solid var(--scada-border); border-radius: 8px; padding: 1rem; overflow-x: auto;">
+        {% if cards %}
+            {% include "qc/results/_result_cards.html" %}
+        {% else %}
+            <div style="padding: 3rem 1.5rem; text-align: center; color: var(--scada-text-muted);">
+                <i class="fa-solid fa-clipboard-question" style="font-size: 2.5rem; margin-bottom: 0.75rem; color: #475569;"></i>
+                <h4>No Active Analysis Scheduled for this Cycle</h4>
+                <p>There are no active sampling schedules or water analyses recorded for {{ selected_plant.name|default:"this plant" }} on {{ selected_date|date:"d M Y" }}.</p>
+                <a href="{% url 'qc:quality_control' %}{% if selected_plant %}?plant={{ selected_plant.pk }}{% endif %}" class="scada-btn-icon" style="display: inline-flex; margin-top: 0.5rem;">
+                    <i class="fa-solid fa-plus"></i> Initialize Worksheet
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>

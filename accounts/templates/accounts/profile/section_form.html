@@ -9,6 +9,13 @@
             <form id="sectionForm" method="post">
                 {% csrf_token %}
                 <div class="mb-3">
+                    <label for="id_treatment_plant" class="form-label fw-bold">Treatment Plant</label>
+                    {{ form.treatment_plant }}
+                    {% if form.treatment_plant.errors %}
+                        <div class="text-danger small mt-1">{{ form.treatment_plant.errors|striptags }}</div>
+                    {% endif %}
+                </div>
+                <div class="mb-3">
                     <label for="id_name" class="form-label fw-bold">Section Name</label>
                     {{ form.name }}
                     {% if form.name.errors %}

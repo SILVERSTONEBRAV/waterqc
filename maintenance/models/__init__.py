@@ -1,0 +1,80 @@
+# maintenance/models/__init__.py
+"""Maintenance facade: work models + re-exports from housing/incident apps."""
+
+from .audit import AuditModel
+from .work import (
+    TargetType,
+    WorkPriority,
+    RequestStatus,
+    OrderStatus,
+    TaskStatus,
+    MaterialTxType,
+    SLAStatus,
+    WorkRequest,
+    WorkOrder,
+    WorkTask,
+    WorkMaterialUsage,
+    WorkLog,
+    WorkCost,
+    SLARecord,
+)
+
+from duty_house.models import (
+    LocationType,
+    Location,
+    DutyHouseStatus,
+    DutyHouse,
+    HousingUnitType,
+    UnitStatus,
+    DutyHouseUnit,
+    OccupancyStatus,
+    DutyHouseOccupancy,
+    OccupancyTransfer,
+)
+
+from Maintenance_Incident.models import (
+    IncidentSeverity,
+    IncidentStatus,
+    IncidentType,
+    IncidentEscalationRule,
+    IncidentCluster,
+    EquipmentHealthScore,
+    MaintenanceIncident,
+    IncidentStream,
+)
+
+__all__ = [
+    "AuditModel",
+    "TargetType",
+    "WorkPriority",
+    "RequestStatus",
+    "OrderStatus",
+    "TaskStatus",
+    "MaterialTxType",
+    "SLAStatus",
+    "WorkRequest",
+    "WorkOrder",
+    "WorkTask",
+    "WorkMaterialUsage",
+    "WorkLog",
+    "WorkCost",
+    "SLARecord",
+    "LocationType",
+    "Location",
+    "DutyHouseStatus",
+    "DutyHouse",
+    "HousingUnitType",
+    "UnitStatus",
+    "DutyHouseUnit",
+    "OccupancyStatus",
+    "DutyHouseOccupancy",
+    "OccupancyTransfer",
+    "IncidentSeverity",
+    "IncidentStatus",
+    "IncidentType",
+    "IncidentEscalationRule",
+    "IncidentCluster",
+    "EquipmentHealthScore",
+    "MaintenanceIncident",
+    "IncidentStream",
+]

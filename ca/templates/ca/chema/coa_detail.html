@@ -142,11 +142,7 @@
             <div class="detail-item">
                 <span class="detail-label">Location</span>
                 <span class="detail-value">
-                    {% if coa.analysis_request %}
-                        {{ coa.analysis_request.location|default:coa.location|default:"—" }}
-                    {% else %}
-                        {{ coa.location|default:"—" }}
-                    {% endif %}
+                    {{ coa.batch.location|default:"—" }}
                 </span>
             </div>
 

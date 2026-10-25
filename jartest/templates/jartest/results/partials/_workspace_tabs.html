@@ -1,0 +1,16 @@
+<nav class="jt-workspace-tabs jt-workspace-tabs--header" role="tablist" aria-label="Jar-test workspace">
+    <button type="button" class="jt-workspace-tab is-active" id="jt-bench-tab" role="tab"
+            aria-selected="true" aria-controls="jt-bench-panel" data-jt-tab="bench">
+        <i class="fa-solid fa-flask-vial" aria-hidden="true"></i><span>Jar-test bench</span>
+    </button>
+    <button type="button" class="jt-workspace-tab" id="jt-intelligence-tab" role="tab"
+            aria-selected="false" aria-controls="jt-intelligence-panel" data-jt-tab="intelligence">
+        <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i><span>Dosage intelligence</span>
+        <span class="jt-tab-count">{{ dosage_analytics.summary.count|default:0 }}</span>
+    </button>
+    <button type="button" class="jt-workspace-tab" id="jt-reports-tab" role="tab"
+            aria-selected="false" aria-controls="jt-reports-panel" data-jt-tab="reports">
+        <i class="fa-solid fa-chart-column" aria-hidden="true"></i><span>Jar-test reports</span>
+        <span class="jt-tab-count">{{ jar_test_reports.summary.records|default:0 }}</span>
+    </button>
+</nav>

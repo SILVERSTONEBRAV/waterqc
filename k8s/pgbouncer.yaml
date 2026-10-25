@@ -37,16 +37,6 @@ data:
 
 ---
 apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: pgbouncer-users
-  namespace: qad
-data:
-  userlist.txt: |
-    "qad" "md5REPLACE_WITH_HASH"
-
----
-apiVersion: v1
 kind: Service
 metadata:
   name: pgbouncer
@@ -78,7 +68,7 @@ spec:
     spec:
       containers:
         - name: pgbouncer
-          image: edoburu/pgbouncer:latest
+          image: edoburu/pgbouncer:v1.25.2-p0
           imagePullPolicy: IfNotPresent
 
           ports:
@@ -140,5 +130,8 @@ spec:
             name: pgbouncer-config
 
         - name: users
-          configMap:
-            name: pgbouncer-users
+          secret:
+            secretName: qad-secrets
+            items:
+              - key: userlist.txt
+                path: userlist.txt

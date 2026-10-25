@@ -1,0 +1,80 @@
+{% load static %}
+
+<div class="scada-topbar" id="scada-topbar">
+    <div class="scada-brand-group">
+        <div class="scada-logo-badge">
+            <i class="fa-solid fa-compass-drafting scada-logo-icon"></i>
+            <span>QC SCADA Sentinel</span>
+        </div>
+
+        <!-- Scope Controls (Plant & Date) -->
+        <div class="scada-scope-pill">
+            <span class="scada-scope-label"><i class="fa-solid fa-industry"></i> Plant:</span>
+            <select class="scada-plant-select"
+                    name="plant"
+                    id="scadaPlantSelect"
+                    onchange="window.location.search = '?plant=' + this.value + '&tab={{ active_tab|default:'overview' }}';">
+                {% for p in available_plants %}
+                <option value="{{ p.pk }}" {% if selected_plant and selected_plant.pk == p.pk %}selected{% endif %}>
+                    {{ p.code }} — {{ p.name }}
+                </option>
+                {% empty %}
+                <option value="">No Plants Available</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="scada-scope-pill">
+            <span class="scada-scope-label"><i class="fa-regular fa-calendar"></i> Date:</span>
+            <input type="date"
+                   class="scada-date-input"
+                   name="date"
+                   id="scadaDateInput"
+                   value="{{ selected_date|date:'Y-m-d' }}"
+                   onchange="window.location.search = '?plant={{ selected_plant.pk|default:'' }}&date=' + this.value + '&tab={{ active_tab|default:'overview' }}';">
+        </div>
+    </div>
+
+    <!-- Live SCADA Health Tickers -->
+    <div class="scada-telemetry-kpis">
+        <div class="scada-kpi-chip {{ system_status_class }}" title="Overall SCADA Plant Status">
+            <i class="fa-solid fa-shield-halved"></i>
+            <span style="font-weight: 800;">{{ system_status }}</span>
+        </div>
+
+        <div class="scada-kpi-chip kpi-cyan" title="Sensor vs Laboratory Analytical Agreement Rate">
+            <span>Agreement:</span>
+            <span class="kpi-val">{{ agreement_pct }}%</span>
+        </div>
+
+        <div class="scada-kpi-chip kpi-success" title="Composite SCADA Operational Health Index">
+            <span>Health Index:</span>
+            <span class="kpi-val">{{ scada_health_index }}/100</span>
+        </div>
+
+        {% if total_critical_alarms > 0 %}
+        <div class="scada-kpi-chip kpi-danger" title="Critical Discrepancies between sensor and lab results">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>{{ total_critical_alarms }} Critical</span>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Right Telemetry Sync & Control -->
+    <div class="scada-controls-right">
+        <div class="scada-live-pulse" title="Live SCADA telemetry pipeline stream active">
+            <span class="pulse-beacon"></span>
+            <span>LIVE SCADA STREAM</span>
+        </div>
+
+        <button type="button"
+                class="scada-btn-icon"
+                hx-get="?partial=dashboard_content{% if selected_plant %}&plant={{ selected_plant.pk }}{% endif %}{% if selected_date %}&date={{ selected_date|date:'Y-m-d' }}{% endif %}&tab={{ active_tab|default:'overview' }}"
+                hx-target="#scada-dashboard-root"
+                hx-swap="outerHTML"
+                title="Synchronize live sensor telemetry and QC data now">
+            <i class="fa-solid fa-arrows-rotate"></i>
+            <span>Refresh</span>
+        </button>
+    </div>
+</div>

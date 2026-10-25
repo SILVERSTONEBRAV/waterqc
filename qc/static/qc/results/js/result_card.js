@@ -2,13 +2,13 @@
 // ──────────────────────────────────────────────────────────────
 // QCA Analytics — Advanced Real-Time Progressive Dashboard
 // Features:
-//   1. PWA Fullscreen Mode Enforcement & Service Worker
+//   1. Full-viewport PWA shell
 //   2. Cycle Navigation Ribbon (All Cycles / Direct Cycle Jump)
 //   3. Card Permanence Guarantee & Input State Preservation
 //   4. Web Audio Synthesized Futuristic Sound FX (Save / Alert / Tap)
 //   5. Excel-Style High-Speed Navigation
-//   6. WebSocket Real-Time Stream & Fallback Heartbeat
-//   7. Holographic Shortcuts HUD & Native Fullscreen Toggle
+//   6. Durable WebSocket Real-Time Stream
+//   7. Holographic Shortcuts HUD
 // ──────────────────────────────────────────────────────────────
 
 (() => {
@@ -20,61 +20,26 @@
     const RECONNECT_BASE_MS = 1000;
     const RECONNECT_MAX_MS = 30000;
     const REFRESH_DEBOUNCE_MS = 350;
-
     let socket = null;
     let reconnectAttempts = 0;
     let reconnectTimer = null;
     let refreshDebounceTimer = null;
     let clockTimer = null;
-    let fallbackPollTimer = null;
+    const receivedRealtimeEvents = new Set();
 
     let persistenceWatchdogTimer = null;
 
     let isBusy = false;
     let isEditing = false;
     let hasQueuedRefresh = false;
+    let queuedRefreshPreserveInput = true;
+    let preserveInputForNextSwap = true;
     let isShuttingDown = false;
     let soundEnabled = localStorage.getItem("qca_sound") !== "muted";
 
 
     // Track active input state before HTMX swaps to eliminate typing interruption
     let lastActiveInputInfo = null;
-
-    // ═══════════════════════════════════════════════════════════
-    // 1. PWA REGISTRATION & FULLSCREEN MODE ENFORCEMENT
-    // ═══════════════════════════════════════════════════════════
-    function isPWAMode() {
-        return window.matchMedia("(display-mode: fullscreen)").matches ||
-               window.matchMedia("(display-mode: standalone)").matches ||
-               window.navigator.standalone === true;
-    }
-
-    function enforcePWAFullscreen() {
-        if (!document.fullscreenElement) {
-            const docEl = document.documentElement;
-            const rfs = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.msRequestFullscreen;
-            if (rfs) {
-                rfs.call(docEl).catch(() => {});
-            }
-        }
-    }
-
-    function registerPWA() {
-        if ("serviceWorker" in navigator) {
-            window.addEventListener("load", () => {
-                navigator.serviceWorker.register("/static/qc/results/js/sw.js")
-                    .then(reg => console.log("[QCA PWA] Service Worker active in scope:", reg.scope))
-                    .catch(err => console.warn("[QCA PWA] Service Worker registration failed:", err));
-            });
-        }
-
-        // When launched as PWA or clicked anywhere in standalone mode, trigger fullscreen
-        window.addEventListener("click", enforcePWAFullscreen, { passive: true });
-        window.addEventListener("touchstart", enforcePWAFullscreen, { passive: true });
-        if (isPWAMode()) {
-            setTimeout(enforcePWAFullscreen, 400);
-        }
-    }
 
     // ═══════════════════════════════════════════════════════════
     // 2. WEB AUDIO API SYNTHESIZER
@@ -172,42 +137,76 @@
         }
     }
 
-    function scheduleRefresh() {
+    function scheduleRefresh(force = false, preserveInputState = true) {
         clearTimeout(refreshDebounceTimer);
-        refreshDebounceTimer = setTimeout(() => refreshCardsAndTopbar(), REFRESH_DEBOUNCE_MS);
+        refreshDebounceTimer = setTimeout(() => refreshCardsAndTopbar(force, preserveInputState), REFRESH_DEBOUNCE_MS);
     }
 
-    function refreshCardsAndTopbar(force = false) {
+    function hasPermanentCards(root) {
+        const scope = root || document;
+        return !!scope.querySelector(
+            "#cards-container .result-card, #cards-container .permanent-card, .result-card.permanent-card, .visible-cycle-card"
+        );
+    }
+
+    function isEmptyCardsPayload(fragment) {
+        if (!fragment) return true;
+        const hasCard = fragment.querySelector(
+            ".result-card, .permanent-card, .visible-cycle-card"
+        );
+        const emptyState = fragment.querySelector(".empty-dashboard-card");
+        return !hasCard || !!emptyState;
+    }
+
+    function dedupeTopbars() {
+        const bars = document.querySelectorAll("#dashboard-topbars");
+        if (bars.length <= 1) return;
+        for (let i = 1; i < bars.length; i++) {
+            bars[i].remove();
+        }
+    }
+
+    function refreshCardsAndTopbar(force = false, preserveInputState = true) {
         if (!hasHTMX()) return;
         const container = getCardsContainer();
         if (!container) return;
 
-        if (document.hidden && !force) {
+        if (document.hidden) {
             hasQueuedRefresh = true;
+            queuedRefreshPreserveInput = queuedRefreshPreserveInput && preserveInputState;
             return;
         }
-        if ((isBusy || isEditing) && !force) {
+        if (isBusy || isEditing) {
             hasQueuedRefresh = true;
+            queuedRefreshPreserveInput = queuedRefreshPreserveInput && preserveInputState;
+            return;
+        }
+
+        // Routine telemetry updates keep the worksheet stable. Database change
+        // events use force=true to refresh cards immediately.
+        if (!force) {
+            refreshTopbar();
             return;
         }
 
         isBusy = true;
         hasQueuedRefresh = false;
+        queuedRefreshPreserveInput = true;
+        preserveInputForNextSwap = preserveInputState;
+        if (preserveInputState) captureActiveInputState();
+        else lastActiveInputInfo = null;
 
-        captureActiveInputState();
-
-        // Perform atomic HTMX swap on cards container
         htmx.ajax("GET", buildCardsRefreshUrl(), {
             target: "#cards-container",
             swap: "outerHTML"
         });
 
-        // Concurrently refresh telemetry topbars
         refreshTopbar();
     }
 
     function refreshTopbar() {
         if (!hasHTMX()) return;
+        dedupeTopbars();
         const topbars = document.getElementById("dashboard-topbars");
         if (!topbars) return;
 
@@ -226,7 +225,8 @@
     function enforceCardsVisibility() {
         const cards = document.querySelectorAll("#cards-container .result-card, #cards-container .excel-card, #cards-container .card");
         cards.forEach(card => {
-            if (card.classList.contains("dismissing")) return;
+            // Clear a stale dismissal class from cached/older scripts.
+            card.classList.remove("dismissing");
             card.style.setProperty("display", "flex", "important");
             card.style.setProperty("opacity", "1", "important");
             card.style.setProperty("visibility", "visible", "important");
@@ -235,7 +235,6 @@
         // Also guard the card bodies
         const bodies = document.querySelectorAll("#cards-container .card-cycle-body");
         bodies.forEach(body => {
-            if (body.closest(".dismissing")) return;
             body.style.setProperty("display", "flex", "important");
             body.style.setProperty("opacity", "1", "important");
             body.style.setProperty("visibility", "visible", "important");
@@ -385,7 +384,7 @@
                     label.textContent = "Live Stream";
                     break;
                 case "disconnected":
-                    label.textContent = "Offline (Polling)";
+                    label.textContent = "Offline";
                     break;
                 case "reconnecting":
                     label.textContent = "Syncing…";
@@ -398,6 +397,8 @@
 
     function connectWebSocket() {
         if (isShuttingDown) return;
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
         if (socket) {
             socket.onclose = null;
             socket.close();
@@ -431,7 +432,21 @@
 
             switch (data.type) {
                 case "connection.ready":
+                    // Reconcile once on connect/reconnect; no periodic status poll.
+                    scheduleRefresh(true, false);
                     break;
+                case "results.changed": {
+                    const eventId = data.event_id;
+                    if (eventId && receivedRealtimeEvents.has(eventId)) break;
+                    if (eventId) {
+                        receivedRealtimeEvents.add(eventId);
+                        if (receivedRealtimeEvents.size > 256) {
+                            receivedRealtimeEvents.delete(receivedRealtimeEvents.values().next().value);
+                        }
+                    }
+                    scheduleRefresh(true, false);
+                    break;
+                }
                 case "analysis.created":
                 case "analysis_created":
                 case "results.updated":
@@ -439,7 +454,7 @@
                 case "dashboard.refresh":
                 case "dashboard_refresh":
                     playSound("click");
-                    scheduleRefresh();
+                    scheduleRefresh(true, !["analysis.created", "analysis_created", "results.updated", "qc_results_updated"].includes(data.type));
                     break;
             }
         };
@@ -454,21 +469,40 @@
         };
     }
 
+    window.addEventListener("qad:data-changed", event => {
+        // QC cards consume the durable qc.results.changed stream instead.
+        if (event.detail?.app_label === "qc") return;
+        const newAnalysis = event.detail && event.detail.model === "wateranalysis" && event.detail.action === "created";
+        scheduleRefresh(true, !newAnalysis);
+        event.preventDefault();
+    });
+
+    window.addEventListener("qad:resume", event => {
+        scheduleRefresh(true);
+        event.preventDefault();
+    });
+
+    document.addEventListener("visibilitychange", () => {
+        if (document.hidden) return;
+        if (!socket || socket.readyState === WebSocket.CLOSED) {
+            connectWebSocket();
+        }
+        if (hasQueuedRefresh) {
+            const preserveInputState = queuedRefreshPreserveInput;
+            hasQueuedRefresh = false;
+            queuedRefreshPreserveInput = true;
+            scheduleRefresh(true, preserveInputState);
+        } else {
+            scheduleRefresh(true, false);
+        }
+    });
+
     function reconnectWebSocket() {
         clearTimeout(reconnectTimer);
         reconnectAttempts++;
         const delay = Math.min(RECONNECT_BASE_MS * Math.pow(2, reconnectAttempts), RECONNECT_MAX_MS);
         setConnectionStatus("reconnecting");
         reconnectTimer = setTimeout(connectWebSocket, delay);
-    }
-
-    function startFallbackPolling() {
-        clearInterval(fallbackPollTimer);
-        fallbackPollTimer = setInterval(() => {
-            if (!isEditing && !isBusy && document.visibilityState === "visible") {
-                refreshCardsAndTopbar();
-            }
-        }, 60000); // 1-minute fallback heartbeat
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -550,8 +584,10 @@
         if (cell) cell.classList.remove("excel-cell-active");
 
         if (hasQueuedRefresh && !isBusy) {
+            const preserveInputState = queuedRefreshPreserveInput;
             hasQueuedRefresh = false;
-            scheduleRefresh();
+            queuedRefreshPreserveInput = true;
+            scheduleRefresh(true, preserveInputState);
         }
     }
 
@@ -565,39 +601,57 @@
         // Find the out-of-range bubble sibling
         const wrapper = input.closest(".input-cell-wrapper");
         const oorBubble = wrapper ? wrapper.querySelector(".oor-spec-bubble") : null;
+        const limitLabel = wrapper ? wrapper.querySelector(".cell-sub-spec") : null;
 
         if (isNaN(val) || !limits) {
             input.classList.remove("form-control-danger", "form-control-success");
-            if (oorBubble) oorBubble.style.display = "none";
+            if (wrapper) wrapper.classList.remove("cell-danger-glow", "cell-success-glow");
+            if (oorBubble) {
+                oorBubble.hidden = true;
+                oorBubble.style.display = "none";
+                oorBubble.setAttribute("aria-hidden", "true");
+            }
+            if (limitLabel) limitLabel.hidden = true;
             return;
         }
 
         if (val < limits.min || val > limits.max) {
             input.classList.add("form-control-danger");
             input.classList.remove("form-control-success");
-            // Show the out-of-range spec bubble
+            if (wrapper) {
+                wrapper.classList.add("cell-danger-glow");
+                wrapper.classList.remove("cell-success-glow");
+            }
             if (oorBubble) {
+                oorBubble.hidden = false;
                 oorBubble.style.display = "flex";
                 oorBubble.setAttribute("aria-hidden", "false");
             }
+            if (limitLabel) limitLabel.hidden = false;
             if (playAlertOnAbnormal) playSound("alert");
         } else {
             input.classList.remove("form-control-danger");
             input.classList.add("form-control-success");
-            // Hide the out-of-range spec bubble
+            if (wrapper) {
+                wrapper.classList.add("cell-success-glow");
+                wrapper.classList.remove("cell-danger-glow");
+            }
             if (oorBubble) {
+                oorBubble.hidden = true;
                 oorBubble.style.display = "none";
                 oorBubble.setAttribute("aria-hidden", "true");
             }
+            if (limitLabel) limitLabel.hidden = true;
         }
     }
 
     function parseSpec(text) {
-        const match = text.match(/(\d+\.?\d*)\s*[-–]\s*(\d+\.?\d*)/);
+        const number = "-?\\d+(?:\\.\\d+)?";
+        const match = text.match(new RegExp(`(${number})\\s*[-–]\\s*(${number})`));
         if (match) return { min: parseFloat(match[1]), max: parseFloat(match[2]) };
-        const maxMatch = text.match(/≤\s*(\d+\.?\d*)/);
+        const maxMatch = text.match(new RegExp(`≤\\s*(${number})`));
         if (maxMatch) return { min: -Infinity, max: parseFloat(maxMatch[1]) };
-        const minMatch = text.match(/≥\s*(\d+\.?\d*)/);
+        const minMatch = text.match(new RegExp(`≥\\s*(${number})`));
         if (minMatch) return { min: parseFloat(minMatch[1]), max: Infinity };
         return null;
     }
@@ -605,7 +659,7 @@
     // Autosave removed — manual form submission only
 
     // ═══════════════════════════════════════════════════════════
-    // 9. HEADER CONTROLS (Scope, Theme, Audio, Fullscreen, HUD)
+    // 9. HEADER CONTROLS (Scope, Theme, Audio, HUD)
     // ═══════════════════════════════════════════════════════════
     function initHeaderControls() {
         // Superuser Scope Dropdown
@@ -621,15 +675,6 @@
             });
         }
 
-        // Fullscreen Toggle
-        const fsBtn = document.getElementById("fullscreenToggle");
-        if (fsBtn) {
-            fsBtn.addEventListener("click", () => {
-                playSound("click");
-                toggleFullscreen();
-            });
-        }
-
         // Audio Effects Toggle
         const soundBtn = document.getElementById("soundToggle");
         if (soundBtn) {
@@ -642,47 +687,20 @@
             });
         }
 
-        // Shortcuts HUD Dialog Toggle
-        const shortcutsBtn = document.getElementById("shortcutsToggle");
-        const shortcutsModal = document.getElementById("shortcutsModal");
-        if (shortcutsBtn && shortcutsModal) {
-            shortcutsBtn.addEventListener("click", () => {
-                playSound("click");
-                shortcutsModal.showModal();
-            });
-        }
-
-        // Global hotkeys (F for fullscreen, M for mute, ? for shortcuts, 0-9 for cycles)
+        // Global hotkey (M mute).
         document.addEventListener("keydown", (e) => {
             if (["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName)) {
                 return;
             }
 
-            if (e.key === "f" || e.key === "F") {
-                e.preventDefault();
-                toggleFullscreen();
-            } else if (e.key === "m" || e.key === "M") {
+            if (e.key === "m" || e.key === "M") {
                 e.preventDefault();
                 soundEnabled = !soundEnabled;
                 localStorage.setItem("qca_sound", soundEnabled ? "active" : "muted");
                 updateSoundIcon();
                 if (soundEnabled) playSound("save");
-            } else if (e.key === "?") {
-                e.preventDefault();
-                const modal = document.getElementById("shortcutsModal");
-                if (modal) {
-                    modal.open ? modal.close() : modal.showModal();
-                }
-
+            }
         });
-    }
-
-    function toggleFullscreen() {
-        if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen().catch(() => {});
-        } else {
-            if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
-        }
     }
 
     function updateSoundIcon() {
@@ -700,27 +718,69 @@
     document.body.addEventListener("htmx:beforeRequest", e => {
         if (e.detail.target?.id === "cards-container") {
             isBusy = true;
-            captureActiveInputState();
+            if (preserveInputForNextSwap) captureActiveInputState();
+            else lastActiveInputInfo = null;
+        }
+    });
+
+    document.body.addEventListener("htmx:beforeSwap", e => {
+        const target = e.detail.target;
+        if (!target) return;
+
+        if (target.id === "cards-container") {
+            const incoming = e.detail.serverResponse
+                ? new DOMParser().parseFromString(e.detail.serverResponse, "text/html")
+                : null;
+            const incomingContainer = incoming?.querySelector("#cards-container");
+            const incomingWatermark = incomingContainer?.dataset.analysisWatermark || "";
+            const currentWatermark = target.dataset.analysisWatermark || "";
+            const analysisAdvanced = incomingWatermark && incomingWatermark !== currentWatermark;
+            // Never wipe an on-screen permanent card with an empty/awaiting payload.
+            // A changed analysis watermark is authoritative, even if the new
+            // analysis currently has no card rows, so an older card is removed.
+            if (hasPermanentCards(document) && isEmptyCardsPayload(incoming) && !analysisAdvanced) {
+                e.detail.shouldSwap = false;
+                isBusy = false;
+            }
+        }
+
+        if (target.id === "dashboard-topbars") {
+            dedupeTopbars();
         }
     });
 
     document.body.addEventListener("htmx:afterSwap", e => {
         if (e.target.id === "cards-container" || e.target.id === "dashboard-topbars") {
             isBusy = false;
+            preserveInputForNextSwap = true;
+            dedupeTopbars();
             enforceCardsVisibility();
             initCardInputs();
             restoreActiveInputState();
             startLiveClock();
             initCompletionLifecycle();
             updateCompletedChips();
-            // Re-enforce after a brief delay in case of CSS reflows
             setTimeout(enforceCardsVisibility, 100);
             setTimeout(enforceCardsVisibility, 500);
+            if (hasQueuedRefresh && !isEditing && !document.hidden) {
+                const preserveInputState = queuedRefreshPreserveInput;
+                hasQueuedRefresh = false;
+                queuedRefreshPreserveInput = true;
+                scheduleRefresh(true, preserveInputState);
+            }
         }
     });
 
     document.body.addEventListener("htmx:responseError", e => {
-        if (e.detail.target?.id === "cards-container") isBusy = false;
+        if (e.detail.target?.id === "cards-container") {
+            isBusy = false;
+            if (hasQueuedRefresh && !isEditing && !document.hidden) {
+                const preserveInputState = queuedRefreshPreserveInput;
+                hasQueuedRefresh = false;
+                queuedRefreshPreserveInput = true;
+                scheduleRefresh(true, preserveInputState);
+            }
+        }
     });
 
     // ═══════════════════════════════════════════════════════════
@@ -730,7 +790,6 @@
         document.documentElement.classList.add("dashboard-locked");
         document.body.classList.add("dashboard-fullscreen");
 
-        registerPWA();
         startLiveClock();
         initHeaderControls();
         initCycleRibbon();
@@ -743,7 +802,6 @@
         if (hasHTMX()) {
             connectWebSocket();
         }
-        startFallbackPolling();
     }
 
     if (document.readyState === "loading") {
@@ -758,7 +816,6 @@
         clearTimeout(refreshDebounceTimer);
 
         clearInterval(clockTimer);
-        clearInterval(fallbackPollTimer);
         clearInterval(persistenceWatchdogTimer);
         if (socket) {
             socket.onclose = null;

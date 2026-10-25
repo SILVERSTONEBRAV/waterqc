@@ -32,10 +32,10 @@
     display: flex;
     flex: 0 0 62px;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
     gap: 10px;
     min-width: 0;
-    padding: 0 8px;
+    padding: 0 16px;
     border-bottom: 1px solid rgb(148 163 184 / .08);
     background: rgb(15 31 52 / .62);
 }
@@ -77,10 +77,10 @@
     min-width: 0;
     flex-direction: column;
     overflow: hidden;
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
-    transform: translateX(-4px);
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: none;
     transition:
         opacity var(--ca-transition-fast),
         transform var(--ca-transition-fast),
@@ -155,9 +155,9 @@
     min-width: 0;
     flex-direction: column;
     overflow: hidden;
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
 }
 
 .ca-sidebar-system-content strong,
@@ -189,8 +189,8 @@
     font-size: 9px;
     font-weight: 800;
     letter-spacing: .06em;
-    opacity: 0;
-    visibility: hidden;
+    opacity: 1;
+    visibility: visible;
 }
 
 .ca-sidebar-navigation {
@@ -238,21 +238,21 @@
     letter-spacing: .14em;
     text-transform: uppercase;
     white-space: nowrap;
-    opacity: 0;
-    visibility: hidden;
+    opacity: 1;
+    visibility: visible;
 }
 
 .ca-sidebar-item {
     position: relative;
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 0;
+    justify-content: flex-start;
+    gap: 12px;
     width: 100%;
     min-width: 0;
-    min-height: 36px;
+    min-height: 38px;
     margin: 2px 0;
-    padding: 6px 0;
+    padding: 7px 14px;
     overflow: hidden;
     border: 1px solid transparent;
     border-radius: 8px;
@@ -308,9 +308,9 @@
     min-width: 0;
     flex: 1 1 auto;
     flex-direction: column;
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
 }
 
 .ca-sidebar-item-label {
@@ -343,9 +343,9 @@
     margin-left: auto;
     padding: 0;
     overflow: hidden;
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
 }
 
 .ca-sidebar-counter {
@@ -396,8 +396,8 @@
     overflow: hidden;
     border-top: 0 solid transparent;
     background: rgb(0 0 0 / .09);
-    opacity: 0;
-    visibility: hidden;
+    opacity: 1;
+    visibility: visible;
 }
 
 .ca-sidebar-footer-status {
@@ -825,4 +825,37 @@
 .ca-sidebar-icon-alert {
     clip-path: polygon(50% 0, 100% 100%, 0 100%);
     background: currentColor;
+}
+
+/* ==========================================================================
+   DESKTOP COLLAPSED STATE (ICONS ONLY - CLEAN & ALIGNED)
+   ========================================================================== */
+.ca-app-shell.is-sidebar-collapsed:not(.is-sidebar-hover) .ca-sidebar {
+    width: var(--ca-sidebar-collapsed-width, 68px) !important;
+}
+
+.ca-app-shell.is-sidebar-collapsed:not(.is-sidebar-hover) .ca-sidebar-header {
+    justify-content: center !important;
+    padding: 0 8px !important;
+}
+
+.ca-app-shell.is-sidebar-collapsed:not(.is-sidebar-hover) .ca-sidebar-toggle,
+.ca-app-shell.is-sidebar-collapsed:not(.is-sidebar-hover) .ca-sidebar-brand-content,
+.ca-app-shell.is-sidebar-collapsed:not(.is-sidebar-hover) .ca-sidebar-system-content,
+.ca-app-shell.is-sidebar-collapsed:not(.is-sidebar-hover) .ca-sidebar-system-state,
+.ca-app-shell.is-sidebar-collapsed:not(.is-sidebar-hover) .ca-sidebar-section-heading,
+.ca-app-shell.is-sidebar-collapsed:not(.is-sidebar-hover) .ca-sidebar-item-content,
+.ca-app-shell.is-sidebar-collapsed:not(.is-sidebar-hover) .ca-sidebar-counter,
+.ca-app-shell.is-sidebar-collapsed:not(.is-sidebar-hover) .ca-sidebar-live,
+.ca-app-shell.is-sidebar-collapsed:not(.is-sidebar-hover) .ca-sidebar-footer {
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+.ca-app-shell.is-sidebar-collapsed:not(.is-sidebar-hover) .ca-sidebar-item {
+    justify-content: center !important;
+    padding: 8px 0 !important;
+    gap: 0 !important;
 }

@@ -1,0 +1,17 @@
+{% extends "ca/dashboard/layout/app.html" %}
+{% block title %}Assign analysts · Chemical Analysis{% endblock %}
+
+{% block content %}
+<div class="ca-assignment-page-overlay">
+    <section class="ca-assignment-page-dialog" role="dialog" aria-modal="true" aria-labelledby="ca-assignment-page-title">
+        <header class="ca-assignment-dialog-header">
+            <div>
+                <p class="ca-assignment-eyebrow">CHEMICAL ANALYSIS · WORKFLOW</p>
+                <h1 id="ca-assignment-page-title">Assign analysts</h1>
+            </div>
+            <a class="ca-assignment-close" href="{{ assignment_cancel_url }}" aria-label="Close analyst assignment">&times;</a>
+        </header>
+        {% include "ca/chema/partials/assign_analyst_form.html" %}
+    </section>
+</div>
+{% endblock %}

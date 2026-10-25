@@ -125,6 +125,7 @@ class CustomUserCreateForm(
             "first_name",
             "last_name",
             "mobile_number",
+            "assigned_treatment_plant",
             "section",
             "profile_picture",
             "is_active",
@@ -133,6 +134,24 @@ class CustomUserCreateForm(
             "groups",
             "user_permissions",
         ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from django.db.models import Q
+        plant_id = None
+        if self.is_bound:
+            plant_id = self.data.get("assigned_treatment_plant")
+        elif self.instance and getattr(self.instance, "assigned_treatment_plant_id", None):
+            plant_id = self.instance.assigned_treatment_plant_id
+
+        if "section" in self.fields:
+            if plant_id:
+                self.fields["section"].queryset = Section.objects.filter(
+                    Q(treatment_plant_id=plant_id) | Q(treatment_plant__isnull=True),
+                    is_active=True
+                ).order_by("name")
+            else:
+                self.fields["section"].queryset = Section.objects.filter(is_active=True).order_by("name")
 
         widgets = {
             "groups": forms.SelectMultiple(
@@ -217,6 +236,24 @@ class CustomUserForm(
             "failed_login_attempts",
             "deactivated_at",
         ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from django.db.models import Q
+        plant_id = None
+        if self.is_bound:
+            plant_id = self.data.get("assigned_treatment_plant")
+        elif self.instance and getattr(self.instance, "assigned_treatment_plant_id", None):
+            plant_id = self.instance.assigned_treatment_plant_id
+
+        if "section" in self.fields:
+            if plant_id:
+                self.fields["section"].queryset = Section.objects.filter(
+                    Q(treatment_plant_id=plant_id) | Q(treatment_plant__isnull=True),
+                    is_active=True
+                ).order_by("name")
+            else:
+                self.fields["section"].queryset = Section.objects.filter(is_active=True).order_by("name")
 
     def clean_email(self):
         email = (

@@ -1,0 +1,52 @@
+{% extends "core/base/base.html" %}
+{% load static %}
+
+{% block title %}{{ dashboard_title|default:"Dashboard" }} | QAD{% endblock %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'core/css/cockpit-fullscreen.css' %}?v=20261013">
+{% block dashboard_styles %}{% endblock %}
+<script>
+  document.documentElement.classList.add("dashboard-locked");
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="app-shell">
+<div class="qad-cockpit-viewport cockpit-fs" id="qad-cockpit-root">
+
+    <!-- ═══ COCKPIT TOPBAR ═══ -->
+    <div class="cockpit-topbar">
+        <div class="cockpit-topbar__left">
+            <span class="cockpit-topbar__title">
+                <i class="fa-solid fa-{{ dashboard_icon|default:'gauge-high' }}"></i>
+                {{ dashboard_title|default:"Dashboard" }}
+            </span>
+            <span class="cockpit-topbar__subtitle">{{ dashboard_subtitle|default:"" }}</span>
+        </div>
+        <div class="cockpit-topbar__right">
+            <span class="live-tag"><i class="fa-solid fa-circle" style="font-size: 0.5rem; margin-right: 4px;"></i> LIVE</span>
+            <button type="button" class="cockpit-btn cockpit-btn--ghost" onclick="window.location.reload();" title="Refresh Telemetry" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
+                <i class="fa-solid fa-arrows-rotate"></i>
+            </button>
+            {% block topbar_actions %}{% endblock %}
+        </div>
+    </div>
+
+    <!-- ═══ KPI ROW ═══ -->
+    {% block kpi_strip %}{% endblock %}
+
+    <!-- ═══ MAIN GRID ═══ -->
+    {% block cockpit_grid %}{% endblock %}
+
+</div>
+</div>
+<script>
+document.body.classList.add("dashboard-fullscreen", "cockpit-fs-active");
+document.documentElement.classList.add("dashboard-locked");
+</script>
+{% endblock %}
+
+{% block extra_scripts %}
+{% block dashboard_scripts %}{% endblock %}
+{% endblock %}

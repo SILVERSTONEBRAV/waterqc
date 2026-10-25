@@ -62,7 +62,7 @@
 
 /* ─── Dark Theme ───────────────────────────────────────────────────── */
 
-[data-theme="dark"] {
+html.theme-dark {
 --ca-dashboard-bg: #080e1a;
 --ca-dashboard-surface: rgba(17, 24, 42, 0.92);
 --ca-dashboard-surface-soft: #131c2e;

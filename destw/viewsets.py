@@ -2,6 +2,7 @@ from datetime import timedelta
 from django.utils import timezone
 from django.db import transaction
 from rest_framework import viewsets, permissions, status
+from core.permissions import ViewModelPermissions
 from rest_framework.response import Response
 from rest_framework.decorators import action
 
@@ -77,18 +78,18 @@ class AutoTransitionMixin:
 class WasteWaterSamplingSiteViewSet(OptionalTreatmentPlantShiftMixin, viewsets.ModelViewSet):
     queryset = WasteWaterSamplingSite.objects.all()
     serializer_class = WasteWaterSamplingSiteSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
 
 class WasteWaterSampleViewSet(OptionalTreatmentPlantShiftMixin, viewsets.ModelViewSet):
     queryset = WasteWaterSample.objects.select_related('sampling_site', 'shift', 'assignment', 'treatment_plant')
     serializer_class = WasteWaterSampleSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
 
 class WasteWaterAnalysisViewSet(OptionalTreatmentPlantShiftMixin, AutoTransitionMixin, viewsets.ModelViewSet):
     serializer_class = WasteWaterAnalysisSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
     def get_queryset(self):
         qs = WasteWaterAnalysis.objects.select_related(
@@ -107,7 +108,7 @@ class WasteWaterAnalysisViewSet(OptionalTreatmentPlantShiftMixin, AutoTransition
         self._apply_auto_transition(instance, request.user)
         return super().retrieve(request, *args, **kwargs)
 
-    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    @action(detail=True, methods=['post'], permission_classes=[ViewModelPermissions])
     def transition(self, request, pk=None):
         instance = self.get_object()
         new_state = request.data.get("new_state")
@@ -131,30 +132,30 @@ class WasteWaterAnalysisViewSet(OptionalTreatmentPlantShiftMixin, AutoTransition
 class WasteWaterParameterResultViewSet(viewsets.ModelViewSet):
     queryset = WasteWaterParameterResult.objects.select_related('analysis', 'parameter', 'analysis_method')
     serializer_class = WasteWaterParameterResultSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
 
 class WasteWaterStabilizationPondViewSet(OptionalTreatmentPlantShiftMixin, viewsets.ModelViewSet):
     queryset = WasteWaterStabilizationPond.objects.select_related('treatment_plant')
     serializer_class = WasteWaterStabilizationPondSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
 
 class WasteWaterPondSamplingSiteViewSet(viewsets.ModelViewSet):
     queryset = WasteWaterPondSamplingSite.objects.select_related('pond')
     serializer_class = WasteWaterPondSamplingSiteSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
 
 class WasteWaterPondSampleViewSet(OptionalTreatmentPlantShiftMixin, viewsets.ModelViewSet):
     queryset = WasteWaterPondSample.objects.select_related('site', 'shift', 'assignment')
     serializer_class = WasteWaterPondSampleSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
 
 class WasteWaterPondAnalysisViewSet(OptionalTreatmentPlantShiftMixin, AutoTransitionMixin, viewsets.ModelViewSet):
     serializer_class = WasteWaterPondAnalysisSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
     def get_queryset(self):
         qs = WasteWaterPondAnalysis.objects.select_related(
@@ -173,7 +174,7 @@ class WasteWaterPondAnalysisViewSet(OptionalTreatmentPlantShiftMixin, AutoTransi
         self._apply_auto_transition(instance, request.user)
         return super().retrieve(request, *args, **kwargs)
 
-    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    @action(detail=True, methods=['post'], permission_classes=[ViewModelPermissions])
     def transition(self, request, pk=None):
         instance = self.get_object()
         new_state = request.data.get("new_state")
@@ -197,4 +198,4 @@ class WasteWaterPondAnalysisViewSet(OptionalTreatmentPlantShiftMixin, AutoTransi
 class WasteWaterPondParameterResultViewSet(viewsets.ModelViewSet):
     queryset = WasteWaterPondParameterResult.objects.select_related('analysis', 'parameter', 'analysis_method')
     serializer_class = WasteWaterPondParameterResultSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]

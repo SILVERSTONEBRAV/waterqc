@@ -15,7 +15,6 @@
 
     x-data="{
         loading:false,
-        fullscreen:false,
         collapsed:false
     }"
 >
@@ -63,20 +62,6 @@
                 hx-swap="outerHTML"
             >
                 <i class="fas fa-rotate"></i>
-            </button>
-
-            <button
-                class="icon-btn"
-                title="Fullscreen"
-                @click="
-                    fullscreen=!fullscreen;
-                    $el.closest('.dashboard-widget')
-                        .classList.toggle(
-                            'widget-fullscreen'
-                        );
-                "
-            >
-                <i class="fas fa-expand"></i>
             </button>
 
             <button

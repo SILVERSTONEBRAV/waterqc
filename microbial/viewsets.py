@@ -1,4 +1,5 @@
 from rest_framework import viewsets, status
+from core.permissions import ViewModelPermissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -24,13 +25,13 @@ from django.shortcuts import get_object_or_404
 class MicrobialMethodViewSet(viewsets.ModelViewSet):
     queryset = MicrobialMethod.objects.all()
     serializer_class = MicrobialMethodSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
 
 class MicrobialParameterResultViewSet(viewsets.ModelViewSet):
     queryset = MicrobialParameterResult.objects.select_related('parameter', 'analysis')
     serializer_class = MicrobialParameterResultSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
     def perform_create(self, serializer):
         serializer.save()
@@ -39,7 +40,7 @@ class MicrobialParameterResultViewSet(viewsets.ModelViewSet):
 class TreatedWaterParameterResultViewSet(viewsets.ModelViewSet):
     queryset = TreatedWaterParameterResult.objects.select_related('parameter', 'analysis')
     serializer_class = TreatedWaterParameterResultSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
     def perform_create(self, serializer):
         serializer.save()
@@ -60,12 +61,12 @@ class MicrobialAnalysisViewSet(viewsets.ModelViewSet):
         'treated_parameters__parameter'
     )
     serializer_class = MicrobialAnalysisSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
 
-    @action(detail=True, methods=['post'], url_path='transition', permission_classes=[IsAuthenticated])
+    @action(detail=True, methods=['post'], url_path='transition', permission_classes=[ViewModelPermissions])
     def transition_state(self, request, pk=None):
         analysis = self.get_object()
         serializer = MicrobialAnalysisStateTransitionSerializer(

@@ -1,4 +1,5 @@
 from rest_framework import viewsets, status
+from core.permissions import ViewModelPermissions
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -16,7 +17,7 @@ from .permissions import IsAdminOrReadOnly  # Example custom permission
 class HeavyMetalLimitViewSet(viewsets.ModelViewSet):
     queryset = HeavyMetalLimit.objects.all()
     serializer_class = HeavyMetalLimitSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
     def get_queryset(self):
         return HeavyMetalLimit.objects.all()
@@ -24,14 +25,14 @@ class HeavyMetalLimitViewSet(viewsets.ModelViewSet):
 class HeavyMetalParameterViewSet(viewsets.ModelViewSet):
     queryset = HeavyMetalParameter.objects.all()
     serializer_class = HeavyMetalParameterSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
     def get_queryset(self):
         return HeavyMetalParameter.objects.all()
 
 class HeavyMetalAnalysisViewSet(viewsets.ModelViewSet):
     queryset = HeavyMetalAnalysis.objects.all()
-    permission_classes = [IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
     def get_serializer_class(self):
         if self.action == 'list':

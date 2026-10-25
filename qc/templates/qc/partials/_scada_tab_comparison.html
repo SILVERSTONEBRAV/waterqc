@@ -1,0 +1,173 @@
+{% load static %}
+
+<div class="scada-tab-pane" id="pane-comparison">
+    <!-- Comparison Header Info & Legend -->
+    <div style="background: var(--scada-panel); border: 1px solid var(--scada-border); border-radius: 8px; padding: 0.85rem 1.25rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <h4 style="font-size: 0.95rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--scada-text-main); margin: 0 0 0.2rem 0;">
+                <i class="fa-solid fa-scale-balanced" style="color: var(--scada-cyan); margin-right: 0.4rem;"></i> Sensor Telemetry vs Manual Laboratory Worksheet Reconciliation
+            </h4>
+            <div style="font-size: 0.74rem; color: var(--scada-text-muted);">
+                Algorithmic variance auditing compares live IoT probe signals against laboratory-entered batch measurements.
+            </div>
+        </div>
+
+        <!-- Legend Pills -->
+        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+            <span class="recon-badge badge-synch"><i class="fa-solid fa-check"></i> In Synch (&le;10%)</span>
+            <span class="recon-badge badge-drift"><i class="fa-solid fa-triangle-exclamation"></i> Drift (10-20%)</span>
+            <span class="recon-badge badge-mismatch"><i class="fa-solid fa-circle-xmark"></i> Critical Mismatch (&gt;20%)</span>
+            <span class="recon-badge badge-pending"><i class="fa-solid fa-hourglass-half"></i> Lab Pending</span>
+            <span class="recon-badge badge-offline"><i class="fa-solid fa-ban"></i> Sensor Offline</span>
+        </div>
+    </div>
+
+    <!-- Stage Comparison Tables -->
+    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        {% for stage in stages %}
+        <div class="scada-reconciliation-card">
+            <div class="reconciliation-card-header">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <span style="font-weight: 800; font-size: 0.88rem; letter-spacing: 0.04em; color: #ffffff; text-transform: uppercase;">
+                        {{ stage.stage_title }}
+                    </span>
+                    <span class="recon-badge" style="background: {{ stage.status_color }}22; color: {{ stage.status_color }}; border: 1px solid {{ stage.status_color }}66;">
+                        {{ stage.status_badge }}
+                    </span>
+                </div>
+                <div style="font-size: 0.75rem; color: var(--scada-text-muted);">
+                    Health: <strong style="color: {{ stage.status_color }}; font-family: var(--scada-mono-font);">{{ stage.health_score }}%</strong> |
+                    Synced: <strong style="color: #34d399; font-family: var(--scada-mono-font);">{{ stage.in_synch_count }}/{{ stage.total_parameters }}</strong>
+                </div>
+            </div>
+
+            <div style="overflow-x: auto;">
+                <table class="scada-recon-table" role="grid">
+                    <thead>
+                        <tr>
+                            <th style="width: 140px;">Phase / Node</th>
+                            <th style="width: 170px;">Parameter</th>
+                            <th style="width: 150px;">Sensor Telemetry</th>
+                            <th style="width: 130px;">Manual Lab Entry</th>
+                            <th style="width: 110px;">Variance (&Delta;)</th>
+                            <th style="width: 140px;">% Deviation</th>
+                            <th style="width: 160px;">Reconciliation Status</th>
+                            <th style="min-width: 250px;">Automated SCADA Advisory</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for comp in stage.comparisons %}
+                        <tr {% if comp.reconciliation_status == 'critical_mismatch' %}style="background: rgba(239,68,68,0.06);"{% endif %}>
+                            <!-- Phase -->
+                            <td style="font-weight: 700; color: #f1f5f9;">
+                                {{ comp.phase_name }}
+                            </td>
+
+                            <!-- Parameter -->
+                            <td>
+                                <div style="font-weight: 700; color: #38bdf8;">{{ comp.parameter_name }}</div>
+                                <div style="font-size: 0.68rem; color: var(--scada-text-muted);">Unit: {{ comp.unit }}</div>
+                            </td>
+
+                            <!-- Sensor Live -->
+                            <td>
+                                {% if comp.sensor_value is not None %}
+                                <div class="scada-val-cell sensor-val-color">
+                                    {{ comp.sensor_display }} <span style="font-size: 0.68rem; color: #94a3b8;">{{ comp.unit }}</span>
+                                </div>
+                                <div style="font-size: 0.65rem; color: #64748b; margin-top: 0.15rem;">
+                                    <i class="fa-solid fa-microchip"></i> {{ comp.instrument_name }} · {{ comp.sensor_time_ago }}
+                                </div>
+                                {% else %}
+                                <div class="scada-val-cell delta-muted">—</div>
+                                <div style="font-size: 0.65rem; color: #64748b;">No sensor telemetry</div>
+                                {% endif %}
+                            </td>
+
+                            <!-- Manual Lab Entry -->
+                            <td>
+                                {% if comp.manual_entered %}
+                                <div class="scada-val-cell manual-val-color">
+                                    {{ comp.manual_display }} <span style="font-size: 0.68rem; color: #94a3b8;">{{ comp.unit }}</span>
+                                </div>
+                                <div style="font-size: 0.65rem; color: #10b981;">
+                                    <i class="fa-solid fa-circle-check"></i> Lab Recorded
+                                </div>
+                                {% else %}
+                                <div class="scada-val-cell delta-muted">—</div>
+                                <div style="font-size: 0.65rem; color: #fbbf24;">
+                                    <i class="fa-regular fa-clock"></i> Awaiting Entry
+                                </div>
+                                {% endif %}
+                            </td>
+
+                            <!-- Delta Abs -->
+                            <td>
+                                {% if comp.delta_abs is not None %}
+                                <div class="scada-delta-cell {% if comp.reconciliation_status == 'in_synch' %}delta-success{% elif comp.reconciliation_status == 'minor_drift' %}delta-warning{% else %}delta-danger{% endif %}">
+                                    &Delta; {{ comp.delta_display }}
+                                </div>
+                                {% else %}
+                                <span class="delta-muted">—</span>
+                                {% endif %}
+                            </td>
+
+                            <!-- % Deviation Bar -->
+                            <td>
+                                {% if comp.pct_variance is not None %}
+                                <div style="font-family: var(--scada-mono-font); font-size: 0.78rem; font-weight: 700;">
+                                    {{ comp.variance_display }}
+                                </div>
+                                <div class="variance-bar-wrap">
+                                    <div class="variance-bar-fill"
+                                         style="width: {% if comp.pct_variance > 100 %}100{% else %}{{ comp.pct_variance }}{% endif %}%; background: {% if comp.reconciliation_status == 'in_synch' %}#10b981{% elif comp.reconciliation_status == 'minor_drift' %}#f59e0b{% else %}#ef4444{% endif %};">
+                                    </div>
+                                </div>
+                                {% else %}
+                                <span class="delta-muted">—</span>
+                                {% endif %}
+                            </td>
+
+                            <!-- Status Pill -->
+                            <td>
+                                <span class="recon-badge {% if comp.reconciliation_status == 'in_synch' %}badge-synch{% elif comp.reconciliation_status == 'minor_drift' %}badge-drift{% elif comp.reconciliation_status == 'critical_mismatch' %}badge-mismatch{% elif comp.reconciliation_status == 'lab_pending' %}badge-pending{% else %}badge-offline{% endif %}">
+                                    {% if comp.reconciliation_status == 'in_synch' %}
+                                    <i class="fa-solid fa-check"></i>
+                                    {% elif comp.reconciliation_status == 'critical_mismatch' %}
+                                    <i class="fa-solid fa-circle-xmark"></i>
+                                    {% elif comp.reconciliation_status == 'minor_drift' %}
+                                    <i class="fa-solid fa-triangle-exclamation"></i>
+                                    {% else %}
+                                    <i class="fa-solid fa-circle-info"></i>
+                                    {% endif %}
+                                    {{ comp.status_label }}
+                                </span>
+                            </td>
+
+                            <!-- Advisory -->
+                            <td>
+                                <div class="recon-advisory-box {% if comp.reconciliation_status == 'critical_mismatch' %}critical-advisory{% endif %}">
+                                    {{ comp.advisory }}
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" style="text-align: center; color: var(--scada-text-muted); padding: 2rem;">
+                                No parameters actively configured for reconciliation in this stage.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% empty %}
+        <div style="background: var(--scada-panel); border: 1px dashed var(--scada-border); border-radius: 8px; padding: 3rem; text-align: center; color: var(--scada-text-muted);">
+            <i class="fa-solid fa-scale-balanced" style="font-size: 2.5rem; margin-bottom: 0.75rem; color: #475569;"></i>
+            <h3>No Reconciliation Streams Available</h3>
+            <p>Ensure that both field sensors in the Instruments app and QC sampling schedules are configured for this plant.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>

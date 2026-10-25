@@ -17,6 +17,15 @@
         </div>
 
         <div class="d-flex align-items-center gap-2">
+            {% if request.user.is_superuser or perms.qc.view_wateranalysis or perms.filtered_water.view_filteredwateranalysis or perms.microbial.view_microbialanalysis or perms.heavy_metal.view_heavymetalanalysis %}
+            <nav class="d-flex flex-wrap align-items-center gap-2" aria-label="QC dashboards">
+                <a class="btn btn-sm btn-outline-primary" href="{% url 'qc:reports' %}"><i class="fa-solid fa-file-lines me-1" aria-hidden="true"></i>Reports</a>
+                <a class="btn btn-sm btn-outline-primary" href="{% url 'qc:analytics' %}"><i class="fa-solid fa-chart-line me-1" aria-hidden="true"></i>Analytics</a>
+                <a class="btn btn-sm btn-outline-primary" href="{% url 'qc:visualizations' %}"><i class="fa-solid fa-chart-pie me-1" aria-hidden="true"></i>Data Visualization</a>
+                <a class="btn btn-sm btn-outline-danger" href="{% url 'qc:noncompliance' %}"><i class="fa-solid fa-triangle-exclamation me-1" aria-hidden="true"></i>Non-compliance</a>
+                <a class="btn btn-sm btn-outline-info" href="{% url 'qc:scada_dashboard' %}"><i class="fa-solid fa-compass-drafting me-1" aria-hidden="true"></i>SCADA Command Center</a>
+            </nav>
+            {% endif %}
             <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 rounded-pill">
                 <i class="fa fa-cube me-1"></i> {{ models|length|default:stats.total_models }} Registered Entities
             </span>
@@ -35,11 +44,11 @@
                     <div class="card border-0 shadow-sm h-100">
                         <div class="card-body p-3">
                             <div class="d-flex justify-content-between align-items-center">
-                                <small class="text-muted text-uppercase fw-bold" style="font-size:0.75rem;">Quality Compliance</small>
+                            <small class="text-muted text-uppercase fw-bold" style="font-size:0.75rem;">Create-enabled models</small>
                                 <span class="rounded p-1 bg-success bg-opacity-10 text-success"><i class="fa fa-shield-check fa-sm"></i></span>
                             </div>
-                            <h3 class="fw-bold mb-0 mt-2 text-success">99.8%</h3>
-                            <small class="text-muted" style="font-size:0.75rem;">WHO &amp; KEBS standards</small>
+                            <h3 class="fw-bold mb-0 mt-2 text-success">{{ stats.with_create }}</h3>
+                            <small class="text-muted" style="font-size:0.75rem;">of {{ stats.total_models }} registered entities</small>
                         </div>
                     </div>
                 </div>
@@ -48,11 +57,11 @@
                     <div class="card border-0 shadow-sm h-100">
                         <div class="card-body p-3">
                             <div class="d-flex justify-content-between align-items-center">
-                                <small class="text-muted text-uppercase fw-bold" style="font-size:0.75rem;">Registered Models</small>
+                            <small class="text-muted text-uppercase fw-bold" style="font-size:0.75rem;">Export-enabled models</small>
                                 <span class="rounded p-1 bg-primary bg-opacity-10 text-primary"><i class="fa fa-database fa-sm"></i></span>
                             </div>
-                            <h3 class="fw-bold mb-0 mt-2">{{ stats.total_models|default:models|length }}</h3>
-                            <small class="text-success" style="font-size:0.75rem;"><i class="fa fa-check me-1"></i>Schemas online</small>
+                            <h3 class="fw-bold mb-0 mt-2">{{ stats.with_export }}</h3>
+                            <small class="text-primary" style="font-size:0.75rem;">of {{ stats.total_models }} registered entities</small>
                         </div>
                     </div>
                 </div>
@@ -61,11 +70,11 @@
                     <div class="card border-0 shadow-sm h-100">
                         <div class="card-body p-3">
                             <div class="d-flex justify-content-between align-items-center">
-                                <small class="text-muted text-uppercase fw-bold" style="font-size:0.75rem;">Testing Velocity</small>
+                            <small class="text-muted text-uppercase fw-bold" style="font-size:0.75rem;">Inline-editable models</small>
                                 <span class="rounded p-1 bg-info bg-opacity-10 text-info"><i class="fa fa-flask fa-sm"></i></span>
                             </div>
-                            <h3 class="fw-bold mb-0 mt-2">Active</h3>
-                            <small class="text-info" style="font-size:0.75rem;">Continuous monitoring</small>
+                            <h3 class="fw-bold mb-0 mt-2">{{ stats.with_inline }}</h3>
+                            <small class="text-info" style="font-size:0.75rem;">of {{ stats.total_models }} registered entities</small>
                         </div>
                     </div>
                 </div>
@@ -77,12 +86,9 @@
                     <div class="card border-0 shadow-sm h-100">
                         <div class="card-header bg-transparent py-3 border-bottom d-flex justify-content-between align-items-center">
                             <div>
-                                <h6 class="fw-bold mb-0"><i class="fa fa-chart-line text-primary me-2"></i>Water Quality Compliance Curve</h6>
-                                <small class="text-muted">14-Day progressive pass index</small>
+                                <h6 class="fw-bold mb-0"><i class="fa fa-chart-line text-primary me-2"></i>Registry capability coverage</h6>
+                                <small class="text-muted">Registered models that support each action</small>
                             </div>
-                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="expandDashboardChart('qcComplianceTrend', 'Water Quality Compliance Curve', '14-Day compliance percentage and pass index trend')" title="Expand view">
-                                <i class="fa fa-expand"></i>
-                            </button>
                         </div>
                         <div class="card-body p-3">
                             <div style="height: 220px; width: 100%;">
@@ -96,12 +102,9 @@
                     <div class="card border-0 shadow-sm h-100">
                         <div class="card-header bg-transparent py-3 border-bottom d-flex justify-content-between align-items-center">
                             <div>
-                                <h6 class="fw-bold mb-0"><i class="fa fa-chart-bar text-info me-2"></i>Test Volume by Parameter</h6>
-                                <small class="text-muted">Assay category distribution</small>
+                                <h6 class="fw-bold mb-0"><i class="fa fa-chart-bar text-info me-2"></i>Models by registry tag</h6>
+                                <small class="text-muted">Entity classification coverage</small>
                             </div>
-                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="expandDashboardChart('qcCategoryDist', 'Test Volume by Parameter', 'Distribution of water quality testing across core assay categories')" title="Expand view">
-                                <i class="fa fa-expand"></i>
-                            </button>
                         </div>
                         <div class="card-body p-3">
                             <div style="height: 220px; width: 100%;">
@@ -160,7 +163,7 @@
                                     </td>
                                     <td class="text-end pe-3">
                                         <div class="btn-group btn-group-sm">
-                                            {% with r=m.routes c=m.capabilities %}
+                                            {% with r=m.urls c=m.capabilities %}
                                                 <a href="{{ r.list }}" class="btn btn-outline-primary" title="View Records">
                                                     <i class="fas fa-list me-1"></i> List
                                                 </a>
@@ -223,25 +226,17 @@
                 </div>
             </div>
 
-            <!-- Laboratory Compliance Card -->
+            <!-- Registry scope and data-source note -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-transparent py-3 border-bottom">
                     <h6 class="fw-bold mb-0 d-flex align-items-center">
-                        <i class="fa fa-microscope text-success me-2"></i> Standards Compliance
+                        <i class="fa fa-database text-primary me-2"></i> Registry scope
                     </h6>
                 </div>
                 <div class="card-body p-3">
                     <div class="mb-3">
-                        <small class="text-muted d-block">Regulatory Reference</small>
-                        <span class="fw-semibold">KEBS KS 05-459 / WHO Drinking Water</span>
-                    </div>
-                    <div class="mb-3">
-                        <small class="text-muted d-block">Assay Calibration Status</small>
-                        <span class="badge bg-success-subtle text-success border border-success-subtle">All Instruments Calibrated</span>
-                    </div>
-                    <div>
-                        <small class="text-muted d-block">Sampling Cadence</small>
-                        <span class="text-muted small"><i class="fa fa-clock me-1"></i>Hourly Treatment Plant Verification</span>
+                        <small class="text-muted d-block">Record-backed operational data</small>
+                        <p class="text-muted small mb-0">This page summarizes registered QC entities and their capabilities. Use Reports for measured water quality results and Non-compliance for recorded QC cases and derived filtered-water exceedances.</p>
                     </div>
                 </div>
             </div>
@@ -252,28 +247,34 @@
 
 </div>
 
-<!-- Client-side Chart Initialization -->
+{{ capability_chart|json_script:"qc-capability-chart-data" }}
+{{ tag_chart|json_script:"qc-tag-chart-data" }}
+<!-- Client-side registry chart initialization -->
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-    if (typeof initProgressiveLineChart === "function") {
-        initProgressiveLineChart("qcComplianceTrend", {
-            labels: ["D-13", "D-11", "D-9", "D-7", "D-5", "D-3", "Today"],
-            data: [99.2, 99.4, 99.1, 99.7, 99.8, 99.6, 99.9],
-            label: "Compliance %",
-            color: "#10b981",
-            title: "Water Quality Compliance Curve",
-            subtitle: "14-Day compliance percentage and pass index trend"
-        });
-    }
+    const readChartData = id => {
+        try { return JSON.parse(document.getElementById(id)?.textContent || "{}"); }
+        catch (_) { return { labels: [], values: [] }; }
+    };
+    const capabilities = readChartData("qc-capability-chart-data");
+    const tags = readChartData("qc-tag-chart-data");
 
     if (typeof initBarChart === "function") {
+        initBarChart("qcComplianceTrend", {
+            labels: capabilities.labels || [],
+            data: capabilities.values || [],
+            label: "Registered models",
+            colors: ["#0072b2", "#009e73", "#e69f00"],
+            title: "Registry capability coverage",
+            subtitle: "Registered entities that support each action"
+        });
         initBarChart("qcCategoryDist", {
-            labels: ["Turbidity", "pH", "Residual Cl₂", "Bacteriological", "Colour"],
-            data: [142, 138, 155, 96, 110],
-            label: "Assays Run",
-            colors: ["#0284c7", "#38bdf8", "#10b981", "#8b5cf6", "#f59e0b"],
-            title: "Test Volume by Parameter",
-            subtitle: "Distribution of water quality testing across core assay categories"
+            labels: tags.labels || [],
+            data: tags.values || [],
+            label: "Models",
+            colors: ["#0072b2", "#009e73", "#e69f00", "#cc79a7", "#56b4e9", "#d55e00", "#6b4c9a", "#64748b"],
+            title: "Models by registry tag",
+            subtitle: "Registered entity classification coverage"
         });
     }
 });

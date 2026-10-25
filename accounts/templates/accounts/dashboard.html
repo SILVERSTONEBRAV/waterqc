@@ -13,48 +13,7 @@
                 <!-- OVERVIEW -->
                 <div class="tab-pane fade show active"
                      id="overview-tab">
-
-                    <div class="row g-3">
-
-                        <div class="col-md-4">
-                            <div class="card">
-                                <div class="card-body">
-                                    <small class="text-muted">MFA</small>
-                                    <h4>
-                                        {{ request.user.mfa_enabled|yesno:"Enabled,Disabled" }}
-                                    </h4>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-md-4">
-                            <div class="card">
-                                <div class="card-body">
-                                    <small class="text-muted">
-                                        Failed Logins
-                                    </small>
-                                    <h4>
-                                        {{ request.user.failed_login_attempts }}
-                                    </h4>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-md-4">
-                            <div class="card">
-                                <div class="card-body">
-                                    <small class="text-muted">
-                                        Account Locked
-                                    </small>
-                                    <h4>
-                                        {{ request.user.is_locked|yesno:"Yes,No" }}
-                                    </h4>
-                                </div>
-                            </div>
-                        </div>
-
-                    </div>
-
+                    {% include "accounts/partials/_tab_users_overview.html" %}
                 </div>
 
                 <div class="tab-pane fade"

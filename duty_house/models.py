@@ -1,47 +1,28 @@
 # duty_house/models.py
-
 import uuid
 
 from django.apps import apps
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.db.models import Q, Count
+from django.db.models import Q
 from django.utils import timezone
 
+
 class AuditModel(models.Model):
-    created_at = models.DateTimeField(
-        auto_now_add=True,
-        db_index=True,
-    )
-
-    updated_at = models.DateTimeField(
-        auto_now=True,
-    )
-
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name="%(class)s_created",
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="%(class)s_created",
     )
-
     updated_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name="%(class)s_updated",
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="%(class)s_updated",
     )
-
     class Meta:
         abstract = True
 
-
-# =========================================================
-# LOCATION
-# =========================================================
 
 class LocationType(models.TextChoices):
     CAMP = "camp", "Camp"
@@ -436,13 +417,6 @@ class DutyHouseOccupancy(AuditModel):
 
         constraints = [
             models.UniqueConstraint(
-                fields=["unit"],
-                condition=Q(
-                    is_current=True
-                ),
-                name="unique_current_occupancy_per_unit",
-            ),
-            models.UniqueConstraint(
                 fields=["user"],
                 condition=Q(
                     is_current=True
@@ -478,20 +452,42 @@ class DutyHouseOccupancy(AuditModel):
                 }
             )
 
+        if self.is_current and self.unit_id:
+            unit = self.unit
+            current_count = (
+                type(self).objects.filter(unit_id=self.unit_id, is_current=True)
+                .exclude(pk=self.pk)
+                .count()
+            )
+            if current_count >= unit.max_occupants:
+                raise ValidationError(
+                    {"unit": "This unit has reached its configured occupant capacity."}
+                )
+
+    @transaction.atomic
     def save(self, *args, **kwargs):
+        unit = DutyHouseUnit.objects.select_for_update().get(pk=self.unit_id)
+        if self.duty_house_id != unit.duty_house_id:
+            raise ValidationError("The selected unit does not belong to this duty house.")
+        if self.is_current:
+            if not unit.duty_house.is_active or unit.duty_house.status == DutyHouseStatus.DECOMMISSIONED:
+                raise ValidationError("Occupants cannot be assigned to an inactive house.")
+            if unit.status == UnitStatus.MAINTENANCE:
+                raise ValidationError("Occupants cannot be assigned to a unit under maintenance.")
+            current_count = type(self).objects.filter(
+                unit_id=unit.pk, is_current=True
+            ).exclude(pk=self.pk).count()
+            if current_count >= unit.max_occupants:
+                raise ValidationError("This unit has reached its configured occupant capacity.")
         super().save(*args, **kwargs)
 
-        self.unit.status = (
-            UnitStatus.OCCUPIED
-            if self.unit.occupancies.filter(
-                is_current=True
-            ).exists()
-            else UnitStatus.VACANT
-        )
-
-        self.unit.save(
-            update_fields=["status"]
-        )
+        if unit.status != UnitStatus.MAINTENANCE:
+            unit.status = (
+                UnitStatus.OCCUPIED
+                if unit.occupancies.filter(is_current=True).exists()
+                else UnitStatus.VACANT
+            )
+            unit.save(update_fields=["status"])
 
     def __str__(self):
         return (
@@ -547,24 +543,32 @@ class OccupancyTransfer(AuditModel):
             "DutyHouseOccupancy",
         )
 
-        current = (
-            DutyHouseOccupancy.objects
-            .select_for_update()
-            .get(
-                unit=self.from_unit,
-                user=self.user,
-                is_current=True,
+        try:
+            current = (
+                DutyHouseOccupancy.objects
+                .select_for_update()
+                .get(
+                    unit=self.from_unit,
+                    user=self.user,
+                    is_current=True,
+                )
             )
-        )
+        except DutyHouseOccupancy.DoesNotExist as exc:
+            raise ValidationError("This housing assignment is no longer current.") from exc
 
+        if self.from_unit_id == self.to_unit_id:
+            raise ValidationError("Choose a different destination unit.")
+        if self.from_unit.duty_house.plant_id != self.to_unit.duty_house.plant_id:
+            raise ValidationError("Transfers must stay within the same treatment plant.")
         if (
-            self.to_unit.occupancies
-            .filter(is_current=True)
-            .exists()
+            not self.to_unit.duty_house.is_active
+            or self.to_unit.duty_house.status != DutyHouseStatus.ACTIVE
         ):
-            raise ValidationError(
-                "Destination unit is occupied."
-            )
+            raise ValidationError("The destination house is not available for occupancy.")
+        if self.to_unit.status == UnitStatus.MAINTENANCE:
+            raise ValidationError("The destination unit is under maintenance.")
+        if self.to_unit.occupancies.filter(is_current=True).count() >= self.to_unit.max_occupants:
+            raise ValidationError("The destination unit has reached capacity.")
 
         current.is_current = False
         current.status = (
@@ -572,6 +576,7 @@ class OccupancyTransfer(AuditModel):
         )
         current.end_date = timezone.now()
         current.check_out_by = executor
+        current.updated_by = executor
 
         current.save(
             update_fields=[
@@ -579,6 +584,8 @@ class OccupancyTransfer(AuditModel):
                 "status",
                 "end_date",
                 "check_out_by",
+                "updated_by",
+                "updated_at",
             ]
         )
 
@@ -589,13 +596,18 @@ class OccupancyTransfer(AuditModel):
             status=OccupancyStatus.ACTIVE,
             is_current=True,
             check_in_by=executor,
+            created_by=executor,
+            updated_by=executor,
         )
 
         self.transferred_by = executor
+        self.updated_by = executor
 
         self.save(
             update_fields=[
-                "transferred_by"
+                "transferred_by",
+                "updated_by",
+                "updated_at",
             ]
         )
 

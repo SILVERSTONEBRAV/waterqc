@@ -1,0 +1,253 @@
+/*
+ * QAD shared theme contract.
+ * core/css/theme.css owns palette values; this file only maps legacy app tokens
+ * and shared controls onto that palette so all modules resolve colors alike.
+ */
+:root,
+html[data-theme="day"],
+html[data-theme="light"],
+html[data-theme="default"],
+html[data-theme="standard"],
+html[data-theme="enterprise"],
+html[data-theme="ocean"],
+html[data-theme="summer"],
+html[data-theme="emerald"],
+html[data-theme="spring"],
+html[data-theme="dawn"],
+html[data-theme="gold"],
+html[data-theme="autumn"],
+html[data-theme="winter"],
+html[data-theme="night"],
+html[data-theme="dark"],
+html[data-theme="oled"],
+html[data-theme="amoled"],
+html[data-theme="emerald-dark"],
+html[data-theme="dusk"],
+html[data-theme="inferno"],
+html[data-theme="aurora"],
+html[data-theme="celestial"],
+html[data-theme="high-contrast"],
+html[data-theme="contrast"] {
+    color-scheme: light;
+
+    --page-bg: var(--theme-bg, #f4f6f8);
+    --bg-page: var(--theme-bg, #f4f6f8);
+    --surface: var(--theme-surface, #ffffff);
+    --surface-alt: var(--theme-surface-muted, #f2f4f7);
+    --surface-hover: var(--theme-accent-soft, rgba(65, 118, 144, .10));
+    --text: var(--theme-text, #182230);
+    --text-primary: var(--theme-text, #182230);
+    --text-light: var(--theme-text-secondary, #344054);
+    --text-secondary: var(--theme-text-secondary, #344054);
+    --text-muted: var(--theme-muted, #596579);
+    --muted: var(--theme-muted, #596579);
+    --border: var(--theme-border, #d0d5dd);
+    --border-subtle: var(--theme-border, #d0d5dd);
+    --border-active: var(--theme-accent, #417690);
+    --border-contrast: var(--theme-border-strong, #98a2b3);
+    --text-accent: var(--theme-accent, #417690);
+    --text-high-contrast: var(--theme-text, #182230);
+
+    --topbar-bg: var(--theme-surface-strong, #ffffff);
+    --topbar-border: var(--theme-border, #d0d5dd);
+    --sidebar-bg: var(--theme-surface-strong, #ffffff);
+    --sidebar-border: var(--theme-border, #d0d5dd);
+    --panel-bg: var(--theme-surface, #ffffff);
+    --panel-bg-soft: var(--theme-surface-muted, #f2f4f7);
+    --panel-border: var(--theme-border, #d0d5dd);
+    --input-bg: var(--theme-surface-strong, #ffffff);
+    --bg-input: var(--theme-surface-strong, #ffffff);
+    --hud-bg: linear-gradient(135deg, var(--theme-surface, #ffffff), var(--theme-surface-muted, #f2f4f7));
+    --bg-surface-dark: var(--theme-bg, #f4f6f8);
+    --bg-card: var(--theme-surface, #ffffff);
+    --bg-card-alt: var(--theme-surface-muted, #f2f4f7);
+    --bg-header: linear-gradient(135deg, var(--theme-surface, #ffffff), var(--theme-surface-muted, #f2f4f7));
+    --bg-topbar: linear-gradient(90deg, var(--theme-surface, #ffffff), var(--theme-surface-muted, #f2f4f7));
+    --table-header-bg: var(--theme-surface-muted, #f2f4f7);
+    --table-row-bg: var(--theme-surface, #ffffff);
+    --table-row-alt: var(--theme-surface-muted, #f2f4f7);
+    --table-row-hover: var(--theme-accent-soft, rgba(65, 118, 144, .10));
+    --row-hover-bg: var(--theme-accent-soft, rgba(65, 118, 144, .10));
+    --chip-bg: var(--theme-surface-muted, #f2f4f7);
+    --accent-glow: 0 0 10px var(--theme-accent-glow, rgba(65, 118, 144, .18));
+
+    --ca-body-bg: var(--theme-bg, #f4f6f8);
+    --ca-surface: var(--theme-surface, #ffffff);
+    --ca-surface-solid: var(--theme-surface-strong, #ffffff);
+    --ca-surface-raised: var(--theme-surface-muted, #f2f4f7);
+    --ca-surface-muted: var(--theme-surface-muted, #f2f4f7);
+    --ca-surface-hover: var(--theme-accent-soft, rgba(65, 118, 144, .10));
+    --ca-text: var(--theme-text, #182230);
+    --ca-text-soft: var(--theme-text-secondary, #344054);
+    --ca-text-muted: var(--theme-muted, #596579);
+    --ca-text-faint: var(--theme-muted, #596579);
+    --ca-border: var(--theme-border, #d0d5dd);
+    --ca-border-soft: var(--theme-border, #d0d5dd);
+    --ca-border-strong: var(--theme-border-strong, #98a2b3);
+    --ca-primary: var(--theme-accent, #417690);
+    --ca-primary-hover: var(--theme-accent-hover, #315a6e);
+    --ca-primary-soft: var(--theme-accent-soft, rgba(65, 118, 144, .10));
+    --ca-success-soft: color-mix(in srgb, var(--color-success, #10b981) 14%, transparent);
+    --ca-warning-soft: color-mix(in srgb, var(--color-warning, #f59e0b) 14%, transparent);
+    --ca-danger-soft: color-mix(in srgb, var(--color-danger, #ef4444) 14%, transparent);
+    --ca-info-soft: var(--theme-accent-soft, rgba(65, 118, 144, .10));
+
+    --ca-dashboard-bg: var(--theme-bg, #f4f6f8);
+    --ca-dashboard-surface: var(--theme-surface, #ffffff);
+    --ca-dashboard-surface-soft: var(--theme-surface-muted, #f2f4f7);
+    --ca-dashboard-border: var(--theme-border, #d0d5dd);
+    --ca-dashboard-border-strong: var(--theme-border-strong, #98a2b3);
+    --ca-dashboard-text: var(--theme-text, #182230);
+    --ca-dashboard-text-soft: var(--theme-text-secondary, #344054);
+    --ca-dashboard-text-muted: var(--theme-muted, #596579);
+    --ca-dashboard-primary: var(--theme-accent, #417690);
+    --ca-dashboard-primary-soft: var(--theme-accent-soft, rgba(65, 118, 144, .10));
+    --ca-dashboard-primary-border: var(--theme-border-strong, #98a2b3);
+    --ca-dashboard-glass: var(--panel-bg-soft, rgba(255, 255, 255, .92));
+    --ca-dashboard-glass-border: var(--theme-border, #d0d5dd);
+    --ca-dashboard-glow: var(--theme-accent-glow, rgba(65, 118, 144, .22));
+
+    --bs-body-bg: var(--theme-bg, #f4f6f8);
+    --bs-body-color: var(--theme-text, #182230);
+    --bs-secondary-color: var(--theme-text-secondary, #344054);
+    --bs-tertiary-bg: var(--theme-surface-muted, #f2f4f7);
+    --bs-border-color: var(--theme-border, #d0d5dd);
+    --bs-card-bg: var(--theme-surface, #ffffff);
+    --bs-modal-bg: var(--theme-surface, #ffffff);
+    --bs-dropdown-bg: var(--theme-surface, #ffffff);
+    --bs-form-control-bg: var(--theme-surface-strong, #ffffff);
+    --bs-form-control-color: var(--theme-text, #182230);
+    --bs-form-control-border-color: var(--theme-border-strong, #98a2b3);
+    --bs-table-bg: var(--theme-surface, #ffffff);
+    --bs-table-color: var(--theme-text, #182230);
+    --bs-table-border-color: var(--theme-border, #d0d5dd);
+}
+
+html[data-theme="day"],
+html[data-theme="light"],
+html[data-theme="default"],
+html[data-theme="standard"],
+html[data-theme="enterprise"],
+html[data-theme="ocean"],
+html[data-theme="summer"],
+html[data-theme="emerald"],
+html[data-theme="spring"],
+html[data-theme="dawn"],
+html[data-theme="gold"],
+html[data-theme="autumn"],
+html[data-theme="winter"],
+html[data-theme="high-contrast"],
+html[data-theme="contrast"] {
+    color-scheme: light;
+}
+
+html[data-theme="night"],
+html[data-theme="dark"],
+html[data-theme="oled"],
+html[data-theme="amoled"],
+html[data-theme="emerald-dark"],
+html[data-theme="dusk"],
+html[data-theme="inferno"],
+html[data-theme="aurora"],
+html[data-theme="celestial"] {
+    color-scheme: dark;
+}
+
+html,
+body {
+    background-color: var(--theme-bg, #f4f6f8);
+    color: var(--theme-text, #182230);
+}
+
+body > nav.navbar,
+body > footer.footer {
+    background: var(--theme-surface-strong, #ffffff) !important;
+    color: var(--theme-text, #182230) !important;
+    border-color: var(--theme-border, #d0d5dd) !important;
+}
+
+body > nav.navbar :is(.navbar-brand, .nav-link),
+body > footer.footer,
+body > footer.footer * {
+    color: var(--theme-text, #182230) !important;
+}
+
+body :is(.card, .modal-content, .dropdown-menu, .list-group-item, .popover, .offcanvas) {
+    background-color: var(--theme-surface, #ffffff);
+    color: var(--theme-text, #182230);
+    border-color: var(--theme-border, #d0d5dd);
+}
+
+body :is(.bg-white, .bg-light, .bg-body, .bg-body-tertiary) {
+    background-color: var(--theme-surface, #ffffff) !important;
+    color: var(--theme-text, #182230) !important;
+}
+
+body :is(.text-dark, .text-body) {
+    color: var(--theme-text, #182230) !important;
+}
+
+body :is(.text-muted, .text-secondary) {
+    color: var(--theme-muted, #596579) !important;
+}
+
+body :is(input, select, textarea, .form-control, .form-select) {
+    color-scheme: inherit;
+    background-color: var(--theme-surface-strong, #ffffff);
+    color: var(--theme-text, #182230);
+    border-color: var(--theme-border-strong, #98a2b3);
+}
+
+body :is(input, select, textarea, .form-control, .form-select):focus {
+    background-color: var(--theme-surface-strong, #ffffff);
+    color: var(--theme-text, #182230);
+    border-color: var(--theme-accent, #417690);
+    box-shadow: 0 0 0 .2rem var(--theme-accent-soft, rgba(65, 118, 144, .10));
+}
+
+body .btn-primary {
+    background-color: var(--theme-accent, #417690);
+    border-color: var(--theme-accent, #417690);
+    color: var(--theme-on-accent, #ffffff);
+}
+
+body .btn-primary:hover,
+body .btn-primary:focus-visible {
+    background-color: var(--theme-accent-hover, #315a6e);
+    border-color: var(--theme-accent-hover, #315a6e);
+    color: var(--theme-on-accent, #ffffff);
+}
+
+body .btn-outline-primary {
+    color: var(--theme-accent, #417690);
+    border-color: var(--theme-accent, #417690);
+}
+
+body .btn-outline-primary:hover {
+    background-color: var(--theme-accent, #417690);
+    border-color: var(--theme-accent, #417690);
+    color: var(--theme-on-accent, #ffffff);
+}
+
+body .table {
+    --bs-table-bg: var(--theme-surface, #ffffff);
+    --bs-table-color: var(--theme-text, #182230);
+    --bs-table-border-color: var(--theme-border, #d0d5dd);
+}
+
+body .table thead th {
+    background-color: var(--theme-surface-muted, #f2f4f7);
+    color: var(--theme-text, #182230);
+    border-color: var(--theme-border, #d0d5dd);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}

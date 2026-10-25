@@ -1069,6 +1069,11 @@ class ModelRegistry:
     def clear_runtime(self, key: str):
         self._runtime.pop(key, None)
     def check_policy(self, request, action: str, entry: RegistryEntry):
+        if (
+            getattr(request.user, "is_active", False)
+            and getattr(request.user, "is_superuser", False)
+        ):
+            return True
         if entry.policy:
             return entry.policy(request, action, entry)
         perm = f"{entry.meta['app_label']}.{action}_{entry.meta['model_name']}"

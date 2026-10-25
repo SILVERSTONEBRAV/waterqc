@@ -162,4 +162,6 @@ class ClarifiedWaterLimitAdmin(BaseLimitAdmin): pass
 class CoagulatedWaterLimitAdmin(BaseLimitAdmin): pass
 
 @admin.register(FilteredWaterLimit)
-class FilteredWaterLimitAdmin(BaseLimitAdmin): pass
+class FilteredWaterLimitAdmin(BaseLimitAdmin):
+    list_display = ['parameter', 'water_filter', 'treatment_plant', 'min_value', 'max_value']
+    list_filter = ['treatment_plant', 'water_filter', 'parameter']

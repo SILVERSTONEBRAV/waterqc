@@ -6,37 +6,47 @@ from django.urls import reverse, NoReverseMatch, URLPattern, URLResolver
 from core.engine.super_user import SuperUserEngine
 
 
+CA_DASHBOARD_DATA_PERMISSIONS = (
+    "ca.view_chemicalbatch",
+    "ca.view_chemicalanalysisprocess",
+    "ca.view_chemicalanalysisrequest",
+    "ca.view_batchtestresult",
+    "ca.view_chemicalcoa",
+)
+CA_ANALYTICS_DATA_PERMISSIONS = (
+    "ca.view_chemicalbatch",
+    "ca.view_batchtestresult",
+    "ca.view_chemicalspecification",
+)
+CA_TASK_ACTION_PERMISSIONS = (
+    "ca.receive_chemical_batch",
+    "ca.create_analysis_request",
+    "ca.complete_receiving_checklist",
+    "ca.start_chemical_analysis",
+    "ca.record_chemical_result",
+    "ca.complete_chemical_analysis",
+    "ca.perform_chemical_retest",
+    "ca.review_chemical_analysis",
+    "ca.approve_chemical_batch",
+    "ca.reject_chemical_batch",
+    "ca.approve_chemical_coa",
+    "ca.verify_chemical_coa",
+    "ca.utilize_chemical_batch",
+    "ca.return_chemical_batch",
+)
+
+
 # Navigation is derived from ca/urls.py names. Keep labels/sections here;
 # URL discovery stays tied to the named routes in urlpatterns.
 CA_SIDEBAR_ITEMS = (
     {
-        "section": "Dashboards",
-        "section_key": "dashboards",
+        "section": "Workspace",
+        "section_key": "workspace",
         "name": "dashboard",
-        "label": "Command Center",
-        "description": "Dashboard 1 · live operations",
+        "label": "Dashboard",
+        "description": "Chemical analysis workflow overview",
         "icon": "dashboard",
         "active_names": ("dashboard", "dashboard-view"),
-        "permission": None,
-    },
-    {
-        "section": "Dashboards",
-        "section_key": "dashboards",
-        "name": "dashboard2",
-        "label": "Operations",
-        "description": "Dashboard 2 · intelligence",
-        "icon": "operations",
-        "active_names": ("dashboard2",),
-        "permission": None,
-    },
-    {
-        "section": "Dashboards",
-        "section_key": "dashboards",
-        "name": "dashboard3",
-        "label": "Analytics",
-        "description": "Dashboard 3 · models",
-        "icon": "analytics",
-        "active_names": ("dashboard3",),
         "permission": None,
     },
     {
@@ -48,13 +58,7 @@ CA_SIDEBAR_ITEMS = (
         "icon": "tasks",
         "active_names": ("my-tasks",),
         "permission": "ca.view_chemicalanalysisprocess",
-        "alt_permissions": (
-            "ca.record_chemical_result",
-            "ca.start_chemical_analysis",
-            "ca.review_chemical_analysis",
-            "ca.approve_chemical_batch",
-            "ca.complete_receiving_checklist",
-        ),
+        "alt_permissions": CA_TASK_ACTION_PERMISSIONS,
     },
     {
         "section": "Workspace",
@@ -103,11 +107,7 @@ CA_SIDEBAR_ITEMS = (
         "description": "Requests and assignments",
         "icon": "document",
         "active_names": ("request-list", "request-detail", "request-transition"),
-        "permission": "ca.view_chemicalanalysisprocess",
-        "alt_permissions": (
-            "ca.create_analysis_request",
-            "ca.view_chemicalanalysisrequest",
-        ),
+        "permission": "ca.view_chemicalanalysisrequest",
     },
     {
         "section": "Analysis Operations",
@@ -118,7 +118,6 @@ CA_SIDEBAR_ITEMS = (
         "icon": "results",
         "active_names": ("result-list", "result-detail"),
         "permission": "ca.view_batchtestresult",
-        "alt_permissions": ("ca.record_chemical_result",),
     },
     {
         "section": "Control Queues",
@@ -128,7 +127,7 @@ CA_SIDEBAR_ITEMS = (
         "description": "Work awaiting analysis",
         "icon": "analysis",
         "active_names": ("pending-analysis",),
-        "permission": "ca.view_chemicalanalysisprocess",
+        "permission": "ca.record_chemical_result",
     },
     {
         "section": "Control Queues",
@@ -138,7 +137,7 @@ CA_SIDEBAR_ITEMS = (
         "description": "Quality review queue",
         "icon": "approval",
         "active_names": ("pending-qa",),
-        "permission": "ca.review_chemical_analysis",
+        "permission": "ca.view_chemicalanalysisprocess",
     },
     {
         "section": "Control Queues",
@@ -149,7 +148,6 @@ CA_SIDEBAR_ITEMS = (
         "icon": "approval",
         "active_names": ("pending-approval",),
         "permission": "ca.approve_chemical_batch",
-        "alt_permissions": ("ca.approve_chemical_coa",),
     },
     {
         "section": "Control Queues",
@@ -221,9 +219,12 @@ def get_registered_ca_url_names():
     return _named_routes_from_urlpatterns(ca_urls.urlpatterns)
 
 
-def _user_may(user, permission, alt_permissions=()):
+def _user_may(user, permission, alt_permissions=(), all_permissions=()):
     if SuperUserEngine.is_superuser(user):
         return True
+
+    if all_permissions and not all(user.has_perm(perm) for perm in all_permissions):
+        return False
 
     if not permission and not alt_permissions:
         return True
@@ -255,6 +256,7 @@ def build_ca_sidebar(request):
             user,
             item.get("permission"),
             item.get("alt_permissions", ()),
+            item.get("all_permissions", ()),
         ):
             continue
 

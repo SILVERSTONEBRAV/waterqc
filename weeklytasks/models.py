@@ -236,6 +236,13 @@ class MonthlyDutySchedule(TimestampedModel):
             )
 
         if self.section_id and self.treatment_plant_id:
+            sec_plant_id = getattr(self.section, "treatment_plant_id", None)
+            if sec_plant_id and sec_plant_id != self.treatment_plant_id:
+                errors["section"] = (
+                    f"Section '{self.section.name}' belongs to plant '{self.section.treatment_plant.name}', "
+                    f"which does not match schedule treatment plant '{self.treatment_plant.name}'."
+                )
+
             section_users_exist = User.objects.filter(
                 section_id=self.section_id,
                 assigned_treatment_plant_id=self.treatment_plant_id,
@@ -564,6 +571,13 @@ class WeeklyDutyTask(TimestampedModel):
             errors["section"] = (
                 "A section is required."
             )
+        elif self.treatment_plant_id:
+            sec_plant_id = getattr(self.section, "treatment_plant_id", None)
+            if sec_plant_id and sec_plant_id != self.treatment_plant_id:
+                errors["section"] = (
+                    f"Section '{self.section.name}' belongs to plant '{self.section.treatment_plant.name}', "
+                    f"which does not match task treatment plant '{self.treatment_plant.name}'."
+                )
 
         if self.task_template_id and not self.task_template.is_active:
             errors["task_template"] = (

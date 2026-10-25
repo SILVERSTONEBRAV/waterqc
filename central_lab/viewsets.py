@@ -1,4 +1,5 @@
 from rest_framework import viewsets, status, permissions
+from core.permissions import ViewModelPermissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
@@ -17,7 +18,7 @@ from .serializers import (
 )
 
 class SecureDynamicModelViewSet(viewsets.ModelViewSet):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
     def get_queryset(self):
         return super().get_queryset().filter(is_deleted=False)
@@ -33,7 +34,7 @@ class SecureDynamicModelViewSet(viewsets.ModelViewSet):
         })
         return context
 
-    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    @action(detail=True, methods=['post'], permission_classes=[ViewModelPermissions])
     def change_status(self, request, pk=None):
         instance = self.get_object()
         new_status = request.data.get('status')
@@ -113,7 +114,7 @@ class SampleCategoryViewSet(SecureDynamicModelViewSet):
     queryset = SampleCategory.objects.all()
     serializer_class = SampleCategorySerializer
 
-    @action(detail=True, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    @action(detail=True, methods=['get'], permission_classes=[ViewModelPermissions])
     def samples(self, request, pk=None):
         category = self.get_object()
         region_samples = RegionSample.objects.filter(category=category, is_deleted=False)

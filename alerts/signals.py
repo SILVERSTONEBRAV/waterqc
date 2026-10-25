@@ -41,7 +41,7 @@ def register_nc_alerts(app_label, model_name):
     def _handle_nc_save(sender, instance, created, **kwargs):
         if created:
             AlertEngine.trigger_alert(instance, alert_type='nonconformity')
-            AlertEngine.auto_escalate_unacknowledged(instance)
+            AlertEngine.auto_escalate_unacknowledged(instance=instance)
 
 
 # Register all NonConformity models dynamically
@@ -77,7 +77,7 @@ def handle_water_analysis_save(sender, instance, created, **kwargs):
 
     if previous != instance.state and instance.state.lower() in state_transitions_for_alert:
         AlertEngine.trigger_alert(instance, alert_type='auto_verification')
-        AlertEngine.auto_escalate_unacknowledged(instance)
+        AlertEngine.auto_escalate_unacknowledged(instance=instance)
 
 
 # ============================================================
@@ -94,18 +94,26 @@ def handle_equipment_save(sender, instance, created, **kwargs):
 
 def check_and_trigger_equipment_alerts(instance):
     """Trigger maintenance/calibration alerts if due."""
-    now = timezone.now()
+    today = timezone.localdate()
     alert_types = []
 
-    if getattr(instance, 'next_maintenance_date', None) and instance.next_maintenance_date <= now:
-        alert_types.append('maintenance_due')
+    maint_date = getattr(instance, 'next_maintenance_date', None)
+    if maint_date:
+        if hasattr(maint_date, 'date'):
+            maint_date = maint_date.date()
+        if maint_date <= today:
+            alert_types.append('maintenance_due')
 
-    if getattr(instance, 'calibration_due_date', None) and instance.calibration_due_date <= now:
-        alert_types.append('verification_pending')
+    calib_date = getattr(instance, 'calibration_due_date', None)
+    if calib_date:
+        if hasattr(calib_date, 'date'):
+            calib_date = calib_date.date()
+        if calib_date <= today:
+            alert_types.append('verification_pending')
 
     for alert_type in alert_types:
         AlertEngine.trigger_alert(instance, alert_type=alert_type)
-        AlertEngine.auto_escalate_unacknowledged(instance)
+        AlertEngine.auto_escalate_unacknowledged(instance=instance)
 
 
 # ============================================================
@@ -124,3 +132,54 @@ def dynamic_alert_trigger(instance, alert_type):
         logger.info(f"✅ Alert triggered for {alert_type} on {instance}")
     except Exception as e:
         logger.exception(f"❌ Failed to trigger alert for {alert_type} on {instance}: {e}")
+
+
+# ============================================================
+# 🎙️ UNIVERSAL VOICE MESSAGE GENERATION FOR ALL ALERTS & NOTIFICATIONS
+# ============================================================
+
+AlertState = apps.get_model('alerts', 'AlertState')
+
+
+@receiver(post_save, sender=AlertState)
+def handle_alert_state_voice(sender, instance, created, **kwargs):
+    """Ensure every AlertState record has a corresponding persistent VoiceAlert."""
+    if created:
+        try:
+            from alerts.models import VoiceAlert
+            if not VoiceAlert.objects.filter(alert_state=instance).exists():
+                cfg = instance.alert_config
+                body = (cfg.template.body_template if cfg and cfg.template else None) or f"Alert state {instance.state} for {instance.instance_ref}"
+                title = cfg.alert_type if cfg else "System Alert Notification"
+                VoiceAlert.generate_persistent_voice_alert(
+                    message=body,
+                    title=title,
+                    alert_config=cfg,
+                    alert_state=instance,
+                )
+        except Exception as e:
+            logger.warning(f"[VoiceAlert] AlertState signal voice generation notice: {e}")
+
+
+try:
+    ChemicalWorkflowAlert = apps.get_model('ca', 'ChemicalWorkflowAlert')
+
+    @receiver(post_save, sender=ChemicalWorkflowAlert)
+    def handle_ca_workflow_alert_voice(sender, instance, created, **kwargs):
+        """Ensure every CA workflow alert generates a corresponding voice message."""
+        if created:
+            try:
+                from alerts.models import VoiceAlert
+                from datetime import timedelta
+                # Deduplicate by title & recent window to avoid duplicate voice per recipient in batch notifications
+                recent_window = timezone.now() - timedelta(seconds=15)
+                if not VoiceAlert.objects.filter(title=instance.title, created_at__gte=recent_window).exists():
+                    voice_text = f"{instance.title}. {instance.message}"
+                    VoiceAlert.generate_persistent_voice_alert(
+                        message=voice_text,
+                        title=instance.title,
+                    )
+            except Exception as e:
+                logger.warning(f"[VoiceAlert] CA workflow alert signal voice generation notice: {e}")
+except Exception:
+    pass

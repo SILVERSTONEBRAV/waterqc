@@ -106,11 +106,17 @@ class ChlorineDemandTest(ReviewMixin):
             jar.save(update_fields=['performance_rank', 'is_optimal'])
 
         self.established_dosage_mg_per_l = scored[0].dosage_mg_per_l
-        self.save(update_fields=['established_dosage_mg_per_l'])
+        ChlorineDemandTest.objects.filter(pk=self.pk).update(
+            established_dosage_mg_per_l=scored[0].dosage_mg_per_l
+        )
 
     def save(self, *args, **kwargs):
+        if "update_fields" in kwargs and kwargs["update_fields"] and "established_dosage_mg_per_l" in kwargs["update_fields"]:
+            super().save(*args, **kwargs)
+            return
+
         super().save(*args, **kwargs)
-        if self.jar_results.exists():
+        if self.pk and self.jar_results.exists():
             self.rank_results()
 
 

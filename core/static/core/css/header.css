@@ -13,6 +13,29 @@
     overflow: visible;
 }
 
+/* ===========================================================================
+   NOTIFICATION WRAPPER – gives the bell dropdown the same top-layer
+   painting priority as the user-menu dialog.
+=========================================================================== */
+.notification-wrapper {
+    /* Inherit dropdown-wrapper's isolation/z-index; add explicit stacking */
+    position: relative;
+    z-index: calc(var(--header-z, 2000) + 60);
+}
+
+/* When the panel is open, paint it as a fixed overlay anchored to the header
+   so it clears all dashboard stacking contexts (charts, canvas, etc). */
+.notification-wrapper #notificationDropdown.show {
+    /* Override absolute positioning from .dropdown-menu */
+    position: fixed;
+    top: calc(var(--header-height, 62px) + .45rem);
+    right: 1rem;
+    left: auto;
+    /* Remove the transform that would fight fixed positioning */
+    transform: translateY(0) scale(1);
+}
+
+
 /* ==========================================================================
    BRAND INFO
 ========================================================================== */
@@ -44,6 +67,30 @@
     color: var(--theme-muted);
 
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.header-app-context {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    max-width: 190px;
+    padding: .35rem .6rem;
+    border: 1px solid var(--theme-border);
+    border-radius: 999px;
+    color: var(--theme-muted);
+    font-size: .68rem;
+    font-weight: 650;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.header-app-context i {
+    color: var(--theme-accent);
+}
+
+.header-app-context span {
     overflow: hidden;
     text-overflow: ellipsis;
 }
@@ -136,6 +183,71 @@
     z-index: 20;
 }
 
+/* Shared cross-dashboard notification feed. Alert surfaces use the same
+   urgency vocabulary returned by the permission-scoped notification API. */
+.notification-container .notification-dropdown {
+    width: min(400px, calc(100vw - 1.5rem));
+    padding: 0;
+    overflow-x: hidden;
+}
+
+/* The native hidden attribute must win over the shared dropdown's display rule. */
+.notification-dropdown[hidden] { display: none !important; }
+
+.notification-dropdown .notification-header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    padding: .8rem .9rem;
+    border-bottom: 1px solid var(--theme-border);
+    background: var(--theme-surface-strong);
+    color: var(--theme-text);
+    font-size: .8rem;
+    font-weight: 800;
+}
+
+.notification-header > span:first-child { display: inline-flex; align-items: center; gap: .45rem; }
+.notification-header i { color: var(--theme-accent); }
+.notification-unread-count { color: var(--theme-muted); font-size: .66rem; font-weight: 700; }
+.notification-dropdown .notification-empty { padding: 1.25rem .9rem; color: var(--theme-muted); font-size: .78rem; text-align: center; }
+.notification-dropdown .notification-status { padding: .6rem .85rem; color: #b45309; font-size: .68rem; line-height: 1.4; }
+
+.notification-dropdown .notification-item {
+    --notification-urgency: #1685d5;
+    --notification-tint: rgba(22, 133, 213, .1);
+    display: grid;
+    gap: .35rem;
+    padding: .7rem .85rem;
+    border-bottom: 1px solid var(--theme-border);
+    border-left: 3px solid var(--notification-urgency);
+    background: var(--notification-tint);
+}
+
+.notification-item--expired { --notification-urgency: #dc2626 !important; --notification-tint: rgba(220, 38, 38, .12) !important; }
+.notification-item--almost-expiring { --notification-urgency: #f59e0b !important; --notification-tint: rgba(245, 158, 11, .13) !important; }
+.notification-item--average { --notification-urgency: #1685d5 !important; --notification-tint: rgba(22, 133, 213, .1) !important; }
+.notification-item--new { --notification-urgency: #10b981 !important; --notification-tint: rgba(16, 185, 129, .12) !important; }
+.notification-item-top,.notification-item-actions { display: flex; align-items: center; justify-content: space-between; gap: .6rem; }
+.notification-urgency { color: var(--notification-urgency); font-size: .6rem; font-weight: 850; letter-spacing: .07em; text-transform: uppercase; }
+.notification-item-top time { color: var(--theme-muted); font-size: .62rem; white-space: nowrap; }
+.notification-item-title { color: var(--theme-text); font-size: .76rem; line-height: 1.3; }
+.notification-item-message { color: var(--theme-muted); font-size: .7rem; line-height: 1.4; }
+.notification-item-actions { justify-content: flex-end; margin-top: .1rem; }
+.notification-item-actions .notification-open,.notification-item-actions .notification-ack { display: inline-flex; align-items: center; min-height: 1.7rem; padding: .22rem .5rem; border: 1px solid color-mix(in srgb, var(--notification-urgency) 38%, transparent); border-radius: .45rem; background: color-mix(in srgb, var(--notification-urgency) 9%, transparent); color: var(--notification-urgency); font: inherit; font-size: .65rem; font-weight: 800; text-decoration: none; cursor: pointer; }
+.notification-item-actions .notification-open:hover,.notification-item-actions .notification-ack:hover { background: color-mix(in srgb, var(--notification-urgency) 18%, transparent); }
+.notification-btn.has-alert--expired { border-color: #dc2626; color: #dc2626; }
+.notification-btn.has-alert--almost-expiring { border-color: #f59e0b; color: #d97706; }
+.notification-btn.has-alert--average { border-color: #1685d5; color: #1685d5; }
+.notification-btn.has-alert--new { border-color: #10b981; color: #059669; }
+.notification-btn.has-alert--expired .notification-badge { background: #dc2626; }
+.notification-btn.has-alert--almost-expiring .notification-badge { background: #f59e0b; }
+.notification-btn.has-alert--average .notification-badge { background: #1685d5; }
+.notification-btn.has-alert--new .notification-badge { background: #10b981; }
+
 /* ==========================================================================
    STACKING FIXES
 ========================================================================== */
@@ -151,6 +263,10 @@
 
 @media (max-width: 768px) {
     .company-subtitle {
+        display: none;
+    }
+
+    .header-app-context {
         display: none;
     }
 }
@@ -171,8 +287,315 @@
     }
 }
 
+/* Native dialogs enter the browser top layer, so the account menu stays above
+   dashboards with their own stacking contexts and fullscreen canvases. */
+.user-menu-dialog {
+    color: var(--theme-text);
+    border: 1px solid var(--theme-border);
+    background: var(--theme-surface-strong);
+    box-shadow: 0 24px 80px rgba(2, 12, 30, .38);
+    padding: 0;
+}
+
+.user-menu-dialog:not([open]) {
+    display: none;
+}
+
+.user-menu-dialog {
+    position: fixed;
+    inset: calc(var(--header-height, 62px) + .45rem) 1rem auto auto;
+    width: min(310px, calc(100vw - 1rem));
+    max-height: min(70dvh, 540px);
+    margin: 0;
+    overflow: auto;
+    border-radius: 1rem;
+    animation: userMenuEnter .16s ease-out;
+}
+
+.user-menu-dialog::backdrop {
+    background: rgba(5, 15, 35, .32);
+    backdrop-filter: blur(2px);
+}
+
+.user-menu-card__header {
+    display: flex;
+    align-items: center;
+    gap: .7rem;
+    padding: .85rem .9rem;
+    border-bottom: 1px solid var(--theme-border);
+    background: color-mix(in srgb, var(--theme-accent) 7%, var(--theme-surface-strong));
+}
+
+.user-menu-card__avatar {
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    object-fit: cover;
+    border: 2px solid color-mix(in srgb, var(--theme-accent) 60%, white);
+    border-radius: 50%;
+}
+
+.user-menu-card__identity {
+    min-width: 0;
+    flex: 1;
+}
+
+.user-menu-card__identity h2 {
+    margin: 0;
+    overflow: hidden;
+    color: var(--theme-text);
+    font-size: .88rem;
+    font-weight: 800;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.user-menu-card__identity p {
+    margin: .15rem 0 0;
+    overflow: hidden;
+    color: var(--theme-muted);
+    font-size: .67rem;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.user-menu-card__close {
+    display: grid;
+    width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
+    place-items: center;
+    border: 1px solid var(--theme-border);
+    border-radius: .55rem;
+    background: var(--theme-surface);
+    color: var(--theme-muted);
+    cursor: pointer;
+}
+
+.user-menu-card__close:hover,
+.user-menu-card__close:focus-visible {
+    border-color: var(--theme-accent);
+    color: var(--theme-accent);
+}
+
+.user-menu-actions {
+    display: grid;
+    gap: .12rem;
+    margin: 0;
+    padding: .4rem;
+    list-style: none;
+}
+
+.user-menu-actions li[role="none"] > a,
+.user-menu-actions li[role="none"] > button,
+.user-menu-action {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 36px;
+    gap: .65rem;
+    padding: .5rem .6rem;
+    border: 0;
+    border-radius: .55rem;
+    background: transparent;
+    color: var(--theme-text);
+    font: inherit;
+    font-size: .76rem;
+    font-weight: 650;
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.user-menu-actions li[role="none"] > a:hover,
+.user-menu-actions li[role="none"] > a:focus-visible,
+.user-menu-actions li[role="none"] > button:hover,
+.user-menu-actions li[role="none"] > button:focus-visible {
+    background: color-mix(in srgb, var(--theme-accent) 10%, transparent);
+    color: var(--theme-accent);
+    outline: none;
+}
+
+.user-menu-actions i,
+.user-menu-action i {
+    width: 1rem;
+    color: var(--theme-accent);
+    text-align: center;
+}
+
+.user-menu-divider {
+    height: 1px;
+    margin: .2rem .55rem;
+    background: var(--theme-border);
+}
+
+.user-menu-actions .user-menu-action--logout {
+    color: #dc2626;
+}
+
+.user-menu-actions .user-menu-action--logout i {
+    color: inherit;
+}
+
+.user-menu-trigger {
+    gap: .55rem;
+}
+
+.header-window-close {
+    display: inline-grid;
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+    place-items: center;
+    border: 1px solid var(--theme-border);
+    border-radius: .55rem;
+    background: var(--theme-surface);
+    color: var(--theme-muted);
+    cursor: pointer;
+    transition: color var(--t-fast), border-color var(--t-fast), background var(--t-fast);
+}
+
+.header-window-close:hover,
+.header-window-close:focus-visible {
+    border-color: #dc2626;
+    background: color-mix(in srgb, #dc2626 10%, var(--theme-surface));
+    color: #dc2626;
+    outline: none;
+}
+
+.user-menu-trigger .user-role-label {
+    color: var(--theme-muted);
+    font-size: .62rem;
+}
+
+.user-menu-chevron {
+    color: var(--theme-muted);
+    font-size: .65rem;
+}
+
+@keyframes userMenuEnter {
+    from { opacity: 0; transform: translateY(-5px) scale(.985); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (max-width: 480px) {
+    .user-menu-dialog {
+        inset-inline: .5rem;
+        top: calc(var(--header-height, 62px) + .4rem);
+        width: auto;
+        max-height: calc(100dvh - var(--header-height, 62px) - .8rem);
+    }
+
+}
+
 @media (max-width: 360px) {
     .company-name {
+        display: none;
+    }
+}
+
+/* Shared role-aware identity used by every application header. */
+.user-trigger-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: .12rem;
+    min-width: 0;
+    line-height: 1.15;
+}
+
+.user-role-label {
+    max-width: 180px;
+    overflow: hidden;
+    color: var(--theme-muted);
+    font-size: .68rem;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dropdown-role-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+    margin-top: .55rem;
+}
+
+.dropdown-role-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.4rem;
+    padding: .15rem .5rem;
+    border: 1px solid var(--theme-border);
+    border-radius: 999px;
+    background: var(--theme-surface);
+    color: var(--theme-text);
+    font-size: .68rem;
+    font-weight: 650;
+    line-height: 1.2;
+}
+
+.dropdown-user-scope {
+    display: flex;
+    align-items: flex-start;
+    gap: .4rem;
+    margin-top: .55rem;
+    color: var(--theme-muted);
+    font-size: .72rem;
+    line-height: 1.4;
+}
+
+.dropdown-user-scope i {
+    margin-top: .12rem;
+    color: var(--theme-accent);
+}
+
+.dropdown-scope-values {
+    display: grid;
+    gap: .2rem;
+    min-width: 0;
+}
+
+.dropdown-scope-item {
+    display: flex;
+    gap: .35rem;
+    min-width: 0;
+}
+
+.dropdown-scope-item strong {
+    flex: 0 0 auto;
+    color: var(--theme-text);
+    font-size: .67rem;
+}
+
+.dropdown-scope-item > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.header-login-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .55rem .85rem;
+    border: 1px solid var(--theme-border);
+    border-radius: var(--radius-md);
+    background: var(--theme-surface);
+    color: var(--theme-text);
+    font-weight: 650;
+    text-decoration: none;
+}
+
+.header-login-btn:hover {
+    border-color: var(--theme-accent);
+    color: var(--theme-accent);
+}
+
+@media (max-width: 560px) {
+    .user-role-label {
         display: none;
     }
 }

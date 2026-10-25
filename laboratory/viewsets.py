@@ -1,4 +1,5 @@
 from rest_framework import viewsets, permissions, status
+from core.permissions import ViewModelPermissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
@@ -14,7 +15,7 @@ class LaboratoryViewSet(viewsets.ModelViewSet):
     """
     queryset = Laboratory.objects.select_related('treatment_plant').all()
     serializer_class = LaboratorySerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
     @action(detail=True, methods=['get'], url_path='users')
     def users(self, request, pk=None):

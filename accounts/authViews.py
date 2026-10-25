@@ -1,6 +1,6 @@
 #accounts/authViews.py
 import logging
-import uuid
+
 from django.conf import settings
 from django.utils import timezone
 from django.urls import reverse_lazy
@@ -64,37 +64,158 @@ class CheckUsernameView(View):
 
 
 # =========================================================
-# RESET PASSWORD REQUEST
+# RESET PASSWORD REQUEST  (10-minute expiring signed token)
 # =========================================================
 class ResetPasswordRequestView(View):
+    """
+    Accepts AJAX POST with ``username``.
+    Looks up the user, generates a signed token (10-min TTL),
+    builds a reset URL, and dispatches an HTML email.
+    """
+
+    RESET_TOKEN_MAX_AGE = 600  # 10 minutes in seconds
+
+    @method_decorator(csrf_exempt)
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
     def post(self, request):
         username = request.POST.get("username", "").strip().upper()
 
+        if not username:
+            return JsonResponse({"success": False, "message": "Username is required."})
+
         user = CustomUser.objects.filter(username=username).first()
         if not user:
-            return JsonResponse({"success": False, "message": "User not found."})
+            # Intentionally vague to prevent user enumeration
+            return JsonResponse({"success": True, "message": "If the account exists, a reset email has been sent."})
 
-        token = uuid.uuid4().hex
-        request.session[f"reset_{user.pk}"] = token
+        if not user.email:
+            return JsonResponse({"success": False, "message": "No email address associated with this account. Contact your administrator."})
 
-        reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}&uid={user.pk}"
+        # ── Build signed token with timestamp ──
+        from django.core.signing import TimestampSigner
+        signer = TimestampSigner()
+        token = signer.sign(str(user.pk))
+
+        reset_path = reverse("accounts:password_reset_confirm", kwargs={"token": token})
+        reset_url = request.build_absolute_uri(reset_path)
+
+        # ── Render email ──
+        from django.template.loader import render_to_string
+        from django.utils.html import strip_tags
+
+        context = {
+            "user": user,
+            "reset_url": reset_url,
+            "expiry_minutes": self.RESET_TOKEN_MAX_AGE // 60,
+        }
+        html_message = render_to_string("accounts/emails/password_reset_email.html", context)
+        plain_message = strip_tags(html_message)
 
         try:
             send_mail(
                 subject="Password Reset Request",
-                message=f"Use this link to reset your password:\n{reset_link}",
+                message=plain_message,
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=[user.email],
+                html_message=html_message,
                 fail_silently=False,
             )
-
-            logger.info(f"Password reset requested for {user.username}")
-
-            return JsonResponse({"success": True, "message": "Reset email sent."})
-
+            logger.info("Password reset email sent for user=%s to=%s", user.username, user.email)
         except Exception as e:
-            logger.error(f"Reset email failed for {user.username}: {e}")
-            return JsonResponse({"success": False, "message": "Failed to send email."})
+            logger.error("Password reset email failed for user=%s: %s", user.username, e)
+            return JsonResponse({"success": False, "message": "Failed to send email. Please try again later."})
+
+        # Mask actual email for privacy
+        email = user.email
+        at_idx = email.index("@")
+        masked = email[0] + "***" + email[at_idx - 1:] if at_idx > 1 else email
+        return JsonResponse({"success": True, "message": f"Password reset email sent to {masked}."})
+
+
+# =========================================================
+# PASSWORD RESET CONFIRM  (token-validated form)
+# =========================================================
+class PasswordResetConfirmView(View):
+    """
+    GET  – Validates the signed token (10-min TTL), renders the new-password form.
+    POST – Validates token again, applies the new password.
+    """
+
+    template_name = "accounts/password_reset_confirm.html"
+    RESET_TOKEN_MAX_AGE = 600  # 10 minutes
+
+    def _unsign_token(self, token):
+        """Return (user_pk, error_message) tuple."""
+        from django.core.signing import TimestampSigner, SignatureExpired, BadSignature
+        signer = TimestampSigner()
+        try:
+            user_pk = signer.unsign(token, max_age=self.RESET_TOKEN_MAX_AGE)
+            return user_pk, None
+        except SignatureExpired:
+            return None, "This password reset link has expired (10-minute limit). Please request a new one."
+        except BadSignature:
+            return None, "Invalid password reset link. Please request a new one."
+
+    def get(self, request, token):
+        user_pk, error = self._unsign_token(token)
+        ctx = get_company_context(request)
+        if error:
+            ctx["error"] = error
+            ctx["token_valid"] = False
+        else:
+            ctx["token_valid"] = True
+            ctx["token"] = token
+        return render(request, self.template_name, ctx)
+
+    def post(self, request, token):
+        user_pk, error = self._unsign_token(token)
+        ctx = get_company_context(request)
+
+        if error:
+            ctx["error"] = error
+            ctx["token_valid"] = False
+            return render(request, self.template_name, ctx)
+
+        user = CustomUser.objects.filter(pk=user_pk).first()
+        if not user:
+            ctx["error"] = "User account not found."
+            ctx["token_valid"] = False
+            return render(request, self.template_name, ctx)
+
+        new_password = request.POST.get("new_password", "").strip()
+        confirm_password = request.POST.get("confirm_password", "").strip()
+
+        if not new_password or not confirm_password:
+            ctx["error"] = "Both password fields are required."
+            ctx["token_valid"] = True
+            ctx["token"] = token
+            return render(request, self.template_name, ctx)
+
+        if new_password != confirm_password:
+            ctx["error"] = "Passwords do not match."
+            ctx["token_valid"] = True
+            ctx["token"] = token
+            return render(request, self.template_name, ctx)
+
+        try:
+            validate_password_strength(new_password)
+        except ValidationError as e:
+            ctx["error"] = e.messages[0] if hasattr(e, 'messages') else str(e)
+            ctx["token_valid"] = True
+            ctx["token"] = token
+            return render(request, self.template_name, ctx)
+
+        user.set_password(new_password)
+        user.password_last_set = timezone.now()
+        user.save(update_fields=["password", "password_last_set"])
+
+        logger.info("Password reset completed for user=%s from IP=%s", user.username, get_client_ip(request))
+
+        ctx["success"] = True
+        ctx["token_valid"] = False  # Prevent re-submission
+        return render(request, self.template_name, ctx)
 
 
 # =========================================================
@@ -150,3 +271,32 @@ class ChangePasswordView(LoginRequiredMixin, View):
         context["success"] = "Password changed successfully."
         context["password_changed"] = True
         return render(request, self.template_name, context)
+
+
+class SessionCheckView(View):
+    """
+    Heartbeat endpoint to verify the current session is still valid.
+    Detects if the account was logged into from another computer or terminated.
+    """
+
+    def get(self, request):
+        user = getattr(request, "user", None)
+        if not user or not user.is_authenticated:
+            return JsonResponse({"active": False, "reason": "unauthenticated"}, status=401)
+
+        from django.core.cache import cache
+
+        current_session_key = getattr(request.session, "session_key", None)
+        active_session_key = cache.get(f"active_user_session:{user.pk}")
+
+        if active_session_key and current_session_key and active_session_key != current_session_key:
+            return JsonResponse(
+                {
+                    "active": False,
+                    "reason": "concurrent_login",
+                    "message": "Your account was logged in from another computer.",
+                },
+                status=401,
+            )
+
+        return JsonResponse({"active": True, "username": user.username})

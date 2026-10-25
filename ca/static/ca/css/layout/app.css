@@ -1,23 +1,24 @@
 .ca-app-shell {
-    --ca-current-sidebar-width: var(--ca-sidebar-collapsed-width);
+    --ca-current-sidebar-width: var(--ca-sidebar-width, 272px);
     --ca-current-right-sidebar-width: 0px;
 
     display: flex;
     width: 100%;
     min-width: 0;
     min-height: 100vh;
+    padding-top: var(--header-height, 62px);
     flex-direction: column;
     background: transparent;
 }
 
 .ca-app-shell.is-sidebar-collapsed {
-    --ca-current-sidebar-width: var(--ca-sidebar-collapsed-width);
+    --ca-current-sidebar-width: var(--ca-sidebar-collapsed-width, 68px);
 }
 
 .ca-app-shell.is-sidebar-expanded,
 .ca-app-shell.is-sidebar-hover,
 .ca-app-shell.is-sidebar-collapsed:has(#ca-sidebar:hover) {
-    --ca-current-sidebar-width: var(--ca-sidebar-width);
+    --ca-current-sidebar-width: var(--ca-sidebar-width, 272px);
 }
 
 .ca-app-layout {

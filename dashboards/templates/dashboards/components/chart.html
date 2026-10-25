@@ -26,13 +26,6 @@
 
             <button
                 class="icon-btn"
-                @click="toggleFullscreen"
-            >
-                <i class="fas fa-expand"></i>
-            </button>
-
-            <button
-                class="icon-btn"
                 @click="downloadPNG"
             >
                 <i class="fas fa-image"></i>
@@ -322,32 +315,6 @@
 function chartWidget(id) {
 
     return {
-
-        toggleFullscreen() {
-
-            const card =
-                document
-                .getElementById(
-                    "chart-" + id
-                )
-                .closest(
-                    ".dashboard-widget"
-                );
-
-            card.classList.toggle(
-                "widget-fullscreen"
-            );
-
-            setTimeout(
-                () =>
-                    Plotly.Plots.resize(
-                        document.getElementById(
-                            "chart-" + id
-                        )
-                    ),
-                300
-            );
-        },
 
         downloadPNG() {
             Plotly.downloadImage(

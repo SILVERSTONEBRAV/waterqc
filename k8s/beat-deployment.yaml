@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: beat
-          image: qad-backend:latest
+          image: qad-backend:stable
 
           envFrom:
             - configMapRef:

@@ -98,32 +98,16 @@ class FilteredWaterAnalysis(TimestampedModel):
             raise ValidationError("The selected treatment plant phase does not belong to the specified treatment plant.")
 
     def save(self, *args, **kwargs):
-        is_new = self._state.adding
+        self.clean()
         super().save(*args, **kwargs)
 
-        # 🔁 Auto-generate results only on creation
-        if is_new:
-            filters = WaterFilter.objects.filter(
-                treatment_plant_phase=self.treatment_plant_phase,
-                status=WaterFilterStatus.WORKING.value
-            )
-            limits = FilteredWaterLimit.objects.filter(
-                treatment_plant=self.treatment_plant,
-                water_filter__in=filters
-            )
-            results = [
-                FilteredWaterResults(
-                    analysis=self,
-                    water_filter=limit.water_filter,
-                    parameter=limit,
-                    result_value=0  # or leave null if preferable
-                )
-                for limit in limits
-            ]
-            FilteredWaterResults.objects.bulk_create(results)
-
     def get_parameters(self):
-        filters = WaterFilter.objects.filter(treatment_plant_phase=self.treatment_plant_phase)
+        filters = WaterFilter.objects.filter(
+            phase=self.treatment_plant_phase,
+        ).filter(
+            models.Q(treatment_plant=self.treatment_plant)
+            | models.Q(treatment_plant__isnull=True)
+        )
         parameters = FilteredWaterLimit.objects.filter(
             treatment_plant=self.treatment_plant,
             water_filter__in=filters
@@ -202,6 +186,8 @@ class FilteredWaterResults(TimestampedModel):
     result_value = models.DecimalField(
         max_digits=10,
         decimal_places=2,
+        null=True,
+        blank=True,
         validators=[MinValueValidator(0)],
         help_text="Measured value for this parameter on the specific filter."
     )
@@ -216,7 +202,8 @@ class FilteredWaterResults(TimestampedModel):
         ]
 
     def __str__(self):
-        return f"{self.parameter.parameter.name} on {self.water_filter.name}: {self.result_value}"
+        value = self.result_value if self.result_value is not None else "Pending"
+        return f"{self.parameter.parameter.name} on {self.water_filter.name}: {value}"
 
     def clean(self):
         if self.parameter.treatment_plant != self.analysis.treatment_plant:

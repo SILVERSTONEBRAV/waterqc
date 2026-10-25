@@ -1,19 +1,29 @@
+{% load static %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="day" class="app-fullscreen">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#0f172a">
-    <link rel="manifest" href="{% static 'manifest.json' %}">
+    <meta name="theme-color" content="#417690">
+    <link rel="manifest" href="/manifest.json?v=20261020-enterprise-theme">
+    {% if company.logo %}
+    <link rel="apple-touch-icon" href="{{ company.logo.url }}">
+    <link rel="icon" href="{{ company.logo.url }}">
+    {% elif company.favicon %}
+    <link rel="apple-touch-icon" href="{{ company.favicon.url }}">
+    <link rel="icon" href="{{ company.favicon.url }}">
+    {% else %}
+    <link rel="apple-touch-icon" href="{% static 'image/apple-touch-icon.png' %}">
+    <link rel="icon" href="{% static 'image/logo.ico' %}" type="image/x-icon">
+    {% endif %}
     <meta name="description" content="Water Quality Assurance - Ensuring the quality of water for a healthier future.">
     <meta name="keywords" content="Water, Quality, Assurance, Health, Environment">
     <meta name="author" content="Water Quality Assurance Team">
     <title>{% block title %}Water Quality Assurance{% endblock %}</title>
-
-    {% load static %}
+    <script src="{% static 'core/js/theme.js' %}?v=20261020-enterprise-theme"></script>
 
     <!-- CSS Files -->
     <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
@@ -21,51 +31,19 @@
     <link rel="stylesheet" href="{% static 'css/material.min.css' %}">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     <link rel="stylesheet" href="{% static 'css/styles.css' %}">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/font_awesome/all.min.css' %}">
+    <link rel="stylesheet" href="{% static 'core/css/base.css' %}">
+    <link rel="stylesheet" href="{% static 'core/css/theme.css' %}?v=20261020-enterprise-theme">
+    <link rel="stylesheet" href="{% static 'core/css/app-fullscreen.css' %}?v=20261018-fullscreen">
+    <link rel="stylesheet" href="{% static 'core/css/header.css' %}?v=20261023-standard-alert-center">
+    <link rel="stylesheet" href="{% static 'core/css/dropdown.css' %}">
     {% block extra_css %}{% endblock %}
+    <link rel="stylesheet" href="{% static 'core/css/ca-theme-bridge.css' %}?v=20261020-enterprise-theme">
 
     <!-- Favicon -->
-    <link rel="icon" href="{% static 'image/favicon.ico' %}" type="image/x-icon">
 </head>
-<body>
-    <header>
-        <div class="container">
-            <nav class="navbar navbar-expand-lg navbar-light bg-light" role="navigation">
-                <a class="navbar-brand" href="#">
-                    <img src="{% static 'image/logo.png' %}" alt="Logo" width="30" height="30" class="d-inline-block align-top" loading="lazy">
-                    Water Quality Assurance
-                </a>
-                <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="collapse navbar-collapse" id="navbarNav">
-                    <ul class="navbar-nav ml-auto">
-                        <li class="nav-item">
-                            <a class="nav-link" href="#">Home</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="#">About</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="#">Services</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="#">Contact</a>
-                        </li>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                Username
-                            </a>
-                            <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navbarDropdown">
-                                <a class="dropdown-item" href="#">Change Password</a>
-                                <a class="dropdown-item" href="#">Logout</a>
-                            </div>
-                        </li>
-                    </ul>
-                </div>
-            </nav>
-        </div>
-    </header>
+<body class="app-fullscreen-shell">
+    {% include "accounts/partials/header.html" %}
     <main role="main" class="container">
         {% block content %}{% endblock %}
     </main>
@@ -75,33 +53,20 @@
         </div>
     </footer>
 
-    <!-- JavaScript Files -->
+    <!-- JavaScript Files: Optimized for High Performance -->
     <script src="{% static 'js/jquery.min.js' %}"></script>
-    <script src="{% static 'js/bootstrap.min.js' %}"></script>
+    <script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
     <script src="{% static 'js/flatpickr.min.js' %}"></script>
-    <script src="{% static 'js/material.min.js' %}"></script>
-    <script src="{% static 'js/chart.min.js' %}"></script>
-    <script src="{% static 'js/plotly.min.js' %}"></script>
-    <script src="{% static 'js/react.min.js' %}"></script>
-    <script src="{% static 'js/react-dom.min.js' %}"></script>
-    <script src="{% static 'js/react.production.min.js' %}"></script>
-    <script src="{% static 'js/react-dom.production.min.js' %}"></script>
-    <script src="{% static 'js/react-dom-server.min.js' %}"></script>
-    <script src="{% static 'js/react-with-addons.min.js' %}"></script>
-    <script src="{% static 'js/turbo.js' %}"></script>
-    <script src="{% static 'js/d3.js' %}"></script>
-    <script src="{% static 'js/form.js' %}"></script>
-    <script src="{% static 'js/LoginForm.js' %}"></script>
-    <script src="{% static 'js/PasswordInput.js' %}"></script>
-    <script src="{% static 'js/popper.min.js' %}"></script>
-    <script src="{% static 'js/slim.min.js' %}"></script>
-    <script src="{% static 'core/js/fullscreen.js' %}"></script>
+    <script src="{% static 'core/js/fullscreen.js' %}?v=20261018-first-interaction"></script>
+    <script src="{% static 'core/js/offline-queue.js' %}?v=20261024-offline" defer></script>
+    <script src="{% static 'core/js/pwa.js' %}?v=20261024-pwa" defer></script>
+    <script src="{% static 'core/js/header.js' %}?v=20261023-standard-alert-center" defer></script>
+    <script src="{% static 'core/js/plant_section_user_cascade.js' %}?v=20261024-cascade" defer></script>
     {% block extra_js %}{% endblock %}
 
     <style>
-        body {
-            overflow: hidden;  /* Prevent scroll bars */
-        }
+        body { min-height: 100dvh; }
+        main.container { padding-top: calc(var(--header-height, 62px) + 20px); }
         .container {
             max-width: 1200px;
             margin: 0 auto;

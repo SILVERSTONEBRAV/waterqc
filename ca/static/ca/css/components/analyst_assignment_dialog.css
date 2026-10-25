@@ -1,0 +1,363 @@
+.ca-analyst-assignment-dialog {
+    width: min(44rem, calc(100vw - 2rem));
+    max-width: none;
+    max-height: min(90dvh, 48rem);
+    padding: 0;
+    overflow: hidden;
+    color: var(--ca-text-primary, #122b42);
+    background: transparent;
+    border: 0;
+    border-radius: 1.15rem;
+}
+
+.ca-analyst-assignment-dialog::backdrop {
+    background: rgb(5 16 34 / 62%);
+    backdrop-filter: blur(7px);
+}
+
+.ca-assignment-dialog-shell,
+.ca-assignment-page-dialog {
+    overflow: auto;
+    max-height: min(90dvh, 48rem);
+    color: var(--ca-text-primary, #122b42);
+    background: var(--ca-surface, #fff);
+    border: 1px solid rgb(139 162 190 / 38%);
+    border-radius: 1.15rem;
+    box-shadow: 0 28px 90px rgb(1 14 32 / 38%);
+}
+
+.ca-assignment-dialog-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.25rem 1.35rem 1rem;
+    border-bottom: 1px solid var(--ca-border, #dce5ed);
+    background: linear-gradient(120deg, rgb(4 48 79 / 7%), rgb(84 91 189 / 8%));
+}
+
+.ca-assignment-dialog-header h1,
+.ca-assignment-dialog-header h2 {
+    margin: 0;
+    font-size: clamp(1.1rem, 2vw, 1.35rem);
+    font-weight: 780;
+    letter-spacing: -.025em;
+}
+
+.ca-assignment-eyebrow {
+    margin: 0 0 .35rem;
+    color: #078ba2;
+    font-size: .62rem;
+    font-weight: 800;
+    letter-spacing: .13em;
+}
+
+.ca-assignment-close {
+    display: grid;
+    flex: 0 0 auto;
+    width: 2.35rem;
+    height: 2.35rem;
+    place-items: center;
+    padding: 0;
+    color: var(--ca-text-primary, #122b42);
+    background: var(--ca-surface, #fff);
+    border: 1px solid var(--ca-border, #dce5ed);
+    border-radius: .75rem;
+    font: inherit;
+    font-size: 1.35rem;
+    line-height: 1;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.ca-assignment-dialog-content {
+    overflow: auto;
+    max-height: calc(min(90dvh, 48rem) - 4.4rem);
+}
+
+.ca-assignment-form-content {
+    display: grid;
+    gap: 1rem;
+    padding: 1.15rem 1.35rem 1.3rem;
+}
+
+.ca-assignment-request-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: .6rem;
+}
+
+.ca-assignment-request-summary > div {
+    display: grid;
+    gap: .25rem;
+    min-width: 0;
+    padding: .7rem .8rem;
+    background: var(--ca-surface-raised, #f5f8fb);
+    border: 1px solid var(--ca-border, #dce5ed);
+    border-radius: .75rem;
+}
+
+.ca-assignment-request-summary span {
+    color: var(--ca-text-muted, #64788b);
+    font-size: .66rem;
+    font-weight: 650;
+}
+
+.ca-assignment-request-summary strong {
+    overflow-wrap: anywhere;
+    font-size: .78rem;
+}
+
+.ca-assignment-window {
+    display: flex;
+    align-items: flex-start;
+    gap: .7rem;
+    margin: 0;
+    padding: .8rem .9rem;
+    color: var(--ca-text-primary, #122b42);
+    background: rgb(8 145 178 / 8%);
+    border: 1px solid rgb(8 145 178 / 22%);
+    border-radius: .8rem;
+}
+
+.ca-assignment-window > i {
+    padding-top: .12rem;
+    color: #078ba2;
+}
+
+.ca-assignment-window p,
+.ca-assignment-help {
+    margin: 0;
+    color: var(--ca-text-muted, #64788b);
+    font-size: .76rem;
+    line-height: 1.5;
+}
+
+.ca-assignment-window strong {
+    color: var(--ca-text-primary, #122b42);
+}
+
+.ca-assignment-errors:empty { display: none; }
+
+.ca-assignment-error-panel {
+    display: grid;
+    gap: .25rem;
+    padding: .7rem .85rem;
+    color: #8f1d16;
+    background: #fff4f2;
+    border: 1px solid #f3b8b2;
+    border-left: 3px solid #c0392b;
+    border-radius: .65rem;
+    font-size: .76rem;
+    line-height: 1.45;
+}
+
+.ca-assignment-error-panel strong { font-size: .8rem; }
+.ca-assignment-error-panel ul { margin: 0; padding-left: 1.1rem; }
+
+.ca-assignment-fieldset {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.ca-assignment-fieldset legend {
+    margin-bottom: .35rem;
+    font-size: .9rem;
+    font-weight: 760;
+}
+
+.ca-assignment-count {
+    display: inline-grid;
+    min-width: 1.4rem;
+    height: 1.4rem;
+    margin-left: .25rem;
+    padding: 0 .3rem;
+    place-items: center;
+    color: #087f95;
+    background: rgb(8 145 178 / 10%);
+    border-radius: 999px;
+    font-size: .68rem;
+    vertical-align: .08rem;
+}
+
+.ca-assignment-search {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+    min-height: 2.5rem;
+    margin-top: .65rem;
+    padding: 0 .75rem;
+    color: var(--ca-text-muted, #64788b);
+    background: var(--ca-surface, #fff);
+    border: 1px solid var(--ca-border, #dce5ed);
+    border-radius: .7rem;
+}
+
+.ca-assignment-search:focus-within {
+    border-color: #078ba2;
+    box-shadow: 0 0 0 3px rgb(8 145 178 / 12%);
+}
+
+.ca-assignment-search input {
+    width: 100%;
+    min-width: 0;
+    padding: .45rem 0;
+    color: var(--ca-text-primary, #122b42);
+    background: transparent;
+    border: 0;
+    outline: 0;
+    font: inherit;
+    font-size: .76rem;
+}
+
+.ca-assignment-visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    clip-path: inset(50%);
+}
+
+.ca-assignment-checklist {
+    max-height: 17rem;
+    overflow: auto;
+    margin-top: .7rem;
+    padding: .65rem;
+    background: var(--ca-surface-raised, #f5f8fb);
+    border: 1px solid var(--ca-border, #dce5ed);
+    border-radius: .85rem;
+}
+
+.ca-assignment-checklist ul {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+    gap: .5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.ca-assignment-checklist li { min-width: 0; }
+
+.ca-assignment-checklist label {
+    display: flex;
+    align-items: center;
+    gap: .65rem;
+    min-height: 2.8rem;
+    padding: .55rem .7rem;
+    color: var(--ca-text-primary, #122b42);
+    background: var(--ca-surface, #fff);
+    border: 1px solid var(--ca-border, #dce5ed);
+    border-radius: .65rem;
+    font-size: .78rem;
+    cursor: pointer;
+    transition: border-color .15s ease, background .15s ease, transform .15s ease;
+}
+
+.ca-assignment-checklist li:has(input:checked) label {
+    background: rgb(8 145 178 / 9%);
+    border-color: #0891b2;
+}
+
+.ca-assignment-checklist label:hover { transform: translateY(-1px); }
+
+.ca-assignment-checklist input[type="checkbox"],
+.ca-assignment-confirm input[type="checkbox"] {
+    width: 1.08rem;
+    height: 1.08rem;
+    flex: 0 0 auto;
+    accent-color: #078ba2;
+}
+
+.ca-assignment-confirm label {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    color: var(--ca-text-primary, #122b42);
+    font-size: .76rem;
+}
+
+.ca-assignment-empty,
+.ca-assignment-loading,
+.ca-assignment-no-match {
+    margin: 0;
+    padding: .85rem;
+    color: var(--ca-text-muted, #64788b);
+    font-size: .78rem;
+}
+
+.ca-assignment-error {
+    margin: .4rem 0 0;
+    color: #b42318;
+    font-size: .74rem;
+}
+
+.ca-assignment-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: .6rem;
+    padding-top: .85rem;
+    border-top: 1px solid var(--ca-border, #dce5ed);
+}
+
+.ca-assignment-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.65rem;
+    padding: .6rem .95rem;
+    border: 1px solid transparent;
+    border-radius: .7rem;
+    font: inherit;
+    font-size: .76rem;
+    font-weight: 730;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.ca-assignment-button--quiet {
+    color: var(--ca-text-primary, #122b42);
+    background: var(--ca-surface, #fff);
+    border-color: var(--ca-border, #dce5ed);
+}
+
+.ca-assignment-button--primary {
+    color: #fff;
+    background: linear-gradient(120deg, #087f95, #2563a8);
+    box-shadow: 0 7px 18px rgb(8 127 149 / 20%);
+}
+
+.ca-assignment-button:disabled { opacity: .55; cursor: wait; }
+.ca-assignment-button:focus-visible,
+.ca-assignment-close:focus-visible,
+.ca-assignment-checklist input:focus-visible { outline: 3px solid #22d3ee; outline-offset: 2px; }
+
+.ca-assignment-page-overlay {
+    position: fixed;
+    z-index: 10000;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    background: rgb(5 16 34 / 62%);
+    backdrop-filter: blur(7px);
+}
+
+.ca-assignment-page-dialog { width: min(44rem, calc(100vw - 2rem)); }
+
+@media (max-width: 540px) {
+    .ca-assignment-dialog-header { padding: 1rem; }
+    .ca-assignment-form-content { padding: 1rem; }
+    .ca-assignment-actions { position: sticky; bottom: -1rem; padding: .75rem 0 0; background: var(--ca-surface, #fff); }
+    .ca-assignment-button { flex: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ca-assignment-checklist label { transition: none; }
+}

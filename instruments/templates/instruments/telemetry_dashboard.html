@@ -1,0 +1,18 @@
+{% extends "qc/results/base.html" %}
+{% load static custom_filters %}
+
+{% block title %}Sensor Telemetry Matrix — {{ selected_plant.name|default:"Instruments" }}{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'instruments/css/telemetry_dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="telemetry-dashboard-shell">
+    <!-- Topbar with Treatment Plant Selector, KPIs and Sync Status -->
+    {% include "instruments/partials/_telemetry_topbar.html" %}
+
+    <!-- Real-time Tabular Telemetry Grid -->
+    {% include "instruments/partials/_telemetry_cards.html" %}
+</div>
+{% endblock %}

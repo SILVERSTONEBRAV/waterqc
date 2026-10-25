@@ -225,6 +225,16 @@
         background: rgba(37, 99, 235, .035);
     }
 
+    .batch-table tbody tr.batch-row--highlighted {
+        background: rgba(34, 211, 238, .12);
+        box-shadow: inset 4px 0 0 #06b6d4;
+        scroll-margin-top: 7rem;
+    }
+
+    .dark .batch-table tbody tr.batch-row--highlighted {
+        background: rgba(34, 211, 238, .1);
+    }
+
     .batch-id {
         font-weight: 800;
         color: #2563eb;
@@ -336,7 +346,39 @@
     .row-actions {
         display: flex;
         gap: .35rem;
+        align-items: center;
         justify-content: flex-end;
+        flex-wrap: wrap;
+    }
+
+    .batch-workflow-action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 34px;
+        padding: .45rem .65rem;
+        border: 1px solid #0891b2;
+        border-radius: .55rem;
+        background: #ecfeff;
+        color: #0e7490;
+        font-size: .7rem;
+        font-weight: 800;
+        line-height: 1.2;
+        text-decoration: none;
+        white-space: nowrap;
+        transition: .18s ease;
+    }
+
+    .batch-workflow-action:hover {
+        background: #cffafe;
+        color: #155e75;
+        transform: translateY(-1px);
+    }
+
+    .dark .batch-workflow-action {
+        border-color: rgba(34, 211, 238, .42);
+        background: rgba(8, 145, 178, .16);
+        color: #a5f3fc;
     }
 
     .icon-btn {
@@ -690,7 +732,7 @@
 
                     {% for batch in batches %}
 
-                        <tr>
+                        <tr id="batch-row-{{ batch.pk }}"{% if highlighted_batch_id == batch.pk %} class="batch-row--highlighted"{% endif %}>
 
                             <td>
 
@@ -956,6 +998,19 @@
                                             ✎
                                         </a>
 
+                                    {% endif %}
+
+                                    {% if batch.workflow_action_url %}
+                                        <a href="{{ batch.workflow_action_url }}" class="batch-workflow-action">
+                                            {% if batch.workflow_action_label == "Complete Checklist" %}
+                                                <i class="fa-solid fa-clipboard-check" aria-hidden="true"></i>
+                                            {% elif batch.workflow_action_label == "Start Analysis" %}
+                                                <i class="fa-solid fa-play" aria-hidden="true"></i>
+                                            {% else %}
+                                                <i class="fa-solid fa-flask" aria-hidden="true"></i>
+                                            {% endif %}
+                                            {{ batch.workflow_action_label }}
+                                        </a>
                                     {% endif %}
 
                                 </div>

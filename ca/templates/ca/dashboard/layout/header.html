@@ -236,7 +236,7 @@
             <span class="ca-user-info">
 
                 <strong>
-                    {{ request.user.get_full_name|default:request.user.username }}
+                    {{ request.user.full_name }}
                 </strong>
 
                 <small>
@@ -276,7 +276,7 @@
                 <div>
 
                     <strong>
-                        {{ request.user.get_full_name|default:request.user.username }}
+                        {{ request.user.full_name }}
                     </strong>
 
                     <small>

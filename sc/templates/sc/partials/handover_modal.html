@@ -1,0 +1,242 @@
+{% load static %}
+<!-- Shift Handover & Takeover Modal Component -->
+<div id="shiftHandoverModal" class="shift-modal-overlay" style="display:none;" aria-hidden="true" role="dialog" aria-labelledby="shiftModalTitle">
+    <div class="shift-modal-container">
+        <!-- Modal Header -->
+        <div class="shift-modal-header">
+            <div class="shift-modal-header-left">
+                <span class="shift-modal-badge" id="shiftModalStageBadge">STAGE 1</span>
+                <h3 id="shiftModalTitle" class="shift-modal-title">Shift Handing Over</h3>
+            </div>
+            <button type="button" class="shift-modal-close" data-close-handover-modal aria-label="Close modal">&times;</button>
+        </div>
+
+        <!-- Telemetry Status Bar -->
+        <div class="shift-telemetry-bar">
+            <div class="telemetry-item">
+                <span class="telemetry-label">Treatment Plant:</span>
+                <strong id="modalPlantName">{{ current_plant.name|default:"Ngethu Water Treatment Plant" }}</strong>
+            </div>
+            <div class="telemetry-item">
+                <span class="telemetry-label">Current Shift:</span>
+                <strong id="modalCurrentShiftName">{{ current_shift.name|default:"Morning Shift" }}</strong>
+            </div>
+            <div class="telemetry-item">
+                <span class="telemetry-label">Target Shift:</span>
+                <strong id="modalNextShiftName">{{ next_shift.name|default:"Afternoon Shift" }}</strong>
+            </div>
+            <div class="telemetry-item">
+                <span class="telemetry-label">Handover Window:</span>
+                <span class="window-badge" id="modalWindowBadge">{{ handover_window_time|default:"Active" }}</span>
+            </div>
+        </div>
+
+        <!-- Modal Body Content -->
+        <div class="shift-modal-body">
+            <!-- Alert banner for errors/validation -->
+            <div id="modalAlertBox" class="shift-alert" style="display:none;" role="alert"></div>
+
+            <!-- =======================================================
+                 STAGE 1: SHIFT HANDING OVER FORM (EDITABLE)
+                 ======================================================= -->
+            <form id="shiftHandoverForm" class="shift-stage-container">
+                {% csrf_token %}
+                <input type="hidden" name="shift_id" id="handoverShiftId" value="{{ current_shift.id|default:'' }}">
+                <input type="hidden" name="next_shift_id" id="handoverNextShiftId" value="{{ next_shift.id|default:'' }}">
+
+                <div class="shift-form-grid">
+                    <!-- Outgoing Supervisor -->
+                    <div class="shift-form-group">
+                        <label for="outgoingSupervisorSelect">Outgoing Shift Supervisor <span class="required">*</span></label>
+                        <select id="outgoingSupervisorSelect" name="outgoing_supervisor_id" class="shift-form-control" required>
+                            <option value="{{ request.user.id }}">{{ request.user.get_full_name|default:request.user.username }} (Current User)</option>
+                        </select>
+                        <small class="form-hint">Must belong to active outgoing shift ({{ current_shift.name }}).</small>
+                    </div>
+
+                    <!-- Incoming Supervisor -->
+                    <div class="shift-form-group">
+                        <label for="incomingSupervisorSelect">Incoming Shift Supervisor <span class="required">*</span></label>
+                        <select id="incomingSupervisorSelect" name="incoming_supervisor_id" class="shift-form-control" required>
+                            <option value="">-- Select Incoming Shift Supervisor --</option>
+                        </select>
+                        <small class="form-hint">Only supervisors assigned to {{ next_shift.name|default:"next shift" }} are listed.</small>
+                    </div>
+                </div>
+
+                <!-- Handover Notes -->
+                <div class="shift-form-group">
+                    <label for="handoverNotesText">Shift Operations & Water Treatment Summary <span class="required">*</span></label>
+                    <textarea id="handoverNotesText" name="handover_notes" class="shift-form-control shift-textarea" rows="3" required
+                              placeholder="Detail water treatment throughput, flow rates, clarifier sludge discharge, coagulation dosing (alum/polymer), pre-chlorination, pH adjustments, and filter bed status..."></textarea>
+                </div>
+
+                <!-- Pending Work / Critical Issues -->
+                <div class="shift-form-group">
+                    <label for="pendingWorkText">Pending Work & Unresolved Tasks</label>
+                    <textarea id="pendingWorkText" name="pending_work" class="shift-form-control shift-textarea" rows="2"
+                              placeholder="Specify filters currently backwashing, ongoing equipment maintenance, scheduled laboratory calibration, or pending verification samples..."></textarea>
+                </div>
+
+                <!-- Apparatus & Equipment Condition Checklist -->
+                <div class="shift-form-group">
+                    <label class="section-subtitle"><i class="fa-solid fa-microscope"></i> Apparatus & Plant Equipment Status Verification</label>
+                    <div class="apparatus-table-wrapper">
+                        <table class="apparatus-table" id="apparatusTable">
+                            <thead>
+                                <tr>
+                                    <th>Apparatus / Equipment</th>
+                                    <th>Operational Status</th>
+                                    <th>Remarks / Defect Details</th>
+                                </tr>
+                            </thead>
+                            <tbody id="apparatusTableBody">
+                                <!-- Dynamically populated -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Stage 1 Actions -->
+                <div class="shift-modal-footer">
+                    <button type="button" class="btn-shift-cancel" data-close-handover-modal>Cancel</button>
+                    <button type="submit" id="saveHandoverBtn" class="btn-shift-primary">
+                        <span>Save Handover & Open Taking Over Form</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
+            </form>
+
+            <!-- =======================================================
+                 STAGE 2: SHIFT TAKING OVER FORM (READ-ONLY HANDOVER + TAKEOVER INPUTS)
+                 ======================================================= -->
+            <div id="shiftTakeoverContainer" class="shift-stage-container" style="display:none;">
+                <div class="locked-banner">
+                    <i class="fa-solid fa-lock"></i>
+                    <div>
+                        <strong>Handover Record Sealed</strong>
+                        <span>The outgoing shift details below are locked and non-editable. Review thoroughly before taking over.</span>
+                    </div>
+                </div>
+
+                <!-- Read-Only Handover Details Card -->
+                <div class="locked-card">
+                    <div class="locked-card-header">
+                        <h4><i class="fa-solid fa-clipboard-check"></i> Outgoing Shift Handover Record</h4>
+                        <span class="locked-time-tag" id="lockedTimestamp"></span>
+                    </div>
+                    <div class="locked-card-grid">
+                        <div>
+                            <span class="locked-label">Outgoing Supervisor:</span>
+                            <strong id="lockedOutgoingSup" class="locked-value"></strong>
+                        </div>
+                        <div>
+                            <span class="locked-label">Incoming Supervisor:</span>
+                            <strong id="lockedIncomingSup" class="locked-value"></strong>
+                        </div>
+                        <div>
+                            <span class="locked-label">Plant & Shift:</span>
+                            <span id="lockedPlantShift" class="locked-value"></span>
+                        </div>
+                        <div>
+                            <span class="locked-label">Transition Date:</span>
+                            <span id="lockedDate" class="locked-value"></span>
+                        </div>
+                    </div>
+
+                    <div class="locked-section">
+                        <span class="locked-label">Operational Handover Summary:</span>
+                        <div id="lockedNotes" class="locked-box"></div>
+                    </div>
+
+                    <div class="locked-section">
+                        <span class="locked-label">Pending Operational Work:</span>
+                        <div id="lockedPending" class="locked-box"></div>
+                    </div>
+
+                    <div class="locked-section">
+                        <span class="locked-label">Apparatus & Equipment Verification Status:</span>
+                        <div id="lockedApparatusSummary" class="locked-apparatus-list"></div>
+                    </div>
+                </div>
+
+                <!-- Editable Takeover Section for Incoming Supervisor -->
+                <div class="takeover-action-section">
+                    <h4 class="section-subtitle"><i class="fa-solid fa-user-check"></i> Shift Takeover Acceptance & Remarks</h4>
+
+                    <div class="shift-form-group">
+                        <label for="takeoverNotesText">Incoming Supervisor Acceptance Notes & Observations</label>
+                        <textarea id="takeoverNotesText" class="shift-form-control shift-textarea" rows="2"
+                                  placeholder="Confirm plant inspection, residual chlorine in clearwell, telemetry readings, and accept shift responsibility..."></textarea>
+                    </div>
+
+                    <div class="shift-checklist-group">
+                        <label class="checklist-item">
+                            <input type="checkbox" id="checkPhysicalLog" required checked>
+                            <span>I have physically inspected the plant logbooks, telemetry dashboard, and ongoing treatment processes.</span>
+                        </label>
+                        <label class="checklist-item">
+                            <input type="checkbox" id="checkApparatusVerify" required checked>
+                            <span>I acknowledge the condition of all laboratory apparatus, dosing equipment, and chemical reserves.</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Stage 2 Actions -->
+                <div class="shift-modal-footer">
+                    <button type="button" id="backToHandoverBtn" class="btn-shift-cancel"><i class="fa-solid fa-arrow-left"></i> Back to Handover</button>
+                    <button type="button" id="proceedToAuthBtn" class="btn-shift-success">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        <span>Authorize Shift Takeover (Authenticate)</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===============================================================
+     STAGE 3: SUPERVISOR CREDENTIAL AUTHENTICATION DIALOG
+     =============================================================== -->
+<div id="shiftAuthDialog" class="shift-auth-overlay" style="display:none;" aria-hidden="true" role="dialog" aria-labelledby="shiftAuthTitle">
+    <div class="shift-auth-card">
+        <div class="shift-auth-header">
+            <div class="auth-icon-circle">
+                <i class="fa-solid fa-key"></i>
+            </div>
+            <div>
+                <h4 id="shiftAuthTitle" class="auth-title">Supervisor Authentication</h4>
+                <p class="auth-subtitle">Verify incoming supervisor credentials to seal and effect shift transition.</p>
+            </div>
+            <button type="button" class="auth-close-btn" data-close-auth-dialog aria-label="Cancel authentication">&times;</button>
+        </div>
+
+        <div id="authAlertBox" class="shift-alert shift-alert-danger" style="display:none;" role="alert"></div>
+
+        <form id="shiftAuthForm" class="shift-auth-form">
+            <div class="shift-form-group">
+                <label for="authUsernameInput">Incoming Supervisor Username / PF Number</label>
+                <div class="input-with-icon">
+                    <i class="fa-solid fa-user"></i>
+                    <input type="text" id="authUsernameInput" class="shift-form-control" required readonly>
+                </div>
+            </div>
+
+            <div class="shift-form-group">
+                <label for="authPasswordInput">Password</label>
+                <div class="input-with-icon">
+                    <i class="fa-solid fa-lock"></i>
+                    <input type="password" id="authPasswordInput" class="shift-form-control" required autocomplete="current-password" placeholder="Enter password to sign">
+                </div>
+            </div>
+
+            <div class="auth-button-group">
+                <button type="button" class="btn-shift-cancel" data-close-auth-dialog>Cancel</button>
+                <button type="submit" id="confirmTransitionBtn" class="btn-shift-confirm">
+                    <i class="fa-solid fa-check-double"></i>
+                    <span>Verify & Effect Shift Transition</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

@@ -81,7 +81,7 @@
             return;
         }
 
-        let state = shell.dataset.sidebarState || "expanded";
+        let state = shell.dataset.sidebarState || "collapsed";
 
         try {
             state = localStorage.getItem(storageKey) || state;
@@ -140,6 +140,22 @@
             sidebar.addEventListener("mouseleave", () => {
                 if (isMobile()) return;
                 hoverTimer = setTimeout(() => {
+                    shell.classList.remove("is-sidebar-hover");
+                    sidebar.classList.remove("is-hover-expanded");
+                }, 120);
+            });
+
+            sidebar.addEventListener("focusin", () => {
+                if (isMobile() || !shell.classList.contains("is-sidebar-collapsed")) return;
+                clearTimeout(hoverTimer);
+                shell.classList.add("is-sidebar-hover");
+                sidebar.classList.add("is-hover-expanded");
+            });
+
+            sidebar.addEventListener("focusout", () => {
+                if (isMobile()) return;
+                hoverTimer = setTimeout(() => {
+                    if (sidebar.contains(document.activeElement)) return;
                     shell.classList.remove("is-sidebar-hover");
                     sidebar.classList.remove("is-hover-expanded");
                 }, 120);

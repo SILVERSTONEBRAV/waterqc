@@ -1,0 +1,242 @@
+{% load static %}
+
+<div class="scada-tab-pane" id="pane-fleet">
+    <!-- Fleet Header -->
+    <div style="background: var(--scada-panel); border: 1px solid var(--scada-border); border-radius: 8px; padding: 0.85rem 1.25rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+        <div>
+            <h4 style="font-size: 0.95rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--scada-text-main); margin: 0 0 0.2rem 0;">
+                <i class="fa-solid fa-tower-broadcast" style="color: var(--scada-cyan); margin-right: 0.4rem;"></i> Gateway & Instrument Fleet Diagnostics
+            </h4>
+            <div style="font-size: 0.74rem; color: var(--scada-text-muted);">
+                Comprehensive telemetry fleet overview. Monitor deployed instruments, sensor probe health, calibration expiry, and data acquisition pipeline status.
+            </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            {% if telemetry_kpis %}
+            <div class="scada-kpi-chip kpi-success">
+                <i class="fa-solid fa-signal"></i>
+                <span>Active Sensors:</span>
+                <span class="kpi-val">{{ telemetry_kpis.total_sensors }}</span>
+            </div>
+            <div class="scada-kpi-chip kpi-cyan">
+                <i class="fa-solid fa-microchip"></i>
+                <span>Instruments:</span>
+                <span class="kpi-val">{{ fleet_instruments|length }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Telemetry KPIs Summary Row -->
+    {% if telemetry_kpis %}
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.85rem; margin-bottom: 1.25rem;">
+        <!-- Overall Health -->
+        <div style="background: var(--scada-panel); border: 1px solid var(--scada-border); border-radius: 10px; padding: 1rem; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+            <div style="font-size: 0.65rem; color: var(--scada-text-muted); text-transform: uppercase; font-weight: 700; margin-bottom: 0.3rem;">Fleet Health</div>
+            <div style="font-family: var(--scada-mono-font); font-size: 1.8rem; font-weight: 800; color: {% if telemetry_kpis.overall_health_pct >= 80 %}#34d399{% elif telemetry_kpis.overall_health_pct >= 50 %}#fbbf24{% else %}#f87171{% endif %};">
+                {{ telemetry_kpis.overall_health_pct }}%
+            </div>
+        </div>
+
+        <!-- Operational -->
+        <div style="background: var(--scada-panel); border: 1px solid var(--scada-border); border-radius: 10px; padding: 1rem; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+            <div style="font-size: 0.65rem; color: var(--scada-text-muted); text-transform: uppercase; font-weight: 700; margin-bottom: 0.3rem;">Operational</div>
+            <div style="font-family: var(--scada-mono-font); font-size: 1.8rem; font-weight: 800; color: #34d399;">
+                {{ telemetry_kpis.operational_sensors }}
+            </div>
+        </div>
+
+        <!-- Warning -->
+        <div style="background: var(--scada-panel); border: 1px solid var(--scada-border); border-radius: 10px; padding: 1rem; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+            <div style="font-size: 0.65rem; color: var(--scada-text-muted); text-transform: uppercase; font-weight: 700; margin-bottom: 0.3rem;">Stale / Warning</div>
+            <div style="font-family: var(--scada-mono-font); font-size: 1.8rem; font-weight: 800; color: #fbbf24;">
+                {{ telemetry_kpis.warning_sensors }}
+            </div>
+        </div>
+
+        <!-- Danger / Offline -->
+        <div style="background: var(--scada-panel); border: 1px solid var(--scada-border); border-radius: 10px; padding: 1rem; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+            <div style="font-size: 0.65rem; color: var(--scada-text-muted); text-transform: uppercase; font-weight: 700; margin-bottom: 0.3rem;">Offline / Danger</div>
+            <div style="font-family: var(--scada-mono-font); font-size: 1.8rem; font-weight: 800; color: #f87171;">
+                {{ telemetry_kpis.danger_sensors }}
+            </div>
+        </div>
+
+        <!-- Total Sensors -->
+        <div style="background: var(--scada-panel); border: 1px solid var(--scada-border); border-radius: 10px; padding: 1rem; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+            <div style="font-size: 0.65rem; color: var(--scada-text-muted); text-transform: uppercase; font-weight: 700; margin-bottom: 0.3rem;">Total Sensors</div>
+            <div style="font-family: var(--scada-mono-font); font-size: 1.8rem; font-weight: 800; color: #38bdf8;">
+                {{ telemetry_kpis.total_sensors }}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Instrument Fleet Table -->
+    <div style="background: var(--scada-panel); border: 1px solid var(--scada-border); border-radius: 10px; overflow: hidden; box-shadow: 0 6px 25px rgba(0,0,0,0.4);">
+        <div style="padding: 0.85rem 1.25rem; background: var(--scada-panel-surface); border-bottom: 1px solid var(--scada-border); display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fa-solid fa-server" style="color: var(--scada-cyan);"></i>
+                <span style="font-weight: 800; font-size: 0.88rem; letter-spacing: 0.04em; color: #ffffff; text-transform: uppercase;">
+                    Deployed Instrument Fleet
+                </span>
+            </div>
+            <span style="font-size: 0.72rem; color: var(--scada-text-muted);">
+                {{ fleet_instruments|length }} instruments deployed at {{ selected_plant.name|default:"—" }}
+            </span>
+        </div>
+
+        <div style="overflow-x: auto;">
+            <table class="scada-recon-table">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">#</th>
+                        <th>Instrument / Gateway</th>
+                        <th>Phase / Location</th>
+                        <th>Status</th>
+                        <th>Sensors</th>
+                        <th>Last Calibration</th>
+                        <th>Calibration Status</th>
+                        <th>Serial / Model</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for instr in fleet_instruments %}
+                    <tr>
+                        <td style="font-family: var(--scada-mono-font); font-size: 0.72rem; color: #64748b;">{{ forloop.counter }}</td>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 0.6rem;">
+                                <div style="width: 32px; height: 32px; border-radius: 6px; background: rgba(56,189,248,0.15); display: flex; align-items: center; justify-content: center; color: #38bdf8; font-size: 0.85rem;">
+                                    <i class="fa-solid fa-microchip"></i>
+                                </div>
+                                <div>
+                                    <div style="font-weight: 700; color: #f1f5f9; font-size: 0.85rem;">{{ instr.name }}</div>
+                                    <div style="font-size: 0.68rem; color: #64748b;">{{ instr.instrument_type|default:"—" }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span style="color: #cbd5e1; font-weight: 600;">{{ instr.phase.name|default:"Unassigned" }}</span>
+                        </td>
+                        <td>
+                            {% if instr.status == "operational" or instr.status == "OPERATIONAL" %}
+                            <span class="recon-badge badge-synch"><i class="fa-solid fa-circle-check"></i> Operational</span>
+                            {% elif instr.status == "maintenance" or instr.status == "MAINTENANCE" %}
+                            <span class="recon-badge badge-drift"><i class="fa-solid fa-wrench"></i> Maintenance</span>
+                            {% else %}
+                            <span class="recon-badge badge-offline"><i class="fa-solid fa-power-off"></i> {{ instr.get_status_display|default:instr.status|default:"Offline" }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div style="display: flex; flex-wrap: wrap; gap: 0.35rem;">
+                                {% for sensor in instr.sensors.all %}
+                                <span style="background: rgba(56,189,248,0.1); color: #38bdf8; border: 1px solid rgba(56,189,248,0.3); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.68rem; font-weight: 700;">
+                                    {{ sensor.name|truncatechars:20 }}
+                                </span>
+                                {% empty %}
+                                <span style="font-size: 0.72rem; color: #64748b; font-style: italic;">No sensors</span>
+                                {% endfor %}
+                            </div>
+                        </td>
+                        <td>
+                            {% with latest_cal=instr.calibrations.all|first %}
+                            {% if latest_cal %}
+                            <span style="font-family: var(--scada-mono-font); font-size: 0.78rem; color: #cbd5e1;">
+                                {{ latest_cal.calibration_date|date:"d M Y" }}
+                            </span>
+                            {% else %}
+                            <span style="font-size: 0.72rem; color: #f87171; font-style: italic;">Never calibrated</span>
+                            {% endif %}
+                            {% endwith %}
+                        </td>
+                        <td>
+                            {% with latest_cal=instr.calibrations.all|first %}
+                            {% if latest_cal and latest_cal.next_calibration_date %}
+                                {% if latest_cal.is_overdue %}
+                                <span class="recon-badge badge-mismatch"><i class="fa-solid fa-clock"></i> Overdue</span>
+                                {% else %}
+                                <span class="recon-badge badge-synch"><i class="fa-solid fa-check"></i> Valid</span>
+                                {% endif %}
+                            {% else %}
+                            <span class="recon-badge badge-offline"><i class="fa-solid fa-question"></i> Unknown</span>
+                            {% endif %}
+                            {% endwith %}
+                        </td>
+                        <td>
+                            <div style="font-family: var(--scada-mono-font); font-size: 0.72rem; color: #94a3b8;">
+                                {{ instr.serial_number|default:"—" }}
+                            </div>
+                            <div style="font-size: 0.65rem; color: #475569;">
+                                {{ instr.model|default:"" }}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" style="text-align: center; color: var(--scada-text-muted); padding: 2.5rem;">
+                            <i class="fa-solid fa-tower-broadcast" style="font-size: 2rem; margin-bottom: 0.5rem; display: block; color: #475569;"></i>
+                            No instruments deployed at this plant. Configure instruments in the Instruments app.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Telemetry Stage Matrix (from instruments app) -->
+    {% if telemetry_matrix %}
+    <div style="margin-top: 1.5rem;">
+        <div style="margin-bottom: 0.6rem; display: flex; align-items: center; justify-content: space-between;">
+            <h4 style="font-size: 0.88rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--scada-text-main); margin: 0;">
+                <i class="fa-solid fa-table-cells" style="color: var(--scada-cyan); margin-right: 0.4rem;"></i> Live Sensor Telemetry Matrix
+            </h4>
+            <span style="font-size: 0.72rem; color: var(--scada-text-muted);">{{ telemetry_matrix|length }} stages active</span>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+            {% for stage_group in telemetry_matrix %}
+            <div style="background: var(--scada-panel); border: 1px solid var(--scada-border); border-radius: 10px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+                <div style="padding: 0.65rem 1rem; background: var(--scada-panel-surface); border-bottom: 1px solid var(--scada-border);">
+                    <span style="font-weight: 800; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.04em; color: #ffffff;">
+                        {{ stage_group.stage_label }}
+                    </span>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="scada-recon-table">
+                        <thead>
+                            <tr>
+                                <th>Phase</th>
+                                {% for param_name in stage_group.parameter_names %}
+                                <th style="text-align: center;">{{ param_name }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in stage_group.rows %}
+                            <tr>
+                                <td style="font-weight: 700; color: #f1f5f9;">{{ row.phase_name }}</td>
+                                {% for param_uuid in stage_group.parameter_uuids %}
+                                <td style="text-align: center;">
+                                    {% with cell=row.cells %}
+                                    {% if cell %}
+                                    <span class="scada-val-cell sensor-val-color" style="font-size: 0.88rem;">
+                                        {{ cell|default:"—" }}
+                                    </span>
+                                    {% else %}
+                                    <span class="delta-muted">—</span>
+                                    {% endif %}
+                                    {% endwith %}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>

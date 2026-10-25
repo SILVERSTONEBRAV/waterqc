@@ -1,37 +1,48 @@
 {% load custom_filters %}
 
-<!-- Dashboard Topbars Wrapper -->
+<!-- Dashboard Topbars Wrapper (JS telemetry refresh only — no auto HTMX every-Ns) -->
 <div id="dashboard-topbars"
      class="dashboard-topbars-wrapper"
-     hx-get="{{ request.path }}?partial=topbar{% if plant %}&plant={{ plant.pk }}{% endif %}{% if request.GET.date %}&date={{ request.GET.date }}{% endif %}"
-     hx-trigger="every 60s"
-     hx-swap="outerHTML">
+     data-topbar-url="{{ request.path }}?partial=topbar{% if plant %}&plant={{ plant.pk }}{% endif %}{% if request.GET.date %}&date={{ request.GET.date }}{% endif %}">
 
-    <!-- Raw Water Parameters Topbar (Real-time Ticker) -->
+    <!-- Current approved dosing and phase chemical concentration ticker -->
     <div id="raw-water-topbar" class="raw-water-topbar">
         <div class="topbar-label">
-            <span class="pulse-dot"></span>
-            Raw Water Live
+            {% if request.user.is_superuser or perms.qc.view_wateranalysis or perms.filtered_water.view_filteredwateranalysis or perms.microbial.view_microbialanalysis or perms.heavy_metal.view_heavymetalanalysis %}
+            <a class="topbar-report-link" href="{% url 'qc:reports' %}{% if plant %}?plant={{ plant.pk }}{% endif %}" title="Open advanced water quality reports"><i class="fa-solid fa-file-lines" aria-hidden="true"></i> Reports</a>
+            {% endif %}
+            <span class="topbar-context-label">Current Treatment</span>
         </div>
 
         <div class="topbar-ticker" id="raw-water-ticker">
-            {% if raw_water_params %}
-                {% for param in raw_water_params %}
-                <div class="param-chip {% if param.abnormal %}abnormal{% endif %}"
-                     title="{{ param.name }}: {{ param.display_value }} {{ param.unit }}{% if param.spec %} (Spec: {{ param.spec }}){% endif %}">
-                    <span class="param-label">{{ param.short_name }}</span>
-                    <span class="param-value">{{ param.display_value }}</span>
-                    {% if param.unit %}
-                    <span class="param-unit">{{ param.unit }}</span>
-                    {% endif %}
+            {% for dosage in current_dosages %}
+                <div class="param-chip" title="{{ dosage.detail }}">
+                    <span class="param-label">{{ dosage.label }}</span>
+                    <span class="param-value">{{ dosage.value_display|default:"—" }}</span>
+                    <span class="param-unit">{{ dosage.unit }}</span>
                 </div>
-                {% endfor %}
-            {% else %}
+            {% endfor %}
+            {% for phase in phase_concentrations %}
+                {% if phase.items %}
+                    {% for item in phase.items %}
+                    <div class="param-chip" title="{{ item.tank }} · {{ item.measured_at|date:'d M Y H:i' }}">
+                        <span class="param-label">{{ phase.name }} · {{ item.chemical }}</span>
+                        <span class="param-value">{{ item.value_display|default:"—" }}</span>
+                        <span class="param-unit">{{ item.unit }}</span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="param-chip" title="No current chemical concentration is recorded for this phase.">
+                        <span class="param-label">{{ phase.name }}</span>
+                        <span class="param-value">No concentration</span>
+                    </div>
+                {% endif %}
+            {% empty %}
                 <div class="param-chip">
-                    <span class="param-label">Status</span>
-                    <span class="param-value" style="color:#64748b;">Awaiting raw water telemetry…</span>
+                    <span class="param-label">Phase concentrations</span>
+                    <span class="param-value">No phases configured</span>
                 </div>
-            {% endif %}
+            {% endfor %}
         </div>
 
         <div class="topbar-time">
@@ -40,14 +51,14 @@
         </div>
     </div>
 
-    <!-- Active Analysis Metadata Topbar -->
-    {% if cards %}
+    <!-- Active Analysis Metadata Topbar (stays even if card partial is refreshing) -->
+    {% if cards or current_analysis or current_time_label %}
     {% with card=cards.0 %}
     <div id="analysis-topbar" class="analysis-meta-topbar">
         <div class="meta-left">
             <div class="analysis-badge">
                 <i class="fa-solid fa-flask"></i>
-                <span>{{ card.time_label }} Cycle</span>
+                <span>{{ card.time_label|default:current_time_label|default:"Current" }} Cycle</span>
             </div>
             {% if current_analysis %}
             <span class="ref-pill">
@@ -55,7 +66,7 @@
             </span>
             {% endif %}
             <span class="water-type-pill">
-                {{ card.water_type|title|default:"Treatment" }}
+                {{ card.water_type|default:"Treatment"|title }}
             </span>
         </div>
 

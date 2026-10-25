@@ -1,0 +1,663 @@
+/* ==============================================================================
+   SCADA QUALITY CONTROL & SENSOR TELEMETRY COMMAND CENTER
+   Ultra-advanced, multi-tabbed cyber-industrial monitoring dashboard
+   ============================================================================== */
+
+:root {
+  --scada-bg: #070b14;
+  --scada-panel: #0d1526;
+  --scada-panel-surface: #111c33;
+  --scada-border: #1e2e4f;
+  --scada-border-bright: #2e4474;
+  --scada-cyan: #38bdf8;
+  --scada-emerald: #10b981;
+  --scada-amber: #f59e0b;
+  --scada-rose: #ef4444;
+  --scada-violet: #8b5cf6;
+  --scada-text-main: #f8fafc;
+  --scada-text-muted: #94a3b8;
+  --scada-mono-font: "JetBrains Mono", Consolas, "Courier New", monospace;
+}
+
+/* Base Dashboard Shell */
+.scada-dashboard-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--scada-bg);
+  color: var(--scada-text-main);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif;
+  overflow-x: hidden;
+}
+
+/* SCADA Top Command Bar */
+.scada-topbar {
+  background: var(--scada-panel);
+  border-bottom: 1px solid var(--scada-border);
+  padding: 0.65rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
+}
+
+.scada-brand-group {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.scada-logo-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--scada-cyan);
+  text-transform: uppercase;
+}
+
+.scada-logo-icon {
+  font-size: 1.25rem;
+  color: var(--scada-cyan);
+  animation: radar-spin 12s linear infinite;
+}
+
+@keyframes radar-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Scope Selector Pill */
+.scada-scope-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--scada-panel-surface);
+  border: 1px solid var(--scada-border);
+  padding: 0.25rem 0.65rem;
+  border-radius: 8px;
+}
+
+.scada-scope-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--scada-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.scada-plant-select,
+.scada-date-input {
+  background: #090e1a;
+  color: #ffffff;
+  border: 1px solid var(--scada-border-bright);
+  border-radius: 6px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+}
+
+.scada-plant-select:focus,
+.scada-date-input:focus {
+  border-color: var(--scada-cyan);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
+}
+
+/* Topbar Health & Status Ticker */
+.scada-telemetry-kpis {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.scada-kpi-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(17, 28, 51, 0.85);
+  border: 1px solid var(--scada-border);
+  padding: 0.25rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.76rem;
+}
+
+.scada-kpi-chip .kpi-val {
+  font-family: var(--scada-mono-font);
+  font-weight: 700;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+}
+
+.kpi-success .kpi-val { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+.kpi-warning .kpi-val { background: rgba(245, 158, 11, 0.25); color: #fbbf24; }
+.kpi-danger .kpi-val { background: rgba(239, 68, 68, 0.25); color: #f87171; }
+.kpi-cyan .kpi-val { background: rgba(56, 189, 248, 0.2); color: #38bdf8; }
+
+/* Status Banner */
+.status-nominal { background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; color: #34d399; }
+.status-warning { background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; color: #fbbf24; }
+.status-critical { background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #f87171; animation: pulse-critical 2s infinite; }
+
+@keyframes pulse-critical {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
+  70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+/* SCADA Controls Right */
+.scada-controls-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.scada-live-pulse {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--scada-emerald);
+  background: rgba(16, 185, 129, 0.1);
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.pulse-beacon {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--scada-emerald);
+  box-shadow: 0 0 8px var(--scada-emerald);
+  animation: pulse-beacon-anim 1.6s infinite;
+}
+
+@keyframes pulse-beacon-anim {
+  0% { transform: scale(0.9); opacity: 0.8; }
+  50% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.8; }
+}
+
+.scada-btn-icon {
+  background: var(--scada-panel-surface);
+  border: 1px solid var(--scada-border);
+  color: var(--scada-text-main);
+  padding: 0.3rem 0.7rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: all 0.15s ease;
+}
+
+.scada-btn-icon:hover {
+  background: #1e2e4f;
+  border-color: var(--scada-cyan);
+  color: var(--scada-cyan);
+}
+
+/* ==============================================================================
+   MULTI-TAB SCADA NAVIGATION BAR
+   ============================================================================== */
+.scada-nav-tabs-wrapper {
+  background: #090e1a;
+  border-bottom: 2px solid var(--scada-border);
+  padding: 0.25rem 1.25rem 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  overflow-x: auto;
+}
+
+.scada-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.15rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--scada-text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  position: relative;
+}
+
+.scada-tab-btn:hover {
+  color: var(--scada-text-main);
+  background: rgba(17, 28, 51, 0.5);
+}
+
+.scada-tab-btn.active {
+  color: #ffffff;
+  background: var(--scada-panel);
+  border-color: var(--scada-border-bright) var(--scada-border-bright) transparent;
+  box-shadow: 0 -3px 12px rgba(0, 242, 254, 0.15);
+}
+
+.scada-tab-btn.active::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #00f2fe, #4facfe);
+  border-radius: 8px 8px 0 0;
+}
+
+.scada-tab-badge {
+  font-size: 0.68rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 9999px;
+  font-weight: 700;
+}
+
+.badge-alert { background: #ef4444; color: #ffffff; }
+.badge-warning { background: #f59e0b; color: #000000; }
+.badge-info { background: #38bdf8; color: #000000; }
+
+/* ==============================================================================
+   TAB 1: SCADA PROCESS PIPELINE (FLOW OVERVIEW)
+   ============================================================================== */
+.scada-workspace-content {
+  flex: 1;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.scada-pipeline-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.85rem;
+  align-items: stretch;
+}
+
+.scada-stage-node {
+  background: var(--scada-panel);
+  border: 1px solid var(--scada-border);
+  border-radius: 10px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.35);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s, border-color 0.2s;
+}
+
+.scada-stage-node:hover {
+  transform: translateY(-2px);
+  border-color: var(--scada-cyan);
+}
+
+.stage-node-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.stage-node-title {
+  font-weight: 800;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--scada-cyan);
+}
+
+.stage-health-meter {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
+.stage-health-num {
+  font-family: var(--scada-mono-font);
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+
+.stage-node-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  color: var(--scada-text-muted);
+  margin-top: 0.5rem;
+}
+
+.stage-stat-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.stage-stat-row strong {
+  color: var(--scada-text-main);
+  font-family: var(--scada-mono-font);
+}
+
+/* ==============================================================================
+   TAB 2: RECONCILIATION & COMPARATIVE MATRIX TABLE
+   ============================================================================== */
+.scada-reconciliation-card {
+  background: var(--scada-panel);
+  border: 1px solid var(--scada-border);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 6px 25px rgba(0, 0, 0, 0.4);
+}
+
+.reconciliation-card-header {
+  padding: 0.85rem 1.25rem;
+  background: var(--scada-panel-surface);
+  border-bottom: 1px solid var(--scada-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.scada-recon-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.scada-recon-table th {
+  background: #090e1a;
+  color: var(--scada-text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid var(--scada-border);
+}
+
+.scada-recon-table td {
+  padding: 0.75rem 0.85rem;
+  border-bottom: 1px solid #162238;
+  vertical-align: middle;
+  font-size: 0.82rem;
+}
+
+.scada-recon-table tr:hover td {
+  background: rgba(17, 28, 51, 0.6);
+}
+
+/* Values Styling */
+.scada-val-cell {
+  font-family: var(--scada-mono-font);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.sensor-val-color { color: #38bdf8; }
+.manual-val-color { color: #a78bfa; }
+
+.scada-delta-cell {
+  font-family: var(--scada-mono-font);
+  font-weight: 700;
+}
+
+.delta-success { color: #34d399; }
+.delta-warning { color: #fbbf24; }
+.delta-danger { color: #f87171; }
+.delta-muted { color: #64748b; }
+
+/* Status Badges */
+.recon-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.badge-synch { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
+.badge-drift { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
+.badge-mismatch { background: rgba(239, 68, 68, 0.25); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.5); }
+.badge-pending { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
+.badge-offline { background: rgba(100, 116, 139, 0.2); color: #94a3b8; border: 1px solid rgba(100, 116, 139, 0.3); }
+
+/* Variance Bar Visual */
+.variance-bar-wrap {
+  width: 90px;
+  height: 6px;
+  background: #1e293b;
+  border-radius: 9999px;
+  overflow: hidden;
+  margin-top: 0.25rem;
+}
+
+.variance-bar-fill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.4s ease;
+}
+
+/* Advisory Alert Box */
+.recon-advisory-box {
+  font-size: 0.72rem;
+  color: var(--scada-text-muted);
+  max-width: 280px;
+  line-height: 1.35;
+}
+
+.recon-advisory-box.critical-advisory {
+  color: #fca5a5;
+  font-weight: 600;
+}
+
+/* ==============================================================================
+   TAB 5: SCADA ALARMS & ANOMALY SENTINEL RADAR
+   ============================================================================== */
+.scada-alarms-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 1rem;
+}
+
+.scada-alarm-card {
+  background: var(--scada-panel);
+  border: 1px solid var(--scada-border);
+  border-radius: 10px;
+  padding: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  position: relative;
+  overflow: hidden;
+}
+
+.alarm-card-critical {
+  border-left: 4px solid #ef4444 !important;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, var(--scada-panel) 100%);
+}
+
+.alarm-card-warning {
+  border-left: 4px solid #f59e0b !important;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, var(--scada-panel) 100%);
+}
+
+.alarm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+
+.alarm-title {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.alarm-metrics-strip {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin: 0.6rem 0;
+  padding: 0.5rem;
+  background: #090e1a;
+  border-radius: 6px;
+  font-family: var(--scada-mono-font);
+  font-size: 0.82rem;
+}
+
+.alarm-advisory {
+  margin-top: 0.5rem;
+  font-size: 0.76rem;
+  color: #cbd5e1;
+  background: rgba(15, 23, 42, 0.7);
+  padding: 0.5rem 0.65rem;
+  border-radius: 6px;
+  border-left: 2px solid var(--scada-cyan);
+}
+
+/* ==============================================================================
+   TAB PANE VISIBILITY CONTROLLER
+   ============================================================================== */
+.scada-tab-pane-wrapper {
+  display: none;
+}
+
+.scada-tab-pane-wrapper.scada-pane-active {
+  display: block;
+  animation: scada-pane-fadein 0.3s ease;
+}
+
+@keyframes scada-pane-fadein {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ==============================================================================
+   ALARM FILTER BUTTONS
+   ============================================================================== */
+.scada-alarm-filter.active {
+  background: var(--scada-cyan) !important;
+  color: #000 !important;
+  border-color: var(--scada-cyan) !important;
+  font-weight: 700;
+}
+
+/* ==============================================================================
+   FLEET DIAGNOSTICS GAUGE CARDS
+   ============================================================================== */
+.scada-fleet-gauge {
+  background: var(--scada-panel);
+  border: 1px solid var(--scada-border);
+  border-radius: 10px;
+  padding: 1rem;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s, border-color 0.2s;
+}
+
+.scada-fleet-gauge:hover {
+  transform: translateY(-2px);
+  border-color: var(--scada-cyan);
+}
+
+/* ==============================================================================
+   SCAN-LINE OVERLAY (FUTURISTIC EFFECT)
+   ============================================================================== */
+.scada-dashboard-shell::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+}
+
+/* ==============================================================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================================================== */
+@media (max-width: 768px) {
+  .scada-topbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  .scada-pipeline-strip {
+    grid-template-columns: 1fr;
+  }
+  .scada-alarms-grid {
+    grid-template-columns: 1fr;
+  }
+  .scada-nav-tabs-wrapper {
+    padding: 0.25rem 0.5rem 0;
+    gap: 0.25rem;
+  }
+  .scada-tab-btn {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.72rem;
+  }
+  .scada-tab-btn span:not(.scada-tab-badge) {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .scada-workspace-content {
+    padding: 0.75rem;
+  }
+}
+
+/* ==============================================================================
+   SCROLLBAR CUSTOMIZATION (SCADA THEME)
+   ============================================================================== */
+.scada-dashboard-shell ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scada-dashboard-shell ::-webkit-scrollbar-track {
+  background: #0d1526;
+}
+
+.scada-dashboard-shell ::-webkit-scrollbar-thumb {
+  background: #2e4474;
+  border-radius: 9999px;
+}
+
+.scada-dashboard-shell ::-webkit-scrollbar-thumb:hover {
+  background: #38bdf8;
+}

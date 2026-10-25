@@ -1,23 +1,17 @@
 {% extends "core/base/base.html" %}
 {% load static %}
 
-{% block title %}
-    NCWSCwaterLAB - Accounts
-{% endblock %}
-
-{% block header %}
-    {% include "accounts/partials/header.html" %}
-{% endblock %}
 
 {% block extra_styles %}
 {% endblock %}
 
-{% block sidebar %}
-    {% include "jartest/partials/sidebar.html" %}
-{% endblock %}
 
 {% block content %}
+<div class="app-shell">
+  <div class="app-content">
     {% block page_content %}{% endblock %}
+  </div>
+</div>
 {% endblock %}
 
 {% block modals %}

@@ -1,0 +1,104 @@
+/* QAD palette and company branding for the native Django admin layout. */
+:root {
+  --admin-ink: var(--theme-text, #182230);
+  --admin-muted: var(--theme-muted, #596579);
+  --admin-surface: var(--theme-surface, #fff);
+  --admin-wash: var(--theme-bg, #f4f6f8);
+  --admin-line: var(--theme-border, #d0d5dd);
+  --admin-accent: var(--theme-accent, #417690);
+  --admin-accent-hover: var(--theme-accent-hover, #315a6e);
+  --admin-soft: var(--theme-accent-soft, rgba(65, 118, 144, .1));
+
+  /* Feed the same semantic palette into Django's existing admin components. */
+  --primary: var(--theme-accent-hover, #315a6e);
+  --secondary: var(--theme-accent, #417690);
+  --accent: var(--theme-accent, #417690);
+  --primary-fg: var(--theme-on-accent, #fff);
+  --body-fg: var(--theme-text, #182230);
+  --body-bg: var(--theme-surface, #fff);
+  --body-quiet-color: var(--theme-muted, #596579);
+  --body-medium-color: var(--theme-text-secondary, #344054);
+  --body-loud-color: var(--theme-text, #182230);
+  --header-color: var(--theme-text, #182230);
+  --header-branding-color: var(--theme-accent, #417690);
+  --header-bg: var(--topbar-bg, #fff);
+  --header-link-color: var(--theme-accent, #417690);
+  --breadcrumbs-fg: var(--theme-muted, #596579);
+  --breadcrumbs-link-fg: var(--theme-accent, #417690);
+  --breadcrumbs-bg: var(--theme-surface-muted, #f2f4f7);
+  --link-fg: var(--theme-accent, #417690);
+  --link-hover-color: var(--theme-accent-hover, #315a6e);
+  --link-selected-fg: var(--theme-accent, #417690);
+  --hairline-color: var(--theme-border, #d0d5dd);
+  --border-color: var(--theme-border-strong, #98a2b3);
+  --error-fg: var(--color-danger, #b42318);
+  --message-debug-bg: var(--theme-surface-muted, #f2f4f7);
+  --message-info-bg: var(--theme-accent-soft, rgba(65, 118, 144, .1));
+  --message-success-bg: color-mix(in srgb, var(--color-success, #067647) 14%, var(--theme-surface, #fff));
+  --message-warning-bg: color-mix(in srgb, var(--color-warning, #8a4b08) 16%, var(--theme-surface, #fff));
+  --message-error-bg: color-mix(in srgb, var(--color-danger, #b42318) 12%, var(--theme-surface, #fff));
+  --darkened-bg: var(--theme-surface-muted, #f2f4f7);
+  --selected-bg: var(--theme-accent-soft, rgba(65, 118, 144, .1));
+  --selected-row: var(--theme-accent-soft, rgba(65, 118, 144, .1));
+  --button-fg: var(--theme-on-accent, #fff);
+  --button-bg: var(--theme-accent, #417690);
+  --button-hover-bg: var(--theme-accent-hover, #315a6e);
+  --default-button-bg: var(--theme-accent, #417690);
+  --default-button-hover-bg: var(--theme-accent-hover, #315a6e);
+  --close-button-bg: var(--theme-muted, #596579);
+  --close-button-hover-bg: var(--theme-text-secondary, #344054);
+  --delete-button-bg: var(--color-danger, #b42318);
+  --delete-button-hover-bg: color-mix(in srgb, var(--color-danger, #b42318) 82%, #000);
+  --object-tools-fg: var(--theme-on-accent, #fff);
+  --object-tools-bg: var(--theme-accent, #417690);
+  --object-tools-hover-bg: var(--theme-accent-hover, #315a6e);
+}
+
+body { background-color: var(--admin-wash) !important; color: var(--admin-ink) !important; }
+a { color: var(--admin-accent); }
+a:hover { color: var(--admin-accent-hover); }
+
+/* Brand/header only: retain Django's native header and utility layout. */
+#header { background: var(--topbar-bg, var(--admin-surface)) !important; color: var(--admin-ink) !important; border-bottom: 1px solid var(--admin-line); }
+#header #branding { display: flex; align-items: center; gap: 16px; }
+#site-name { margin: 0; font-size: inherit; }
+.qad-admin-brand { display: inline-flex; align-items: center; gap: 10px; color: var(--admin-ink) !important; text-decoration: none; }
+.qad-admin-brand:hover { color: var(--admin-ink) !important; }
+.qad-admin-brand__logo { display: block; width: 38px; height: 38px; object-fit: contain; padding: 3px; border: 1px solid var(--admin-line); border-radius: 10px; background: var(--admin-surface); }
+.qad-admin-brand__copy { display: grid; gap: 2px; }
+.qad-admin-brand__copy strong { color: var(--admin-ink); font-size: var(--font-size-sm); font-weight: 700; }
+.qad-admin-brand__copy small { color: var(--admin-muted); font-size: var(--font-size-xs); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+#user-tools, #user-tools a, #user-tools button { color: var(--admin-ink) !important; }
+#user-tools a:hover { color: var(--admin-accent) !important; }
+#user-tools .theme-toggle { display: none; }
+.qad-theme-button { display: inline-grid; width: 34px; height: 34px; place-items: center; border: 1px solid var(--admin-line); border-radius: 9px; background: var(--admin-surface); color: var(--admin-accent); cursor: pointer; font-size: 17px; }
+.qad-theme-button:hover { border-color: var(--admin-accent); background: var(--admin-soft); }
+
+/* Palette colors on Django's existing navigation, content, and controls. */
+#nav-sidebar { background: var(--admin-surface); border-color: var(--admin-line); color: var(--admin-ink); }
+#nav-sidebar #nav-filter { background: var(--admin-wash); color: var(--admin-ink); border-color: var(--admin-line); }
+#nav-sidebar .module caption a.section { color: var(--admin-muted); }
+#nav-sidebar .module th a, #nav-sidebar .module th { color: var(--admin-ink); }
+#nav-sidebar .module tr.current-model { background: var(--admin-soft); }
+#nav-sidebar .module tr.current-model th a { color: var(--admin-accent); }
+#content, #content h1, #content h2, #content h3, #content label { color: var(--admin-ink); }
+.breadcrumbs { background: var(--admin-surface); color: var(--admin-muted); border-color: var(--admin-line); }
+.module, .inline-group, #changelist, #changelist-filter, .delete-confirmation { background: var(--admin-surface); border-color: var(--admin-line); color: var(--admin-ink); }
+.module h2, .module caption, .inline-group h2, #changelist-filter h2,
+#result_list thead th { background: var(--table-header-bg, var(--theme-surface-muted)); color: var(--admin-ink); }
+#result_list td, #result_list th, .module td, .module th { border-color: var(--admin-line); color: var(--admin-ink); }
+#result_list tbody tr, #result_list tbody tr:nth-child(odd) { background: var(--admin-surface); }
+#result_list tbody tr:hover { background: var(--admin-soft); }
+.form-row, .submit-row { border-color: var(--admin-line); }
+.form-row label, .aligned label { color: var(--admin-ink); }
+input:not([type=checkbox]):not([type=radio]), textarea, select { background: var(--input-bg, var(--admin-surface)); color: var(--admin-ink); border-color: var(--admin-line); }
+input:focus, textarea:focus, select:focus { border-color: var(--admin-accent); outline-color: var(--admin-accent); }
+input[type=submit], input[type=button], .button, a.button, .object-tools a { background: var(--admin-accent); color: var(--theme-on-accent, #fff); border-color: var(--admin-accent); }
+input[type=submit]:hover, input[type=button]:hover, .button:hover, a.button:hover, .object-tools a:hover { background: var(--admin-accent-hover); color: var(--theme-on-accent, #fff); }
+.messagelist li { background: var(--admin-surface); color: var(--admin-ink); border-color: var(--admin-line); }
+
+@media (max-width: 720px) {
+  .qad-admin-brand__copy small { display: none; }
+  .qad-admin-brand__copy strong { max-width: 42vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+

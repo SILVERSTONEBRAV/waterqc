@@ -1,0 +1,218 @@
+/* Shared CA / QCA form language. All color is resolved through the active app theme. */
+:root {
+    --ca-form-glow: color-mix(in srgb, var(--theme-accent, #0284c7) 18%, transparent);
+    --ca-form-panel: var(--theme-surface, #fff);
+    --ca-form-panel-soft: var(--theme-surface-muted, #f3f7fb);
+    --ca-form-border: var(--theme-border, #d8e4ef);
+    --ca-form-border-strong: var(--theme-border-strong, #b9cede);
+    --ca-form-text: var(--theme-text, #142033);
+    --ca-form-muted: var(--theme-muted, #62738a);
+    --ca-form-accent: var(--theme-accent, #0284c7);
+    --ca-form-accent-strong: var(--theme-accent-hover, #0369a1);
+}
+
+/* Baseline control polish for every Chemical Analysis page form. */
+#ca-main .ca-page form:not(.ca-scope-form):not(.ca-modal-form) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), select, textarea),
+#ca-main .ca-page form:not(.ca-scope-form):not(.ca-modal-form) .form-control,
+#ca-main .ca-page form:not(.ca-scope-form):not(.ca-modal-form) .form-select {
+    max-width: 100%;
+    min-width: 0;
+    border: 1px solid var(--ca-form-border-strong);
+    border-radius: 10px;
+    background: var(--theme-surface-strong, var(--ca-form-panel));
+    color: var(--ca-form-text);
+    box-shadow: 0 1px 2px rgb(15 23 42 / .035);
+    transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+#ca-main .ca-page form:not(.ca-scope-form):not(.ca-modal-form) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), select, .form-control, .form-select) {
+    min-height: 40px;
+    padding: 8px 11px;
+}
+
+#ca-main .ca-page form:not(.ca-scope-form):not(.ca-modal-form) textarea {
+    min-height: 92px;
+    padding: 10px 11px;
+    resize: vertical;
+}
+
+#ca-main .ca-page form:not(.ca-scope-form):not(.ca-modal-form) :is(input, select, textarea):focus-visible,
+#ca-main .ca-page form:not(.ca-scope-form):not(.ca-modal-form) :is(.form-control, .form-select):focus {
+    border-color: var(--ca-form-accent);
+    outline: 0;
+    box-shadow: 0 0 0 3px var(--ca-form-glow), 0 5px 16px color-mix(in srgb, var(--ca-form-glow) 45%, transparent);
+}
+
+#ca-main .ca-page form:not(.ca-scope-form):not(.ca-modal-form) input[type="checkbox"],
+#ca-main .ca-page form:not(.ca-scope-form):not(.ca-modal-form) input[type="radio"] {
+    accent-color: var(--ca-form-accent);
+}
+
+#ca-main .ca-page form:not(.ca-scope-form):not(.ca-modal-form) :is(label, .form-label, .ca-field-label) {
+    color: var(--ca-form-text);
+}
+
+#ca-main .ca-page form:not(.ca-scope-form):not(.ca-modal-form) :is(.helptext, .form-text, small) {
+    color: var(--ca-form-muted);
+}
+
+.ca-workflow-task {
+    --ca-form-radius: 18px;
+    width: min(100%, 1120px);
+    margin-inline: auto;
+}
+
+.ca-form-hero {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 14px 22px;
+    align-items: center;
+    margin: 0 0 14px;
+    padding: 18px 20px 14px;
+    overflow: hidden;
+    border: 1px solid var(--ca-form-border);
+    border-radius: var(--ca-form-radius);
+    background:
+        radial-gradient(ellipse at 92% 0%, color-mix(in srgb, var(--ca-form-accent) 12%, transparent), transparent 38%),
+        linear-gradient(135deg, var(--ca-form-panel), var(--ca-form-panel-soft));
+    box-shadow: 0 8px 26px rgb(15 23 42 / .055), inset 0 1px 0 rgb(255 255 255 / .55);
+}
+
+.ca-form-hero::before {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    content: "";
+    background: linear-gradient(180deg, var(--ca-form-accent), color-mix(in srgb, var(--ca-form-accent) 32%, transparent));
+}
+
+.ca-form-hero__identity { display: flex; min-width: 0; align-items: center; gap: 14px; }
+.ca-form-orbit {
+    display: grid;
+    width: 48px;
+    height: 48px;
+    flex: 0 0 48px;
+    place-items: center;
+    border: 1px solid color-mix(in srgb, var(--ca-form-accent) 32%, var(--ca-form-border));
+    border-radius: 15px;
+    background: linear-gradient(145deg, color-mix(in srgb, var(--ca-form-accent) 15%, var(--ca-form-panel)), var(--ca-form-panel));
+    color: var(--ca-form-accent);
+    box-shadow: 0 0 24px var(--ca-form-glow), inset 0 1px 0 rgb(255 255 255 / .6);
+    font-size: 1.15rem;
+}
+.ca-form-hero__copy { min-width: 0; }
+.ca-form-eyebrow { margin: 0 0 4px; color: var(--ca-form-accent); font-size: .67rem; font-weight: 800; letter-spacing: .12em; line-height: 1.4; text-transform: uppercase; }
+.ca-form-eyebrow span { color: var(--ca-form-muted); }
+.ca-form-hero h1 { margin: 0; color: var(--ca-form-text); font-size: clamp(1.35rem, 2.6vw, 1.9rem); font-weight: 780; letter-spacing: -.045em; line-height: 1.1; }
+.ca-form-subtitle { margin: 5px 0 0; color: var(--ca-form-muted); font-size: .82rem; }
+.ca-form-utility { display: inline-flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid var(--ca-form-border); border-radius: 10px; color: var(--ca-form-text); font-size: .76rem; font-weight: 700; text-decoration: none; transition: border-color 160ms ease, color 160ms ease, background 160ms ease; }
+.ca-form-utility:hover { border-color: var(--ca-form-accent); background: var(--ca-form-glow); color: var(--ca-form-accent-strong); }
+.ca-form-context { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 7px; padding-top: 11px; border-top: 1px solid var(--ca-form-border); }
+.ca-context-chip { display: inline-flex; min-height: 26px; align-items: center; gap: 6px; padding: 4px 9px; border: 1px solid var(--ca-form-border); border-radius: 999px; background: color-mix(in srgb, var(--ca-form-panel) 78%, transparent); color: var(--ca-form-muted); font-size: .68rem; font-weight: 700; }
+.ca-context-chip i { color: var(--ca-form-accent); }
+.ca-context-chip--live { color: var(--ca-form-text); }
+.ca-status-pulse { width: 7px; height: 7px; border-radius: 50%; background: #16a36a; box-shadow: 0 0 0 3px rgb(22 163 106 / .13), 0 0 10px rgb(22 163 106 / .3); }
+
+.ca-advanced-form-panel {
+    overflow: hidden;
+    border: 1px solid var(--ca-form-border);
+    border-radius: var(--ca-form-radius, 18px);
+    background: var(--ca-form-panel);
+    box-shadow: 0 12px 34px rgb(15 23 42 / .065), inset 0 1px 0 rgb(255 255 255 / .55);
+}
+.ca-advanced-form-panel__header { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--ca-form-border); background: linear-gradient(100deg, var(--ca-form-panel-soft), var(--ca-form-panel)); }
+.ca-advanced-form-panel__mark { display: grid; width: 38px; height: 38px; flex: 0 0 38px; place-items: center; border: 1px solid color-mix(in srgb, var(--ca-form-accent) 28%, var(--ca-form-border)); border-radius: 12px; background: var(--ca-form-glow); color: var(--ca-form-accent); }
+.ca-advanced-form-panel__header h2 { margin: 0; color: var(--ca-form-text); font-size: 1.02rem; font-weight: 780; letter-spacing: -.025em; }
+.ca-advanced-form-panel__header p:last-child { margin: 3px 0 0; color: var(--ca-form-muted); font-size: .75rem; }
+.ca-advanced-form-panel__header .ca-form-eyebrow { margin-bottom: 2px; }
+.ca-required-note { margin-left: auto; color: var(--ca-form-muted); font-size: .68rem; white-space: nowrap; }
+.ca-required-note span, .ca-required-star { color: var(--ca-form-accent); font-weight: 800; }
+.ca-advanced-form { padding: 15px 18px 0; }
+.ca-form-sections { display: grid; gap: 12px; }
+.ca-form-section { overflow: hidden; border: 1px solid var(--ca-form-border); border-radius: 13px; background: var(--ca-form-panel); }
+.ca-form-section__heading { display: flex; align-items: center; gap: 10px; padding: 10px 13px; border-bottom: 1px solid var(--ca-form-border); background: linear-gradient(90deg, var(--ca-form-panel-soft), color-mix(in srgb, var(--ca-form-panel) 82%, transparent)); }
+.ca-form-section__icon { display: grid; width: 30px; height: 30px; flex: 0 0 30px; place-items: center; border-radius: 9px; background: var(--ca-form-glow); color: var(--ca-form-accent); font-size: .78rem; }
+.ca-form-section__heading h3 { margin: 0; color: var(--ca-form-text); font-size: .81rem; font-weight: 780; }
+.ca-form-section__heading p { margin: 2px 0 0; color: var(--ca-form-muted); font-size: .68rem; }
+.ca-form-section__index { margin-left: auto; color: var(--ca-form-accent); font-family: var(--ca-font-mono, monospace); font-size: .68rem; font-weight: 800; letter-spacing: .08em; }
+.ca-workflow-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 12px; padding: 13px; }
+.ca-workflow-field { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
+.ca-workflow-field--wide { grid-column: span 2; }
+.ca-workflow-field > label { margin: 0; color: var(--ca-form-text); font-size: .7rem; font-weight: 730; line-height: 1.35; }
+.ca-workflow-field :is(input:not([type="checkbox"]), select, textarea) { width: 100%; min-height: 36px; padding: 7px 9px; border: 1px solid var(--ca-form-border-strong); border-radius: 9px; background: var(--theme-surface-strong, var(--ca-form-panel)); color: var(--ca-form-text); font-size: .76rem; box-shadow: 0 1px 2px rgb(15 23 42 / .035); }
+.ca-workflow-field textarea { min-height: 66px; resize: vertical; }
+.ca-workflow-field :is(input, select, textarea):focus-visible { border-color: var(--ca-form-accent); outline: 0; box-shadow: 0 0 0 3px var(--ca-form-glow); }
+.ca-workflow-field--check { justify-content: center; min-height: 39px; padding: 8px 10px; border: 1px solid var(--ca-form-border); border-radius: 10px; background: var(--ca-form-panel-soft); }
+.ca-workflow-check-label { display: flex; min-height: 20px; align-items: center; gap: 8px; margin: 0; color: var(--ca-form-text); cursor: pointer; font-size: .7rem; font-weight: 660; line-height: 1.35; }
+.ca-workflow-check-label input { width: 16px; height: 16px; flex: 0 0 16px; margin: 0; accent-color: var(--ca-form-accent); }
+.ca-workflow-fields--safety { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.ca-workflow-fields--safety .ca-workflow-field--wide { grid-column: span 2; }
+.ca-workflow-fields--safety .ca-workflow-field:not(.ca-workflow-field--check) { grid-column: span 2; }
+.ca-form-help { color: var(--ca-form-muted); font-size: .67rem; line-height: 1.4; }
+.ca-field-errors { color: var(--theme-danger, #b42318); font-size: .7rem; }
+.ca-field-errors ul { margin: 0; padding-left: 17px; }
+.ca-form-error-summary { display: flex; align-items: flex-start; gap: 9px; margin: 0 0 12px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--theme-danger, #dc2626) 36%, transparent); border-radius: 11px; background: color-mix(in srgb, var(--theme-danger, #dc2626) 8%, var(--ca-form-panel)); color: var(--theme-danger, #b42318); font-size: .76rem; }
+.ca-form-error-summary p { margin: 0 0 3px; }
+.ca-form-error-summary p:last-child { margin-bottom: 0; }
+.ca-form-notices { display: grid; gap: 8px; margin: 0 0 12px; }
+.ca-form-notice { display: flex; align-items: flex-start; gap: 9px; padding: 10px 12px; border: 1px solid color-mix(in srgb, #b7791f 34%, transparent); border-radius: 11px; background: color-mix(in srgb, #f6ad36 11%, var(--ca-form-panel)); color: var(--ca-form-text); font-size: .76rem; }
+.ca-form-notice > i { margin-top: 2px; color: #b7791f; }
+.ca-advanced-form__footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; padding: 12px 2px 14px; border-top: 1px solid var(--ca-form-border); }
+.ca-advanced-form__footer > span { display: inline-flex; align-items: center; gap: 7px; color: var(--ca-form-muted); font-size: .67rem; }
+.ca-advanced-form__footer > span i { color: var(--ca-form-accent); }
+.ca-form-actions { display: flex; align-items: center; gap: 8px; }
+.ca-form-button { display: inline-flex; min-height: 37px; align-items: center; justify-content: center; gap: 8px; padding: 8px 13px; border: 1px solid transparent; border-radius: 10px; cursor: pointer; font: inherit; font-size: .74rem; font-weight: 760; text-decoration: none; transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease; }
+.ca-form-button:hover { transform: translateY(-1px); }
+.ca-form-button--secondary { border-color: var(--ca-form-border-strong); background: var(--ca-form-panel); color: var(--ca-form-text); }
+.ca-form-button--primary { background: linear-gradient(130deg, var(--ca-form-accent), var(--ca-form-accent-strong)); color: #fff; box-shadow: 0 5px 14px var(--ca-form-glow); }
+.ca-form-button--primary:hover { box-shadow: 0 8px 20px var(--ca-form-glow); }
+.ca-form-button:focus-visible, .ca-form-utility:focus-visible { outline: 3px solid var(--ca-form-glow); outline-offset: 2px; }
+
+/* QCA analytical cards: retain the dense worksheet while sharing the same theme, controls and elevation. */
+.excel-form { color: var(--theme-text, #142033); }
+.excel-form .cards-grid-workspace { gap: 11px; }
+.excel-form .excel-card { overflow: hidden; border: 1px solid var(--theme-border, #d8e4ef); border-radius: 15px; background: var(--theme-surface, #fff); box-shadow: 0 10px 28px rgb(15 23 42 / .07), inset 0 1px 0 rgb(255 255 255 / .55); }
+.excel-form .card-cycle-body { background: var(--theme-surface, #fff); }
+.excel-form .stage-section { border-color: var(--theme-border, #d8e4ef); background: var(--theme-surface, #fff); }
+.excel-form .stage-left-rail { background: linear-gradient(160deg, var(--theme-surface-muted, #f3f7fb), var(--theme-surface, #fff)); border-color: var(--theme-border, #d8e4ef); }
+.excel-form .stage-pill-wrap { color: var(--theme-text, #142033); }
+.excel-form .excel-wrapper { border-color: var(--theme-border, #d8e4ef); border-radius: 11px; background: var(--theme-surface, #fff); }
+.excel-form .excel-table { background: var(--theme-surface, #fff); color: var(--theme-text, #142033); }
+.excel-form .excel-th { border-color: var(--theme-border, #d8e4ef); background: linear-gradient(180deg, var(--theme-surface, #fff), var(--theme-surface-muted, #f3f7fb)); color: var(--theme-text-secondary, #334155); }
+.excel-form .excel-cell { border-color: var(--theme-border, #d8e4ef); color: var(--theme-text, #142033); }
+.excel-form .excel-row:nth-child(even) .excel-cell { background: color-mix(in srgb, var(--theme-surface-muted, #f3f7fb) 54%, var(--theme-surface, #fff)); }
+.excel-form .excel-row:hover .excel-cell { background: var(--theme-accent-soft, rgba(2,132,199,.1)); }
+.excel-form .excel-input { min-height: 30px; padding: 4px 6px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--theme-text, #142033); }
+.excel-form .excel-input:hover { border-color: var(--theme-border-strong, #b9cede); background: var(--theme-surface, #fff); }
+.excel-form .excel-input:focus { border-color: var(--theme-accent, #0284c7); outline: 0; background: var(--theme-surface-strong, #fff); box-shadow: 0 0 0 3px var(--ca-form-glow); }
+.excel-form .excel-input.form-control-success { border-color: color-mix(in srgb, var(--theme-success, #16a36a) 38%, transparent); background: color-mix(in srgb, var(--theme-success, #16a36a) 8%, var(--theme-surface, #fff)); }
+.excel-form .excel-input.form-control-danger { border-color: color-mix(in srgb, var(--theme-danger, #dc2626) 45%, transparent); background: color-mix(in srgb, var(--theme-danger, #dc2626) 9%, var(--theme-surface, #fff)); }
+.excel-form .analysis-meta-topbar, .excel-form .result-topbar { border: 1px solid var(--theme-border, #d8e4ef); border-radius: 12px; background: linear-gradient(110deg, var(--theme-surface, #fff), var(--theme-surface-muted, #f3f7fb)); color: var(--theme-text, #142033); }
+.excel-form .dashboard-panel-footer { position: sticky; z-index: 15; bottom: 0; padding: 9px 12px; border: 1px solid var(--theme-border, #d8e4ef); border-radius: 13px; background: color-mix(in srgb, var(--theme-surface, #fff) 92%, transparent); color: var(--theme-text, #142033); box-shadow: 0 -8px 24px rgb(15 23 42 / .08); backdrop-filter: blur(12px); }
+.excel-form .hint-status, .excel-form .footer-hints { color: var(--theme-muted, #62738a); }
+.excel-form .btn-futuristic { border: 0; border-radius: 10px; background: linear-gradient(130deg, var(--theme-accent, #0284c7), var(--theme-accent-hover, #0369a1)); color: #fff; box-shadow: 0 5px 14px var(--ca-form-glow); }
+.excel-form .btn-glass { border: 1px solid var(--theme-border-strong, #b9cede); border-radius: 10px; background: var(--theme-surface, #fff); color: var(--theme-text, #142033); }
+.excel-form .empty-dashboard-card { border: 1px solid var(--theme-border, #d8e4ef); border-radius: 15px; background: radial-gradient(ellipse at 50% 0%, var(--theme-accent-soft, rgba(2,132,199,.1)), transparent 65%), var(--theme-surface, #fff); color: var(--theme-text, #142033); }
+
+@media (max-width: 900px) {
+    .ca-workflow-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ca-workflow-fields--safety { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 620px) {
+    .ca-form-hero { grid-template-columns: 1fr; gap: 10px; padding: 14px; }
+    .ca-form-hero__identity { align-items: flex-start; }
+    .ca-form-orbit { width: 40px; height: 40px; flex-basis: 40px; border-radius: 12px; }
+    .ca-form-utility { justify-self: start; }
+    .ca-form-context { grid-column: 1; }
+    .ca-advanced-form-panel__header { align-items: flex-start; padding: 12px; }
+    .ca-advanced-form { padding: 11px 10px 0; }
+    .ca-workflow-fields, .ca-workflow-fields--safety { grid-template-columns: 1fr; padding: 10px; }
+    .ca-workflow-field--wide, .ca-workflow-fields--safety .ca-workflow-field--wide, .ca-workflow-fields--safety .ca-workflow-field:not(.ca-workflow-field--check) { grid-column: auto; }
+    .ca-advanced-form__footer { align-items: flex-start; flex-direction: column; }
+    .ca-form-actions { width: 100%; }
+    .ca-form-actions > * { flex: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .ca-form-utility, .ca-form-button, .ca-workflow-field :is(input, select, textarea) { transition: none; }
+}

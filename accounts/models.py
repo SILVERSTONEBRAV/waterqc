@@ -364,6 +364,33 @@ class CustomUser(
     USERNAME_FIELD = "username"
     REQUIRED_FIELDS = ["email"]
 
+    def has_perm(self, perm, obj=None):
+        """Give active superusers full access and reserve delete perms to them."""
+        if not self.is_active:
+            return False
+        if self.is_superuser:
+            return True
+        if isinstance(perm, str):
+            _, separator, codename = perm.partition(".")
+            if separator and codename.startswith("delete_"):
+                return False
+        return super().has_perm(perm, obj=obj)
+
+    def has_module_perms(self, app_label):
+        if self.is_active and self.is_superuser:
+            return True
+        return super().has_module_perms(app_label)
+
+    def get_all_permissions(self, obj=None):
+        permissions = super().get_all_permissions(obj)
+        if self.is_active and self.is_superuser:
+            return permissions
+        return {
+            permission
+            for permission in permissions
+            if not permission.partition(".")[2].startswith("delete_")
+        }
+
     # ======================================================
     # META
     # ======================================================
@@ -446,10 +473,28 @@ class CustomUser(
                 self.mobile_number
             )
 
+        # Plant and Section Integrity
+        if self.section_id and self.assigned_treatment_plant_id:
+            sec_plant_id = getattr(self.section, "treatment_plant_id", None)
+            if sec_plant_id and sec_plant_id != self.assigned_treatment_plant_id:
+                raise ValidationError({
+                    "section": (
+                        f"Section '{self.section.name}' belongs to plant '{self.section.treatment_plant.name}', "
+                        f"which conflicts with user's assigned plant '{self.assigned_treatment_plant.name}'."
+                    )
+                })
+        elif self.section_id and not self.assigned_treatment_plant_id:
+            sec_plant = getattr(self.section, "treatment_plant", None)
+            if sec_plant:
+                self.assigned_treatment_plant = sec_plant
+
     # ======================================================
     # SAVE
     # ======================================================
     def save(self, *args, **kwargs):
+        if self.is_superuser:
+            self.is_staff = True
+
         if self.username:
             self.username = (
                 self.username.upper().strip()
@@ -509,6 +554,10 @@ class CustomUser(
             f"{self.first_name} "
             f"{self.last_name}"
         ).strip() or self.username
+
+    def get_full_name(self):
+        """Provide Django's standard user name API for workflow integrations."""
+        return self.full_name
 
     @property
     def short_name(self):

@@ -1517,10 +1517,11 @@
 
                                     <td>
                                         <a
-                                            href="{{ urls.processes }}?id={{ row.id }}"
+                                            href="{{ row.action_url }}"
                                             class="ca-btn ca-btn--small"
+                                            title="{{ row.action_title }}"
                                         >
-                                            Inspect
+                                            {% if row.action_title == "Open process" %}Inspect{% else %}Continue workflow{% endif %}
                                         </a>
                                     </td>
                                 </tr>
@@ -1717,7 +1718,7 @@
 
 {% block extra_js %}
 
-<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script src="{% static 'js/plotly.min.js' %}"></script>
 
 <script>
 (function () {

@@ -1,138 +1,307 @@
 {% extends "maintenance/base.html" %}
 {% load static %}
 
-{% block content %}
+{% block title %}Maintenance Command Center | QAD{% endblock %}
 
-<div class="container-fluid mt-3">
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'maintenance/css/dashboard.css' %}">
+{% endblock %}
 
-    <!-- ================= HEADER ================= -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h3 class="mb-0">
-                📊 {{ app.label }}
-            </h3>
-            <small class="text-muted">
-                Registry-driven overview for "{{ app.name }}"
-            </small>
-        </div>
-
-        <div class="text-muted small">
-            Total: {{ stats.total_models }} models
-        </div>
-    </div>
-
-
-    <!-- ================= STATS ================= -->
-    <div class="row g-3 mb-4">
-
-        {% for key, value in stats.items %}
-        <div class="col-md-3">
-            <div class="card shadow-sm border-0">
-                <div class="card-body">
-                    <small class="text-muted">{{ key|title }}</small>
-                    <h3 class="mb-0">{{ value }}</h3>
-                </div>
+{% block page_content %}
+<div class="maint-shell">
+    <header class="maint-topbar">
+        <div class="maint-topbar__title">
+            <i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i>
+            <div style="min-width:0">
+                <span>{{ dashboard_title }}</span>
+                <div class="maint-topbar__sub">{{ dashboard_subtitle }}</div>
             </div>
         </div>
-        {% endfor %}
+        <form class="maint-plant-filter" method="get" action="{% url 'maintenance:dashboard' %}">
+            <input type="hidden" name="tab" value="{{ active_tab }}">
+            <label class="visually-hidden" for="maintenance-plant">Treatment plant</label>
+            <select id="maintenance-plant" name="plant" aria-label="Filter by treatment plant" onchange="this.form.submit()">
+                {% if request.user.is_superuser %}<option value="">All treatment plants</option>{% endif %}
+                {% for plant_option in plant_options %}
+                <option value="{{ plant_option.pk }}" {% if plant_filter == plant_option.pk|stringformat:'s' %}selected{% endif %}>{{ plant_option.name }}</option>
+                {% endfor %}
+            </select>
+            <noscript><button class="maint-btn" type="submit">Apply</button></noscript>
+            <a class="maint-btn" href="{% url 'maintenance:dashboard' %}?tab={{ active_tab }}{% if plant_filter %}&amp;plant={{ plant_filter }}{% endif %}" aria-label="Refresh this dashboard"><i class="fa-solid fa-arrows-rotate"></i> Refresh</a>
+        </form>
+    </header>
 
-    </div>
+    {% if can_access_dashboard %}
+    <nav class="maint-tabs" aria-label="Maintenance sections">
+        <a class="maint-tab {% if active_tab == 'overview' %}is-active{% endif %}" href="?tab=overview{% if plant_filter %}&amp;plant={{ plant_filter }}{% endif %}"><i class="fa-solid fa-gauge-high"></i> Overview</a>
+        {% if can_view_requests %}<a class="maint-tab {% if active_tab == 'requests' %}is-active{% endif %}" href="?tab=requests{% if plant_filter %}&amp;plant={{ plant_filter }}{% endif %}"><i class="fa-solid fa-clipboard-list"></i> Work Requests</a>{% endif %}
+        {% if can_view_orders %}<a class="maint-tab {% if active_tab == 'orders' %}is-active{% endif %}" href="?tab=orders{% if plant_filter %}&amp;plant={{ plant_filter }}{% endif %}"><i class="fa-solid fa-wrench"></i> Work Orders</a>{% endif %}
+        {% if can_view_incidents %}<a class="maint-tab {% if active_tab == 'incidents' %}is-active{% endif %}" href="?tab=incidents{% if plant_filter %}&amp;plant={{ plant_filter }}{% endif %}"><i class="fa-solid fa-triangle-exclamation"></i> Incidents</a>{% endif %}
+        {% if can_view_housing %}<a class="maint-tab {% if active_tab == 'housing' %}is-active{% endif %}" href="?tab=housing{% if plant_filter %}&amp;plant={{ plant_filter }}{% endif %}"><i class="fa-solid fa-house"></i> Duty Houses</a>{% endif %}
+        {% if can_view_sla %}<a class="maint-tab {% if active_tab == 'sla' %}is-active{% endif %}" href="?tab=sla{% if plant_filter %}&amp;plant={{ plant_filter }}{% endif %}"><i class="fa-solid fa-stopwatch"></i> SLA</a><a class="maint-tab {% if active_tab == 'schedule' %}is-active{% endif %}" href="?tab=schedule{% if plant_filter %}&amp;plant={{ plant_filter }}{% endif %}"><i class="fa-solid fa-calendar-days"></i> Schedule</a>{% endif %}
+    </nav>
 
+    <main class="maint-body">
+        {% if dashboard_notice %}<div class="maint-notice" role="status">{{ dashboard_notice }}</div>{% endif %}
+        {% if invalid_plant %}<div class="maint-notice maint-notice--warning" role="alert">That plant is not assigned to your account.</div>{% endif %}
+        {% if not request.user.is_superuser and not plant_options %}<div class="maint-notice maint-notice--warning" role="alert">No treatment plant is assigned to your account, so plant records are unavailable. Contact an administrator to be assigned.</div>{% endif %}
 
-    <!-- ================= MODELS ================= -->
-    <div class="card shadow-sm border-0">
-
-        <div class="card-header bg-light">
-            <strong>Registered Models</strong>
-        </div>
-
-        <div class="card-body p-0">
-
-            {% for m in models %}
-
-                <div class="d-flex justify-content-between align-items-center px-3 py-3 border-bottom">
-
-                    <!-- LEFT -->
-                    <div class="d-flex align-items-center">
-
-                        <div class="me-3">
-                            <i class="fas fa-{{ m.icon|default:'cube' }} fa-lg text-primary"></i>
-                        </div>
-
-                        <div>
-                            <div class="fw-semibold">
-                                {{ m.label }}
-                            </div>
-
-                            <small class="text-muted">
-                                {{ m.key }}
-                            </small>
-
-                            <!-- TAGS (pure registry-driven) -->
-                            <div class="mt-1">
-                                {% for tag in m.tags %}
-                                    <span class="badge bg-secondary">{{ tag }}</span>
-                                {% empty %}
-                                    <span class="text-muted small">No tags</span>
-                                {% endfor %}
-                            </div>
-                        </div>
-                    </div>
-
-
-                    <!-- RIGHT ACTIONS (registry-driven ONLY) -->
-                    <div class="d-flex align-items-center gap-2">
-
-                        {% with r=m.routes c=m.capabilities %}
-
-                            <a href="{{ r.list }}"
-                               class="btn btn-sm btn-outline-primary">
-                                <i class="fas fa-list"></i>
-                                List
-                            </a>
-
-                            {% if c.create %}
-                                <a href="{{ r.create }}"
-                                   class="btn btn-sm btn-outline-success">
-                                    <i class="fas fa-plus"></i>
-                                    Create
-                                </a>
-                            {% endif %}
-
-                            {% if c.export %}
-                                <a href="{{ r.export }}"
-                                   class="btn btn-sm btn-outline-warning">
-                                    <i class="fas fa-file-export"></i>
-                                    Export
-                                </a>
-                            {% endif %}
-
-                            {% if c.inline %}
-                                <a href="{{ r.update }}"
-                                   class="btn btn-sm btn-outline-info">
-                                    <i class="fas fa-edit"></i>
-                                    Inline
-                                </a>
-                            {% endif %}
-
-                        {% endwith %}
-
-                    </div>
-
-                </div>
-
-            {% empty %}
-
-                <div class="text-center text-muted py-5">
-                    <i class="fas fa-database fa-2x mb-2"></i>
-                    <div>No models registered for this app</div>
-                </div>
-
+        <section class="maint-kpi-strip" aria-label="Current operations summary">
+            {% for kpi in kpis %}
+            <div class="kpi-card">
+                <div class="kpi-card__icon kpi-card__icon--{{ kpi.color }}"><i class="fa-solid {{ kpi.icon }}" aria-hidden="true"></i></div>
+                <div class="kpi-card__body"><div class="kpi-card__value">{{ kpi.value }}</div><div class="kpi-card__label">{{ kpi.label }}</div></div>
+            </div>
+            {% empty %}<p class="maint-empty">No dashboard sections are available for this account.</p>
             {% endfor %}
+        </section>
 
-        </div>
-    </div>
+        {% if active_tab == 'overview' %}
+        <section class="maint-grid-2">
+            <div class="maint-panel">
+                <div class="maint-panel__header"><span class="maint-panel__title"><i class="fa-solid fa-bolt"></i> Quick actions</span></div>
+                <div class="maint-panel__body maint-quick-actions">
+                    {% if can_add_requests %}<a class="maint-btn" href="/Maintenance/workrequest/create/"><i class="fa-solid fa-plus"></i> New work request</a>{% endif %}
+                    {% if can_add_incidents %}<button class="maint-btn maint-btn--rose" type="button" data-open-incident-report><i class="fa-solid fa-triangle-exclamation"></i> Report incident</button>{% endif %}
+                    {% if can_view_housing %}<a class="maint-btn maint-btn--amber" href="/Maintenance/dutyhouse/list/"><i class="fa-solid fa-house"></i> Manage houses</a>{% endif %}
+                    {% if can_view_sla %}<a class="maint-btn maint-btn--emerald" href="?tab=sla{% if plant_filter %}&amp;plant={{ plant_filter }}{% endif %}"><i class="fa-solid fa-stopwatch"></i> Review SLA</a>{% endif %}
+                    {% if not can_add_requests and not can_view_incidents and not can_view_housing %}<span class="maint-empty">No actions are enabled for your permissions.</span>{% endif %}
+                </div>
+            </div>
+            <div class="maint-panel">
+                <div class="maint-panel__header"><span class="maint-panel__title">Recent activity</span></div>
+                <div class="maint-panel__body">
+                    <ul class="maint-feed">
+                        {% for item in recent_activity %}<li class="maint-feed__item"><span class="maint-feed__dot maint-feed__dot--{{ item.tone }}"></span><div class="maint-feed__text"><strong>{{ item.title }}</strong> · {{ item.meta }}<div class="maint-feed__meta">{{ item.kind }} · {{ item.when|timesince }} ago</div></div></li>
+                        {% empty %}<li class="maint-empty">No recent activity in your authorized plants.</li>{% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </section>
 
+        {% if can_view_incidents %}
+        <section class="maint-grid-2">
+            <div class="maint-panel">
+                <div class="maint-panel__header"><span class="maint-panel__title">Incident volume · last six months</span><a class="maint-btn" href="?tab=incidents{% if plant_filter %}&amp;plant={{ plant_filter }}{% endif %}">Open incident queue</a></div>
+                <div class="maint-panel__body">
+                    <div class="maint-bars" role="img" aria-label="Incident reports by month">
+                        {% for point in incident_trend %}<div class="maint-bar-row"><span>{{ point.label }}</span><span class="maint-bar-track"><span class="maint-bar-fill maint-bar-fill--cyan" style="width:{{ point.width }}%"></span></span><strong>{{ point.value }}</strong></div>{% endfor %}
+                    </div>
+                </div>
+            </div>
+            <div class="maint-panel">
+                <div class="maint-panel__header"><span class="maint-panel__title">Filtered incident severity</span></div>
+                <div class="maint-panel__body"><div class="maint-bars" role="img" aria-label="Incident reports by severity">
+                    {% for item in incident_severity_bars %}<div class="maint-bar-row"><span>{{ item.label }}</span><span class="maint-bar-track"><span class="maint-bar-fill maint-bar-fill--{{ item.tone }}" style="width:{{ item.width }}%"></span></span><strong>{{ item.value }}</strong></div>{% endfor %}
+                </div></div>
+            </div>
+        </section>
+        {% endif %}
+
+        {% if can_view_housing %}
+        <section class="maint-grid-2">
+            <div class="maint-panel"><div class="maint-panel__header"><span class="maint-panel__title">Housing condition</span><a class="maint-btn" href="?tab=housing{% if plant_filter %}&amp;plant={{ plant_filter }}{% endif %}">Open houses</a></div><div class="maint-panel__body"><div class="maint-bars">
+                {% for item in house_status_bars %}<div class="maint-bar-row"><span>{{ item.label }}</span><span class="maint-bar-track"><span class="maint-bar-fill maint-bar-fill--amber" style="width:{{ item.width }}%"></span></span><strong>{{ item.value }}</strong></div>{% endfor %}
+            </div></div></div>
+            <div class="maint-panel"><div class="maint-panel__header"><span class="maint-panel__title">Houses by location</span></div><div class="maint-panel__body"><div class="maint-bars">
+                {% for item in location_bars %}<div class="maint-bar-row"><span>{{ item.name }}</span><span class="maint-bar-track"><span class="maint-bar-fill maint-bar-fill--emerald" style="width:{{ item.width }}%"></span></span><strong>{{ item.total }}</strong></div>{% empty %}<p class="maint-empty">No location data available.</p>{% endfor %}
+            </div></div></div>
+        </section>
+        {% endif %}
+        {% endif %}
+
+        {% if active_tab == 'requests' and can_view_requests %}
+        <section class="maint-panel">
+            <div class="maint-panel__header"><span class="maint-panel__title">Work requests · {{ open_requests_count }} open</span>{% if can_add_requests %}<a class="maint-btn" href="/Maintenance/workrequest/create/"><i class="fa-solid fa-plus"></i> Create request</a>{% endif %}</div>
+            <div class="maint-panel__body"><table class="maint-table"><thead><tr><th>Title</th><th>Priority</th><th>Status</th><th>House</th><th>Reported by</th><th>Created</th><th>Actions</th></tr></thead><tbody>
+                {% for item in open_requests %}<tr><td title="{{ item.title }}">{{ item.title }}</td><td><span class="maint-pill {% if item.priority == 'critical' %}maint-pill--rose{% elif item.priority == 'high' %}maint-pill--amber{% else %}maint-pill--cyan{% endif %}">{{ item.get_priority_display }}</span></td><td>{{ item.get_status_display }}</td><td>{{ item.duty_house|default:"—" }}</td><td>{{ item.reported_by|default:"—" }}</td><td>{{ item.created_at|date:"Y-m-d H:i" }}</td><td><div class="maint-actions">{% if can_change_requests and item.status == 'pending' or can_change_requests and item.status == 'draft' %}<form method="post" action="{% url 'maintenance:approve_request' item.pk %}">{% csrf_token %}<button class="maint-btn maint-btn--emerald" type="submit">Approve</button></form>{% endif %}{% if can_change_requests and can_add_orders and item.status == 'approved' or can_change_requests and can_add_orders and item.status == 'pending' %}<form method="post" action="{% url 'maintenance:convert_request' item.pk %}">{% csrf_token %}<button class="maint-btn" type="submit">Create order</button></form>{% endif %}</div></td></tr>
+                {% empty %}<tr><td colspan="7" class="maint-empty">No open work requests in your authorized plants.</td></tr>{% endfor %}
+            </tbody></table></div>
+        </section>
+        {% endif %}
+
+        {% if active_tab == 'orders' and can_view_orders %}
+        <section class="maint-panel"><div class="maint-panel__header"><span class="maint-panel__title">Active work orders</span></div><div class="maint-panel__body"><table class="maint-table"><thead><tr><th>Order</th><th>Request</th><th>House</th><th>Status</th><th>Priority</th><th>Progress</th><th>Assignee</th><th>Actions</th></tr></thead><tbody>
+            {% for item in all_orders %}<tr><td>{{ item }}</td><td>{{ item.request.title }}</td><td>{{ item.duty_house|default:item.request.duty_house|default:"—" }}</td><td>{{ item.get_status_display }}</td><td>{{ item.get_priority_display }}</td><td><div class="maint-progress"><span style="width:{{ item.progress }}%"></span></div>{{ item.progress }}%</td><td>{{ item.assigned_to|default:"—" }}</td><td><div class="maint-actions">{% if can_change_orders and item.status == 'queued' %}<form method="post" action="{% url 'maintenance:assign_order' item.pk %}">{% csrf_token %}<button class="maint-btn" type="submit">Assign to me</button></form>{% endif %}{% if can_change_orders and item.status == 'assigned' or can_change_orders and item.status == 'queued' %}<form method="post" action="{% url 'maintenance:start_order' item.pk %}">{% csrf_token %}<button class="maint-btn maint-btn--amber" type="submit">Start</button></form>{% endif %}{% if can_change_orders and item.status == 'in_progress' or can_change_orders and item.status == 'assigned' %}<form method="post" action="{% url 'maintenance:complete_order' item.pk %}">{% csrf_token %}<button class="maint-btn maint-btn--emerald" type="submit">Complete</button></form>{% endif %}</div></td></tr>
+            {% empty %}<tr><td colspan="8" class="maint-empty">No work orders in your authorized plants.</td></tr>{% endfor %}
+        </tbody></table></div></section>
+        {% endif %}
+
+        {% if active_tab == 'incidents' and can_view_incidents %}
+        <section class="maint-kpi-strip maint-incident-kpis">
+            <div class="kpi-card"><div class="kpi-card__icon kpi-card__icon--cyan"><i class="fa-solid fa-stopwatch"></i></div><div class="kpi-card__body"><div class="kpi-card__value">{{ median_response_label }}</div><div class="kpi-card__label">Median time to acknowledge · 90 days</div></div></div>
+            <div class="kpi-card"><div class="kpi-card__icon kpi-card__icon--emerald"><i class="fa-solid fa-check-double"></i></div><div class="kpi-card__body"><div class="kpi-card__value">{{ median_resolution_label }}</div><div class="kpi-card__label">Median time to resolve · 90 days</div></div></div>
+        </section>
+        <section class="maint-grid-2 maint-incident-metrics">
+            <div class="maint-panel"><div class="maint-panel__header"><span class="maint-panel__title">Incident aging · open incidents</span></div><div class="maint-panel__body"><div class="maint-bars">
+                {% for item in incident_age_bars %}<div class="maint-bar-row"><span>{{ item.label }}</span><span class="maint-bar-track"><span class="maint-bar-fill maint-bar-fill--rose" style="width:{{ item.width }}%"></span></span><strong>{{ item.value }}</strong></div>{% endfor %}
+            </div></div></div>
+            <div class="maint-panel"><div class="maint-panel__header"><span class="maint-panel__title">Reported trends</span></div><div class="maint-panel__body"><div class="maint-bars">
+                {% for item in incident_trend %}<div class="maint-bar-row"><span>{{ item.label }}</span><span class="maint-bar-track"><span class="maint-bar-fill maint-bar-fill--cyan" style="width:{{ item.width }}%"></span></span><strong>{{ item.value }}</strong></div>{% endfor %}
+            </div></div></div>
+        </section>
+        <section class="maint-panel">
+            <div class="maint-panel__header"><span class="maint-panel__title">Incident triage · {{ incident_filter_count }} matching</span><div class="maint-actions">{% if can_add_incidents %}<button class="maint-btn maint-btn--rose" type="button" data-open-incident-report><i class="fa-solid fa-plus"></i> Report</button>{% endif %}<a class="maint-btn" href="?tab=incidents&amp;export=csv&amp;incident_q={{ incident_search|urlencode }}&amp;severity={{ severity_filter|urlencode }}&amp;incident_status={{ incident_status_filter|urlencode }}&amp;incident_type={{ incident_type_filter|urlencode }}&amp;date_from={{ date_from|urlencode }}&amp;date_to={{ date_to|urlencode }}{% if plant_filter %}&amp;plant={{ plant_filter }}{% endif %}"><i class="fa-solid fa-file-csv"></i> Export CSV</a></div></div>
+            <form class="maint-filterbar" method="get" action="{% url 'maintenance:dashboard' %}">
+                <input type="hidden" name="tab" value="incidents">{% if plant_filter %}<input type="hidden" name="plant" value="{{ plant_filter }}">{% endif %}
+                <label class="visually-hidden" for="incident-search">Search incidents</label><input id="incident-search" type="search" name="incident_q" value="{{ incident_search }}" placeholder="Search number, title, house, equipment">
+                <select name="severity" aria-label="Severity"><option value="">All severities</option>{% for value,label in incident_severity_choices %}<option value="{{ value }}" {% if severity_filter == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+                <select name="incident_status" aria-label="Incident status"><option value="">All statuses</option>{% for value,label in incident_status_choices %}<option value="{{ value }}" {% if incident_status_filter == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+                <select name="incident_type" aria-label="Incident type"><option value="">All types</option>{% for value,label in incident_type_choices %}<option value="{{ value }}" {% if incident_type_filter == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+                <label class="maint-date-filter">From <input type="date" name="date_from" value="{{ date_from }}"></label><label class="maint-date-filter">To <input type="date" name="date_to" value="{{ date_to }}"></label>
+                <select name="sort" aria-label="Sort incidents"><option value="newest" {% if incident_sort == 'newest' %}selected{% endif %}>Newest first</option><option value="oldest" {% if incident_sort == 'oldest' %}selected{% endif %}>Oldest first</option><option value="age" {% if incident_sort == 'age' %}selected{% endif %}>Longest waiting</option><option value="severity" {% if incident_sort == 'severity' %}selected{% endif %}>Highest severity</option><option value="impact" {% if incident_sort == 'impact' %}selected{% endif %}>Highest impact</option></select>
+                <button class="maint-btn" type="submit"><i class="fa-solid fa-filter"></i> Apply</button><a class="maint-btn maint-btn--slate" href="?tab=incidents{% if plant_filter %}&amp;plant={{ plant_filter }}{% endif %}">Clear</a>
+            </form>
+            <div class="maint-panel__body"><div class="maint-table-wrap"><table class="maint-table"><thead><tr><th>Incident</th><th>Type / Target</th><th>Severity</th><th>Status</th><th>Plant / Location</th><th>Assigned</th><th>Age / Impact</th><th>Actions &amp; timeline</th></tr></thead><tbody>
+                {% for item in incidents %}
+                <tr class="{% if item.severity == 'critical' %}maint-row--critical{% endif %}">
+                    <td><strong>{{ item.incident_no }}</strong><div class="maint-cell-sub" title="{{ item.title }}">{{ item.title }}</div></td>
+                    <td>{{ item.get_incident_type_display }}<div class="maint-cell-sub">{% if item.duty_house %}House {{ item.duty_house.house_number }}{% elif item.equipment %}{{ item.equipment }}{% else %}{{ item.target_type|title }}{% endif %}</div></td>
+                    <td><span class="maint-pill {% if item.severity == 'critical' or item.severity == 'high' %}maint-pill--rose{% elif item.severity == 'medium' %}maint-pill--amber{% else %}maint-pill--cyan{% endif %}">{{ item.get_severity_display }}</span></td>
+                    <td>{{ item.get_status_display }}{% if item.work_order %}<div class="maint-cell-sub">{{ item.work_order }}</div>{% endif %}</td>
+                    <td>{{ item.plant|default:item.duty_house.plant|default:"—" }}<div class="maint-cell-sub">{{ item.duty_house.location|default:"" }}</div></td>
+                    <td>{{ item.assigned_to|default:"Unassigned" }}</td>
+                    <td>{{ item.reported_at|timesince }}<div class="maint-cell-sub">Impact {{ item.estimated_impact_score|floatformat:1 }}</div></td>
+                    <td><details class="maint-row-details"><summary>Review</summary>
+                        <div class="maint-detail-content"><p>{{ item.description|linebreaksbr }}</p>
+                            {% if item.root_cause %}<p><strong>Root cause:</strong> {{ item.root_cause|linebreaksbr }}</p>{% endif %}{% if item.resolution_summary %}<p><strong>Resolution:</strong> {{ item.resolution_summary|linebreaksbr }}</p>{% endif %}
+                            {% if item.cluster %}<p><strong>Repeat cluster:</strong> {{ item.cluster.title }} · {{ item.cluster.frequency_score|floatformat:0 }} reports · risk {{ item.cluster.predicted_risk_score|floatformat:2 }}</p>{% endif %}
+                            {% if can_view_requests and item.work_request %}<p><strong>Work request:</strong> {{ item.work_request.title }}</p>{% endif %}{% if can_view_orders and item.work_order %}<p><strong>Work order:</strong> {{ item.work_order }}</p>{% endif %}
+                            <div class="maint-timeline">{% for event in item.dashboard_events %}<div><strong>{{ event.event_type|title }}</strong><span>{{ event.created_at|date:"Y-m-d H:i" }}</span><small>{{ event.payload }}</small></div>{% empty %}<span class="maint-cell-sub">No timeline entries recorded yet.</span>{% endfor %}</div>
+                            {% if can_change_incidents %}<div class="maint-actions maint-actions--detail">
+                                {% if item.status == 'reported' %}<form method="post" action="{% url 'maintenance:acknowledge_incident' item.pk %}">{% csrf_token %}<button class="maint-btn" type="submit">Acknowledge</button></form>{% endif %}
+                                {% if item.status != 'resolved' and item.status != 'closed' %}{% if not item.assigned_to %}<form method="post" action="{% url 'maintenance:assign_incident' item.pk %}">{% csrf_token %}<button class="maint-btn" type="submit">Assign to me</button></form>{% endif %}<form method="post" action="{% url 'maintenance:escalate_incident' item.pk %}">{% csrf_token %}<button class="maint-btn maint-btn--amber" type="submit">Escalate</button></form>
+                                <details class="maint-resolution"><summary class="maint-btn maint-btn--emerald">Resolve</summary><form method="post" action="{% url 'maintenance:resolve_incident' item.pk %}">{% csrf_token %}<label>Resolution summary <textarea name="resolution_summary" required maxlength="10000" rows="3"></textarea></label><label>Root cause <textarea name="root_cause" maxlength="10000" rows="2"></textarea></label><button class="maint-btn maint-btn--emerald" type="submit">Save resolution</button></form></details>{% endif %}
+                                {% if item.status == 'resolved' %}<form method="post" action="{% url 'maintenance:close_incident' item.pk %}">{% csrf_token %}<button class="maint-btn maint-btn--emerald" type="submit">Close</button></form>{% endif %}{% if item.status == 'resolved' or item.status == 'closed' %}<form method="post" action="{% url 'maintenance:reopen_incident' item.pk %}">{% csrf_token %}<button class="maint-btn maint-btn--amber" type="submit">Reopen</button></form>{% endif %}
+                            {% endif %}
+                        </div>
+                    </details></td>
+                </tr>
+                {% empty %}<tr><td colspan="8" class="maint-empty">No matching incidents are available in your authorized plants.</td></tr>{% endfor %}
+            </tbody></table></div></div>
+        </section>
+        {% endif %}
+
+        {% if active_tab == 'housing' and can_view_housing %}
+        {% if can_view_units %}<section class="maint-kpi-strip maint-kpi-strip--housing">
+            {% if can_view_occupants %}<div class="kpi-card"><div class="kpi-card__icon kpi-card__icon--emerald"><i class="fa-solid fa-bed"></i></div><div class="kpi-card__body"><div class="kpi-card__value">{{ occupancy_rate }}%</div><div class="kpi-card__label">Occupant capacity in use</div></div></div>{% endif %}
+            <div class="kpi-card"><div class="kpi-card__icon kpi-card__icon--cyan"><i class="fa-solid fa-door-open"></i></div><div class="kpi-card__body"><div class="kpi-card__value">{{ occupied_units }} / {{ total_units }}</div><div class="kpi-card__label">Occupied units</div></div></div>
+            {% if can_view_occupants %}<div class="kpi-card"><div class="kpi-card__icon kpi-card__icon--amber"><i class="fa-solid fa-users"></i></div><div class="kpi-card__body"><div class="kpi-card__value">{{ current_occupants }} / {{ total_capacity }}</div><div class="kpi-card__label">Current occupants / capacity</div></div></div>
+            <div class="kpi-card"><div class="kpi-card__icon kpi-card__icon--rose"><i class="fa-solid fa-triangle-exclamation"></i></div><div class="kpi-card__body"><div class="kpi-card__value">{{ over_capacity_units }}</div><div class="kpi-card__label">Over-capacity units</div></div></div>{% endif %}
+        </section>{% endif %}
+        <section class="maint-panel">
+            <div class="maint-panel__header"><span class="maint-panel__title">Duty house register · {{ house_filter_count }} matching</span><a class="maint-btn" href="?tab=housing&amp;export=csv&amp;house_q={{ house_search|urlencode }}&amp;house_status={{ house_status_filter|urlencode }}&amp;location={{ house_location_filter|urlencode }}{% if plant_filter %}&amp;plant={{ plant_filter }}{% endif %}"><i class="fa-solid fa-file-csv"></i> Export filtered CSV</a></div>
+            <form class="maint-filterbar" method="get" action="{% url 'maintenance:dashboard' %}"><input type="hidden" name="tab" value="housing">{% if plant_filter %}<input type="hidden" name="plant" value="{{ plant_filter }}">{% endif %}
+                <label class="visually-hidden" for="house-search">Search houses</label><input id="house-search" type="search" name="house_q" value="{{ house_search }}" placeholder="Search house or location">
+                <select name="house_status" aria-label="House status"><option value="">All statuses</option>{% for value,label in house_status_choices %}<option value="{{ value }}" {% if house_status_filter == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+                <select name="location" aria-label="Location"><option value="">All locations</option>{% for item in location_options %}<option value="{{ item.pk }}" {% if house_location_filter == item.pk|stringformat:'s' %}selected{% endif %}>{{ item.name }}</option>{% endfor %}</select>
+                <button class="maint-btn" type="submit"><i class="fa-solid fa-filter"></i> Apply</button><a class="maint-btn maint-btn--slate" href="?tab=housing{% if plant_filter %}&amp;plant={{ plant_filter }}{% endif %}">Clear</a>
+            </form>
+            <div class="maint-panel__body"><div class="maint-table-wrap"><table class="maint-table"><thead><tr><th>House</th><th>Location</th><th>Status</th><th>Condition</th>{% if can_view_units %}<th>Units</th>{% endif %}{% if can_view_occupants %}<th>Occupants</th>{% endif %}{% if can_view_incidents %}<th>Open incidents</th>{% endif %}<th>Actions</th></tr></thead><tbody>
+                {% for house in duty_houses %}<tr><td><strong>{{ house.house_number }}</strong><div class="maint-cell-sub">{{ house.name|default:"Duty house" }}</div></td><td>{{ house.location.name }}</td><td><span class="maint-pill {% if house.status == 'maintenance' %}maint-pill--amber{% elif house.status == 'active' %}maint-pill--emerald{% else %}maint-pill--slate{% endif %}">{{ house.get_status_display }}</span></td><td><span class="maint-score">{{ house.maintenance_score|floatformat:0 }}%</span><div class="maint-cell-sub">{{ house.critical_issues_open }} critical issues</div></td>{% if can_view_units %}<td>{{ house.unit_count }}<div class="maint-cell-sub">Capacity {{ house.occupant_capacity }}</div></td>{% endif %}{% if can_view_occupants %}<td>{{ house.current_occupant_count }}<div class="maint-cell-sub">current occupants</div></td>{% endif %}{% if can_view_incidents %}<td>{{ house.open_incident_count }}</td>{% endif %}<td><div class="maint-actions"><a class="maint-btn" href="?tab=housing&amp;house_id={{ house.pk }}{% if plant_filter %}&amp;plant={{ plant_filter }}{% endif %}">Details</a>{% if can_change_houses and house.status == 'active' %}<form method="post" action="{% url 'maintenance:mark_house_maintenance' house.pk %}">{% csrf_token %}<button class="maint-btn maint-btn--amber" type="submit">Mark maintenance</button></form>{% elif can_change_houses and house.status == 'maintenance' %}<form method="post" action="{% url 'maintenance:activate_house' house.pk %}">{% csrf_token %}<button class="maint-btn maint-btn--emerald" type="submit">Mark active</button></form>{% endif %}</div></td></tr>
+                {% empty %}<tr><td colspan="8" class="maint-empty">No houses match those filters in your authorized plants.</td></tr>{% endfor %}
+            </tbody></table></div></div>
+        </section>
+
+        {% if selected_house %}<section class="maint-panel maint-house-detail">
+            <div class="maint-panel__header"><span class="maint-panel__title">{{ selected_house.house_number }} · {{ selected_house.location.name }}</span><a class="maint-btn maint-btn--slate" href="?tab=housing{% if plant_filter %}&amp;plant={{ plant_filter }}{% endif %}">Close details</a></div>
+            <div class="maint-house-meta"><span>{{ selected_house.get_status_display }}</span><span>Condition {{ selected_house.maintenance_score|floatformat:0 }}%</span><span>{{ selected_house.floors }} floors</span><span>{{ selected_house.gps_lat|default:"" }}{% if selected_house.gps_lng %}, {{ selected_house.gps_lng }}{% endif %}</span></div>
+            <div class="maint-panel__body">
+                {% if can_view_units %}
+                <h3>Units</h3>
+                <div class="maint-table-wrap"><table class="maint-table">
+                    <thead><tr><th>Unit</th><th>Floor</th><th>Type</th><th>Status</th>{% if can_view_occupants %}<th>Occupancy</th>{% endif %}</tr></thead>
+                    <tbody>
+                        {% for unit in house_detail_units %}
+                        <tr>
+                            <td>{{ unit.unit_number }}</td><td>{{ unit.floor }}</td><td>{{ unit.get_unit_type_display }}</td><td>{{ unit.get_status_display }}</td>
+{% if can_view_occupants %}<td>{{ unit.current_occupants }} / {{ unit.max_occupants }} places{% for occupancy in unit.occupancies.all %}{% if occupancy.is_current %}<div class="maint-cell-sub">{{ occupancy.user|default:"Unassigned occupant" }}</div>{% endif %}{% endfor %}</td>{% endif %}
+                        </tr>
+                        {% empty %}<tr><td colspan="{% if can_view_occupants %}5{% else %}4{% endif %}" class="maint-empty">No units recorded.</td></tr>{% endfor %}
+                    </tbody>
+                </table></div>
+                {% else %}<p class="maint-cell-sub">Unit details are not available to your account.</p>{% endif %}
+
+                {% if can_add_occupants and can_view_units and selected_house.is_active and selected_house.status == 'active' %}
+                <section class="maint-occupancy-action">
+                    <h3>Check in occupant</h3>
+                    {% if house_detail_users and house_checkin_units %}
+                    <form method="post" action="{% url 'maintenance:check_in_occupant' %}" class="maint-occupancy-form maint-occupancy-form--inline">
+                        {% csrf_token %}<input type="hidden" name="house_id" value="{{ selected_house.pk }}">
+                        <label>Staff member<select name="user_id" required><option value="">Select staff</option>{% for person in house_detail_users %}<option value="{{ person.pk }}">{{ person.get_full_name|default:person.username }}</option>{% endfor %}</select></label>
+                        <label>Available unit<select name="unit_id" required><option value="">Select unit</option>{% for unit in house_checkin_units %}<option value="{{ unit.pk }}">{{ unit.unit_number }} · {{ unit.current_occupants }}/{{ unit.max_occupants }} places</option>{% endfor %}</select></label>
+                        <button class="maint-btn maint-btn--emerald" type="submit">Check in</button>
+                    </form>
+                    {% elif not house_detail_users %}<p class="maint-cell-sub">No eligible staff are available for this plant.</p>
+                    {% else %}<p class="maint-cell-sub">No available units in this house.</p>{% endif %}
+                </section>
+                {% endif %}
+            {% if can_view_occupants %}
+            <h3 class="maint-section-heading">Occupancy history</h3>
+            {% if can_transfer_occupants %}
+            <section class="maint-occupancy-action">
+                <h4>Transfer current occupant</h4>
+                {% if house_detail_current_occupancies and house_detail_transfer_units %}
+                <form method="post" action="{% url 'maintenance:transfer_occupant' %}" class="maint-occupancy-form maint-occupancy-form--inline">
+                    {% csrf_token %}
+                    <label>Current occupant<select name="occupancy_id" required><option value="">Select occupant</option>{% for occupancy in house_detail_current_occupancies %}<option value="{{ occupancy.pk }}">{{ occupancy.user|default:"Unknown" }} · {{ occupancy.duty_house.house_number }} / {{ occupancy.unit.unit_number }}</option>{% endfor %}</select></label>
+                    <label>Destination unit<select name="to_unit_id" required><option value="">Select available unit</option>{% for destination in house_detail_transfer_units %}<option value="{{ destination.pk }}">{{ destination.duty_house.house_number }} · {{ destination.unit_number }}</option>{% endfor %}</select></label>
+                    <button class="maint-btn" type="submit">Transfer</button>
+                </form>
+                {% else %}<p class="maint-cell-sub">A transfer needs a current occupant and an available unit in this plant.</p>{% endif %}
+            </section>
+            {% endif %}
+            <div class="maint-table-wrap"><table class="maint-table">
+                <thead><tr><th>Occupant</th><th>Unit</th><th>Start</th><th>End</th><th>Exit reason</th>{% if can_change_occupants %}<th>Actions</th>{% endif %}</tr></thead>
+                <tbody>
+                    {% for occupancy in house_detail_occupancies %}
+                    <tr>
+                        <td>{{ occupancy.user|default:"Unknown" }}</td><td>{{ occupancy.unit.unit_number }}</td><td>{{ occupancy.start_date|date:"Y-m-d" }}</td><td>{{ occupancy.end_date|date:"Y-m-d"|default:"Current" }}</td><td>{{ occupancy.exit_reason|default:"—" }}</td>
+                        {% if can_change_occupants %}<td>{% if occupancy.is_current %}<details><summary>Check out</summary><form method="post" action="{% url 'maintenance:check_out_occupant' occupancy.pk %}" class="maint-occupancy-form">{% csrf_token %}<label>Exit note <input name="exit_reason" maxlength="2000" placeholder="Optional handover note"></label><button class="maint-btn maint-btn--amber" type="submit">Confirm check-out</button></form></details>{% else %}<span class="maint-cell-sub">—</span>{% endif %}</td>{% endif %}
+                    </tr>
+                    {% empty %}<tr><td colspan="6" class="maint-empty">No occupancy history recorded.</td></tr>{% endfor %}
+                </tbody>
+            </table></div>
+            {% endif %}
+            {% if can_view_incidents or can_view_orders %}
+            <div class="maint-grid-2 maint-related-records">
+                {% if can_view_incidents %}<div><h3>Recent incidents</h3>{% for item in house_detail_incidents %}<div class="maint-related-row"><strong>{{ item.incident_no }}</strong> · {{ item.get_severity_display }} · {{ item.get_status_display }}<div class="maint-cell-sub">{{ item.title }}</div></div>{% empty %}<p class="maint-cell-sub">No linked incidents.</p>{% endfor %}</div>{% endif %}
+                {% if can_view_orders %}<div><h3>Recent work orders</h3>{% for item in house_detail_orders %}<div class="maint-related-row"><strong>{{ item }}</strong> · {{ item.get_status_display }}<div class="maint-cell-sub">{{ item.request.title }}</div></div>{% empty %}<p class="maint-cell-sub">No linked work orders.</p>{% endfor %}</div>{% endif %}
+            </div>
+            {% endif %}</div>
+        </section>{% endif %}
+        {% endif %}
+
+        {% if active_tab == 'sla' and can_view_sla %}<section class="maint-grid-2"><div class="maint-panel"><div class="maint-panel__header"><span class="maint-panel__title">Breached SLA</span></div><div class="maint-panel__body"><table class="maint-table"><thead><tr><th>Request</th><th>Due</th><th>Reason</th></tr></thead><tbody>{% for item in breached_sla %}<tr><td>{{ item.request.title }}</td><td>{{ item.resolution_due|date:"Y-m-d H:i" }}</td><td>{{ item.breach_reason|default:"—" }}</td></tr>{% empty %}<tr><td colspan="3" class="maint-empty">No breaches recorded.</td></tr>{% endfor %}</tbody></table></div></div><div class="maint-panel"><div class="maint-panel__header"><span class="maint-panel__title">Due in the next eight hours</span></div><div class="maint-panel__body"><table class="maint-table"><thead><tr><th>Request</th><th>Response due</th><th>Resolution due</th><th>Status</th></tr></thead><tbody>{% for item in due_soon %}<tr><td>{{ item.request.title }}</td><td>{{ item.response_due|date:"Y-m-d H:i" }}</td><td>{{ item.resolution_due|date:"Y-m-d H:i" }}</td><td>{{ item.get_status_display }}</td></tr>{% empty %}<tr><td colspan="4" class="maint-empty">Nothing due soon.</td></tr>{% endfor %}</tbody></table></div></div></section>{% endif %}
+
+        {% if active_tab == 'schedule' and can_view_sla %}<section class="maint-panel"><div class="maint-panel__header"><span class="maint-panel__title">SLA schedule</span></div><div class="maint-panel__body"><table class="maint-table"><thead><tr><th>Request</th><th>Priority</th><th>Response due</th><th>Resolution due</th><th>Status</th></tr></thead><tbody>{% for item in sla_records %}<tr><td>{{ item.request.title }}</td><td>{{ item.request.get_priority_display }}</td><td>{{ item.response_due|date:"Y-m-d H:i" }}</td><td>{{ item.resolution_due|date:"Y-m-d H:i" }}</td><td>{{ item.get_status_display }}</td></tr>{% empty %}<tr><td colspan="5" class="maint-empty">No SLA items.</td></tr>{% endfor %}</tbody></table></div></section>{% endif %}
+    </main>
+    {% if can_add_incidents %}
+    <dialog class="maint-report-dialog" id="incident-report-dialog" aria-labelledby="incident-report-title" data-queue-user="{{ request.user.pk }}" data-endpoint="{% url 'maintenance:report_incident' %}">
+        <form id="incident-report-form" method="post" action="{% url 'maintenance:report_incident' %}">
+            {% csrf_token %}
+            <input type="hidden" name="offline_submission_key" id="incident-submission-key">
+            <div class="maint-dialog-header"><div><span class="maint-eyebrow">FIELD REPORT</span><h2 id="incident-report-title">Report maintenance incident</h2></div><button class="maint-dialog-close" type="button" data-close-incident-report aria-label="Close report form">×</button></div>
+            <p class="maint-cell-sub">Reports can be queued in this tab while offline and synchronized when the connection returns. Avoid entering sensitive personal information.</p>
+            <div class="maint-report-grid">
+                <label>Treatment plant <select name="plant" id="incident-report-plant" required><option value="">Select plant</option>{% for plant_option in plant_options %}<option value="{{ plant_option.pk }}" {% if selected_plant and selected_plant.pk == plant_option.pk %}selected{% endif %}>{{ plant_option.name }}</option>{% endfor %}</select></label>
+                <label>Duty house <select name="duty_house" id="incident-report-house"><option value="">Plant / site incident</option>{% for house in incident_report_houses %}<option value="{{ house.pk }}" data-plant="{{ house.plant_id }}">{{ house.house_number }} · {{ house.location.name }}</option>{% endfor %}</select></label>
+                <label>Incident type <select name="incident_type" required><option value="">Select type</option>{% for value,label in incident_type_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></label>
+                <label>Severity <select name="severity" required><option value="">Select severity</option>{% for value,label in incident_severity_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></label>
+                <label class="maint-report-wide">Incident title <input name="title" maxlength="255" required autocomplete="off"></label>
+                <label>Occurred at <input name="occurred_at" type="datetime-local"></label>
+                <label class="maint-report-wide">Description <textarea name="description" rows="4" required></textarea></label>
+            </div>
+            <div class="maint-report-footer"><span id="incident-queue-status" class="maint-cell-sub" role="status" aria-live="polite">No offline reports queued.</span><div><button class="maint-btn maint-btn--slate" type="button" data-close-incident-report>Cancel</button> <button class="maint-btn maint-btn--rose" type="submit"><i class="fa-solid fa-paper-plane"></i> Submit report</button></div></div>
+        </form>
+    </dialog>
+    {% endif %}
+    {% else %}
+    <main class="maint-body"><div class="maint-notice maint-notice--warning" role="alert">Your account does not have view permission for any Maintenance dashboard section.</div></main>
+    {% endif %}
 </div>
+{% endblock %}
 
+{% block extra_scripts %}
+<script src="{% static 'maintenance/js/dashboard.js' %}" defer></script>
 {% endblock %}

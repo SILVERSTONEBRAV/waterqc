@@ -1,4 +1,16 @@
-<header class="qc-header" role="banner">
+<header class="qc-header{% if show_jartest_workspace_tabs or show_chlorine_workspace_tabs or show_ph_workspace_tabs %} qca-analytics-header{% endif %}{% if show_jartest_workspace_tabs %} qca-jartest-header{% endif %}" role="region" aria-label="QCA application controls">
+    <button
+        id="qcaSidebarToggle"
+        class="hdr-btn qca-nav-toggle"
+        type="button"
+        aria-label="Open navigation"
+        aria-controls="qcaSidebar"
+        aria-expanded="false"
+        title="Open navigation"
+    >
+        <i class="fa-solid fa-bars" aria-hidden="true"></i>
+    </button>
+
     <!-- Brand / System Title -->
     <div class="header-brand">
         <div class="brand-icon">
@@ -10,7 +22,7 @@
         </div>
     </div>
 
-    <!-- Center Control Zone: Scope Selector / Lab Assignment & Live Status -->
+    <!-- Center Control Zone: Scope Selector / Lab Assignment & Reports -->
     <div class="header-center">
         {% if request.user.is_superuser %}
             <!-- Superuser Treatment Plant Scope Selector (strictly NO 'All' option) -->
@@ -46,11 +58,57 @@
             </div>
         {% endif %}
 
-        <!-- Live Telemetry / Stream Status Indicator -->
-        <div class="ws-status" id="ws-status-indicator" title="Real-time WebSocket Data Link">
-            <span class="ws-dot"></span>
-            <span class="ws-label">Live Stream</span>
-        </div>
+        {% if show_jartest_workspace_tabs %}
+        {% include "jartest/results/partials/_workspace_tabs.html" %}
+        {% elif show_chlorine_workspace_tabs %}
+        {% include "chlorinedemand/results/partials/_workspace_tabs.html" %}
+        {% elif show_ph_workspace_tabs %}
+        {% include "PHadjustment/results/partials/_workspace_tabs.html" %}
+        {% else %}
+        {% if request.user.is_superuser or perms.qc.view_wateranalysis or perms.filtered_water.view_filteredwateranalysis or perms.microbial.view_microbialanalysis or perms.heavy_metal.view_heavymetalanalysis %}
+        <nav class="qca-dashboard-nav" aria-label="QC dashboards">
+        <a
+            class="qc-reports-launch{% if is_reports_page %} is-active{% endif %}"
+            href="{% url 'qc:reports' %}{% if plant %}?plant={{ plant.pk }}{% endif %}"
+            title="Advanced water quality reports and analytics"
+            aria-label="Advanced reports and analytics"
+        >
+            <i class="fa-solid fa-file-lines" aria-hidden="true"></i>
+            <span>Reports</span>
+        </a>
+        <a
+            class="qc-reports-launch{% if is_analytics_page %} is-active{% endif %}"
+            href="{% url 'qc:analytics' %}{% if plant %}?plant={{ plant.pk }}{% endif %}"
+            title="Advanced QC analytics"
+            aria-label="Analytics dashboard"
+            {% if is_analytics_page %}aria-current="page"{% endif %}
+        >
+            <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+            <span>Analytics</span>
+        </a>
+        <a
+            class="qc-reports-launch{% if is_visualizations_page %} is-active{% endif %}"
+            href="{% url 'qc:visualizations' %}{% if plant %}?plant={{ plant.pk }}{% endif %}"
+            title="Advanced QC data visualizations"
+            aria-label="Data Visualization dashboard"
+            {% if is_visualizations_page %}aria-current="page"{% endif %}
+        >
+            <i class="fa-solid fa-chart-pie" aria-hidden="true"></i>
+            <span>Data Visualization</span>
+        </a>
+        <a
+            class="qc-reports-launch{% if is_noncompliance_page %} is-active{% endif %}"
+            href="{% url 'qc:noncompliance' %}{% if plant %}?plant={{ plant.pk }}{% endif %}"
+            title="Recorded non-compliance cases and derived filtered-water exceedances"
+            aria-label="Non-compliance dashboard"
+            {% if is_noncompliance_page %}aria-current="page"{% endif %}
+        >
+            <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+            <span>Non-compliance</span>
+        </a>
+        </nav>
+        {% endif %}
+        {% endif %}
     </div>
 
     <!-- Futuristic Header Controls & Theme Toggle -->
@@ -60,31 +118,18 @@
             <i class="fa-solid fa-volume-high"></i>
         </button>
 
-        <!-- Keyboard Shortcuts Drawer -->
-        <button id="shortcutsToggle" class="hdr-btn" type="button" title="Shortcuts (?)" aria-label="Keyboard Shortcuts">
-            <i class="fa-solid fa-keyboard"></i>
-        </button>
-
-        <!-- Theme Toggle -->
-        <button id="themeToggle"
-                class="theme-toggle hdr-btn"
-                type="button"
-                aria-label="Toggle dark/light theme"
-                title="Toggle Theme">
-            <i class="fas fa-moon" aria-hidden="true"></i>
-        </button>
-
-        <div class="user-pill" title="Active Operator">
-            <i class="fa-solid fa-user-circle"></i>
-            <span class="username">{{ request.user.username }}</span>
-        </div>
-
-        <a href="{% url 'qc:dashboard' %}" class="hdr-btn" title="QC Central Registry">
+        {% if request.user.is_superuser or perms.qc.view_wateranalysis or perms.filtered_water.view_filteredwateranalysis or perms.microbial.view_microbialanalysis or perms.heavy_metal.view_heavymetalanalysis %}
+        <a href="{% url 'qc:dashboard' %}" class="hdr-btn" title="QC Registry Dashboard" aria-label="QC Registry Dashboard">
             <i class="fa-solid fa-gauge-high"></i>
         </a>
-
-        <a href="{% url 'accounts:logout' %}" class="hdr-btn logout-btn" title="Sign Out">
-            <i class="fa-solid fa-right-from-bracket"></i>
+        <a href="{% url 'qc:quality_control' %}" class="hdr-btn" title="QC Analytical Matrix" aria-label="QC Analytical Matrix">
+            <i class="fa-solid fa-chart-line"></i>
         </a>
+        {% endif %}
+
+        <button type="button" class="hdr-btn app-window-close" data-close-app-window
+                title="Close window" aria-label="Close window">
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
     </div>
 </header>

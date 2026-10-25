@@ -57,6 +57,10 @@ else
     echo "⚠️ Using fallback self-signed certificates"
 fi
 
+# envsubst reads exported environment variables, not shell-local variables.
+export DOMAIN_NAME="$DOMAIN"
+export SSL_CERT_PATH SSL_KEY_PATH
+
 # -----------------------------
 # Render Nginx configuration
 # -----------------------------
@@ -77,6 +81,25 @@ if [ "${NGINX_DEBUG:-false}" = "true" ]; then
     echo "📢 Debug mode enabled — printing full Nginx config"
     nginx -T || true
 fi
+
+# -----------------------------
+# Background Upstream DNS Auto-Reloader
+# Automatically reloads Nginx whenever web or daphne containers are rebuilt/recreated.
+# -----------------------------
+(
+  last_ips=""
+  while true; do
+    sleep 5
+    current_ips=$(getent hosts web1 web2 web3 web4 daphne1 daphne2 daphne3 2>/dev/null | awk '{print $1}' | sort | tr '\n' ' ')
+    if [ -n "$current_ips" ]; then
+      if [ -n "$last_ips" ] && [ "$current_ips" != "$last_ips" ]; then
+        echo "🔄 [NGINX] Upstream container IPs changed: $current_ips. Auto-reloading Nginx..."
+        nginx -s reload 2>/dev/null || true
+      fi
+      last_ips="$current_ips"
+    fi
+  done
+) &
 
 # -----------------------------
 # Launch Nginx

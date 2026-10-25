@@ -1,0 +1,192 @@
+<!-- ca/templates/ca/dashboard/partials/_tab_requests.html -->
+{% load static %}
+
+<!-- REQUESTS TELEMETRY STRIP -->
+<div class="ca-mt-kpis">
+    <div class="ca-mt-kpi">
+        <div class="ca-mt-kpi__label"><i class="fa fa-flask-vial"></i> Total Analysis Requests</div>
+        <div class="ca-mt-kpi__value">{{ counts.requests|default:requests|length|default:0 }}</div>
+        <div class="ca-mt-kpi__sub">Assigned to {{ plant_context.plant_name }}</div>
+    </div>
+    <div class="ca-mt-kpi">
+        <div class="ca-mt-kpi__label"><i class="fa fa-clock"></i> Pending Sampling</div>
+        <div class="ca-mt-kpi__value ca-val--amber">{{ queue_counts.request|default:0 }}</div>
+        <div class="ca-mt-kpi__sub">Awaiting laboratory sample collection</div>
+    </div>
+    <div class="ca-mt-kpi">
+        <div class="ca-mt-kpi__label"><i class="fa fa-microscope"></i> In Active Analysis</div>
+        <div class="ca-mt-kpi__value ca-val--cyan">{{ queue_counts.analysis|default:0 }}</div>
+        <div class="ca-mt-kpi__sub">Bench tests actively running</div>
+    </div>
+    <div class="ca-mt-kpi">
+        <div class="ca-mt-kpi__label"><i class="fa fa-fire"></i> SLA Overdue / Warning</div>
+        <div class="ca-mt-kpi__value ca-val--crimson">{{ sla.breached|default:0 }}</div>
+        <div class="ca-mt-kpi__sub">{{ sla.at_risk|default:0 }} at imminent SLA breach risk</div>
+    </div>
+</div>
+
+<!-- ADVANCED REQUESTS CONTROLS & TABLE -->
+<div class="ca-mt-panel">
+    <div class="ca-mt-panel__head">
+        <div class="ca-panel-title-group">
+            <span class="ca-mt-panel__title">
+                <i class="fa fa-vial-circle-check"></i> Chemical Analysis Requests Queue
+            </span>
+            <span class="ca-badge ca-badge--glass">{{ requests|length }} In-View</span>
+        </div>
+
+        <div class="ca-toolbar-actions">
+            <div class="ca-search-input-wrap">
+                <i class="fa fa-search ca-search-icon"></i>
+                <input type="text" id="ca-req-filter-input" class="ca-input-search" placeholder="Search request ID, batch, chemical, user..." onkeyup="filterRequestsTable()">
+            </div>
+            {% if permissions.result %}<a class="ca-mt-btn ca-mt-btn--primary" href="{% url 'ca:pending-analysis' %}">
+                <i class="fa fa-play"></i> Bench Analysis Queue
+            </a>{% endif %}
+            {% if permissions.view_process %}<a class="ca-mt-btn ca-mt-btn--danger" href="{% url 'ca:overdue-analysis' %}">
+                <i class="fa fa-clock-rotate-left"></i> Overdue Tasks
+            </a>{% endif %}
+            {% if permissions.view_chemicalrequest %}<a class="ca-mt-btn" href="{% url 'ca:request-list' %}">
+                <i class="fa fa-list"></i> All Requests
+            </a>{% endif %}
+        </div>
+    </div>
+
+    <!-- STATUS CHIP QUICK FILTERS -->
+    <div class="ca-table-filters-bar">
+        <button class="ca-filter-chip is-active" onclick="filterRequestsByStatus('ALL', this)">All Requests</button>
+        <button class="ca-filter-chip" onclick="filterRequestsByStatus('PENDING', this)">Pending</button>
+        <button class="ca-filter-chip" onclick="filterRequestsByStatus('IN_PROGRESS', this)">In Progress</button>
+        <button class="ca-filter-chip" onclick="filterRequestsByStatus('COMPLETED', this)">Completed</button>
+    </div>
+
+    <div class="ca-mt-panel__body ca-table-responsive">
+        <table class="ca-mt-table" id="ca-requests-table">
+            <thead>
+                <tr>
+                    <th>Request Identifier</th>
+                    <th>Associated Chemical Batch</th>
+                    <th>Intake Date</th>
+                    <th>Sampling Location</th>
+                    <th>Laboratory Custody</th>
+                    <th>SLA Target</th>
+                    <th>Pipeline Status</th>
+                    <th style="text-align: right;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for r in requests %}
+                <tr class="ca-req-row" data-status="{{ r.status|upper }}" data-search="{{ r.request_id }} {{ r.batch.sample_id }} {{ r.batch.chemical.name }} {{ r.batch.location.name }} {{ r.requested_by.get_full_name }} {{ r.received_by.get_full_name }}">
+                    <td>
+                        <div class="ca-sample-cell">
+                            <span class="ca-sample-id"><i class="fa fa-vial"></i> {{ r.request_id|default:r.pk }}</span>
+                            <span class="ca-sub-note">Task: Water Treatment Quality</span>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="ca-chem-cell">
+                            <strong>{{ r.batch.chemical.name|default:"General Chemical" }}</strong>
+                            {% if r.batch and permissions.view_chemicalbatch %}
+                            <a href="{% url 'ca:batch-detail' r.batch.pk %}" class="ca-link-mono" title="View Batch">
+                                <i class="fa fa-barcode"></i> {{ r.batch.sample_id|default:r.batch.batch_number }}
+                            </a>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        <span class="ca-date-text">{{ r.delivery_date|date:"M d, Y"|default:r.created_at|date:"M d, Y"|default:"—" }}</span>
+                    </td>
+                    <td>
+                        <div class="ca-loc-cell">
+                            <i class="fa fa-location-dot text-cyan"></i>
+                            <span>{{ r.batch.location.name|default:"Main Chemical Lab" }}</span>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="ca-custody-cell">
+                            <span class="ca-custody-user"><i class="fa fa-user-circle"></i> {{ r.requested_by.get_full_name|default:r.requested_by.username|default:"Lab Tech" }}</span>
+                            {% if r.received_by %}
+                            <span class="ca-sub-note">Rcvr: {{ r.received_by.get_full_name|default:r.received_by.username }}</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="ca-sla-badge-wrap">
+                            {% if r.status == 'COMPLETED' %}
+                                <span class="ca-sla-pill ca-sla-pill--on-time"><i class="fa fa-check"></i> Fulfilled</span>
+                            {% elif r.analysis_started_at %}
+                                <span class="ca-sla-pill ca-sla-pill--active"><i class="fa fa-stopwatch"></i> Lab Active</span>
+                            {% else %}
+                                <span class="ca-sla-pill ca-sla-pill--warning"><i class="fa fa-hourglass-start"></i> 9h Window</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        {% if r.status == 'COMPLETED' %}
+                            <span class="ca-status-pill ca-status-pill--emerald ca-glow-emerald"><i class="fa fa-circle-check"></i> Completed</span>
+                        {% elif r.status == 'IN_PROGRESS' %}
+                            <span class="ca-status-pill ca-status-pill--cyan ca-glow-cyan"><i class="fa fa-spinner fa-spin"></i> In Progress</span>
+                        {% else %}
+                            <span class="ca-status-pill ca-status-pill--amber ca-glow-amber"><i class="fa fa-clock"></i> Pending</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align: right;">
+                        <div class="ca-btn-group">
+                            {% if r.workflow_has_task %}
+                            <a class="ca-mt-btn ca-mt-btn--sm ca-mt-btn--primary" href="{{ r.workflow_action_url }}" title="{{ r.workflow_task_title }}">
+                                <i class="fa fa-forward-step"></i> Continue
+                            </a>
+                            {% endif %}
+                            {% if permissions.view_chemicalrequest %}<a class="ca-mt-btn ca-mt-btn--sm" href="{% url 'ca:request-detail' r.pk %}" title="Open analysis request">
+                                <i class="fa fa-file-lines"></i> Details
+                            </a>{% endif %}
+                        </div>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="8">
+                        <div class="ca-empty-state">
+                            <i class="fa fa-vial ca-empty-state__icon"></i>
+                            <h3>No Analysis Requests Pending</h3>
+                            <p>All laboratory testing requests are completed or none are currently assigned to {{ plant_context.plant_name }}.</p>
+                            {% if permissions.view_chemicalbatch %}<a class="ca-mt-btn ca-mt-btn--primary" href="{% url 'ca:batch-list' %}">
+                                <i class="fa fa-boxes-stacked"></i> Browse Batches
+                            </a>{% endif %}
+                        </div>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+function filterRequestsTable() {
+    const input = document.getElementById('ca-req-filter-input');
+    const filter = input.value.toUpperCase();
+    const rows = document.querySelectorAll('.ca-req-row');
+    rows.forEach(row => {
+        const text = row.getAttribute('data-search').toUpperCase();
+        row.style.display = text.indexOf(filter) > -1 ? '' : 'none';
+    });
+}
+
+function filterRequestsByStatus(status, btn) {
+    document.querySelectorAll('.ca-table-filters-bar .ca-filter-chip').forEach(b => b.classList.remove('is-active'));
+    if (btn) btn.classList.add('is-active');
+
+    const rows = document.querySelectorAll('.ca-req-row');
+    rows.forEach(row => {
+        const rowStatus = row.getAttribute('data-status');
+        if (status === 'ALL' || rowStatus === status) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+</script>

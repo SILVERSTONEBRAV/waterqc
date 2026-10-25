@@ -3,12 +3,14 @@ from django.urls import path
 from .authViews import (
     CheckUsernameView,
     ResetPasswordRequestView,
+    PasswordResetConfirmView,
     ChangePasswordView,
+    SessionCheckView,
 )
 
 from .LoginView import LoginView
 from .LogoutView import LogoutView
-
+from .views_notifications import DashboardNotificationAckView, DashboardNotificationsView
 from .ProfileView import (
     ProfileView,
     ProfilePictureUpdateView,
@@ -35,6 +37,8 @@ app_name = "accounts"
 
 urlpatterns = [
 
+    path("notifications/", DashboardNotificationsView.as_view(), name="notifications"),
+    path("notifications/<str:alert_id>/ack/", DashboardNotificationAckView.as_view(), name="notification-ack"),
     # =========================
     # AUTH / SESSION
     # =========================
@@ -43,10 +47,12 @@ urlpatterns = [
 
     path("login/", LoginView.as_view(), name="login"),
     path("logout/", LogoutView.as_view(), name="logout"),
+    path("session-check/", SessionCheckView.as_view(), name="session_check"),
 
     path("change-password/", ChangePasswordView.as_view(), name="change_password"),
     path("check-username/", CheckUsernameView.as_view(), name="check_username"),
     path("reset-password-request/", ResetPasswordRequestView.as_view(), name="reset_password_request"),
+    path("reset-password/<path:token>/", PasswordResetConfirmView.as_view(), name="password_reset_confirm"),
 
     # =========================
     # PROFILE

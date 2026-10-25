@@ -10,8 +10,7 @@
     hx-target="#cards-container"
     hx-swap="outerHTML"
     hx-indicator="#loading-indicator"
-    class="dashboard-stack excel-form"
-    data-autosave="true"
+    class="dashboard-stack excel-form ca-advanced-worksheet"
     data-navigation="true">
 
     {% csrf_token %}
@@ -41,8 +40,7 @@
             <div class="footer-hints">
                 <span class="hint-badge"><kbd>Enter</kbd> Save &amp; Advance</span>
                 <span class="hint-badge"><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd><kbd>←</kbd> Navigate</span>
-                <span class="hint-badge"><kbd>?</kbd> Shortcuts</span>
-                <span class="hint-status" id="autosave-status-text">Auto-save on 10s idle</span>
+                <span class="hint-status" id="autosave-status-text">Manual save required</span>
             </div>
             <div class="actions flex gap-2">
                 <button type="submit" class="btn btn-primary btn-futuristic" id="manualSaveBtn">
@@ -58,22 +56,4 @@
     </div>
 </form>
 
-<!-- Futuristic Keyboard Shortcuts Modal Dialog -->
-<dialog id="shortcutsModal" class="shortcuts-hud-dialog">
-    <div class="hud-box">
-        <div class="hud-header">
-            <h3><i class="fa-solid fa-keyboard text-accent"></i> Analytical Workspace Shortcuts</h3>
-            <button type="button" class="close-hud-btn" onclick="document.getElementById('shortcutsModal').close()">✕</button>
-        </div>
-        <div class="hud-grid">
-            <div class="hud-item"><kbd>Enter</kbd> <span>Instantly save cell &amp; advance to next</span></div>
-            <div class="hud-item"><kbd>Arrow Keys</kbd> <span>Navigate seamlessly between cells</span></div>
-            <div class="hud-item"><kbd>Ctrl + S</kbd> <span>Save all worksheet entries immediately</span></div>
-            <div class="hud-item"><kbd>F</kbd> <span>Toggle Fullscreen HUD mode</span></div>
-            <div class="hud-item"><kbd>M</kbd> <span>Toggle Sound Feedback effects</span></div>
-            <div class="hud-item"><kbd>?</kbd> <span>Toggle this shortcuts HUD</span></div>
-            <div class="hud-item"><kbd>Esc</kbd> <span>Close dialogs / Cancel input</span></div>
-        </div>
-    </div>
-</dialog>
 {% endblock %}

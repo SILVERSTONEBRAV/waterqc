@@ -226,7 +226,8 @@ class MicrobialAnalysis(TimeStampedModel):
                 analysis=self,
                 parameter=limit,
                 value=0.0,
-                manually_editable=True
+                manually_editable=True,
+                entry_status=MicrobialParameterResult.EntryStatus.PENDING,
             )
             for limit in microbial_limits if limit.id not in existing_microbial
         ]
@@ -263,7 +264,18 @@ class BaseResult(TimeStampedModel):
 
 
 class MicrobialParameterResult(BaseResult):
+    class EntryStatus(models.TextChoices):
+        RECORDED = "recorded", _("Recorded")
+        PENDING = "pending", _("Pending entry")
+        LEGACY_UNVERIFIED = "legacy_unverified", _("Verify historical value")
+
     parameter = models.ForeignKey(MicrobialLimit, on_delete=models.CASCADE)
+    entry_status = models.CharField(
+        max_length=24,
+        choices=EntryStatus.choices,
+        default=EntryStatus.RECORDED,
+        db_index=True,
+    )
 
     class Meta:
         unique_together = ("analysis", "parameter")
@@ -272,7 +284,23 @@ class MicrobialParameterResult(BaseResult):
         return f"{self.parameter.parameter.name}: {self.value}"
 
     def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        update_fields = kwargs.get("update_fields")
+        status_changed = bool(update_fields and "entry_status" in update_fields)
+        value_updated = bool(update_fields and "value" in update_fields)
+        if self.pk and update_fields is None:
+            previous_value = type(self).objects.filter(pk=self.pk).values_list("value", flat=True).first()
+            if previous_value != self.value:
+                value_updated = True
+        if value_updated:
+            self.entry_status = self.EntryStatus.RECORDED
+            if update_fields is not None:
+                kwargs["update_fields"] = tuple(set(update_fields) | {"entry_status"})
         super().save(*args, **kwargs)
+        if self.entry_status != self.EntryStatus.RECORDED:
+            return
+        if not (is_new or value_updated or status_changed):
+            return
         from .utils import detect_microbial_nonconformity
         detect_microbial_nonconformity(
             self.parameter,

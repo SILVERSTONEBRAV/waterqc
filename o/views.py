@@ -1,4 +1,5 @@
 from rest_framework import viewsets, permissions, filters, status
+from core.permissions import ViewModelPermissions
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework_simplejwt.authentication import JWTAuthentication
@@ -13,7 +14,7 @@ from .utils import get_current_shift_assignment
 # === BASE VIEWSET (dynamic serializers, filtering, etc) ===
 class DynamicSerializerViewSet(viewsets.ModelViewSet):
     authentication_classes = [JWTAuthentication]
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
 
     # Optional dynamic serializers

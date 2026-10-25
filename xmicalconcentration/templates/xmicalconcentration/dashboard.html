@@ -1,138 +1,73 @@
-{% extends "xmicalconcentration/base.html" %}
+{% extends "core/cockpit/base_cockpit.html" %}
 {% load static %}
 
-{% block content %}
-
-<div class="container-fluid mt-3">
-
-    <!-- ================= HEADER ================= -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h3 class="mb-0">
-                📊 {{ app.label }}
-            </h3>
-            <small class="text-muted">
-                Registry-driven overview for "{{ app.name }}"
-            </small>
-        </div>
-
-        <div class="text-muted small">
-            Total: {{ stats.total_models }} models
+{% block kpi_strip %}
+<div class="kpi-strip">
+    {% for kpi in kpis %}
+    <div class="kpi-card">
+        <div class="kpi-card__icon kpi-card__icon--{{ kpi.color }}"><i class="fa-solid {{ kpi.icon }}"></i></div>
+        <div class="kpi-card__body">
+            <div class="kpi-card__value">{{ kpi.value }}</div>
+            <div class="kpi-card__label">{{ kpi.label }}</div>
         </div>
     </div>
-
-
-    <!-- ================= STATS ================= -->
-    <div class="row g-3 mb-4">
-
-        {% for key, value in stats.items %}
-        <div class="col-md-3">
-            <div class="card shadow-sm border-0">
-                <div class="card-body">
-                    <small class="text-muted">{{ key|title }}</small>
-                    <h3 class="mb-0">{{ value }}</h3>
-                </div>
-            </div>
-        </div>
-        {% endfor %}
-
-    </div>
-
-
-    <!-- ================= MODELS ================= -->
-    <div class="card shadow-sm border-0">
-
-        <div class="card-header bg-light">
-            <strong>Registered Models</strong>
-        </div>
-
-        <div class="card-body p-0">
-
-            {% for m in models %}
-
-                <div class="d-flex justify-content-between align-items-center px-3 py-3 border-bottom">
-
-                    <!-- LEFT -->
-                    <div class="d-flex align-items-center">
-
-                        <div class="me-3">
-                            <i class="fas fa-{{ m.icon|default:'cube' }} fa-lg text-primary"></i>
-                        </div>
-
-                        <div>
-                            <div class="fw-semibold">
-                                {{ m.label }}
-                            </div>
-
-                            <small class="text-muted">
-                                {{ m.key }}
-                            </small>
-
-                            <!-- TAGS (pure registry-driven) -->
-                            <div class="mt-1">
-                                {% for tag in m.tags %}
-                                    <span class="badge bg-secondary">{{ tag }}</span>
-                                {% empty %}
-                                    <span class="text-muted small">No tags</span>
-                                {% endfor %}
-                            </div>
-                        </div>
-                    </div>
-
-
-                    <!-- RIGHT ACTIONS (registry-driven ONLY) -->
-                    <div class="d-flex align-items-center gap-2">
-
-                        {% with r=m.routes c=m.capabilities %}
-
-                            <a href="{{ r.list }}"
-                               class="btn btn-sm btn-outline-primary">
-                                <i class="fas fa-list"></i>
-                                List
-                            </a>
-
-                            {% if c.create %}
-                                <a href="{{ r.create }}"
-                                   class="btn btn-sm btn-outline-success">
-                                    <i class="fas fa-plus"></i>
-                                    Create
-                                </a>
-                            {% endif %}
-
-                            {% if c.export %}
-                                <a href="{{ r.export }}"
-                                   class="btn btn-sm btn-outline-warning">
-                                    <i class="fas fa-file-export"></i>
-                                    Export
-                                </a>
-                            {% endif %}
-
-                            {% if c.inline %}
-                                <a href="{{ r.update }}"
-                                   class="btn btn-sm btn-outline-info">
-                                    <i class="fas fa-edit"></i>
-                                    Inline
-                                </a>
-                            {% endif %}
-
-                        {% endwith %}
-
-                    </div>
-
-                </div>
-
-            {% empty %}
-
-                <div class="text-center text-muted py-5">
-                    <i class="fas fa-database fa-2x mb-2"></i>
-                    <div>No models registered for this app</div>
-                </div>
-
-            {% endfor %}
-
-        </div>
-    </div>
-
+    {% endfor %}
 </div>
+{% endblock %}
 
+{% block cockpit_grid %}
+<div class="cockpit-grid cockpit-grid--fit-2x3">
+    <!-- Concentration Trend -->
+    <div class="panel panel--span-2">
+        <div class="panel__header">
+            <span class="panel__title"><i class="fa-solid fa-chart-line"></i> Avg Concentration Trend (mg/L)</span>
+            <span class="pill pill--cyan">{{ period_days }}d</span>
+        </div>
+        <div class="panel__body"><div class="chart-wrap"><canvas id="concTrendChart"></canvas></div></div>
+    </div>
+    <!-- By Chemical -->
+    <div class="panel">
+        <div class="panel__header"><span class="panel__title"><i class="fa-solid fa-flask"></i> By Chemical</span></div>
+        <div class="panel__body"><div class="chart-wrap"><canvas id="byChemicalChart"></canvas></div></div>
+    </div>
+    <!-- By Tank -->
+    <div class="panel panel--span-2">
+        <div class="panel__header"><span class="panel__title"><i class="fa-solid fa-oil-can"></i> By Tank</span></div>
+        <div class="panel__body"><div class="chart-wrap"><canvas id="byTankChart"></canvas></div></div>
+    </div>
+    <!-- Recent Measurements -->
+    <div class="panel">
+        <div class="panel__header"><span class="panel__title"><i class="fa-solid fa-clock-rotate-left"></i> Recent</span><span class="live-tag">LIVE</span></div>
+        <div class="panel__body">
+            <ul class="activity-feed">
+                {% for m in recent %}
+                <li class="activity-feed__item">
+                    <div class="activity-feed__icon kpi-card__icon--cyan"><i class="fa-solid fa-vial"></i></div>
+                    <div class="activity-feed__content">
+                        <div class="activity-feed__text"><strong>{{ m.chemical }}</strong> — <span class="pill pill--cyan">{{ m.concentration }} mg/L</span> <span class="pill pill--slate">R:{{ m.reading }}</span></div>
+                        <div class="activity-feed__time">{{ m.tank }} · {{ m.by }} · {{ m.date }}</div>
+                    </div>
+                </li>
+                {% empty %}
+                <li class="empty-state"><i class="fa-solid fa-inbox"></i><span>No measurements</span></li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block dashboard_scripts %}
+{{ charts_json|json_script:"xmical-data" }}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    var d = JSON.parse(document.getElementById("xmical-data").textContent);
+    if (d.conc_trend && d.conc_trend.labels.length)
+        QADCockpit.line("concTrendChart", d.conc_trend.labels, [QADCockpit.dataset("Avg mg/L", d.conc_trend.data, "cyan", true)]);
+    if (d.by_chemical && d.by_chemical.labels.length)
+        QADCockpit.horizontalBar("byChemicalChart", d.by_chemical.labels, d.by_chemical.data, "purple");
+    if (d.by_tank && d.by_tank.labels.length)
+        QADCockpit.bar("byTankChart", d.by_tank.labels, [QADCockpit.dataset("Avg mg/L", d.by_tank.data, "emerald")]);
+});
+</script>
 {% endblock %}

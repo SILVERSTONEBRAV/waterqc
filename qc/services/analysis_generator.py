@@ -7,10 +7,6 @@ import logging
 from datetime import datetime, timedelta
 from typing import Optional
 
-from asgiref.sync import async_to_sync
-
-from channels.layers import get_channel_layer
-
 from django.core.cache import cache
 from django.db import IntegrityError, transaction
 from django.db.models import Q
@@ -266,11 +262,6 @@ class AnalysisGenerator:
                         analysis,
                         stats,
                     )
-                    cls._broadcast(
-                        analysis,
-                        plant,
-                        sample,
-                    )
                 else:
                     stats["existing"] += 1
                     if force:
@@ -368,84 +359,6 @@ class AnalysisGenerator:
 
             logger.exception(
                 "[QC] Result generation failed analysis=%s",
-                analysis.pk,
-            )
-
-
-
-    # ======================================================
-    # WEBSOCKET BROADCAST
-    # ======================================================
-
-    @classmethod
-    def _broadcast(
-        cls,
-        analysis,
-        plant,
-        sample,
-    ):
-
-        try:
-
-            channel_layer = get_channel_layer()
-
-
-            if channel_layer is None:
-                return
-
-
-            payload = {
-
-                "analysis_id":
-                    analysis.pk,
-
-                "plant_id":
-                    plant.pk,
-
-                "water_type":
-                    sample.schedule.get_water_type_display(),
-
-                "timestamp":
-                    timezone.now().isoformat(),
-
-            }
-
-
-            async_to_sync(
-                channel_layer.group_send
-            )(
-                f"qc-plant-{plant.pk}",
-                {
-                    "type":
-                        "analysis_created",
-                    **payload,
-                },
-            )
-
-
-            async_to_sync(
-                channel_layer.group_send
-            )(
-                f"qc-plant-{plant.pk}",
-                {
-                    "type":
-                        "qc_results_updated",
-                    **payload,
-                },
-            )
-
-
-            logger.info(
-                "[QC WS] Broadcast analysis=%s plant=%s",
-                analysis.pk,
-                plant.pk,
-            )
-
-
-        except Exception:
-
-            logger.exception(
-                "[QC WS] Broadcast failed analysis=%s",
                 analysis.pk,
             )
 
@@ -656,6 +569,10 @@ class AnalysisGenerator:
 
         smallest_difference = None
 
+        next_scheduled = None
+
+        smallest_future_difference = None
+
 
 
         for analysis in analyses:
@@ -682,6 +599,16 @@ class AnalysisGenerator:
 
 
             if difference < 0:
+                future_difference = -difference
+                if (
+                    future_difference <= cls.SAMPLE_WINDOW_MINUTES
+                    and (
+                        smallest_future_difference is None
+                        or future_difference < smallest_future_difference
+                    )
+                ):
+                    smallest_future_difference = future_difference
+                    next_scheduled = analysis
                 continue
 
 
@@ -696,6 +623,13 @@ class AnalysisGenerator:
                 closest = analysis
 
 
+
+        # The generator creates a sampling slot up to SAMPLE_WINDOW_MINUTES
+        # before its scheduled time. Make that newly generated cycle current
+        # right away instead of leaving the previous card visible until its
+        # wall-clock start time.
+        if next_scheduled is not None:
+            return next_scheduled
 
         if closest:
 

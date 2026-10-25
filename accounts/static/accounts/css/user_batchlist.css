@@ -1,0 +1,174 @@
+/* accounts/static/accounts/css/user_batchlist.css */
+
+/* ==========================================================================
+   USER IDENTITY CELLS & AVATARS
+   ========================================================================== */
+.ca-user-identity-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+
+.ca-user-avatar-wrap {
+    flex: 0 0 36px;
+    width: 36px;
+    height: 36px;
+}
+
+.ca-user-avatar-img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--theme-border-strong, #334155);
+}
+
+.ca-user-avatar-initials {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.ca-avatar--purple {
+    background: linear-gradient(135deg, #7c3aed, #4f46e5);
+    color: #ffffff;
+    box-shadow: 0 0 12px rgba(124, 58, 237, 0.35);
+}
+
+.ca-avatar--cyan {
+    background: linear-gradient(135deg, #0284c7, #06b6d4);
+    color: #ffffff;
+    box-shadow: 0 0 12px rgba(6, 182, 212, 0.35);
+}
+
+.ca-avatar--slate {
+    background: linear-gradient(135deg, #334155, #1e293b);
+    color: #cbd5e1;
+}
+
+.ca-user-info-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+}
+
+.ca-user-name {
+    font-weight: 700;
+    font-size: 0.8rem;
+    color: var(--theme-text, #f8fafc);
+    text-decoration: none;
+    transition: color 0.15s ease;
+}
+
+.ca-user-name:hover {
+    color: var(--theme-accent, #38bdf8);
+}
+
+.ca-user-pf {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.68rem;
+    color: var(--theme-muted, #94a3b8);
+}
+
+/* ==========================================================================
+   METADATA CELLS & LABELS
+   ========================================================================== */
+.ca-role-cell,
+.ca-contact-cell,
+.ca-org-cell,
+.ca-facility-cell,
+.ca-security-cell,
+.ca-date-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.ca-contact-link {
+    font-size: 0.72rem;
+    color: var(--theme-text, #cbd5e1);
+    text-decoration: none;
+    max-width: 170px;
+}
+
+.ca-contact-link:hover {
+    color: var(--theme-accent, #38bdf8);
+}
+
+.ca-section-badge {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #38bdf8;
+    background: rgba(56, 189, 248, 0.12);
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    padding: 0.15rem 0.45rem;
+    border-radius: 6px;
+    max-width: 160px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ca-plant-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #10b981;
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    padding: 0.15rem 0.45rem;
+    border-radius: 6px;
+}
+
+.ca-plant-tag--global {
+    color: #a855f7;
+    background: rgba(168, 85, 247, 0.12);
+    border-color: rgba(168, 85, 247, 0.25);
+}
+
+.ca-warning-badge {
+    display: inline-block;
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: #f59e0b;
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    padding: 0.08rem 0.35rem;
+    border-radius: 4px;
+}
+
+/* Status pills */
+.ca-status-pill--purple {
+    background: rgba(168, 85, 247, 0.15);
+    color: #c084fc;
+    border: 1px solid rgba(168, 85, 247, 0.35);
+}
+
+.ca-status-pill--indigo {
+    background: rgba(99, 102, 241, 0.15);
+    color: #818cf8;
+    border: 1px solid rgba(99, 102, 241, 0.35);
+}
+
+.ca-glow-purple {
+    box-shadow: 0 0 8px rgba(168, 85, 247, 0.3);
+}
+
+.ca-val--purple {
+    color: #c084fc !important;
+}
+
+.ca-val--indigo {
+    color: #818cf8 !important;
+}

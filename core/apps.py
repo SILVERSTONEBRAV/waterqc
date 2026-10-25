@@ -38,6 +38,19 @@ class CoreConfig(AppConfig):
     def ready(self) -> None:
         cls = self.__class__
 
+        # These small, idempotent hooks establish request-scoped superuser
+        # authorization in Django, the admin, DRF, deletion Collector, and
+        # Viewflow before optional startup work is considered.
+        from core.engine.superuser_authorization import install_superuser_authorization
+
+        install_superuser_authorization()
+
+        # Register post-commit live refresh events even for lightweight
+        # management startup modes; registration itself performs no I/O.
+        from core.realtime_signals import register_realtime_signals
+
+        register_realtime_signals()
+
         if cls._initialized:
             return
 

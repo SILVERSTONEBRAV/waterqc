@@ -39,11 +39,22 @@ class LoginView(View):
         if request.user.is_authenticated:
             return redirect(self._resolve_landing(request, request.user))
 
+        reason = request.GET.get("reason", "")
+        error_msg = ""
+        if reason == "concurrent_login":
+            error_msg = "Your account was logged in from another computer. You were automatically logged out."
+        elif reason == "window_closed":
+            error_msg = "Previous session was closed when window exited. Please sign in again."
+        elif reason == "logged_out":
+            error_msg = "You have been logged out."
+        elif request.GET.get("expired") == "1":
+            error_msg = "Your session expired. Please sign in again."
+
         return render(request, self.template_name, {
             "username": "",
-            "error": "",
+            "error": error_msg,
             "next": request.GET.get("next", ""),
-            "session_expired": request.GET.get("expired") == "1",
+            "session_expired": bool(error_msg),
             "remember_me": False,
         })
 
@@ -99,7 +110,7 @@ class LoginView(View):
         # -----------------------------
         auth_login(request, user)
 
-        self._initialize_session(request, user, remember=True)
+        self._initialize_session(request, user, remember=False)
 
         request.session.save()
 
@@ -122,20 +133,44 @@ class LoginView(View):
             })
 
         return redirect(redirect_url)
-    def _initialize_session(self, request, user, remember: bool):
-        request.session.set_expiry(self.remember_me_age if remember else 0)
+    def _initialize_session(self, request, user, remember: bool = False):
+        from django.core.cache import cache
+
+        # Window/browser close must terminate the session: set expiry to 0
+        request.session.set_expiry(0)
         request.session.cycle_key()
+        session_key = request.session.session_key
+
+        # Invalidate any previous session for this user on other computers
+        cache_key = f"active_user_session:{user.pk}"
+        old_session_key = cache.get(cache_key)
+        if old_session_key and old_session_key != session_key:
+            logger.info("TERMINATING_PREVIOUS_SESSION user=%s old_session=%s", user.username, old_session_key)
+            try:
+                from django.contrib.sessions.backends.cache import SessionStore
+                SessionStore(session_key=old_session_key).delete()
+            except Exception:
+                pass
+            try:
+                from django.contrib.sessions.models import Session
+                Session.objects.filter(session_key=old_session_key).delete()
+            except Exception:
+                pass
+
+        # Register current session as the single active session for this user
+        timeout = getattr(settings, "SESSION_COOKIE_AGE", 28800)
+        cache.set(cache_key, session_key, timeout=timeout)
+
         request.session.update({
             "user_id": user.pk,
             "username": user.username,
             "login_ts": timezone.now().timestamp(),
             "primary_group": self._primary_group(user),
         })
-        if hasattr(user, "reset_failed_login_attempts"):
-            user.reset_failed_login_attempts()
+        user.failed_login_attempts = 0
         user.is_locked = False
         user.last_login = timezone.now()
-        user.save(update_fields=["is_locked", "last_login"])
+        user.save(update_fields=["failed_login_attempts", "is_locked", "last_login"])
 
 
     def _handle_failed_login(self, request, username, is_ajax):
@@ -240,20 +275,6 @@ class LoginView(View):
     from accounts.utils import get_user_landing_url
 
     def _resolve_landing(self, request, user):
-
-        session_candidates = [
-            request.session.get(self.last_page_key),
-            request.session.get(self.last_url_key),
-            request.session.get(self.last_module_key),
-        ]
-
-        for candidate in session_candidates:
-
-            safe_candidate = self._safe_next(candidate)
-
-            if safe_candidate:
-                return safe_candidate
-
         return get_user_landing_url(user)
     def _resolve_target(self, target: str):
         if target is None:

@@ -75,7 +75,7 @@
                 <div class="detail-item">
                     <span class="detail-label">Location</span>
                     <span class="detail-value">
-                        {{ analysis_request.location|default:"—" }}
+                        {{ analysis_request.batch.location|default:"—" }}
                     </span>
                 </div>
 
@@ -300,4 +300,11 @@
 
 
 </div>
+{% if request.GET.assignment == "complete" %}
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.CA_Notifications) window.CA_Notifications.fetchNotifications();
+        });
+    </script>
+{% endif %}
 {% endblock %}

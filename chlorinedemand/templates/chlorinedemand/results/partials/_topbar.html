@@ -1,0 +1,164 @@
+{% load custom_filters %}
+
+<div id="chlorine-topbars" class="cl-topbar-wrapper">
+    <!-- 1. Real-time Process Telemetry Ticker -->
+    <div class="cl-telemetry-bar">
+        <div class="cl-live-badge">
+            <span class="cl-pulse-beacon"></span>
+            <span>{% if telemetry.is_live %}QC DISINFECTION TELEMETRY{% else %}BASELINE DISINFECTION TELEMETRY{% endif %}</span>
+            <span class="badge bg-emerald-subtle text-emerald px-1 py-0" style="font-size:0.65rem; border:1px solid #10b981;">Target Cl₂: {{ target_residual }} mg/L</span>
+        </div>
+
+        <div class="cl-telemetry-ticker">
+            <div class="cl-ticker-chip">
+                <span class="chip-label">Plant:</span>
+                <span class="chip-val">{{ plant.name|default:"Main Plant" }}</span>
+            </div>
+            <div class="cl-ticker-chip">
+                <span class="chip-label">Raw pH:</span>
+                <span class="chip-val" style="color:#a78bfa;">{{ telemetry.ph }}</span>
+            </div>
+            <div class="cl-ticker-chip">
+                <span class="chip-label">Raw Turbidity:</span>
+                <span class="chip-val" style="color:#38bdf8;">{{ telemetry.turbidity }}</span>
+            </div>
+            <div class="cl-ticker-chip">
+                <span class="chip-label">Water Temp:</span>
+                <span class="chip-val" style="color:#fbbf24;">{{ telemetry.temp }}</span>
+            </div>
+            {% if telemetry.ammonia != "--" %}
+            <div class="cl-ticker-chip">
+                <span class="chip-label">NH₃-N:</span>
+                <span class="chip-val" style="color:#f43f5e;">{{ telemetry.ammonia }}</span>
+            </div>
+            {% endif %}
+            <div class="cl-ticker-chip">
+                <span class="chip-label">Treated Cl₂ Residual:</span>
+                <span class="chip-val" style="color:#10b981;">{{ telemetry.treated_residual }}</span>
+            </div>
+            {% for itm in telemetry.ticker_items %}
+            <div class="cl-ticker-chip">
+                <span class="chip-label">{{ itm.name }}:</span>
+                <span class="chip-val">{{ itm.val }}</span>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="cl-btn-mini" onclick="window.location.reload();" title="Refresh Live QC Feed">
+                <i class="fa-solid fa-arrows-rotate"></i>
+                <span>Refresh</span>
+            </button>
+            <div class="cl-meta-pill" style="font-family:'JetBrains Mono', monospace; font-size:0.75rem;">
+                <i class="fa-regular fa-clock"></i>
+                <span>{% now "H:i:s" %}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Session Controls, Optimal Breakpoint Crown HUD & 3-Tier Approvals -->
+    <div class="cl-control-bar">
+        <!-- Left: Plant & Date Selector -->
+        <div class="cl-session-meta">
+            <div class="cl-meta-pill">
+                <i class="fa-solid fa-industry text-emerald"></i>
+                <select name="plant" id="plant-select" class="cl-select" onchange="const u = new URL(window.location); u.searchParams.set('plant', this.value); window.location = u;">
+                    {% for p in available_plants %}
+                    <option value="{{ p.pk }}" {% if plant.pk == p.pk %}selected{% endif %}>
+                        {{ p.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="cl-meta-pill">
+                <i class="fa-regular fa-calendar-days text-cyan"></i>
+                <input type="date"
+                       name="date"
+                       value="{{ test_date|date:'Y-m-d' }}"
+                       class="cl-date-input"
+                       onchange="const u = new URL(window.location); u.searchParams.set('date', this.value); window.location = u;">
+            </div>
+
+            <div class="cl-meta-pill">
+                <i class="fa-solid fa-user-gear text-muted"></i>
+                <span class="small text-muted">Analyst:</span>
+                <span class="fw-semibold">{{ chlorine_test.analyst.username|default:current_user.username }}</span>
+            </div>
+        </div>
+
+        <!-- Center: Optimal Breakpoint Dosage HUD -->
+        <div class="cl-hud-optimal">
+            <div class="hud-crown">
+                <i class="fa-solid fa-shield-virus"></i>
+            </div>
+            <div class="hud-content">
+                <span class="hud-title">Established Chlorine Dosage</span>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="hud-dosage">
+                        {% if chlorine_test.established_dosage_mg_per_l %}
+                            {{ chlorine_test.established_dosage_mg_per_l }} <span style="font-size:0.75rem;font-weight:600;">mg/L Cl₂</span>
+                        {% else %}
+                            -- mg/L
+                        {% endif %}
+                    </span>
+                    {% if optimal_jar %}
+                    <span class="hud-jar-tag">
+                        Jar {{ optimal_jar.jar_number }} (Rank #1)
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: 3-Tier Multi-Role QA Verification Pipeline -->
+        <div class="cl-review-strip">
+            <!-- 1. Verify -->
+            {% if chlorine_test.verified_at %}
+                <div class="cl-review-step completed" title="Verified by {{ chlorine_test.verified_by.username }} on {{ chlorine_test.verified_at|date:'M d, H:i' }}">
+                    <i class="fa-solid fa-circle-check"></i>
+                    <span>Verified: {{ chlorine_test.verified_by.username }}</span>
+                </div>
+            {% else %}
+                <button type="submit" name="action" value="verify" class="cl-action-btn btn-verify" title="Verify residual observations">
+                    <i class="fa-solid fa-check-double"></i>
+                    <span>Verify</span>
+                </button>
+            {% endif %}
+
+            <!-- 2. Confirm -->
+            {% if chlorine_test.confirmed_at %}
+                <div class="cl-review-step completed" title="Confirmed by {{ chlorine_test.confirmed_by.username }} on {{ chlorine_test.confirmed_at|date:'M d, H:i' }}">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <span>Confirmed: {{ chlorine_test.confirmed_by.username }}</span>
+                </div>
+            {% elif chlorine_test.verified_at %}
+                <button type="submit" name="action" value="confirm" class="cl-action-btn btn-confirm" title="Confirm breakpoint determination">
+                    <i class="fa-solid fa-shield-heart"></i>
+                    <span>Confirm</span>
+                </button>
+            {% endif %}
+
+            <!-- 3. Approve -->
+            {% if chlorine_test.approved_at %}
+                <div class="cl-review-step completed" title="Authorized by {{ chlorine_test.approved_by.username }} on {{ chlorine_test.approved_at|date:'M d, H:i' }}">
+                    <i class="fa-solid fa-stamp"></i>
+                    <span>Approved: {{ chlorine_test.approved_by.username }}</span>
+                </div>
+            {% elif chlorine_test.confirmed_at %}
+                <button type="submit" name="action" value="approve" class="cl-action-btn btn-approve" title="Authorize and establish plant chlorine dosage">
+                    <i class="fa-solid fa-stamp"></i>
+                    <span>Approve</span>
+                </button>
+            {% endif %}
+
+            <!-- Revert Action -->
+            {% if chlorine_test.verified_at and not chlorine_test.approved_at %}
+                <button type="submit" name="action" value="revert_verification" class="cl-action-btn btn-revert" title="Revert to allow edits">
+                    <i class="fa-solid fa-arrow-rotate-left"></i>
+                    <span>Revert</span>
+                </button>
+            {% endif %}
+        </div>
+    </div>
+</div>

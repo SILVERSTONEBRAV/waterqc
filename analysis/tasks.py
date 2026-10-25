@@ -68,15 +68,29 @@ def analyze_heavy_metal_water(data_id):
 
 @shared_task
 def send_alert_email(subject, message, recipient_list):
+    try:
+        from alerts.tasks import generate_voice_notification
+        generate_voice_notification.delay(message, title=subject)
+    except Exception as e:
+        logger.warning(f"Voice generation error in send_alert_email: {e}")
     send_mail(subject, message, 'noreply@example.com', recipient_list)
 
 @shared_task
 def send_alert_notification(message):
+    try:
+        from alerts.models import VoiceAlert
+        voice_alert = VoiceAlert.generate_persistent_voice_alert(message=message, title="Analysis Alert")
+        voice_url = voice_alert.audio_file.url if voice_alert and voice_alert.audio_file else None
+    except Exception as e:
+        logger.warning(f"Voice generation error in send_alert_notification: {e}")
+        voice_url = None
+
     channel_layer = get_channel_layer()
     async_to_sync(channel_layer.group_send)(
         "alerts_group",
         {
             "type": "alert.message",
-            "message": message
+            "message": message,
+            "voice_url": voice_url,
         }
     )

@@ -22,17 +22,16 @@
     }
 
     function isDarkMode() {
-        const theme = document.documentElement.getAttribute('data-theme');
-        return theme === 'dark' || theme === 'oled' || theme === 'amoled' || theme === 'aurora' || theme === 'celestial';
+        return document.documentElement.classList.contains('theme-dark');
     }
 
     function getChartThemeDefaults() {
         const dark = isDarkMode();
         return {
-            textColor: dark ? '#cbd5e1' : '#475569',
+            textColor: getThemeColor('--theme-text-secondary', dark ? '#d0d8e0' : '#344054'),
             gridColor: dark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(0, 0, 0, 0.05)',
-            accentColor: getThemeColor('--theme-accent', '#0284c7'),
-            fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif"
+            accentColor: getThemeColor('--theme-accent', '#417690'),
+            fontFamily: getThemeColor('--font-sans', '"Segoe UI", system-ui, Roboto, Arial, sans-serif')
         };
     }
 

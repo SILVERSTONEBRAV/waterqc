@@ -1,0 +1,183 @@
+{% extends "qc/results/base.html" %}
+{% load static custom_filters %}
+
+{% block title %}Jar Test Coagulation &amp; Flocculation Dashboard | {{ plant.name|default:"Jar Test" }}{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'jartest/css/jartest_dashboard.css' %}?v=20261020-compact-reports">
+    <script src="{% static 'js/plotly.min.js' %}" defer></script>
+    <script src="{% static 'jartest/js/jartest_dashboard.js' %}?v=20261020-compact-reports" defer></script>
+{% endblock %}
+
+{% block content %}
+<main class="jt-workspace-root" data-raw-turbidity="{{ raw_metrics.turbidity|default:'' }}"
+      data-raw-color="{{ raw_metrics.color|default:'' }}" data-raw-ph="{{ raw_metrics.ph|default:'' }}">
+    {% if not plant %}
+    <section class="jt-no-plant-card" role="status">
+        <span class="jt-orbit-icon"><i class="fa-solid fa-satellite-dish"></i></span>
+        <h1>No treatment plant assigned</h1>
+        <p>Your jar-test workspace is hidden until your account is assigned to a treatment plant.</p>
+    </section>
+    {% else %}
+    <section id="jt-bench-panel" class="jt-tab-panel is-active" role="tabpanel" aria-labelledby="jt-bench-tab" data-jt-panel="bench">
+        <form method="post" action="" hx-post="{{ request.get_full_path }}" hx-target="#jar-matrix-container"
+              hx-swap="outerHTML" hx-indicator="#jt-loading-indicator" class="jt-bench-form" id="jar-bench-form">
+            {% csrf_token %}
+            <input type="hidden" name="plant" value="{{ plant.pk }}">
+            <input type="hidden" name="date" value="{{ test_date|date:'Y-m-d' }}">
+            {% include "jartest/results/partials/_topbar.html" %}
+
+            <div class="jt-main-layout">
+                <div class="jt-matrix-col" id="jar-matrix-container">
+                    {% include "jartest/results/partials/_jar_matrix.html" %}
+                </div>
+                <div class="jt-side-col">
+                    {% include "jartest/results/partials/_coagulation_curve.html" %}
+                </div>
+            </div>
+
+            <div id="jt-loading-indicator" class="htmx-indicator realtime-loading-pill">
+                <span class="loading-spinner"></span>
+                <span>Recomputing jar-test performance…</span>
+            </div>
+            <div class="jt-footer-toolbar">
+                <div class="jt-hints-strip">
+                    <span class="jt-hint-badge"><kbd>Ctrl+S</kbd> Save bench</span>
+                    <span class="jt-hint-badge"><kbd>Space</kbd> Timer toggle</span>
+                    <span class="jt-hint-badge">Historical inputs: linked raw-water samples</span>
+                </div>
+                <div class="jt-actions-strip">
+                    <button type="submit" name="action" value="save_jars" class="btn-jt-save" id="saveJarTestBtn">
+                        <i class="fa-solid fa-floppy-disk"></i><span>Save Coagulation Data</span>
+                    </button>
+                    <button type="button" class="btn-jt-print" onclick="window.print();" title="Print Jar Test Lab Certificate">
+                        <i class="fa-solid fa-print"></i><span>Print Certificate</span>
+                    </button>
+                </div>
+            </div>
+        </form>
+    </section>
+
+    <section id="jt-intelligence-panel" class="jt-tab-panel jt-intelligence-panel" role="tabpanel"
+             aria-labelledby="jt-intelligence-tab" data-jt-panel="intelligence" hidden>
+        <div class="jt-intelligence-body">
+            <div class="jt-intel-kpis" aria-live="polite">
+                <article class="jt-intel-kpi"><span>Completed tests</span><strong data-jt-stat="count">{{ dosage_analytics.summary.count|default:0 }}</strong><small>verified · confirmed · approved</small></article>
+                <article class="jt-intel-kpi"><span>Typical established dose</span><strong><b data-jt-stat="median">{{ dosage_analytics.summary.median|default:"—" }}</b><em>mg/L</em></strong><small>historical median</small></article>
+                <article class="jt-intel-kpi"><span>Historical central range</span><strong><b data-jt-stat="range">{% if dosage_analytics.summary.q1 != None %}{{ dosage_analytics.summary.q1 }}–{{ dosage_analytics.summary.q3 }}{% else %}—{% endif %}</b><em>mg/L</em></strong><small>25th–75th percentile</small></article>
+                <article class="jt-intel-kpi"><span>Input provenance</span><strong class="jt-kpi-label">Raw water + prior sample</strong><small>sample and plant scoped</small></article>
+            </div>
+
+            <div class="jt-predictor-grid">
+                <section class="jt-glass-card jt-predictor-card">
+                    <div class="jt-card-heading">
+                        <div><span class="jt-kicker">LIVE SCENARIO</span><h2>Describe the raw water</h2></div>
+                        <span class="jt-live-chip"><i class="fa-solid fa-circle"></i> Editable inputs</span>
+                    </div>
+                    <p class="jt-card-intro">Use the current sample values. Cyan-marked fields are informative in this history; enter at least 60% of these fields (minimum three, or all if fewer). Prior values are shown as context.</p>
+
+                    <form id="jt-prediction-form" class="jt-prediction-form" method="post"
+                          action="{% url 'jartest:predict_dosage' %}" data-predict-url="{% url 'jartest:predict_dosage' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="plant" value="{{ plant.pk }}">
+                        <input type="hidden" name="sample_date" value="{{ test_date|date:'Y-m-d' }}">
+                        <label class="jt-field-label" for="jt-predict-coagulant">Coagulant</label>
+                        <select id="jt-predict-coagulant" class="jt-field-control" name="coagulant">
+                            {% for chemical in available_coagulants %}
+                            <option value="{{ chemical.pk }}" {% if selected_coagulant.pk == chemical.pk %}selected{% endif %}>{{ chemical.name }}{% if chemical.code %} · {{ chemical.code }}{% endif %}</option>
+                            {% endfor %}
+                        </select>
+
+                        {% if predictor_parameters %}
+                        <div class="jt-parameter-grid">
+                            {% for parameter in predictor_parameters %}
+                            <label class="jt-parameter-field {% if parameter.modeled %}is-modeled{% endif %}">
+                                <span class="jt-parameter-title">{{ parameter.name }}{% if parameter.unit %}<small>{{ parameter.unit }}</small>{% endif %}</span>
+                                <input type="number" inputmode="decimal" min="0" step="any" name="raw_{{ parameter.id }}"
+                                       value="{{ parameter.value }}" placeholder="Enter {{ parameter.name|lower }}" autocomplete="off">
+                                <span class="jt-parameter-prior">
+                                    {% if parameter.value_from_prior %}Prefilled from prior sample · verify{% elif parameter.prior_value != None %}Prior sample: {{ parameter.prior_value }}{% if parameter.unit %} {{ parameter.unit }}{% endif %}
+                                    {% else %}No prior measurement{% endif %}
+                                    {% if parameter.modeled %}<b>MODEL INPUT</b>{% endif %}
+                                </span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="jt-empty-state"><i class="fa-solid fa-water"></i><strong>No raw-water parameters are configured</strong><p>Configure Raw Water or Coagulated Water limits for this plant to enter analytical measurements.</p></div>
+                        {% endif %}
+
+                        {% if dosage_analytics.prior_sample %}
+                        <div class="jt-prior-sample"><span class="jt-prior-icon"><i class="fa-solid fa-clock-rotate-left"></i></span><div><b>Prior raw-water sample</b><span>{{ dosage_analytics.prior_sample.source }} · {{ dosage_analytics.prior_sample.date }}</span></div><span class="jt-prior-status">linked</span></div>
+                        {% else %}
+                        <div class="jt-prior-sample is-empty"><span class="jt-prior-icon"><i class="fa-solid fa-clock-rotate-left"></i></span><div><b>No prior raw-water sample</b><span>Prior-water trend inputs will be unavailable until an earlier measurement is recorded.</span></div></div>
+                        {% endif %}
+
+                        <button type="submit" class="jt-predict-button" id="jt-predict-button" {% if not available_coagulants or not predictor_parameters %}disabled{% endif %}>
+                            <span class="jt-button-star"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
+                            <span><b>Estimate dosage</b><small>Fit and validate against approved jar tests</small></span>
+                            <i class="fa-solid fa-arrow-right jt-button-arrow"></i>
+                        </button>
+                        <p class="jt-safety-note"><i class="fa-solid fa-circle-info"></i> Decision support only. Confirm any proposed dose with a fresh jar test and the responsible operator before treatment.</p>
+                    </form>
+                </section>
+
+                <section class="jt-glass-card jt-estimate-card" id="jt-estimate-card" aria-live="polite" aria-atomic="true">
+                    <div class="jt-card-heading">
+                        <div><span class="jt-kicker">MODEL OUTPUT</span><h2 id="jt-result-heading">Awaiting sample values</h2></div>
+                        <span class="jt-result-seal" id="jt-result-seal"><i class="fa-solid fa-atom"></i></span>
+                    </div>
+                    <div class="jt-result-placeholder" id="jt-result-placeholder">
+                        <div class="jt-placeholder-constellation"><span></span><span></span><span></span><i class="fa-solid fa-flask"></i></div>
+                        <p>Enter this sample’s raw-water values to calculate a history-based estimate.</p>
+                    </div>
+                    <div class="jt-result-content" id="jt-result-content" hidden>
+                        <div class="jt-dose-readout"><strong id="jt-result-dose">—</strong><span>mg/L</span></div>
+                        <div class="jt-dose-band"><span>Calibrated historical error band</span><b id="jt-result-interval">—</b><small>bounded by established doses in the training history</small></div>
+                        <div class="jt-confidence-row"><span>Confidence</span><b id="jt-result-confidence">—</b><span id="jt-result-model">—</span></div>
+                        <div class="jt-validation-strip">
+                            <div><span>Temporal validation MAE</span><b id="jt-result-mae">—</b></div>
+                            <div><span>Training outcomes</span><b id="jt-result-count">—</b></div>
+                            <div><span>CV method</span><b id="jt-result-validation">—</b></div>
+                            <div><span>Feature coverage</span><b id="jt-result-coverage">—</b></div>
+                        </div>
+                        <div class="jt-model-comparison"><h3>Model selection · lower error is better</h3><div id="jt-model-score-list"></div></div>
+                        <div class="jt-domain-warning" id="jt-domain-warning" hidden></div>
+                        <div class="jt-similar-cases"><h3><i class="fa-solid fa-diagram-project"></i> Closest historical jar tests</h3><div id="jt-nearest-cases"></div></div>
+                    </div>
+                    <div class="jt-result-message" id="jt-result-message" hidden role="status"></div>
+                    <div class="jt-predictor-loading" id="jt-predictor-loading" hidden><span class="jt-spinner-orbit"></span><b>Comparing raw-water signatures</b><small>Cross-validating historical models…</small></div>
+                </section>
+            </div>
+
+            <section class="jt-analytics-section">
+                <div class="jt-section-title"><div><span class="jt-kicker">EVIDENCE FIELD</span><h2>How your plant has dosed</h2><p>Each point is one approved established dosage, paired with its linked raw-water signature.</p></div><span class="jt-records-pill"><i class="fa-solid fa-check-double"></i><b id="jt-history-count">{{ dosage_analytics.summary.count|default:0 }}</b> approved outcomes</span></div>
+                <div class="jt-chart-grid">
+                    <article class="jt-glass-card jt-chart-card"><div class="jt-chart-heading"><div><h3>Dosage through time</h3><p>Approved jar-test outcomes and model estimate</p></div><span>mg/L</span></div><div id="jt-history-chart" class="jt-plot" role="img" aria-label="Historical established dosage over time"></div></article>
+                    <article class="jt-glass-card jt-chart-card"><div class="jt-chart-heading"><div><h3>Raw-water signatures</h3><p>Parameter association with established dosage</p></div><span>Spearman ρ</span></div><div id="jt-correlation-chart" class="jt-plot" role="img" aria-label="Association between raw-water parameters and established dosage"></div></article>
+                    <article class="jt-glass-card jt-chart-card"><div class="jt-chart-heading"><div><h3>Established-dose distribution</h3><p>Observed outcomes and interquartile spread</p></div><span>distribution</span></div><div id="jt-dose-distribution-chart" class="jt-plot" role="img" aria-label="Distribution of historical established dosages"></div></article>
+                </div>
+            </section>
+
+            <section class="jt-glass-card jt-history-table-card">
+                <div class="jt-section-title compact"><div><span class="jt-kicker">SOURCE RECORDS</span><h2>Approved jar-test history</h2></div><span class="jt-source-caption">Only verified, confirmed, approved tests are included.</span></div>
+                <div class="jt-history-table-wrap"><table class="jt-history-table"><thead><tr><th>Test date</th><th>Established dose</th><th>Raw-water sample</th><th>QC analysis</th></tr></thead><tbody id="jt-history-table-body">
+                    {% for row in dosage_analytics.history|slice:":12" %}
+                    <tr><td>{{ row.date }}</td><td><b>{{ row.dose|floatformat:2 }} mg/L</b></td><td>{% if row.raw %}{{ row.raw|length }} measured parameter{{ row.raw|length|pluralize }}{% else %}No linked parameters{% endif %}</td><td>{% if row.qc_reference %}<span class="jt-qc-reference">{{ row.qc_reference }}</span>{% else %}<span class="jt-no-reference">QC match unavailable</span>{% endif %}</td></tr>
+                    {% empty %}
+                    <tr class="jt-empty-row"><td colspan="4">No completed, approved jar tests match this plant and selected coagulant yet.</td></tr>
+                    {% endfor %}
+                </tbody></table></div>
+            </section>
+            <p class="jt-method-note"><i class="fa-solid fa-microscope"></i> Method: plant- and coagulant-specific approved outcomes; linked jar-test RawWater values enriched from time-aligned QC RawWaterResult (bounded by sample time, or same-day test-record time when the sample timestamp is midnight); previous measured water used as lag and change features. A SciPy Huber robust regression is compared with regularized, tree-based models and a historical-median baseline using out-of-sample validation. Predictions are bounded to historical established-dose limits.</p>
+        </div>
+    </section>
+
+    {% include "jartest/results/partials/_reports_panel.html" %}
+    {% endif %}
+</main>
+
+{{ chart_points|json_script:"jartest-chart-data" }}
+{{ dosage_analytics|json_script:"jt-dosage-history-data" }}
+{{ jar_test_reports|json_script:"jt-report-data" }}
+{% endblock %}

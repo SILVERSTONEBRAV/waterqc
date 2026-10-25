@@ -214,6 +214,26 @@ class CoagulatedWaterLimit(AbstractWaterLimit):
 
 class FilteredWaterLimit(AbstractWaterLimit):
     parameter = models.ForeignKey(PhysicochemicalParameter, on_delete=models.CASCADE)
+    water_filter = models.ForeignKey(
+        WaterFilter,
+        on_delete=models.CASCADE,
+        related_name='filtered_water_limits',
+        null=True,
+        blank=True,
+        help_text="Filter this parameter limit applies to.",
+    )
+
+    def clean(self):
+        super().clean()
+        if not self.water_filter_id:
+            return
+        water_filter = self.water_filter
+        if water_filter.treatment_plant_id not in (None, self.treatment_plant_id):
+            raise ValidationError("The selected filter belongs to a different treatment plant.")
+        if not water_filter.phase_id:
+            raise ValidationError("A filtered-water limit must be linked to a filter assigned to a phase.")
+        if water_filter.phase.treatment_plant_id != self.treatment_plant_id:
+            raise ValidationError("The selected filter phase belongs to a different treatment plant.")
 
     def __str__(self):
         return f"{self.parameter.name} limit for {self.treatment_plant.name}"

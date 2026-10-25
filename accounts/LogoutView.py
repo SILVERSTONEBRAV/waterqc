@@ -9,10 +9,17 @@ from django.core.cache import cache
 from django.contrib.sessions.models import Session
 from django.http import JsonResponse
 
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+
 logger = logging.getLogger(__name__)
 
 
-class LogoutView(LoginRequiredMixin, View):
+@method_decorator(csrf_exempt, name="dispatch")
+class LogoutView(View):
+
+    def post(self, request):
+        return self.get(request)
 
     def get(self, request):
         user = request.user
@@ -32,6 +39,10 @@ class LogoutView(LoginRequiredMixin, View):
 
         # 3. Terminate all sessions
         self._terminate_all_user_sessions(user)
+        try:
+            cache.delete(f"active_user_session:{user.pk}")
+        except Exception:
+            pass
 
         # 4. JWT invalidation hook
         self._invalidate_jwt_tokens(user)

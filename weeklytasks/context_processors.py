@@ -34,9 +34,16 @@ def water_treatment_chemical_analysis_context(request):
     if not treatment_plant_id or not section_id:
         return context
 
+    from django.core.cache import cache
+
     now = timezone.localtime()
     current_date = now.date()
     current_time = now.time()
+
+    cache_key = f"wt_chem_analysis:{user.id}:{current_date}:{now.hour}"
+    cached_result = cache.get(cache_key)
+    if cached_result is not None:
+        return cached_result
 
     task = (
         WeeklyDutyTask.objects
@@ -63,6 +70,7 @@ def water_treatment_chemical_analysis_context(request):
     )
 
     if not task:
+        cache.set(cache_key, context, 60)
         return context
 
     assignments = (
@@ -109,4 +117,5 @@ def water_treatment_chemical_analysis_context(request):
     context["water_treatment_chemical_analysis_task"] = task
     context["water_treatment_chemical_analysis_analysts"] = analysts
 
+    cache.set(cache_key, context, 60)
     return context

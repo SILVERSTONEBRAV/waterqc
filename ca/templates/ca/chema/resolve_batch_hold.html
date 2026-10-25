@@ -1,0 +1,18 @@
+{% extends "ca/dashboard/layout/app.html" %}
+{% block title %}Resolve batch hold · {{ hold.batch.sample_id }}{% endblock %}
+{% block content %}
+<main class="ca-page" style="max-width:900px;margin-inline:auto">
+    <header class="page-header">
+        <div><p class="eyebrow">Batch quality gate · {{ hold.batch.sample_id }}</p><h1>Resolve intake hold</h1><p>{{ hold.batch.chemical }} · {{ hold.batch.treatment_plant }}</p></div>
+        <a class="btn btn-secondary" href="{% url 'ca:batch-detail' hold.batch_id %}">Back to batch</a>
+    </header>
+    <section class="card"><div class="card-body">
+        <h2>{{ hold.get_issue_display }}</h2><p>{{ hold.details }}</p>
+        <form method="post">{% csrf_token %}
+            {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+            {% for field in form.visible_fields %}<div class="form-group" style="margin-block:1rem"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.errors %}<div class="field-errors">{{ field.errors }}</div>{% endif %}</div>{% endfor %}
+            <div class="page-actions"><a class="btn btn-secondary" href="{% url 'ca:batch-detail' hold.batch_id %}">Cancel</a><button class="btn btn-primary" type="submit">Save hold disposition</button></div>
+        </form>
+    </div></section>
+</main>
+{% endblock %}

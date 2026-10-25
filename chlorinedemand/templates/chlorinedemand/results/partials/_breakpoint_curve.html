@@ -1,0 +1,92 @@
+<div class="cl-curve-container">
+    <div class="cl-curve-header">
+        <div class="d-flex align-items-center gap-2">
+            <i class="fa-solid fa-chart-line text-cyan"></i>
+            <h6 class="m-0 fw-bold">Breakpoint Chlorination Curve</h6>
+        </div>
+        <div class="cl-curve-legend">
+            <span class="legend-item"><span class="dot dot-target"></span> Target (0.20 mg/L)</span>
+            <span class="legend-item"><span class="dot dot-residual"></span> Residual Cl₂</span>
+            <span class="legend-item"><span class="dot dot-demand"></span> Chlorine Demand</span>
+            <span class="legend-item"><span class="dot dot-optimal"></span> Optimal Dose</span>
+        </div>
+    </div>
+
+    <!-- SVG Breakpoint Curve Canvas -->
+    <div class="cl-svg-wrapper">
+        <svg id="breakpointCurveSvg" viewBox="0 0 700 280" class="cl-curve-svg" preserveAspectRatio="none">
+            <defs>
+                <!-- Grid background pattern -->
+                <pattern id="clGrid" width="40" height="40" patternUnits="userSpaceOnUse">
+                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(51, 65, 85, 0.25)" stroke-width="1"/>
+                </pattern>
+                <!-- Gradient for residual line area -->
+                <linearGradient id="clAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#10b981" stop-opacity="0.35"/>
+                    <stop offset="100%" stop-color="#10b981" stop-opacity="0.0"/>
+                </linearGradient>
+                <!-- Glow filters -->
+                <filter id="clGlow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="3" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                </filter>
+            </defs>
+
+            <!-- Background grid -->
+            <rect width="100%" height="100%" fill="url(#clGrid)" />
+
+            <!-- Breakpoint Zones background labels -->
+            <g class="cl-zones-group" opacity="0.35">
+                <text x="70" y="30" fill="#94a3b8" font-size="10">ZONE 1: Inorganic Oxidation</text>
+                <text x="230" y="30" fill="#94a3b8" font-size="10">ZONE 2: Chloramines</text>
+                <text x="410" y="30" fill="#94a3b8" font-size="10">ZONE 3: Breakpoint Dip</text>
+                <text x="560" y="30" fill="#94a3b8" font-size="10">ZONE 4: Free Chlorine</text>
+            </g>
+
+            <!-- Axis lines -->
+            <line x1="60" y1="240" x2="680" y2="240" stroke="#475569" stroke-width="2" />
+            <line x1="60" y1="20" x2="60" y2="240" stroke="#475569" stroke-width="2" />
+
+            <!-- Y-Axis labels (Residual Chlorine mg/L) -->
+            <text x="50" y="244" text-anchor="end" fill="#64748b" font-size="10">0.0</text>
+            <text x="50" y="190" text-anchor="end" fill="#64748b" font-size="10">0.2</text>
+            <text x="50" y="140" text-anchor="end" fill="#64748b" font-size="10">0.4</text>
+            <text x="50" y="80" text-anchor="end" fill="#64748b" font-size="10">0.6</text>
+            <text x="50" y="30" text-anchor="end" fill="#64748b" font-size="10">0.8</text>
+
+            <!-- Target Residual Guide Line (0.20 mg/L) -->
+            <line x1="60" y1="190" x2="680" y2="190" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4,4" opacity="0.8" />
+            <text x="670" y="185" text-anchor="end" fill="#f59e0b" font-size="10" font-weight="bold">TARGET 0.20 mg/L</text>
+
+            <!-- Curve Paths (Rendered dynamically by JavaScript) -->
+            <path id="clResidualArea" d="" fill="url(#clAreaGrad)" />
+            <path id="clResidualPath" d="" fill="none" stroke="#10b981" stroke-width="3" filter="url(#clGlow)" />
+            <path id="clDemandPath" d="" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="3,3" opacity="0.6" />
+
+            <!-- Dynamic Points Group -->
+            <g id="clPointsGroup"></g>
+        </svg>
+    </div>
+
+    <!-- Telemetry Insight Cards -->
+    <div class="cl-curve-insights">
+        <div class="insight-pill">
+            <span class="ins-title">Calculated Breakpoint Dose</span>
+            <span class="ins-val text-emerald" id="ins-breakpoint-dose">
+                {{ chlorine_test.established_dosage_mg_per_l|default:"2.00" }} mg/L
+            </span>
+        </div>
+        <div class="insight-pill">
+            <span class="ins-title">Estimated Water Demand</span>
+            <span class="ins-val text-danger" id="ins-chlorine-demand">
+                {% if optimal_jar %}{{ optimal_jar.consumed }} mg/L{% else %}1.80 mg/L{% endif %}
+            </span>
+        </div>
+        <div class="insight-pill">
+            <span class="ins-title">Free Residual @ Optimal</span>
+            <span class="ins-val text-cyan" id="ins-free-residual">
+                {% if optimal_jar %}{{ optimal_jar.residual }} mg/L{% else %}0.20 mg/L{% endif %}
+            </span>
+        </div>
+    </div>
+</div>

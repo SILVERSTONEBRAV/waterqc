@@ -1,0 +1,34 @@
+<div class="dropdown-wrapper notification-wrapper"
+     data-dropdown="notifications">
+<div class="notification-container"
+     data-feed-url="{% url 'accounts:notifications' %}"
+     data-ack-url="{% url 'accounts:notification-ack' alert_id='__ID__' %}"
+     data-plant-id="{% if notification_plant_id %}{{ notification_plant_id }}{% elif plant %}{{ plant.pk }}{% elif treatment_plant %}{{ treatment_plant.pk }}{% elif plant_context.plant %}{{ plant_context.plant.pk }}{% elif request.GET.plant %}{{ request.GET.plant }}{% elif request.user.assigned_treatment_plant_id %}{{ request.user.assigned_treatment_plant_id }}{% endif %}">
+    <button id="notificationBtn"
+            class="notification-btn"
+            type="button"
+            aria-label="Notifications"
+            aria-haspopup="true"
+            aria-expanded="false"
+            aria-controls="notificationDropdown">
+        <i class="fas fa-bell" aria-hidden="true"></i>
+        <span id="notificationBadge"
+              class="notification-badge"
+              aria-label="Unread notifications"
+              style="display:none"></span>
+    </button>
+    <ul id="notificationDropdown"
+        class="notification-dropdown"
+        role="menu"
+        aria-label="Notifications"
+        aria-hidden="true"
+        hidden>
+        <li class="notification-header" role="presentation">
+            <span><i class="fas fa-bell" aria-hidden="true"></i> Notifications</span>
+            <span class="notification-unread-count">Loading…</span>
+        </li>
+        <li class="notification-empty" role="presentation">Open notifications to see recent activity.</li>
+        <li class="notification-status" role="status" aria-live="polite" hidden></li>
+    </ul>
+</div>
+</div>

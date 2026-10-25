@@ -1,0 +1,73 @@
+<section class="ca-assignment-form-content" aria-label="Assign chemical analysis team">
+    <div class="ca-assignment-request-summary">
+        <div><span>Request</span><strong>{{ analysis_request.request_id|default:analysis_request.pk }}</strong></div>
+        {% if analysis_request.batch %}
+            <div><span>Chemical batch</span><strong>{{ analysis_request.batch.chemical.name }} · {{ analysis_request.batch.batch_number }}</strong></div>
+            <div><span>Treatment plant</span><strong>{{ analysis_request.batch.treatment_plant }}</strong></div>
+        {% endif %}
+    </div>
+
+    <aside class="ca-assignment-window" aria-label="Automatic assignment timing">
+        <i class="fa-regular fa-clock" aria-hidden="true"></i>
+        <p>
+            {% if analysis_request.auto_assigned_at %}
+                <strong>Automatic assignment has already run.</strong>
+                The scheduled analyst team was assigned {{ analysis_request.auto_assigned_at|date:"d M Y, H:i" }}.
+            {% else %}
+                <strong>The 30-minute automatic assignment fallback remains active.</strong>
+                If the request has no analysts when its window expires, the system assigns the scheduled analysts
+            {% endif %}
+            {% if analysis_request.assignment_due_at %}
+                (deadline <time datetime="{{ analysis_request.assignment_due_at|date:'c' }}">{{ analysis_request.assignment_due_at|date:"d M Y, H:i" }}</time>).
+            {% else %}
+                30 minutes after request creation.
+            {% endif %}
+        </p>
+    </aside>
+
+    <form method="post" action="{{ request.path }}{% if dialog_mode %}?dialog=1{% endif %}" class="ca-assignment-form" data-ca-assignment-form novalidate>
+        {% csrf_token %}
+        <div class="ca-assignment-errors" data-ca-assignment-errors aria-live="assertive">
+            {% if form.non_field_errors %}
+                <div class="ca-assignment-error-panel" role="alert">
+                    <strong>Assignment not saved</strong>
+                    {{ form.non_field_errors }}
+                </div>
+            {% endif %}
+        </div>
+        <fieldset class="ca-assignment-fieldset">
+            <legend>Choose one or more analysts <span class="ca-assignment-count" data-ca-analyst-visible-count>{{ form.analyst_count }}</span></legend>
+            <p class="ca-assignment-help">Active users at this plant who have the required permissions directly or through a Django group are listed. Eligible analysts from any section can be assigned.</p>
+            {% if form.analyst_count %}
+                <label class="ca-assignment-search">
+                    <span class="ca-assignment-visually-hidden">Search eligible analysts</span>
+                    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                    <input type="search" data-ca-analyst-search placeholder="Search name or username" autocomplete="off">
+                </label>
+            {% endif %}
+            <div class="ca-assignment-checklist" role="group" aria-label="Permitted chemical analysts">
+                {% if form.analyst_count %}
+                    {{ form.analysts }}
+                    <p class="ca-assignment-no-match" data-ca-analyst-no-match hidden>No eligible analysts match that search.</p>
+                {% else %}
+                    <p class="ca-assignment-empty">No active users with the required chemical-analysis permissions are available for this treatment plant.</p>
+                {% endif %}
+            </div>
+            {% for error in form.analysts.errors %}<p class="ca-assignment-error" role="alert">{{ error }}</p>{% endfor %}
+        </fieldset>
+
+        <div class="ca-assignment-confirm">
+            <label for="{{ form.confirm.id_for_label }}">{{ form.confirm }}<span>{{ form.confirm.label }}</span></label>
+            {% for error in form.confirm.errors %}<p class="ca-assignment-error" role="alert">{{ error }}</p>{% endfor %}
+        </div>
+
+        <footer class="ca-assignment-actions">
+            {% if dialog_mode %}
+                <button type="button" class="ca-assignment-button ca-assignment-button--quiet" data-ca-assignment-close>Cancel</button>
+            {% else %}
+                <a class="ca-assignment-button ca-assignment-button--quiet" href="{{ assignment_cancel_url }}">Cancel</a>
+            {% endif %}
+            <button type="submit" class="ca-assignment-button ca-assignment-button--primary" data-ca-assignment-submit>Assign selected analysts</button>
+        </footer>
+    </form>
+</section>

@@ -6,7 +6,7 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
@@ -32,6 +32,10 @@ from qc.models import (
 )
 
 from qc.services.result_card_service import ResultCardService
+from qc.services.operational_summary import (
+    get_filter_sidebar_groups,
+    get_operational_summary,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -53,8 +57,9 @@ class ResultCardEntryView(
     )
 
     permission_required_view = (
-        "qc.change_wateranalysis"
+        "qc.view_wateranalysis"
     )
+    permission_required_update = "qc.change_wateranalysis"
 
 
     RESULT_MODELS = {
@@ -82,14 +87,13 @@ class ResultCardEntryView(
     ):
 
         self.action = (
-            "change"
+            "update"
             if request.method == "POST"
             else "view"
         )
 
-        self.check_permission(
-            self.action
-        )
+        if not self.check_permission(self.action):
+            raise PermissionDenied("You do not have permission to access QC results.")
 
         return super().dispatch(
             request,
@@ -122,7 +126,6 @@ class ResultCardEntryView(
 
         laboratory = assignment["laboratory"]
 
-
         if not plant:
 
             empty = {
@@ -141,8 +144,16 @@ class ResultCardEntryView(
                 "message":
                     "No treatment plant assigned.",
 
+                "analysis_watermark": 0,
+
                 "available_plants":
                     self.get_available_plants(),
+
+                "current_dosages": get_operational_summary(None)[0],
+
+                "phase_concentrations": [],
+
+                "filter_phase_groups": [],
 
                 "raw_water_snapshot": {
                     "available": False,
@@ -180,27 +191,14 @@ class ResultCardEntryView(
         )
 
 
-        # Build flat raw water params for topbar template
-        raw_snapshot = context.get(
-            "raw_water_snapshot", {}
+        current_dosages, phase_concentrations = get_operational_summary(plant)
+        needs_sidebar = not self.wants_json() and request.GET.get("partial") not in {
+            "topbar",
+            "cards",
+        }
+        filter_phase_groups = (
+            get_filter_sidebar_groups(plant, request.user) if needs_sidebar else []
         )
-        raw_water_params = []
-        for p in raw_snapshot.get("parameters", []):
-            # Create a short_name (first word or abbreviation)
-            name = p.get("name", "")
-            short = name.split("[")[0].strip()
-            if len(short) > 12:
-                short = short[:10] + "…"
-            raw_water_params.append({
-                "name": name,
-                "short_name": short,
-                "value": p.get("raw_value"),
-                "display_value": p.get("value", "—"),
-                "unit": p.get("unit", ""),
-                "spec": p.get("limit", ""),
-                "abnormal": p.get("abnormal", False),
-                "entered": p.get("entered", False),
-            })
 
         # Resolve current shift & supervisor for topbar display
         current_shift = None
@@ -229,7 +227,6 @@ class ResultCardEntryView(
 
             "auto_refresh": True,
 
-            "poll_seconds": 60,
 
             "current_time":
                 timezone.localtime(),
@@ -246,8 +243,11 @@ class ResultCardEntryView(
             "live_url":
                 self.build_live_url(plant),
 
-            "raw_water_params":
-                raw_water_params,
+            "current_dosages": current_dosages,
+
+            "phase_concentrations": phase_concentrations,
+
+            "filter_phase_groups": filter_phase_groups,
 
             "current_shift":
                 current_shift,
@@ -305,7 +305,7 @@ class ResultCardEntryView(
 
 
         if user.is_superuser:
-            plant_id = self.request.GET.get("plant")
+            plant_id = self.request.GET.get("plant") or self.request.POST.get("plant")
             if not plant_id and hasattr(self.request, "session"):
                 plant_id = self.request.session.get("qc_selected_plant")
 
@@ -319,7 +319,11 @@ class ResultCardEntryView(
             if plant is None:
                 plant = TreatmentPlant.objects.order_by("name").first()
 
-            if plant and hasattr(self.request, "session"):
+            if (
+                plant
+                and hasattr(self.request, "session")
+                and self.request.session.get("qc_selected_plant") != plant.pk
+            ):
                 self.request.session["qc_selected_plant"] = plant.pk
 
             return {
@@ -327,7 +331,8 @@ class ResultCardEntryView(
                 "laboratory": getattr(user, "assigned_lab", None),
             }
 
-        plant = getattr(user, "assigned_treatment_plant", None) or TreatmentPlant.objects.order_by("name").first()
+        # An unassigned operator must not inherit the first plant's data.
+        plant = getattr(user, "assigned_treatment_plant", None)
         return {
             "plant": plant,
             "laboratory": getattr(user, "assigned_lab", None),
@@ -422,11 +427,6 @@ class ResultCardEntryView(
             )
 
 
-            self.broadcast_results_update(
-                analysis_ids
-            )
-
-
             messages.success(
                 request,
                 f"{updated} results saved successfully."
@@ -461,7 +461,6 @@ class ResultCardEntryView(
         context.update({
             "entry_mode": True,
             "auto_refresh": True,
-            "poll_seconds": 60,
             "current_time": timezone.localtime(),
             "plant": plant,
             "laboratory": laboratory,
@@ -471,92 +470,6 @@ class ResultCardEntryView(
         resp = render(self.request, self.partial_template_name, context)
         resp["HX-Trigger"] = '{"resultsSaved": true, "updated": %d}' % updated
         return resp
-
-
-
-    def broadcast_results_update(
-        self,
-        analysis_ids,
-    ):
-
-        try:
-
-            from asgiref.sync import async_to_sync
-            from channels.layers import get_channel_layer
-
-            from qc.models import WaterAnalysis
-
-
-            channel_layer = (
-                get_channel_layer()
-            )
-
-
-            if channel_layer is None:
-
-                return
-
-
-
-            analyses = (
-                WaterAnalysis.objects
-                .filter(
-                    id__in=analysis_ids
-                )
-                .select_related(
-                    "treatment_plant",
-                    "analysis_time__schedule",
-                )
-            )
-
-
-
-            for analysis in analyses:
-
-                plant = (
-                    analysis.treatment_plant
-                )
-
-
-                event_data = {
-                    "type":
-                        "qc_results_updated",
-                    "analysis_id":
-                        analysis.pk,
-                    "plant_id":
-                        plant.pk,
-                    "water_type":
-                        (
-                            analysis
-                            .analysis_time
-                            .schedule
-                            .get_water_type_display()
-                        ),
-                    "timestamp":
-                        timezone.now()
-                        .isoformat(),
-                }
-
-                async_to_sync(
-                    channel_layer.group_send
-                )(
-                    f"qc-plant-{plant.pk}",
-                    event_data,
-                )
-
-                async_to_sync(
-                    channel_layer.group_send
-                )(
-                    "qc-dashboard",
-                    event_data,
-                )
-
-
-        except Exception:
-
-            logger.exception(
-                "Failed websocket result update."
-            )
 
 
 
@@ -655,6 +568,10 @@ class ResultCardEntryView(
         result_id,
     ):
 
+        plant = self.resolve_user_assignment().get("plant")
+        if plant is None:
+            return None
+
         for model in (
             self.RESULT_MODELS.values()
         ):
@@ -665,7 +582,8 @@ class ResultCardEntryView(
                     model.objects
                     .select_for_update()
                     .get(
-                        pk=result_id
+                        pk=result_id,
+                        analysis__treatment_plant=plant,
                     )
                 )
 
@@ -762,7 +680,6 @@ class ResultCardEntryView(
             return timezone.localdate()
 
 
-
     def render_context(
         self,
         context,
@@ -772,12 +689,12 @@ class ResultCardEntryView(
             "partial"
         )
 
+        # Only serve card/topbar fragments when explicitly requested.
+        # Treating every HTMX request as a cards partial caused the matrix
+        # to flash empty / disappear on navigation boosts.
         if partial == "topbar":
             template = self.topbar_template_name
-        elif (
-            self.is_htmx()
-            or partial == "cards"
-        ):
+        elif partial == "cards":
             template = self.partial_template_name
         else:
             template = self.template_name

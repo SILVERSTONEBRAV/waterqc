@@ -16,10 +16,10 @@ from django.contrib.auth.models import Group, Permission
 # ============================================
 @admin.register(Section)
 class SectionAdmin(admin.ModelAdmin):
-    list_display = ("code", "name", "is_active")
-    list_filter = ("is_active",)
-    search_fields = ("code", "name")
-    ordering = ("name",)
+    list_display = ("code", "name", "treatment_plant", "is_active")
+    list_filter = ("treatment_plant", "is_active")
+    search_fields = ("code", "name", "treatment_plant__name")
+    ordering = ("treatment_plant", "name")
     actions = ["activate_sections", "deactivate_sections"]
 
     @admin.action(description="Activate selected sections")
@@ -176,6 +176,9 @@ class CustomUserAdmin(DjangoUserAdmin):
         "risk_status",
         "group_redirect_preview",
     )
+
+    class Media:
+        js = ("core/js/plant_section_user_cascade.js",)
 
     fieldsets = (
 
@@ -733,3 +736,151 @@ class UserSessionAdmin(admin.ModelAdmin):
     def terminate_sessions(self, request, queryset):
         updated = queryset.update(terminated=True)
         self.message_user(request, f"{updated} sessions terminated.")
+
+
+# ============================================
+# Group Dashboard Redirect Admin
+# ============================================
+from core.models import GroupDashboardRedirect
+from django.contrib.auth.models import Group
+
+
+@admin.register(GroupDashboardRedirect)
+class GroupDashboardRedirectAdmin(admin.ModelAdmin):
+    """
+    Admin for managing which dashboard each auth group lands on after login.
+    These entries override the LOGIN_GROUP_REDIRECT_MAP setting at runtime.
+    """
+
+    list_display = (
+        "group_name",
+        "redirect_url",
+        "label",
+        "is_active",
+        "priority",
+        "resolved_url_preview",
+        "updated_at",
+    )
+    list_display_links = ("group_name", "redirect_url")
+    list_filter = ("is_active",)
+    search_fields = ("group__name", "redirect_url", "label")
+    ordering = ("priority", "group__name")
+    list_editable = ("is_active", "priority")
+    readonly_fields = ("created_at", "updated_at", "resolved_url_preview", "cache_status_info")
+    autocomplete_fields = ("group",)
+    save_on_top = True
+
+    fieldsets = (
+        (
+            "🗺️ Redirect Mapping",
+            {
+                "fields": ("group", "redirect_url", "label", "is_active", "priority"),
+                "description": mark_safe(
+                    '<div style="padding:10px 14px;background:linear-gradient(135deg,#0f172a,#1e3a5f);'
+                    'color:#38bdf8;border-radius:8px;border:1px solid #38bdf840;margin-bottom:10px;">'
+                    '<strong>🔑 Group → Dashboard Mapping</strong><br>'
+                    'Assign a post-login destination URL to each auth group. '
+                    'DB entries <strong>override</strong> the settings-level '
+                    '<code>LOGIN_GROUP_REDIRECT_MAP</code>. '
+                    'When a user belongs to multiple groups, the <em>lowest priority number</em> wins.'
+                    '</div>'
+                ),
+            },
+        ),
+        (
+            "📊 Resolution Preview",
+            {
+                "classes": ("collapse",),
+                "fields": ("resolved_url_preview", "cache_status_info"),
+            },
+        ),
+        (
+            "🕒 Timestamps",
+            {
+                "classes": ("collapse",),
+                "fields": ("created_at", "updated_at"),
+            },
+        ),
+    )
+
+    actions = ["activate_redirects", "deactivate_redirects", "test_resolve_urls", "flush_redirect_cache"]
+
+    # ---- column displays ----
+
+    def group_name(self, obj):
+        return mark_safe(
+            f'<strong style="color:#38bdf8">{obj.group.name}</strong>'
+        )
+    group_name.short_description = "Group"
+    group_name.admin_order_field = "group__name"
+
+    def resolved_url_preview(self, obj):
+        from django.shortcuts import resolve_url
+        from django.urls import NoReverseMatch
+        url = (obj.redirect_url or "").strip()
+        if not url:
+            return mark_safe('<span style="color:#ef4444">⚠ No URL</span>')
+        try:
+            resolved = resolve_url(url) if not url.startswith("/") else url
+            return mark_safe(
+                f'<a href="{resolved}" target="_blank" '
+                f'style="color:#22c55e;font-weight:600;">'
+                f'✓ {resolved}</a>'
+            )
+        except (NoReverseMatch, Exception) as exc:
+            return mark_safe(
+                f'<span style="color:#f59e0b">⚠ Cannot resolve: {exc}</span>'
+            )
+    resolved_url_preview.short_description = "Resolved URL"
+
+    def cache_status_info(self, obj):
+        from django.core.cache import cache
+        cached = cache.get("gdr:redirect_map")
+        if cached is None:
+            return mark_safe('<span style="color:#94a3b8">Cache: COLD (will be populated on next login)</span>')
+        group_key = (obj.group.name or "").strip().upper()
+        if group_key in cached:
+            return mark_safe(
+                f'<span style="color:#22c55e">✓ Cache HOT — group "{obj.group.name}" → {cached[group_key]}</span>'
+            )
+        return mark_safe(
+            f'<span style="color:#f59e0b">⚠ Cache HOT but group "{obj.group.name}" not present (inactive or overridden)</span>'
+        )
+    cache_status_info.short_description = "Live Cache Status"
+
+    # ---- actions ----
+
+    @admin.action(description="✅ Activate selected redirects")
+    def activate_redirects(self, request, queryset):
+        updated = queryset.update(is_active=True)
+        from django.core.cache import cache
+        cache.delete("gdr:redirect_map")
+        self.message_user(request, f"{updated} redirect(s) activated. Cache cleared.")
+
+    @admin.action(description="🚫 Deactivate selected redirects")
+    def deactivate_redirects(self, request, queryset):
+        updated = queryset.update(is_active=False)
+        from django.core.cache import cache
+        cache.delete("gdr:redirect_map")
+        self.message_user(request, f"{updated} redirect(s) deactivated. Cache cleared.")
+
+    @admin.action(description="🔍 Test-resolve selected redirect URLs")
+    def test_resolve_urls(self, request, queryset):
+        from django.shortcuts import resolve_url
+        from django.urls import NoReverseMatch
+        results = []
+        for obj in queryset:
+            url = (obj.redirect_url or "").strip()
+            try:
+                resolved = resolve_url(url) if not url.startswith("/") else url
+                results.append(f"✓ {obj.group.name} → {resolved}")
+            except (NoReverseMatch, Exception) as exc:
+                results.append(f"✗ {obj.group.name}: {exc}")
+        self.message_user(request, " | ".join(results))
+
+    @admin.action(description="🔄 Flush redirect cache")
+    def flush_redirect_cache(self, request, queryset):
+        from django.core.cache import cache
+        cache.delete("gdr:redirect_map")
+        self.message_user(request, "Redirect cache flushed. Next login will reload from DB.")
+

@@ -155,6 +155,7 @@ def batch_qs(model) -> QuerySet:
             "chemical",
             "supplier",
             "treatment_plant",
+            "location",
             "received_by",
         )
         .prefetch_related(
@@ -177,9 +178,9 @@ def request_qs(model) -> QuerySet:
             "batch__chemical",
             "batch__supplier",
             "batch__treatment_plant",
+            "batch__location",
             "requested_by",
             "received_by",
-            "location",
         )
         .prefetch_related(
             "assigned_analysts",
@@ -198,7 +199,7 @@ def process_qs(model) -> QuerySet:
             "batch__chemical",
             "batch__supplier",
             "batch__treatment_plant",
-            "request",
+            "analysis_request",
             "initiated_by",
             "assigned_analyst",
             "qa_officer",
@@ -345,16 +346,16 @@ ANALYSIS_REQUEST_BASE_CONFIG = {
     "filter_fields": [
         "status",
         "batch",
-        "location",
+        "batch__location",
     ],
     "ordering": [
         "-created_at",
     ],
     "select_related": [
         "batch",
+        "batch__location",
         "requested_by",
         "received_by",
-        "location",
     ],
     "prefetch_related": [
         "assigned_analysts",
@@ -382,7 +383,7 @@ ANALYSIS_PROCESS_BASE_CONFIG = {
     ],
     "select_related": [
         "batch",
-        "request",
+        "analysis_request",
         "initiated_by",
         "assigned_analyst",
         "qa_officer",
@@ -1309,6 +1310,7 @@ EXPORT_CONFIG = {
             "chemical",
             "supplier",
             "treatment_plant",
+            "location",
             "status",
             "quantity_received",
             "unit",
@@ -1328,7 +1330,7 @@ EXPORT_CONFIG = {
             "batch",
             "status",
             "delivery_date",
-            "location",
+            "batch__location",
             "analysis_started_at",
             "analysis_deadline",
             "completed_at",
@@ -1345,7 +1347,7 @@ EXPORT_CONFIG = {
         ],
         "columns": [
             "batch",
-            "request",
+            "analysis_request",
             "status",
             "initiated_by",
             "assigned_analyst",
@@ -1526,7 +1528,7 @@ MODEL_CONFIGS = {
             "chemical__code",
             "parameter_name",
             "unit",
-            "method__name",
+            "method__method",
         ],
         "filter_fields": [
             "chemical",

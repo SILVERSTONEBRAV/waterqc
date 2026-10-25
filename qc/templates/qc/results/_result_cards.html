@@ -2,6 +2,7 @@
 
 <div id="cards-container"
      class="cards-grid-workspace"
+     data-analysis-watermark="{{ analysis_watermark|default:0 }}"
      data-refresh-url="{{ request.path }}?partial=cards{% if plant %}&plant={{ plant.pk }}{% endif %}{% if request.GET.date %}&date={{ request.GET.date }}{% endif %}">
 
     {% if cards %}
@@ -107,7 +108,6 @@
                                                 {% elif cell.entered %}
                                                     form-control-success
                                                 {% endif %}"
-                                                data-autosave="true"
                                                 data-navigation="true"
                                                 data-result-id="{{ cell.result.pk }}"
                                                 data-water-type="{{ group.water_type|lower }}"
@@ -115,11 +115,11 @@
                                                 data-spec="{{ cell.display_limit|default:'' }}"
                                                 title="{{ parameter.name }}{% if parameter.unit %} ({{ parameter.unit }}){% endif %}"
                                                 aria-label="{{ card.time_label }} - {{ row.name }} - {{ parameter.name }}">
-                                            <!-- Out-of-range spec bubble (hidden until value is outside limits) -->
                                             {% if cell.display_limit %}
-                                            <div class="oor-spec-bubble" aria-hidden="true" style="display:none;">
-                                                <i class="fa-solid fa-triangle-exclamation"></i>
-                                                Allowed: {{ cell.display_limit }}
+                                            <!-- Limits only when value is out of range -->
+                                            <div class="cell-sub-spec{% if cell.abnormal %} is-oor{% endif %}"
+                                                 {% if not cell.abnormal %}hidden{% endif %}>
+                                                Limit {{ cell.display_limit }}
                                             </div>
                                             {% endif %}
                                         </div>

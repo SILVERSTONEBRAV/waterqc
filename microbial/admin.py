@@ -347,10 +347,12 @@ class MicrobialParameterResultAdmin(admin.ModelAdmin):
         "analysis",
         "parameter_name",
         "value",
+        "entry_status",
         "manually_editable",
     )
 
     list_filter = (
+        "entry_status",
         "manually_editable",
         "parameter__treatment_plant",
     )
@@ -369,6 +371,11 @@ class MicrobialParameterResultAdmin(admin.ModelAdmin):
         return obj.parameter.parameter.name
 
     parameter_name.short_description = "Parameter"
+
+    def save_model(self, request, obj, form, change):
+        if "value" in form.changed_data:
+            obj.entry_status = MicrobialParameterResult.EntryStatus.RECORDED
+        super().save_model(request, obj, form, change)
 
 
 # =============================================================================

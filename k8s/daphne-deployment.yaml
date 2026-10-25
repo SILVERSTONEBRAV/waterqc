@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: daphne
-          image: qad-backend:latest
+          image: qad-backend:stable
 
           ports:
             - containerPort: 8001

@@ -1,0 +1,133 @@
+{% load static custom_filters %}
+
+<div id="telemetry-cards-container"
+     class="tel-workspace"
+     hx-get="?partial=grid{% if selected_plant %}&plant={{ selected_plant.pk }}{% endif %}"
+     hx-trigger="every 15s"
+     hx-swap="innerHTML">
+
+    {% for group in stage_groups %}
+    <section class="tel-stage-card" id="stage-card-{{ group.stage_key }}">
+        <!-- Left Water Stage Identification Rail -->
+        <aside class="tel-stage-rail">
+            <div>
+                <span class="tel-stage-pill stage-pill-{{ group.stage_key }}">
+                    {{ group.stage_title }}
+                </span>
+                <div class="tel-stage-meta">
+                    <div class="tel-meta-item">
+                        <span>Parameters:</span>
+                        <span class="tel-meta-val">{{ group.parameters|length }}</span>
+                    </div>
+                    <div class="tel-meta-item">
+                        <span>Live Sensors:</span>
+                        <span class="tel-meta-val">{{ group.online_sensors }}/{{ group.total_sensors }}</span>
+                    </div>
+                    {% if group.alert_sensors > 0 %}
+                    <div class="tel-meta-item" style="color: #f87171;">
+                        <span>Alerts:</span>
+                        <span class="tel-meta-val" style="color: #f87171;">{{ group.alert_sensors }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div style="font-size:0.65rem; color:#64748b; margin-top: auto;">
+                <i class="fa-solid fa-tower-broadcast"></i> Telemetry Matrix
+            </div>
+        </aside>
+
+        <!-- Right Tabular Telemetry Grid -->
+        <div class="tel-table-area">
+            <table class="tel-grid-table" role="grid" aria-label="{{ group.stage_title }} Telemetry Grid">
+                <thead>
+                    <tr>
+                        <th class="tel-th-phase" scope="col">
+                            <span>Phase / Node</span>
+                        </th>
+                        {% for parameter in group.parameters %}
+                        <th class="tel-th-param" scope="col">
+                            <div class="tel-param-header-content">
+                                <span class="param-name-txt">{{ parameter.name }}</span>
+                                <span class="param-unit-badge">Unit: {{ parameter.unit }}</span>
+                            </div>
+                        </th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in group.rows %}
+                    <tr>
+                        <!-- Phase / Node Identification Column -->
+                        <td class="tel-phase-cell">
+                            <div class="tel-phase-cell-content">
+                                <span class="phase-indicator-dot"></span>
+                                <span class="phase-name-text">{{ row.phase_name }}</span>
+                            </div>
+                        </td>
+
+                        <!-- Parameter Live Telemetry Cells -->
+                        {% for parameter in group.parameters %}
+                        <td class="tel-sensor-cell">
+                            {% with cell=row.cells|get_item:parameter.uuid|stringformat:"s"|default:row.cells|get_item:parameter.uuid %}
+                            {% if cell and cell.status != 'no_sensor' %}
+                                <div class="tel-cell-card status-{{ cell.status }}"
+                                     title="Sensor: {{ cell.sensor_name }}&#10;Instrument: {{ cell.instrument_name }} ({{ cell.instrument_serial }})&#10;Protocol: {{ cell.instrument_protocol }}&#10;Quality: {{ cell.quality_flag|upper }}&#10;Last Reading: {{ cell.measured_at|date:'Y-m-d H:i:s' }}&#10;Status: {{ cell.status_label }}">
+                                    <!-- Value Row -->
+                                    <div class="tel-value-row">
+                                        <span class="tel-live-val">{{ cell.formatted_value }}</span>
+                                        <span class="tel-val-unit">{{ cell.unit }}</span>
+                                    </div>
+
+                                    <!-- Status & Age Subtitle -->
+                                    <div class="tel-cell-meta-row">
+                                        <span class="tel-status-pill">
+                                            <i class="fa-solid {% if cell.status == 'normal' %}fa-circle-check{% elif cell.status == 'danger' %}fa-circle-xmark{% elif cell.status == 'warning' %}fa-triangle-exclamation{% else %}fa-circle-pause{% endif %}"></i>
+                                            {{ cell.status_label }}
+                                        </span>
+                                        <span class="tel-time-ago" title="{{ cell.measured_at|date:'H:i:s' }}">
+                                            <i class="fa-regular fa-clock"></i> {{ cell.time_ago }}
+                                        </span>
+                                    </div>
+
+                                    <!-- Hardware Identification -->
+                                    <div class="tel-device-tag">
+                                        <i class="fa-solid fa-microchip"></i>
+                                        <span>{{ cell.instrument_name }}</span>
+                                        {% if cell.redundant_count > 0 %}
+                                        <span style="color:#38bdf8;font-weight:600;" title="{{ cell.redundant_count }} backup sensor(s)">+{{ cell.redundant_count }}</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% else %}
+                                <!-- Unmonitored Slot -->
+                                <div class="tel-cell-card status-no_sensor" title="No sensor installed for this phase and parameter">
+                                    <span style="font-size: 1.1rem; opacity: 0.5;">—</span>
+                                    <span style="font-size: 0.65rem;">Unmonitored</span>
+                                </div>
+                            {% endif %}
+                            {% endwith %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="{{ group.parameters|length|add:1 }}" class="tel-sensor-cell" style="text-align:center; padding:1.5rem; color:#64748b;">
+                            No operational phases configured for this treatment stage.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    {% empty %}
+    <div class="tel-empty-banner">
+        <i class="fa-solid fa-satellite-dish"></i>
+        <h3>No Sensor Feeds Configured</h3>
+        <p>No active sensors or online instruments are currently assigned to {{ selected_plant.name|default:"this treatment plant" }}.</p>
+        <p style="margin-top:0.5rem;font-size:0.85rem;">You can register instruments and probes in the Instruments Registry.</p>
+    </div>
+    {% endfor %}
+
+</div>

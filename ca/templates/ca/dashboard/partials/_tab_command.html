@@ -1,0 +1,306 @@
+<!-- ca/dashboard/partials/_tab_command.html -->
+<div class="ca-command-hud">
+
+    <!-- SUPERCHARGED KPI TELEMETRY STRIP -->
+    <div class="ca-mt-kpis">
+        <div class="ca-mt-kpi ca-kpi--cyan">
+            <div class="ca-mt-kpi__header">
+                <span class="ca-mt-kpi__label">Active Batches</span>
+                <i class="fa fa-boxes-stacked ca-kpi-icon"></i>
+            </div>
+            <div class="ca-mt-kpi__value">{{ counts.active_batches|default:0 }}</div>
+            <div class="ca-mt-kpi__sub"><i class="fa fa-database"></i> Total logged: {{ counts.batches|default:0 }}</div>
+        </div>
+
+        <div class="ca-mt-kpi ca-kpi--amber">
+            <div class="ca-mt-kpi__header">
+                <span class="ca-mt-kpi__label">Bench Testing</span>
+                <i class="fa fa-flask-vial ca-kpi-icon"></i>
+            </div>
+            <div class="ca-mt-kpi__value">{{ queue_counts.analysis|default:0 }}</div>
+            <div class="ca-mt-kpi__sub"><i class="fa fa-clock"></i> Testing queue</div>
+        </div>
+
+        <div class="ca-mt-kpi ca-kpi--purple">
+            <div class="ca-mt-kpi__header">
+                <span class="ca-mt-kpi__label">QA Sign-Off</span>
+                <i class="fa fa-shield-halved ca-kpi-icon"></i>
+            </div>
+            <div class="ca-mt-kpi__value">{{ queue_counts.qa|default:0 }}</div>
+            <div class="ca-mt-kpi__sub"><i class="fa fa-check-double"></i> Review pending</div>
+        </div>
+
+        <div class="ca-mt-kpi ca-kpi--emerald">
+            <div class="ca-mt-kpi__header">
+                <span class="ca-mt-kpi__label">CoAs Authorized</span>
+                <i class="fa fa-certificate ca-kpi-icon"></i>
+            </div>
+            <div class="ca-mt-kpi__value">{{ counts.approved_batches|default:counts.coas|default:0 }}</div>
+            <div class="ca-mt-kpi__sub"><i class="fa fa-qrcode"></i> Digital seals issued</div>
+        </div>
+
+        <div class="ca-mt-kpi {% if sla.overdue or queue_counts.overdue %}ca-kpi--rose{% else %}ca-kpi--emerald{% endif %}">
+            <div class="ca-mt-kpi__header">
+                <span class="ca-mt-kpi__label">SLA Overdue</span>
+                <i class="fa fa-fire ca-kpi-icon"></i>
+            </div>
+            <div class="ca-mt-kpi__value">{{ sla.overdue|default:queue_counts.overdue|default:0 }}</div>
+            <div class="ca-mt-kpi__sub">
+                {% if sla.overdue %}
+                <span style="color:#ef4444;"><i class="fa fa-triangle-exclamation"></i> Immediate action</span>
+                {% else %}
+                <span style="color:#10b981;"><i class="fa fa-circle-check"></i> 100% on schedule</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="ca-mt-kpi ca-kpi--blue">
+            <div class="ca-mt-kpi__header">
+                <span class="ca-mt-kpi__label">Testing Pass Rate</span>
+                <i class="fa fa-chart-pie ca-kpi-icon"></i>
+            </div>
+            <div class="ca-mt-kpi__value">{{ quality.overall_pass_rate|default:"98.4" }}%</div>
+            <div class="ca-mt-kpi__sub"><i class="fa fa-award"></i> Quality compliance</div>
+        </div>
+    </div>
+
+    <!-- WORKFLOW PIPELINE ACCELERATOR -->
+    <div class="ca-mt-panel">
+        <div class="ca-mt-panel__head">
+            <div class="ca-panel-title-group">
+                <i class="fa fa-route ca-icon--cyan"></i>
+                <span class="ca-mt-panel__title">Live Workflow Telemetry & Pipeline Accelerator</span>
+            </div>
+            <div class="ca-flow-actions">
+                <a href="?tab=workflow" class="ca-mt-btn ca-mt-btn--sm"><i class="fa fa-diagram-project"></i> Open Flow Orchestrator</a>
+            </div>
+        </div>
+        <div class="ca-mt-panel__body">
+            <div class="ca-mt-flow">
+                {% for node in workflow_nodes %}
+                <a class="ca-mt-node {% if node.count %}is-hot{% endif %}" href="{{ node.url|default:'#' }}">
+                    <span class="ca-mt-node__label">{{ node.label }}</span>
+                    <span class="ca-mt-node__count">{{ node.count|default:0 }}</span>
+                </a>
+                {% empty %}
+                <a class="ca-mt-node {% if queue_counts.received %}is-hot{% endif %}" href="{% url 'ca:batch-list' %}?status=RECEIVED">
+                    <span class="ca-mt-node__label">01. Received</span>
+                    <span class="ca-mt-node__count">{{ queue_counts.received|default:0 }}</span>
+                </a>
+                <a class="ca-mt-node {% if queue_counts.checklist %}is-hot{% endif %}" href="{% url 'ca:my-tasks' %}?stage=checklist">
+                    <span class="ca-mt-node__label">02. Checklist</span>
+                    <span class="ca-mt-node__count">{{ queue_counts.checklist|default:0 }}</span>
+                </a>
+                <a class="ca-mt-node {% if queue_counts.analysis %}is-hot{% endif %}" href="{% url 'ca:pending-analysis' %}">
+                    <span class="ca-mt-node__label">03. Bench Test</span>
+                    <span class="ca-mt-node__count">{{ queue_counts.analysis|default:0 }}</span>
+                </a>
+                <a class="ca-mt-node {% if queue_counts.qa %}is-hot{% endif %}" href="{% url 'ca:pending-qa' %}">
+                    <span class="ca-mt-node__label">04. QA Review</span>
+                    <span class="ca-mt-node__count">{{ queue_counts.qa|default:0 }}</span>
+                </a>
+                <a class="ca-mt-node {% if queue_counts.approval %}is-hot{% endif %}" href="{% url 'ca:pending-approval' %}">
+                    <span class="ca-mt-node__label">05. Approval</span>
+                    <span class="ca-mt-node__count">{{ queue_counts.approval|default:0 }}</span>
+                </a>
+                <a class="ca-mt-node" href="{% url 'ca:coa-list' %}">
+                    <span class="ca-mt-node__label">06. CoA Seal</span>
+                    <span class="ca-mt-node__count">{{ counts.approved_batches|default:0 }}</span>
+                </a>
+                <a class="ca-mt-node" href="{% url 'ca:batch-list' %}?status=UTILIZED">
+                    <span class="ca-mt-node__label">07. Released</span>
+                    <span class="ca-mt-node__count">{{ queue_counts.utilize|default:0 }}</span>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 2-COLUMN OPERATIONAL COCKPIT GRID -->
+    <div class="ca-mt-grid-2">
+
+        <!-- COLUMN 1: MY ACTIVE TASKS & ATTENTION ITEMS -->
+        <div class="ca-cockpit-col">
+            <!-- MY TASKS -->
+            <div class="ca-mt-panel">
+                <div class="ca-mt-panel__head">
+                    <div class="ca-panel-title-group">
+                        <i class="fa fa-list-check ca-icon--cyan"></i>
+                        <span class="ca-mt-panel__title">My Assigned Workflow Tasks</span>
+                    </div>
+                    <a class="ca-mt-btn ca-mt-btn--sm" href="{% url 'ca:my-tasks' %}">View All</a>
+                </div>
+                <div class="ca-mt-panel__body">
+                    <table class="ca-mt-table">
+                        <thead>
+                            <tr>
+                                <th>Task Description</th>
+                                <th>Workflow Stage</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for t in my_tasks %}
+                            <tr>
+                                <td>
+                                    <strong>{{ t.title|default:t.label|default:t }}</strong>
+                                    {% if t.batch_number %}
+                                    <div style="font-size:0.7rem; color:#94a3b8;">Batch: {{ t.batch_number }}</div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="ca-mt-pill ca-mt-pill--amber">{{ t.stage|default:t.status|default:"Pending" }}</span>
+                                </td>
+                                <td>
+                                    {% if t.url %}
+                                    <a class="ca-mt-btn ca-mt-btn--sm ca-mt-btn--primary" href="{{ t.url }}">Execute</a>
+                                    {% else %}
+                                    <a class="ca-mt-btn ca-mt-btn--sm" href="{% url 'ca:my-tasks' %}">Open</a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="3" class="ca-mt-empty">
+                                    <i class="fa fa-circle-check" style="color:#10b981; margin-right: 0.35rem;"></i>
+                                    No pending tasks assigned to your account.
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ATTENTION ITEMS & SLA MONITOR -->
+            <div class="ca-mt-panel" style="margin-top: 0.75rem;">
+                <div class="ca-mt-panel__head">
+                    <div class="ca-panel-title-group">
+                        <i class="fa fa-triangle-exclamation ca-icon--rose"></i>
+                        <span class="ca-mt-panel__title">Attention & SLA Exceptions</span>
+                    </div>
+                    <span class="ca-mt-pill ca-mt-pill--rose">{{ attention_items|length|default:0 }} Flags</span>
+                </div>
+                <div class="ca-mt-panel__body">
+                    <table class="ca-mt-table">
+                        <thead>
+                            <tr>
+                                <th>Exception Subject</th>
+                                <th>Severity</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for a in attention_items %}
+                            <tr>
+                                <td>{{ a.title|default:a.label|default:a }}</td>
+                                <td>
+                                    <span class="ca-mt-pill {% if a.severity == 'critical' or a.severity == 'high' %}ca-mt-pill--rose{% else %}ca-mt-pill--amber{% endif %}">
+                                        {{ a.severity|default:"Warning" }}
+                                    </span>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="2" class="ca-mt-empty">
+                                    <i class="fa fa-circle-check" style="color:#10b981; margin-right: 0.35rem;"></i>
+                                    Zero attention exceptions. Laboratory operating within specifications.
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- COLUMN 2: REAL-TIME NOTIFICATIONS & ALARM STREAM (ALERTS APP) -->
+        <div class="ca-cockpit-col">
+            <div class="ca-mt-panel ca-alerts-stream-panel">
+                <div class="ca-mt-panel__head">
+                    <div class="ca-panel-title-group">
+                        <i class="fa fa-bell ca-icon--amber"></i>
+                        <span class="ca-mt-panel__title">Live Notifications & Alarm Stream</span>
+                    </div>
+                    <div class="ca-alerts-stream-badges">
+                        <span class="ca-mt-pill ca-mt-pill--cyan"><i class="fa fa-tower-broadcast"></i> alerts app</span>
+                        <span class="ca-live-chip" data-state="online"><span class="ca-live-chip__dot"></span> LIVE</span>
+                    </div>
+                </div>
+
+                <div class="ca-mt-panel__body">
+                    <div class="ca-alerts-stream-list" id="ca-alerts-stream-list">
+                        {% for alt in channelled_alerts %}
+                        <div class="ca-alarm-card ca-alarm-card--{{ alt.severity|default:'medium' }}" id="alarm-item-{{ alt.id }}">
+                            <div class="ca-alarm-icon">
+                                {% if alt.severity == 'critical' %}
+                                <i class="fa fa-circle-exclamation"></i>
+                                {% elif alt.severity == 'high' %}
+                                <i class="fa fa-triangle-exclamation"></i>
+                                {% else %}
+                                <i class="fa fa-bell"></i>
+                                {% endif %}
+                            </div>
+                            <div class="ca-alarm-content">
+                                <div class="ca-alarm-head">
+                                    <span class="ca-alarm-title">{{ alt.title }}</span>
+                                    <span class="ca-alarm-time">{{ alt.time_ago }}</span>
+                                </div>
+                                <div class="ca-alarm-msg">{{ alt.message }}</div>
+                                <div class="ca-alarm-footer">
+                                    <span class="ca-mt-pill ca-mt-pill--sm {% if alt.severity == 'critical' %}ca-mt-pill--rose{% elif alt.severity == 'high' %}ca-mt-pill--amber{% else %}ca-mt-pill--cyan{% endif %}">
+                                        {{ alt.priority|upper }}
+                                    </span>
+                                    <div class="ca-alarm-actions">
+                                        {% if alt.url %}
+                                        <a href="{{ alt.url }}" class="ca-alarm-action-link">Open</a>
+                                        {% endif %}
+                                        <button type="button" class="ca-alarm-ack-btn" onclick="CA_Notifications.ack('{{ alt.id }}')">
+                                            <i class="fa fa-check"></i> Ack
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="ca-mt-empty" style="padding: 2rem; text-align: center;">
+                            <i class="fa fa-bell-slash" style="font-size: 2rem; color: #64748b; margin-bottom: 0.5rem; display: block;"></i>
+                            <strong>No active alarms channelled.</strong>
+                            <p style="color:#64748b; font-size: 0.8rem; margin-top: 0.25rem;">Quality assurance telemetry normal for {{ plant_context.plant_name }}.</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- RECENT ACTIVITY FEED -->
+            <div class="ca-mt-panel" style="margin-top: 0.75rem;">
+                <div class="ca-mt-panel__head">
+                    <div class="ca-panel-title-group">
+                        <i class="fa fa-clock-rotate-left ca-icon--cyan"></i>
+                        <span class="ca-mt-panel__title">Laboratory Turnaround Activity</span>
+                    </div>
+                </div>
+                <div class="ca-mt-panel__body">
+                    <ul class="ca-activity-feed">
+                        {% for act in recent_activity %}
+                        <li class="ca-activity-feed__item">
+                            <span class="ca-act-dot"></span>
+                            <div class="ca-act-body">
+                                <strong>{{ act.title|default:act.description|default:act }}</strong>
+                                <span class="ca-act-time">{{ act.timestamp|default:"Recently" }}</span>
+                            </div>
+                        </li>
+                        {% empty %}
+                        <li class="ca-activity-feed__item is-empty">
+                            <span class="ca-act-dot is-clean"></span>
+                            <div class="ca-act-body">Laboratory records initialized and awaiting next intake.</div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</div>

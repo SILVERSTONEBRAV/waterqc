@@ -321,6 +321,7 @@ safe_register(
     queryset_factory=parameter_qs,
     inline_edit_fields=[
         "value",
+        "entry_status",
         "manually_editable",
     ],
 )

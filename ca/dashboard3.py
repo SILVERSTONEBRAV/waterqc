@@ -13,13 +13,16 @@ import numpy as np
 import pandas as pd
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.core.exceptions import PermissionDenied
 from django.db.models import Count, Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404
+from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.views.generic import TemplateView
 
 from .mixins import CaWanjalaMixin
+from .navigation import CA_DASHBOARD_DATA_PERMISSIONS
 from t.models import TreatmentPlant
 
 from .models import (
@@ -55,7 +58,7 @@ User = get_user_model()
 
 class Dashboard3View(CaWanjalaMixin, TemplateView):
     template_name = "ca/dashboard/pages/dashboard3.html"
-    permission_required_view = None
+    permission_required_view = "ca.view_chemicalanalysisprocess"
 
     process_statuses = (
         "CREATED",
@@ -115,6 +118,14 @@ class Dashboard3View(CaWanjalaMixin, TemplateView):
             return None
 
     def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and not self.is_ca_superuser(request.user):
+            if not all(
+                request.user.has_perm(permission)
+                for permission in CA_DASHBOARD_DATA_PERMISSIONS
+            ):
+                raise PermissionDenied(
+                    "You do not have permission to view the full CA analytics dashboard."
+                )
         self._now = timezone.now()
         self._filters = self._get_filters()
         return super().dispatch(request, *args, **kwargs)
@@ -135,6 +146,7 @@ class Dashboard3View(CaWanjalaMixin, TemplateView):
             .prefetch_related(
                 "batch__test_results",
                 "batch__test_results__specification",
+                "task_set",
             )
         )
 
@@ -246,6 +258,11 @@ class Dashboard3View(CaWanjalaMixin, TemplateView):
         context["dashboard_url"] = self.request.path
         context["filters"] = self._filters
         context["available_periods"] = self.period_map.keys()
+        context["permissions"] = {
+            "export": self.user_has_ca_permission(
+                "ca.view_chemicalanalysisprocess"
+            ),
+        }
 
         context["urls"] = {
             "dashboard": self.request.path,
@@ -386,6 +403,7 @@ class Dashboard3View(CaWanjalaMixin, TemplateView):
 
     def _build_active_processes(self, processes, terminal):
         rows = []
+        active_task_statuses = {"NEW", "ASSIGNED", "STARTED"}
         for p in processes:
             if p.status in terminal:
                 continue
@@ -400,6 +418,38 @@ class Dashboard3View(CaWanjalaMixin, TemplateView):
             else:
                 risk = "LOW"
 
+            action_url = reverse("ca:process-detail", kwargs={"pk": p.pk})
+            action_title = "Open process"
+            for task in sorted(
+                (
+                    task
+                    for task in p.task_set.all()
+                    if task.status in active_task_statuses and task.flow_task
+                ),
+                key=lambda task: (task.created, task.pk),
+            ):
+                node = task.flow_task
+                try:
+                    available = (
+                        node.can_execute(self.request.user, task)
+                        or node.can_assign(self.request.user, task)
+                        or node.can_view(self.request.user, task)
+                    )
+                except AttributeError:
+                    available = False
+                if available:
+                    try:
+                        action_url = reverse(
+                            f"ca:chemicalanalysis:{node.name}:index",
+                            args=[p.pk, task.pk],
+                        )
+                    except (NoReverseMatch, AttributeError, TypeError):
+                        # Fall back to the process page rather than failing the
+                        # entire dashboard on a bad Viewflow namespace.
+                        pass
+                    action_title = task.title or str(node)
+                    break
+
             rows.append({
                 "id": p.pk,
                 "chemical": self._chemical_name(p),
@@ -408,6 +458,8 @@ class Dashboard3View(CaWanjalaMixin, TemplateView):
                 "rework_count": rework,
                 "overdue": overdue,
                 "risk": risk,
+                "action_url": action_url,
+                "action_title": action_title,
             })
         return rows
 
@@ -469,16 +521,19 @@ class Dashboard3View(CaWanjalaMixin, TemplateView):
 
     def _cache_key(self):
         user = self.request.user
-
-        if getattr(user, "is_superuser", False):
-            scope = "all"
-        else:
-            plant = getattr(user, "assigned_treatment_plant", None)
-            scope = getattr(plant, "pk", "none")
+        plant_id = self.get_scope_plant_id()
+        scope = (
+            "all"
+            if plant_id is None and self.is_ca_superuser(user)
+            else plant_id
+        )
 
         query = self.request.GET.urlencode()
 
-        return f"ca-dashboard3:{scope}:{query}"
+        # The payload can contain plant-scoped process data. Keep entries
+        # isolated by user and the effective selected plant, including the
+        # superuser plant selector stored in the session.
+        return f"ca-dashboard3:{user.pk}:{scope}:{query}"
 
     def _meta(self, processes):
         return {
@@ -1804,7 +1859,9 @@ class Dashboard3View(CaWanjalaMixin, TemplateView):
             matrix = []
             labels = []
         else:
-            df = df.fillna(0)
+            df = df.infer_objects(copy=False)
+            numeric_columns = df.select_dtypes(include=["number", "bool"]).columns
+            df[numeric_columns] = df[numeric_columns].fillna(0)
             corr = df.corr(numeric_only=True)
             labels = list(corr.columns)
             matrix = corr.round(3).values.tolist()

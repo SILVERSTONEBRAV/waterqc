@@ -1,0 +1,157 @@
+{% extends "ca/base.html" %}
+{% load static %}
+
+{% block title %}{{ task_title }} · Chemical Analysis{% endblock %}
+
+{% block extra_styles %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'ca/css/components/advanced-forms.css' %}?v=20261020-focused-form">
+{% endblock %}
+
+{% block accounts_content %}
+<main class="ca-page ca-form-page ca-workflow-task" aria-labelledby="workflow-task-title">
+    {% if messages %}
+        <div class="ca-form-notices" role="status" aria-live="polite">
+            {% for message in messages %}
+                <div class="ca-form-notice ca-form-notice--{{ message.tags|default:'info' }}">
+                    <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                    <span>{{ message }}</span>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+    <header class="ca-form-hero">
+        <div class="ca-form-hero__identity">
+            <span class="ca-form-orbit" aria-hidden="true"><i class="fa-solid fa-flask-vial"></i></span>
+            <div class="ca-form-hero__copy">
+                <p class="ca-form-eyebrow">Chemical batch workflow <span>·</span> {{ batch.sample_id }}</p>
+                <h1 id="workflow-task-title">{{ task_title }}</h1>
+                <p class="ca-form-subtitle">{{ batch.chemical }} <span aria-hidden="true">·</span> {{ batch.treatment_plant }}</p>
+            </div>
+        </div>
+        <a class="ca-form-utility" href="{% url 'ca:process-detail' process.pk %}">
+            <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+            <span>Process overview</span>
+        </a>
+        <div class="ca-form-context" aria-label="Workflow context">
+            <span class="ca-context-chip"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i> {{ process.get_status_display|default:workflow_status }}</span>
+            {% if analysis_request %}<span class="ca-context-chip"><i class="fa-solid fa-hashtag" aria-hidden="true"></i> {{ analysis_request.request_id }}</span>{% endif %}
+            <span class="ca-context-chip ca-context-chip--live"><span class="ca-status-pulse" aria-hidden="true"></span> Active workflow</span>
+        </div>
+    </header>
+
+    <section class="ca-advanced-form-panel" aria-labelledby="workflow-form-title">
+        <div class="ca-advanced-form-panel__header">
+            <div class="ca-advanced-form-panel__mark" aria-hidden="true"><i class="fa-solid fa-clipboard-check"></i></div>
+            <div>
+                <p class="ca-form-eyebrow">{% if formula_result %}Automated assay{% else %}Workflow action{% endif %}</p>
+                <h2 id="workflow-form-title">{{ task_title }}</h2>
+                <p>{{ task_prompt }}</p>
+            </div>
+            <span class="ca-required-note"><span aria-hidden="true">*</span> Required</span>
+        </div>
+
+        {% if formula_result %}
+            <div class="ca-form-context" aria-label="Automated result setup">
+                <span class="ca-context-chip"><i class="fa-solid fa-vial" aria-hidden="true"></i> {{ result_parameter.parameter_name }}</span>
+                <span class="ca-context-chip"><i class="fa-solid fa-ruler-combined" aria-hidden="true"></i>
+                    {% if result_method %}{{ result_method.method }}{% else %}Method not configured{% endif %} · {{ result_unit }}
+                </span>
+                <span class="ca-context-chip"><i class="fa-solid fa-arrows-up-down" aria-hidden="true"></i>
+                    {% if result_has_minimum or result_has_maximum %}
+                        Limits:
+                        {% if result_has_minimum %}min {{ result_minimum }}{% endif %}
+                        {% if result_has_minimum and result_has_maximum %} · {% endif %}
+                        {% if result_has_maximum %}max {{ result_maximum }}{% endif %}
+                        {{ result_unit }}
+                    {% else %}
+                        Limits not configured
+                    {% endif %}
+                </span>
+            </div>
+            {% if formula_setup_error %}
+                <div class="ca-form-error-summary" role="alert">
+                    <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                    <div><p>{{ formula_setup_error }}</p></div>
+                </div>
+            {% endif %}
+        {% endif %}
+
+        <form method="post" enctype="multipart/form-data" novalidate class="ca-advanced-form">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <div class="ca-form-error-summary" role="alert" aria-live="polite">
+                    <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                    <div>{% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}</div>
+                </div>
+            {% endif %}
+            {% for hidden in form.hidden_fields %}
+                {{ hidden }}
+                {% if hidden.errors %}<div class="ca-field-errors" role="alert">{{ hidden.errors }}</div>{% endif %}
+            {% endfor %}
+
+            {% if form_groups %}
+                <div class="ca-form-sections">
+                    {% for group in form_groups %}
+                    <section class="ca-form-section" aria-labelledby="checklist-section-{{ forloop.counter }}">
+                        <div class="ca-form-section__heading">
+                            <span class="ca-form-section__icon" aria-hidden="true"><i class="fa-solid {{ group.icon }}"></i></span>
+                            <div><h3 id="checklist-section-{{ forloop.counter }}">{{ group.title }}</h3><p>{{ group.description }}</p></div>
+                            <span class="ca-form-section__index">0{{ forloop.counter }}</span>
+                        </div>
+                        <div class="ca-workflow-fields{% if group.title == 'Safety verification' %} ca-workflow-fields--safety{% endif %}">
+                            {% for field in group.fields %}
+                                <div class="ca-workflow-field{% if field.field.widget.input_type == 'checkbox' %} ca-workflow-field--check{% endif %}{% if field.name == 'storage_conditions' or field.name == 'handling_instructions' or field.name == 'contact_with_eyes_action' %} ca-workflow-field--wide{% endif %}">
+                                    {% if field.field.widget.input_type == 'checkbox' %}
+                                        <label class="ca-workflow-check-label" for="{{ field.id_for_label }}">{{ field }}<span>{{ field.label }}</span></label>
+                                    {% else %}
+                                        <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="ca-required-star" aria-hidden="true">*</span>{% endif %}</label>
+                                        {{ field }}
+                                    {% endif %}
+                                    {% if field.help_text %}<small class="ca-form-help">{{ field.help_text }}</small>{% endif %}
+                                    {% if field.errors %}<div class="ca-field-errors" role="alert">{{ field.errors }}</div>{% endif %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </section>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="ca-workflow-fields">
+                    {% for field in form.visible_fields %}
+                        <div class="ca-workflow-field{% if field.field.widget.input_type == 'checkbox' %} ca-workflow-field--check{% endif %}">
+                            {% if field.field.widget.input_type == 'checkbox' %}
+                                <label class="ca-workflow-check-label" for="{{ field.id_for_label }}">{{ field }}<span>{{ field.label }}</span></label>
+                            {% else %}
+                                <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="ca-required-star" aria-hidden="true">*</span>{% endif %}</label>
+                                {{ field }}
+                            {% endif %}
+                            {% if field.help_text %}<small class="ca-form-help">{{ field.help_text }}</small>{% endif %}
+                            {% if field.errors %}<div class="ca-field-errors" role="alert">{{ field.errors }}</div>{% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <footer class="ca-advanced-form__footer">
+                <span><i class="fa-solid fa-lock" aria-hidden="true"></i> Changes are recorded in the batch audit trail.</span>
+                <div class="ca-form-actions">
+                    <a class="ca-form-button ca-form-button--secondary" href="{% url 'ca:process-detail' process.pk %}">Cancel</a>
+                    {% if flow_task.name == "checklist" %}
+                        <button type="submit" name="checklist_action" value="save_close" class="ca-form-button ca-form-button--secondary">
+                            <i class="fa-solid fa-clock" aria-hidden="true"></i> Confirm and close for later analysis
+                        </button>
+                        <button type="submit" name="checklist_action" value="start_analysis" class="ca-form-button ca-form-button--primary">
+                            <i class="fa-solid fa-flask-vial" aria-hidden="true"></i> Confirm complete checklist and start analysis
+                        </button>
+                    {% else %}
+                        <button type="submit" class="ca-form-button ca-form-button--primary"{% if formula_setup_error %} disabled aria-disabled="true"{% endif %}>
+                            {% if formula_result %}<i class="fa-solid fa-calculator" aria-hidden="true"></i> Calculate, evaluate and continue{% else %}<i class="fa-solid fa-check" aria-hidden="true"></i> Save and continue{% endif %}
+                        </button>
+                    {% endif %}
+                </div>
+            </footer>
+        </form>
+    </section>
+</main>
+{% endblock %}

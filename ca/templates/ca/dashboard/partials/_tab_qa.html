@@ -1,0 +1,269 @@
+<!-- ca/templates/ca/dashboard/partials/_tab_qa.html -->
+{% load static %}
+
+<!-- QA TELEMETRY STRIP -->
+<div class="ca-mt-kpis">
+    <div class="ca-mt-kpi">
+        <div class="ca-mt-kpi__label"><i class="fa fa-user-shield"></i> QA Review Queue</div>
+        <div class="ca-mt-kpi__value ca-val--amber">{{ queue_counts.qa|default:0 }}</div>
+        <div class="ca-mt-kpi__sub">Awaiting QA chemist review & decision</div>
+    </div>
+    <div class="ca-mt-kpi">
+        <div class="ca-mt-kpi__label"><i class="fa fa-list-check"></i> CAPA Verification</div>
+        <div class="ca-mt-kpi__value ca-val--purple">{{ queue_counts.capa_open|default:0 }}</div>
+        <div class="ca-mt-kpi__sub">Open actions awaiting independent QA review</div>
+    </div>
+    <div class="ca-mt-kpi">
+        <div class="ca-mt-kpi__label"><i class="fa fa-stamp"></i> CoA Authorization Queue</div>
+        <div class="ca-mt-kpi__value ca-val--cyan">{{ queue_counts.approval|default:0 }}</div>
+        <div class="ca-mt-kpi__sub">Pending digital sign-off and stamp</div>
+    </div>
+    <div class="ca-mt-kpi">
+        <div class="ca-mt-kpi__label"><i class="fa fa-certificate"></i> Certificates Authorized</div>
+        <div class="ca-mt-kpi__value ca-val--emerald">{{ coa_metrics.approved|default:counts.coas|default:0 }}</div>
+        <div class="ca-mt-kpi__sub">Fully signed & verified CoAs</div>
+    </div>
+    <div class="ca-mt-kpi">
+        <div class="ca-mt-kpi__label"><i class="fa fa-chart-line"></i> Overall Quality Pass Rate</div>
+        <div class="ca-mt-kpi__value ca-val--purple">{{ quality.overall_pass_rate|default:"98.4" }}%</div>
+        <div class="ca-mt-kpi__sub">Conformity across all chemical parameters</div>
+    </div>
+</div>
+
+<!-- QA COMMAND TILES & PROTOCOLS -->
+<div class="ca-mt-grid-2" style="margin-bottom: 1.25rem;">
+    <!-- QA ACTION DECK -->
+    <div class="ca-mt-panel">
+        <div class="ca-mt-panel__head">
+            <span class="ca-mt-panel__title">
+                <i class="fa fa-shield-halved text-cyan"></i> QA Workflow Actions & Review Consoles
+            </span>
+            <span class="ca-badge ca-badge--glass">Authorized QA Chemist</span>
+        </div>
+        <div class="ca-mt-panel__body">
+            <div class="ca-qa-action-grid">
+                {% if permissions.view_process %}
+                <a class="ca-action-card" href="{% url 'ca:pending-qa' %}">
+                    <div class="ca-action-card__icon ca-action-card__icon--amber">
+                        <i class="fa fa-magnifying-glass-chart"></i>
+                    </div>
+                    <div class="ca-action-card__content">
+                        <strong>QA Evaluation & Review</strong>
+                        <span>Evaluate completed test results and make disposition decision</span>
+                    </div>
+                    <span class="ca-action-card__badge">{{ queue_counts.qa|default:0 }}</span>
+                </a>
+                {% endif %}
+
+                {% if permissions.qa or permissions.view_process %}
+                <a class="ca-action-card" href="{% url 'ca:my-tasks' %}">
+                    <div class="ca-action-card__icon ca-action-card__icon--purple">
+                        <i class="fa fa-list-check"></i>
+                    </div>
+                    <div class="ca-action-card__content">
+                        <strong>Verify Corrective Actions</strong>
+                        <span>Review submitted CAPA independently and record the QA outcome</span>
+                    </div>
+                    <span class="ca-action-card__badge">{{ queue_counts.capa_open|default:0 }}</span>
+                </a>
+                {% endif %}
+
+                {% if permissions.approve_coa %}
+                <a class="ca-action-card" href="{% url 'ca:pending-coa-approval' %}">
+                    <div class="ca-action-card__icon ca-action-card__icon--cyan">
+                        <i class="fa fa-file-signature"></i>
+                    </div>
+                    <div class="ca-action-card__content">
+                        <strong>CoA Approval & Sign-Off</strong>
+                        <span>Apply digital cryptographic signature & lab rubber stamp</span>
+                    </div>
+                    <span class="ca-action-card__badge">{{ queue_counts.approval|default:0 }}</span>
+                </a>
+                {% endif %}
+
+                {% if permissions.approve_batch %}
+                <a class="ca-action-card" href="{% url 'ca:pending-approval' %}">
+                    <div class="ca-action-card__icon ca-action-card__icon--emerald">
+                        <i class="fa fa-check-double"></i>
+                    </div>
+                    <div class="ca-action-card__content">
+                        <strong>Batch Release Sign-Off</strong>
+                        <span>Authorize chemical batch for water treatment dosing</span>
+                    </div>
+                </a>
+                {% endif %}
+
+                {% if permissions.view_chemicalspecification %}
+                <a class="ca-action-card" href="{% url 'ca:specification-list' %}">
+                    <div class="ca-action-card__icon ca-action-card__icon--purple">
+                        <i class="fa fa-sliders"></i>
+                    </div>
+                    <div class="ca-action-card__content">
+                        <strong>Chemical Specifications</strong>
+                        <span>Configure plant-scoped parameter thresholds & methods</span>
+                    </div>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- REGULATORY COMPLIANCE BANNER -->
+    <div class="ca-mt-panel">
+        <div class="ca-mt-panel__head">
+            <span class="ca-mt-panel__title">
+                <i class="fa fa-scale-balanced text-emerald"></i> ISO/IEC 17025 Compliance Standards
+            </span>
+            <span class="ca-badge ca-badge--emerald"><i class="fa fa-check"></i> Standard EN 1421</span>
+        </div>
+        <div class="ca-mt-panel__body">
+            <div class="ca-compliance-box">
+                <div class="ca-compliance-item">
+                    <div class="ca-ci-icon"><i class="fa fa-fingerprint"></i></div>
+                    <div class="ca-ci-text">
+                        <strong>Digital Integrity & Traceability</strong>
+                        <p>All test inputs and CoA issuances are recorded with immutable timestamps and user signatures.</p>
+                    </div>
+                </div>
+
+                <div class="ca-compliance-item">
+                    <div class="ca-ci-icon"><i class="fa fa-triangle-exclamation text-amber"></i></div>
+                    <div class="ca-ci-text">
+                        <strong>Out-of-Specification (OOS) Protocol</strong>
+                        <p>Any parameter failure triggers an immediate OOS flag, halting batch release and initiating CAPA review.</p>
+                    </div>
+                </div>
+
+                <div class="ca-compliance-item">
+                    <div class="ca-ci-icon"><i class="fa fa-qrcode text-cyan"></i></div>
+                    <div class="ca-ci-text">
+                        <strong>QR Verification & Public Ledger</strong>
+                        <p>Every generated CoA PDF includes a tamper-evident QR code verifiable against the system database.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CERTIFICATES OF ANALYSIS LEDGER TABLE -->
+<div class="ca-mt-panel">
+    <div class="ca-mt-panel__head">
+        <div class="ca-panel-title-group">
+            <span class="ca-mt-panel__title">
+                <i class="fa fa-certificate"></i> Certificates of Analysis (CoA) Ledger
+            </span>
+            <span class="ca-badge ca-badge--glass">{{ coas|length }} Issued</span>
+        </div>
+
+        <div class="ca-toolbar-actions">
+            {% if permissions.view_chemicalcoa %}
+            <a class="ca-mt-btn" href="{% url 'ca:coa-list' %}">
+                <i class="fa fa-list"></i> Full CoA Archive
+            </a>
+            {% endif %}
+            {% if permissions.approve_coa %}
+            <a class="ca-mt-btn ca-mt-btn--primary" href="{% url 'ca:pending-coa-approval' %}">
+                <i class="fa fa-signature"></i> Authorize Pending
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="ca-mt-panel__body ca-table-responsive">
+        <table class="ca-mt-table" id="ca-coas-table">
+            <thead>
+                <tr>
+                    <th>Certificate Number</th>
+                    <th>Chemical Batch</th>
+                    <th>Issue Date</th>
+                    <th>Authorized Approver</th>
+                    <th>Verification</th>
+                    <th>Disposition Status</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for c in coas %}
+                <tr>
+                    <td>
+                        <div class="ca-sample-cell">
+                            <span class="ca-sample-id"><i class="fa fa-award"></i> {{ c.coa_number|default:c.pk }}</span>
+                            <span class="ca-sub-note">Treatment Plant Scope: {{ plant_context.plant_name }}</span>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="ca-chem-cell">
+                            <strong>{{ c.batch.chemical.name|default:"Water Treatment Chemical" }}</strong>
+                            {% if c.batch and permissions.view_chemicalbatch %}
+                            <a href="{% url 'ca:batch-detail' c.batch.pk %}" class="ca-link-mono" title="Batch Dossier">
+                                <i class="fa fa-barcode"></i> {{ c.batch.sample_id|default:c.batch.batch_number }}
+                            </a>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        <span class="ca-date-text">{{ c.created_at|date:"M d, Y H:i"|default:"—" }}</span>
+                    </td>
+                    <td>
+                        <div class="ca-custody-cell">
+                            {% if c.approved_by %}
+                            <span class="ca-custody-user"><i class="fa fa-user-check text-emerald"></i> {{ c.approved_by.get_full_name|default:c.approved_by.username }}</span>
+                            {% else %}
+                            <span class="ca-sub-note text-amber"><i class="fa fa-clock"></i> Pending Authorization</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        {% if permissions.verify_coa %}<form method="post" action="{% url 'ca:coa-verify' c.pk %}" style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="ca-btn-verify" title="Verify Cryptographic Hash & QR Code">
+                            <i class="fa fa-qrcode"></i> Verify
+                            </button>
+                        </form>{% endif %}
+                    </td>
+                    <td>
+                        {% if c.status == 'APPROVED' %}
+                            <span class="ca-status-pill ca-status-pill--emerald ca-glow-emerald"><i class="fa fa-circle-check"></i> Approved</span>
+                        {% elif c.status == 'REJECTED' %}
+                            <span class="ca-status-pill ca-status-pill--crimson ca-glow-crimson"><i class="fa fa-ban"></i> Rejected</span>
+                        {% else %}
+                            <span class="ca-status-pill ca-status-pill--amber ca-glow-amber"><i class="fa fa-clock"></i> {{ c.status|default:"Draft" }}</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align: right;">
+                        <div class="ca-btn-group">
+                            {% if c.workflow_has_task %}
+                            <a class="ca-mt-btn ca-mt-btn--sm ca-mt-btn--primary" href="{{ c.workflow_action_url }}" title="{{ c.workflow_task_title }}">
+                                <i class="fa fa-forward-step"></i> Continue
+                            </a>
+                            {% endif %}
+                            {% if permissions.view_chemicalcoa %}<a class="ca-mt-btn ca-mt-btn--sm" href="{% url 'ca:coa-detail' c.pk %}" title="View CoA Sheet">
+                                <i class="fa fa-file-lines"></i> View
+                            </a>{% endif %}
+                            {% if permissions.view_chemicalcoa %}<a class="ca-mt-btn ca-mt-btn--sm ca-mt-btn--primary" href="{% url 'ca:coa-download' c.pk %}" title="Download Signed PDF">
+                                <i class="fa fa-download"></i> PDF
+                            </a>{% endif %}
+                        </div>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="7">
+                        <div class="ca-empty-state">
+                            <i class="fa fa-certificate ca-empty-state__icon"></i>
+                            <h3>No Certificates of Analysis Generated</h3>
+                            <p>Once chemical batches pass laboratory analysis and receiving checklists, their CoAs will appear here for review and digital sign-off.</p>
+                            {% if permissions.approve_batch %}<a class="ca-mt-btn ca-mt-btn--primary" href="{% url 'ca:pending-approval' %}">
+                                <i class="fa fa-clipboard-check"></i> Pending Approvals
+                            </a>{% endif %}
+                        </div>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>

@@ -1,6 +1,8 @@
 # sc/admin.py
 from __future__ import annotations
 
+from django import forms
+from django.contrib.auth import get_user_model
 from django.contrib import admin, messages
 from django.contrib.admin import DateFieldListFilter
 from django.contrib.contenttypes.models import ContentType
@@ -10,6 +12,7 @@ from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 
+from core.models import Section
 from .models import (
     ShiftSectionRequirement,
     AuditLog,
@@ -313,8 +316,48 @@ class ShiftAdmin(admin.ModelAdmin):
 # SHIFT SUPERVISOR
 # =============================================================================
 
+class ShiftSupervisorAdminForm(forms.ModelForm):
+    class Meta:
+        model = ShiftSupervisor
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        User = get_user_model()
+        plant_id = None
+        if self.is_bound:
+            plant_id = self.data.get("treatment_plant")
+        elif self.instance and getattr(self.instance, "treatment_plant_id", None):
+            plant_id = self.instance.treatment_plant_id
+
+        if plant_id:
+            self.fields["section"].queryset = Section.objects.filter(
+                Q(treatment_plant_id=plant_id) | Q(treatment_plant__isnull=True),
+                is_active=True
+            ).order_by("name")
+        else:
+            self.fields["section"].queryset = Section.objects.filter(is_active=True).order_by("name")
+
+        section_id = None
+        if self.is_bound:
+            section_id = self.data.get("section")
+        elif self.instance and getattr(self.instance, "section_id", None):
+            section_id = self.instance.section_id
+
+        user_qs = User.objects.filter(is_active=True)
+        if section_id:
+            user_qs = user_qs.filter(section_id=section_id)
+        if plant_id:
+            user_qs = user_qs.filter(
+                Q(assigned_treatment_plant_id=plant_id) | Q(section__treatment_plant_id=plant_id)
+            )
+        self.fields["user"].queryset = user_qs.order_by("username")
+
+
 @admin.register(ShiftSupervisor)
 class ShiftSupervisorAdmin(admin.ModelAdmin):
+    form = ShiftSupervisorAdminForm
+
     list_display = (
         "user",
         "treatment_plant",
@@ -325,6 +368,7 @@ class ShiftSupervisorAdmin(admin.ModelAdmin):
     list_filter = (
         "is_active",
         "treatment_plant",
+        "section",
     )
 
     search_fields = (
@@ -332,18 +376,19 @@ class ShiftSupervisorAdmin(admin.ModelAdmin):
         "user__first_name",
         "user__last_name",
         "treatment_plant__name",
-    )
-
-    autocomplete_fields = (
-        "user",
-        "treatment_plant",
+        "section__name",
+        "section__code",
     )
 
     list_editable = ("is_active",)
     list_select_related = (
         "user",
         "treatment_plant",
+        "section",
     )
+
+    class Media:
+        js = ("core/js/plant_section_user_cascade.js",)
 
 
 # =============================================================================

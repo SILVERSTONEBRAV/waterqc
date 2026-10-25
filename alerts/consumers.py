@@ -1,197 +1,115 @@
-#alerts/consumers.py
+"""Authenticated, per-user alert delivery over WebSockets."""
+
+from __future__ import annotations
+
 import json
 import logging
-from channels.generic.websocket import AsyncWebsocketConsumer
-from channels.db import database_sync_to_async
-from django.utils import timezone
-from django.contrib.contenttypes.models import ContentType
 
-from alerts.models import (
-    AlertState,
-    AlarmAcknowledgment,
-)
-from alerts.utils import generate_voice_notification_pyttsx3
+from channels.generic.websocket import AsyncJsonWebsocketConsumer
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
 
-class AlertConsumer(AsyncWebsocketConsumer):
-    """
-    Advanced WebSocket consumer for alerts & alarm streams.
+class AlertConsumer(AsyncJsonWebsocketConsumer):
+    """Deliver only to the authenticated recipient's private alert group.
 
-    ✅ Model-aligned with alerts.models
-    ✅ Supports:
-        - GenericForeignKey acknowledgments
-        - Alert state updates
-        - Voice + alarm signaling
-        - Geo/AI enriched payloads
-        - Per-user + global streams
+    Acknowledgment remains on the HTTP endpoint, where the request can be
+    revalidated against the user's plant and alert permissions.
     """
 
-    # --------------------------------------------------
-    #  CONNECT / DISCONNECT
-    # --------------------------------------------------
     async def connect(self):
         user = self.scope.get("user")
-        self.user = user if user and user.is_authenticated else None
+        if not user or not user.is_authenticated:
+            await self.close(code=4001)
+            return
 
-        self.global_group = "alerts_stream"
-        self.user_group = f"user_{self.user.id}_alerts" if self.user else None
+        route = self.scope.get("url_route") or {}
+        route_kwargs = route.get("kwargs") or {}
+        requested_user_id = route_kwargs.get("user_id")
+        if requested_user_id and str(requested_user_id) != str(user.pk):
+            await self.close(code=4003)
+            return
 
-        try:
-            await self.channel_layer.group_add(self.global_group, self.channel_name)
-            if self.user_group:
-                await self.channel_layer.group_add(self.user_group, self.channel_name)
-
-            await self.accept()
-            logger.info(f"✅ Alert WS connected → {self.channel_name}")
-
-        except Exception:
-            logger.exception("❌ WebSocket connection failure")
-            await self.close(code=1011)
+        self.user = user
+        self.user_group = f"user_{user.pk}_alerts"
+        await self.channel_layer.group_add(self.user_group, self.channel_name)
+        await self.channel_layer.group_add("alerts_stream", self.channel_name)
+        await self.channel_layer.group_add("alerts_group", self.channel_name)
+        plant_id = getattr(user, "assigned_treatment_plant_id", None)
+        if plant_id:
+            await self.channel_layer.group_add(f"plant_{plant_id}_alerts", self.channel_name)
+        await self.accept()
+        await self.send_json({
+            "type": "connection.ready",
+            "channel": "user-alerts",
+            "timestamp": timezone.now().isoformat(),
+        })
 
     async def disconnect(self, close_code):
-        try:
-            await self.channel_layer.group_discard(self.global_group, self.channel_name)
-            if self.user_group:
-                await self.channel_layer.group_discard(self.user_group, self.channel_name)
-        except Exception:
-            logger.exception("⚠️ WS disconnect cleanup failed")
+        group = getattr(self, "user_group", None)
+        if group:
+            await self.channel_layer.group_discard(group, self.channel_name)
+        await self.channel_layer.group_discard("alerts_stream", self.channel_name)
+        await self.channel_layer.group_discard("alerts_group", self.channel_name)
+        plant_id = getattr(getattr(self, "user", None), "assigned_treatment_plant_id", None)
+        if plant_id:
+            await self.channel_layer.group_discard(f"plant_{plant_id}_alerts", self.channel_name)
 
-
-    # --------------------------------------------------
-    #  RECEIVE FROM CLIENT
-    # --------------------------------------------------
     async def receive(self, text_data=None, bytes_data=None):
         if not text_data:
             return
-
         try:
             payload = json.loads(text_data)
-            msg_type = payload.get("type")
+        except (TypeError, json.JSONDecodeError):
+            await self.send_json({"type": "error", "error": "Invalid JSON."})
+            return
 
-            if msg_type == "acknowledge":
-                await self._acknowledge_alert(payload)
+        if payload.get("type") == "ping":
+            await self.send_json({"type": "pong", "timestamp": timezone.now().isoformat()})
+        elif payload.get("type") == "acknowledge":
+            await self.send_json({
+                "type": "error",
+                "error": "Acknowledge notifications through the scoped notification action.",
+            })
 
-            elif msg_type == "ping":
-                await self.send_json({"type": "pong"})
-
-            else:
-                logger.warning(f"⚠️ Unknown WS message type: {msg_type}")
-
-        except json.JSONDecodeError:
-            await self.send_json({"error": "Invalid JSON"})
-        except Exception:
-            logger.exception("❌ WS receive error")
-            await self.send_json({"error": "Server error"})
-
-
-    # --------------------------------------------------
-    #  EVENTS FROM CHANNEL LAYER
-    # --------------------------------------------------
     async def alert_message(self, event):
-        """Primary alert dispatch."""
+        """Send a private alert hint; the client fetches its scoped feed."""
         await self.send_json({
             "type": "alert",
+            "title": event.get("title") or "System Notification",
             "message": event.get("message"),
-            "priority": event.get("priority"),
-            "alert_type": event.get("alert_type"),
+            "voice_url": event.get("voice_url"),
+            "priority": event.get("priority", "medium"),
+            "alert_type": event.get("alert_type", "general"),
             "instance_ref": event.get("instance_ref"),
-            "geo": event.get("geo"),
-            "timestamp": timezone.now().isoformat()
+            "timestamp": event.get("timestamp") or timezone.now().isoformat(),
         })
-
-        if self.user:
-            await self._trigger_alarm(event.get("message"))
-
 
     async def alert_state(self, event):
-        """State transition push."""
+        """Send alert event to client so bell badge updates and voice plays immediately."""
         await self.send_json({
-            "type": "state_change",
-            "state": event.get("message"),
-            "geo": event.get("geo"),
-            "timestamp": timezone.now().isoformat()
+            "type": "alert",
+            "title": event.get("title") or "System Alert",
+            "message": event.get("message"),
+            "voice_url": event.get("voice_url"),
+            "priority": event.get("priority", "medium"),
+            "alert_type": event.get("alert_type", "state_change"),
+            "instance_ref": event.get("instance_ref"),
+            "timestamp": event.get("timestamp") or timezone.now().isoformat(),
         })
 
+    async def voice_alert(self, event):
+        """Send persistent voice alert with audio URL for audio playback."""
+        audio_url = event.get("audio_url") or event.get("voice_url")
+        await self.send_json({
+            "type": "voice_alert",
+            "id": event.get("id"),
+            "audio_url": audio_url,
+            "voice_url": audio_url,
+            "message": event.get("message"),
+            "title": event.get("title") or "Voice Alert",
+            "speaker": event.get("speaker"),
+            "timestamp": event.get("timestamp") or timezone.now().isoformat(),
+        })
 
-    # --------------------------------------------------
-    #  ACKNOWLEDGMENT LOGIC (MODEL-CORRECT)
-    # --------------------------------------------------
-    async def _acknowledge_alert(self, payload):
-        """
-        Persist acknowledgment using GenericForeignKey.
-
-        Payload:
-        {
-            type: "acknowledge",
-            content_type: "nonconformity",
-            object_id: 123
-        }
-        """
-        if not self.user:
-            return
-
-        model_name = payload.get("content_type")
-        object_id = payload.get("object_id")
-
-        if not model_name or not object_id:
-            return
-
-        try:
-            ct = await database_sync_to_async(ContentType.objects.get)(
-                model=model_name
-            )
-
-            await database_sync_to_async(AlarmAcknowledgment.objects.update_or_create)(
-                user=self.user,
-                content_type=ct,
-                object_id=object_id,
-                defaults={
-                    "acknowledged": True,
-                    "acknowledged_at": timezone.now(),
-                },
-            )
-
-            # Update alert state if exists
-            await database_sync_to_async(
-                AlertState.objects.filter(
-                    instance_ref=str(object_id)
-                ).update
-            )(state=AlertState.StateChoices.ACKNOWLEDGED)
-
-            await self.send_json({
-                "type": "ack",
-                "status": "ok",
-                "object_id": object_id
-            })
-
-            logger.info(f"✅ Alert acknowledged by user={self.user.id} obj={object_id}")
-
-        except ContentType.DoesNotExist:
-            logger.warning(f"❌ Invalid content_type {model_name}")
-        except Exception:
-            logger.exception("❌ Failed to acknowledge alert")
-
-
-    # --------------------------------------------------
-    #  ALARM / VOICE HANDLER
-    # --------------------------------------------------
-    async def _trigger_alarm(self, message: str):
-        """
-        Sends alarm + optional TTS reference to frontend.
-        """
-        try:
-            voice_file = await database_sync_to_async(
-                generate_voice_notification_pyttsx3
-            )(message)
-
-            await self.send_json({
-                "type": "alarm",
-                "message": message,
-                "voice": voice_file,
-                "alarm_sound": "/static/audio/alarm.mp3",
-            })
-
-        except Exception:
-            logger.exception("⚠️ Alarm trigger failed")

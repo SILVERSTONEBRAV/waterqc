@@ -26,6 +26,13 @@ class DashboardConsumer(
 
             return
 
+        if not user.is_superuser and not (
+            user.has_perm("qc.view_wateranalysis")
+            or user.has_perm("qc.change_wateranalysis")
+        ):
+            await self.close(code=4003)
+            return
+
 
         plant = getattr(
             user,
@@ -51,8 +58,15 @@ class DashboardConsumer(
         self.groups_joined = []
         if plant:
             self.groups_joined.append(f"qc-plant-{plant.pk}")
-        if url_plant and f"qc-plant-{url_plant}" not in self.groups_joined:
-            self.groups_joined.append(f"qc-plant-{url_plant}")
+        if user.is_superuser and url_plant:
+            from asgiref.sync import sync_to_async
+            from t.models import TreatmentPlant
+
+            exists = await sync_to_async(
+                TreatmentPlant.objects.filter(pk=url_plant).exists
+            )()
+            if exists:
+                self.groups_joined.append(f"qc-plant-{url_plant}")
         if user.is_superuser and "qc-dashboard" not in self.groups_joined:
             self.groups_joined.append("qc-dashboard")
 
@@ -130,16 +144,40 @@ class DashboardConsumer(
             }
         )
 
-
         logger.info(
             "[QC WS] Results update sent analysis=%s plant=%s",
-            event.get(
-                "analysis_id"
-            ),
-            event.get(
-                "plant_id"
-            ),
+            event.get("analysis_id"),
+            event.get("plant_id"),
         )
+
+
+    async def qc_results_changed(self, event):
+        """Send a durable outbox invalidation; clients re-fetch scoped HTML."""
+        await self.send_json({
+            "type": "results.changed",
+            "event_id": event.get("event_id"),
+            "analysis_id": event.get("analysis_id"),
+            "plant_id": event.get("plant_id"),
+            "water_type": event.get("water_type"),
+            "action": event.get("action"),
+            "changed_model": event.get("changed_model"),
+            "timestamp": event.get("timestamp"),
+        })
+
+
+    async def qc_nonconformity_created(self, event):
+        """Deliver a newly auto-detected result exception to the QC bell UI."""
+        await self.send_json({
+            "type": "qc_nonconformity",
+            "nonconformity_id": event.get("nonconformity_id"),
+            "analysis_id": event.get("analysis_id"),
+            "plant_id": event.get("plant_id"),
+            "parameter_name": event.get("parameter_name"),
+            "observed_value": event.get("observed_value"),
+            "min_limit": event.get("min_limit"),
+            "max_limit": event.get("max_limit"),
+            "timestamp": event.get("timestamp"),
+        })
 
 
     async def analysis_created(

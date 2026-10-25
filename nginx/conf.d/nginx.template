@@ -5,10 +5,10 @@ upstream django_backend {
 
     least_conn;
 
-    server web1:8000 max_fails=3 fail_timeout=30s;
-    server web2:8000 max_fails=3 fail_timeout=30s;
-    server web3:8000 max_fails=3 fail_timeout=30s;
-    server web4:8000 max_fails=3 fail_timeout=30s;
+    server web1:8000 max_fails=2 fail_timeout=3s;
+    server web2:8000 max_fails=2 fail_timeout=3s;
+    server web3:8000 max_fails=2 fail_timeout=3s;
+    server web4:8000 max_fails=2 fail_timeout=3s;
 
     keepalive 64;
 }
@@ -20,9 +20,9 @@ upstream daphne_backend {
 
     least_conn;
 
-    server daphne1:8001 max_fails=3 fail_timeout=30s;
-    server daphne2:8001 max_fails=3 fail_timeout=30s;
-    server daphne3:8001 max_fails=3 fail_timeout=30s;
+    server daphne1:8001 max_fails=2 fail_timeout=3s;
+    server daphne2:8001 max_fails=2 fail_timeout=3s;
+    server daphne3:8001 max_fails=2 fail_timeout=3s;
 
     keepalive 32;
 }
@@ -34,6 +34,14 @@ server {
 
     listen 80 reuseport;
     listen [::]:80 reuseport;
+    listen 443 ssl http2 reuseport;
+    listen [::]:443 ssl http2 reuseport;
+
+    ssl_certificate $SSL_CERT_PATH;
+    ssl_certificate_key $SSL_KEY_PATH;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:TLS:10m;
+    ssl_session_timeout 1d;
 
     server_name _;
 
@@ -42,8 +50,10 @@ server {
     # =====================================================
     location = /health/ {
         access_log off;
-        default_type text/plain;
-        return 200 "ok\n";
+        proxy_pass http://django_backend/health/ready/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 # =====================================================
 # STATIC FILES
@@ -86,7 +96,6 @@ location /media/ {
     location ~* \.(env|ini|log|sql|bak|swp)$ {
         deny all;
     }
-}
 }
 
     # =====================================================
@@ -143,8 +152,10 @@ location /media/ {
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Forwarded-Port $server_port;
 
-        proxy_next_upstream error timeout http_500 http_502 http_503 http_504;
-        proxy_next_upstream_tries 3;
+        proxy_connect_timeout 2s;
+        proxy_next_upstream error timeout invalid_header http_500 http_502 http_503 http_504 non_idempotent;
+        proxy_next_upstream_tries 4;
+        proxy_next_upstream_timeout 10s;
     }
 
     # =====================================================

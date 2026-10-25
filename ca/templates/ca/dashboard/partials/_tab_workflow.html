@@ -1,0 +1,369 @@
+<!-- ca/templates/ca/dashboard/partials/_tab_workflow.html -->
+<!-- =======================================================================
+     SUPERCHARGED INTERACTIVE CHEMICAL ANALYSIS WORKFLOW ENGINE
+     Directly orchestrating chemical_flow.py and ChemicalAnalysisProcess
+     ======================================================================= -->
+
+<div class="ca-workflow-orchestrator" id="ca-workflow-container">
+
+    <!-- 1. HERO PIPELINE DAG HEADER -->
+    <div class="ca-mt-panel ca-pipeline-panel" style="background: linear-gradient(165deg, #0a1b36 0%, #061124 100%); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 16px; padding: 18px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);">
+        <div class="ca-mt-panel__head" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid rgba(56, 189, 248, 0.15); padding-bottom: 12px;">
+            <div class="ca-panel-title-group" style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 42px; height: 42px; border-radius: 10px; background: rgba(14, 165, 233, 0.2); border: 1px solid rgba(56, 189, 248, 0.4); display: flex; align-items: center; justify-content: center; color: #38bdf8; font-size: 1.25rem;">
+                    <i class="fa fa-diagram-project"></i>
+                </div>
+                <div>
+                    <h2 style="margin: 0; font-size: 1.15rem; font-weight: 800; color: #ffffff; letter-spacing: -0.01em;">
+                        Chemical Analysis Flow Orchestrator
+                    </h2>
+                    <span style="font-size: 0.72rem; color: #7dd3fc; text-transform: uppercase; letter-spacing: 0.05em;">
+                        Viewflow 2.2 Core Engine &bull; chemical_flow.py &bull; ISO 17025 Compliance
+                    </span>
+                </div>
+            </div>
+            <div class="ca-flow-meta" style="display: flex; gap: 8px;">
+                {% if permissions.receive %}
+                <button type="button" class="ca-btn-futuristic" style="padding: 6px 14px; font-size: 0.75rem;" data-open-modal="receive-batch-modal">
+                    <i class="fa fa-plus"></i> Receive Batch
+                </button>
+                {% endif %}
+                {% if permissions.can_view_my_tasks %}<a href="{% url 'ca:my-tasks' %}" class="ca-btn-ghost" style="padding: 6px 14px; font-size: 0.75rem;">
+                    <i class="fa fa-tasks"></i> My Queue ({{ my_tasks|length|default:0 }})
+                </a>{% endif %}
+            </div>
+        </div>
+
+        <div class="ca-workflow-exceptions" aria-label="Workflow risk and quality queues">
+            {% if permissions.view_chemicalbatch and queue_counts.holds %}<a href="{% url 'ca:batch-list' %}" class="ca-exception-card ca-exception-card--hold"><i class="fa fa-pause-circle"></i><span><strong>{{ queue_counts.holds }} batch{{ queue_counts.holds|pluralize }} on hold</strong><small>Resolve intake discrepancies to resume</small></span></a>{% endif %}
+            {% if permissions.view_batchtestresult and queue_counts.quality_exceptions %}<a href="{% url 'ca:result-list' %}?status=FAIL" class="ca-exception-card ca-exception-card--quality"><i class="fa fa-triangle-exclamation"></i><span><strong>{{ queue_counts.quality_exceptions }} batch{{ queue_counts.quality_exceptions|pluralize }} with failed results</strong><small>Review quality findings and retest / CAPA</small></span></a>{% endif %}
+            {% if permissions.view_process and queue_counts.stalled %}<a href="{% url 'ca:process-list' %}" class="ca-exception-card ca-exception-card--stalled"><i class="fa fa-hourglass-half"></i><span><strong>{{ queue_counts.stalled }} stalled workflow{{ queue_counts.stalled|pluralize }}</strong><small>Active stage unchanged for more than 24 hours</small></span></a>{% endif %}
+            {% if permissions.view_chemicalbatch or permissions.view_batchtestresult or permissions.view_process %}
+                {% if not queue_counts.holds and not queue_counts.quality_exceptions and not queue_counts.stalled %}<div class="ca-exception-card ca-exception-card--clear"><i class="fa fa-circle-check"></i><span><strong>No active holds or stalled workflows</strong><small>Quality and stage monitoring is current</small></span></div>{% endif %}
+            {% endif %}
+        </div>
+
+        {% if workflow_stage_durations.stages %}
+        <details class="ca-stage-aging">
+            <summary>Stage timing telemetry · {{ workflow_stage_durations.active_processes }} active processes</summary>
+            <div class="ca-stage-aging__grid">
+                {% for stage in workflow_stage_durations.stages %}
+                    <div class="ca-stage-aging__item"><strong>{{ stage.status|title }}</strong><span>{{ stage.average_hours }}h average</span><small>{{ stage.count }} interval{{ stage.count|pluralize }} · oldest {{ stage.oldest_hours }}h</small></div>
+                {% endfor %}
+            </div>
+        </details>
+        {% endif %}
+
+        <!-- 2. INTERACTIVE 11-STAGE WORKFLOW PIPELINE DAG -->
+        <div class="ca-pipeline-track" style="display: flex; align-items: center; gap: 4px; overflow-x: auto; padding: 10px 4px 18px;">
+
+            <!-- Stage 1: Register Batch -->
+            <div class="ca-pipe-step {% if queue_counts.received or not queue_counts %}is-active{% endif %}" onclick="caFilterWorkflowStage('CREATED')" style="cursor: pointer;" title="Register chemical delivery">
+                <div class="ca-pipe-step__badge"><i class="fa fa-truck-ramp-box"></i></div>
+                <div class="ca-pipe-step__content">
+                    <span class="ca-pipe-step__num">01. INTAKE</span>
+                    <span class="ca-pipe-step__name">Register Batch</span>
+                    <span class="ca-pipe-step__count">{{ counts.batches|default:0 }}</span>
+                    <span class="ca-pipe-link">ChemicalBatch</span>
+                </div>
+            </div>
+
+            <div class="ca-pipe-connector"><i class="fa fa-chevron-right" style="font-size: 0.65rem; color: #38bdf8;"></i></div>
+
+            <!-- Stage 2: Confirm Receipt -->
+            <div class="ca-pipe-step {% if queue_counts.received %}is-hot{% endif %}" onclick="caFilterWorkflowStage('RECEIVED')" style="cursor: pointer;" title="Confirm delivery note and quantity">
+                <div class="ca-pipe-step__badge"><i class="fa fa-clipboard-check"></i></div>
+                <div class="ca-pipe-step__content">
+                    <span class="ca-pipe-step__num">02. RECEIPT</span>
+                    <span class="ca-pipe-step__name">Confirm Receipt</span>
+                    <span class="ca-pipe-step__count">{{ queue_counts.received|default:0 }}</span>
+                    <span class="ca-pipe-link">Verification</span>
+                </div>
+            </div>
+
+            <div class="ca-pipe-connector"><i class="fa fa-chevron-right" style="font-size: 0.65rem; color: #38bdf8;"></i></div>
+
+            <!-- Stage 3: Analysis Request -->
+            <div class="ca-pipe-step {% if queue_counts.requested %}is-active{% endif %}" onclick="caFilterWorkflowStage('REQUESTED')" style="cursor: pointer;" title="Create analytical testing request">
+                <div class="ca-pipe-step__badge"><i class="fa fa-file-circle-plus"></i></div>
+                <div class="ca-pipe-step__content">
+                    <span class="ca-pipe-step__num">03. REQUEST</span>
+                    <span class="ca-pipe-step__name">Analysis Request</span>
+                    <span class="ca-pipe-step__count">{{ queue_counts.request|default:0 }}</span>
+                    <span class="ca-pipe-link">LIMS Dispatch</span>
+                </div>
+            </div>
+
+            <div class="ca-pipe-connector"><i class="fa fa-chevron-right" style="font-size: 0.65rem; color: #38bdf8;"></i></div>
+
+            <!-- Stage 4: Receiving Checklist -->
+            <div class="ca-pipe-step {% if queue_counts.checklist %}is-active{% endif %}" onclick="caFilterWorkflowStage('CHECKLIST')" style="cursor: pointer;" title="Audit packaging and hazard flags">
+                <div class="ca-pipe-step__badge"><i class="fa fa-list-check"></i></div>
+                <div class="ca-pipe-step__content">
+                    <span class="ca-pipe-step__num">04. AUDIT</span>
+                    <span class="ca-pipe-step__name">Receiving Checklist</span>
+                    <span class="ca-pipe-step__count">{{ queue_counts.checklist|default:0 }}</span>
+                    <span class="ca-pipe-link">Safety Matrix</span>
+                </div>
+            </div>
+
+            <div class="ca-pipe-connector"><i class="fa fa-chevron-right" style="font-size: 0.65rem; color: #38bdf8;"></i></div>
+
+            <!-- Stage 5: Start & Record Test Results -->
+            <div class="ca-pipe-step {% if queue_counts.analysis %}is-hot{% endif %}" onclick="caFilterWorkflowStage('ANALYSIS')" style="cursor: pointer;" title="Bench testing, titration & analytical inputs">
+                <div class="ca-pipe-step__badge"><i class="fa fa-flask-vial"></i></div>
+                <div class="ca-pipe-step__content">
+                    <span class="ca-pipe-step__num">05. TESTING</span>
+                    <span class="ca-pipe-step__name">Bench Analysis</span>
+                    <span class="ca-pipe-step__count">{{ queue_counts.analysis_ready|add:queue_counts.analysis|default:0 }}</span>
+                    <span class="ca-pipe-link">Inputs & Methods</span>
+                </div>
+            </div>
+
+            <div class="ca-pipe-connector"><i class="fa fa-chevron-right" style="font-size: 0.65rem; color: #38bdf8;"></i></div>
+
+            <!-- Stage 6: QA Review & Decision Gate -->
+            <div class="ca-pipe-step {% if queue_counts.qa %}is-hot{% endif %}" onclick="caFilterWorkflowStage('QA')" style="cursor: pointer;" title="QA validation, Retest or CAPA decision">
+                <div class="ca-pipe-step__badge"><i class="fa fa-shield-halved"></i></div>
+                <div class="ca-pipe-step__content">
+                    <span class="ca-pipe-step__num">06. QA GATE</span>
+                    <span class="ca-pipe-step__name">QA Decision</span>
+                    <span class="ca-pipe-step__count">{{ queue_counts.qa|default:0 }}</span>
+                    <span class="ca-pipe-link">Review Gate</span>
+                </div>
+            </div>
+
+            <div class="ca-pipe-connector"><i class="fa fa-chevron-right" style="font-size: 0.65rem; color: #38bdf8;"></i></div>
+
+            <!-- Stage 7: Final Approval -->
+            <div class="ca-pipe-step {% if queue_counts.approval %}is-active{% endif %}" onclick="caFilterWorkflowStage('APPROVAL')" style="cursor: pointer;" title="Formal technical manager approval">
+                <div class="ca-pipe-step__badge"><i class="fa fa-circle-check"></i></div>
+                <div class="ca-pipe-step__content">
+                    <span class="ca-pipe-step__num">07. APPROVAL</span>
+                    <span class="ca-pipe-step__name">Batch Approval</span>
+                    <span class="ca-pipe-step__count">{{ queue_counts.approval|default:0 }}</span>
+                    <span class="ca-pipe-link">Authorized</span>
+                </div>
+            </div>
+
+            <div class="ca-pipe-connector"><i class="fa fa-chevron-right" style="font-size: 0.65rem; color: #38bdf8;"></i></div>
+
+            <!-- Stage 8: CoA Sign-off -->
+            <div class="ca-pipe-step {% if queue_counts.coa %}is-active{% endif %}" onclick="caFilterWorkflowStage('COA')" style="cursor: pointer;" title="Digital signature and CoA stamp">
+                <div class="ca-pipe-step__badge"><i class="fa fa-certificate"></i></div>
+                <div class="ca-pipe-step__content">
+                    <span class="ca-pipe-step__num">08. CERTIFICATE</span>
+                    <span class="ca-pipe-step__name">CoA Sign-off</span>
+                    <span class="ca-pipe-step__count">{{ queue_counts.coa|add:queue_counts.coa_approval|default:0 }}</span>
+                    <span class="ca-pipe-link">ChemicalCoA</span>
+                </div>
+            </div>
+
+            <div class="ca-pipe-connector"><i class="fa fa-chevron-right" style="font-size: 0.65rem; color: #38bdf8;"></i></div>
+
+            <!-- Stage 9: Release / Disposition -->
+            <div class="ca-pipe-step {% if queue_counts.disposition %}is-active{% endif %}" onclick="caFilterWorkflowStage('DISPOSITION')" style="cursor: pointer;" title="Utilization in treatment works or return to supplier">
+                <div class="ca-pipe-step__badge"><i class="fa fa-water"></i></div>
+                <div class="ca-pipe-step__content">
+                    <span class="ca-pipe-step__num">09. RELEASE</span>
+                    <span class="ca-pipe-step__name">Utilization / RTS</span>
+                    <span class="ca-pipe-step__count">{{ queue_counts.disposition|add:queue_counts.return|default:0 }}</span>
+                    <span class="ca-pipe-link">Plant Stock</span>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- STAGE QUICK FILTER BUTTONS -->
+        <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+            <button type="button" class="ca-date-chip" onclick="caFilterWorkflowStage('ALL')" style="font-size: 0.68rem; padding: 4px 8px;">Show All Processes</button>
+            <button type="button" class="ca-date-chip" onclick="caFilterWorkflowStage('INTAKE')">Intake ({{ queue_counts.received|default:0 }})</button>
+            <button type="button" class="ca-date-chip" onclick="caFilterWorkflowStage('TESTING')">Testing ({{ queue_counts.analysis|default:0 }})</button>
+            <button type="button" class="ca-date-chip" onclick="caFilterWorkflowStage('QA')">QA Review ({{ queue_counts.qa|default:0 }})</button>
+            <button type="button" class="ca-date-chip" onclick="caFilterWorkflowStage('ASSIGNMENT')">Analyst assignment ({{ queue_counts.assignment_pending|add:queue_counts.assignment_overdue|default:0 }})</button>
+            <button type="button" class="ca-date-chip" onclick="caFilterWorkflowStage('APPROVAL')">Batch approval ({{ queue_counts.approval|default:0 }})</button>
+            <button type="button" class="ca-date-chip" onclick="caFilterWorkflowStage('APPROVED')">Approved ({{ counts.approved_batches|default:0 }})</button>
+            <button type="button" class="ca-date-chip" onclick="caFilterWorkflowStage('RETEST')">Retest ({{ queue_counts.retest|default:0 }})</button>
+            <button type="button" class="ca-date-chip" onclick="caFilterWorkflowStage('COA')">CoA ({{ queue_counts.coa|default:0 }})</button>
+            <button type="button" class="ca-date-chip" onclick="caFilterWorkflowStage('COA_APPROVAL')">CoA approval ({{ queue_counts.coa_approval|default:0 }})</button>
+            <button type="button" class="ca-date-chip" onclick="caFilterWorkflowStage('DISPOSITION')">Disposition ({{ queue_counts.disposition|default:0 }})</button>
+            <button type="button" class="ca-date-chip" onclick="caFilterWorkflowStage('RETURN')">Supplier return ({{ queue_counts.return|default:0 }})</button>
+            <button type="button" class="ca-date-chip" onclick="caFilterWorkflowStage('REJECTED')">Rejected ({{ queue_counts.rejected|default:0 }})</button>
+            <button type="button" class="ca-date-chip" onclick="caFilterWorkflowStage('COMPLETED')">Completed ({{ queue_counts.completed|default:0 }})</button>
+        </div>
+    </div>
+
+    <!-- 3. LIVE PROCESS ORCHESTRATION TABLE -->
+    <div class="pbi-table-card" style="margin-top: 1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <div>
+                <h3 style="margin: 0; font-size: 1.05rem; font-weight: 800; color: #0c2340;">
+                    <i class="fa fa-microchip" style="color: #0b4584;"></i> Chemical Batch Workflow & Viewflow Tasks
+                </h3>
+                <span style="font-size: 0.72rem; color: #64748b;">
+                    Current authorized action for every batch, through CoA release, utilization or supplier return, scoped to {{ plant_context.plant_name }}
+                </span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <span class="pbi-pill pbi-pill--success"><i class="fa fa-circle-dot"></i> Telemetry Active</span>
+            </div>
+        </div>
+
+        <div style="overflow-x: auto;">
+            <table class="pbi-table" id="ca-workflow-proc-table">
+                <thead>
+                    <tr>
+                        <th>Process ID</th>
+                        <th>Chemical & Batch Number</th>
+                        <th>Treatment Plant</th>
+                        <th>Workflow Status</th>
+                        <th>Current Task & Token</th>
+                        <th>Started Timestamp</th>
+                        <th>SLA Status</th>
+                        <th>Execution Trigger</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in processes %}
+                    <tr class="ca-proc-row" data-stage="{{ p.workflow_queue_stage|default:p.status }}" data-status="{{ p.status }}">
+                        <td>
+                            <code>#PR-{{ p.pk }}</code>
+                            <div style="font-size: 0.65rem; color: #64748b;">Flow: ChemicalAnalysisFlow</div>
+                        </td>
+                        <td>
+                            <strong>{{ p.batch.chemical.name|default:"Water Treatment Chemical" }}</strong>
+                            <div style="font-size: 0.68rem; color: #0284c7;">
+                                Batch: <strong>{{ p.batch.batch_number|default:"—" }}</strong>
+                            </div>
+                            <div style="font-size: 0.62rem; color: #64748b;">
+                                Sample: {{ p.batch.sample_id|default:"Pending" }}
+                            </div>
+                        </td>
+                        <td>
+                            <span style="font-size: 0.78rem; font-weight: 600; color: #334155;">
+                                {{ p.batch.treatment_plant.name|default:plant_context.plant_name }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if p.status == 'CREATED' or p.status == 'RECEIVED' %}
+                                <span class="pbi-pill pbi-pill--info"><i class="fa fa-truck-ramp-box"></i> {{ p.status }}</span>
+                            {% elif p.status == 'REQUESTED' or p.status == 'CHECKLIST' %}
+                                <span class="pbi-pill pbi-pill--warning"><i class="fa fa-clipboard-list"></i> {{ p.status }}</span>
+                            {% elif p.status == 'ASSIGNED' or p.status == 'ANALYSIS' or p.status == 'RETEST' %}
+                                <span class="pbi-pill pbi-pill--warning"><i class="fa fa-flask"></i> {{ p.status }}</span>
+                            {% elif p.status == 'QA' %}
+                                <span class="pbi-pill pbi-pill--danger"><i class="fa fa-shield"></i> QA REVIEW</span>
+                            {% elif p.status == 'APPROVED' %}
+                                <span class="pbi-pill pbi-pill--success"><i class="fa fa-circle-check"></i> APPROVED</span>
+                            {% elif p.status == 'UTILIZED' %}
+                                <span class="pbi-pill pbi-pill--success"><i class="fa fa-water"></i> UTILIZED</span>
+                            {% elif p.status == 'RETURNED' %}
+                                <span class="pbi-pill pbi-pill--danger"><i class="fa fa-truck-fast"></i> RETURNED</span>
+                            {% elif p.status == 'COMPLETED' %}
+                                <span class="pbi-pill pbi-pill--success"><i class="fa fa-circle-check"></i> COMPLETED</span>
+                            {% elif p.status == 'REJECTED' %}
+                                <span class="pbi-pill pbi-pill--danger"><i class="fa fa-ban"></i> REJECTED · RETURN REQUIRED</span>
+                            {% else %}
+                                <span class="pbi-pill pbi-pill--info">{{ p.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div style="font-size: 0.74rem;">
+                                {% if p.workflow_task_title %}
+                                    <i class="fa fa-list-check" style="color: #0284c7;"></i> {{ p.workflow_task_title }}
+                                {% elif p.status == 'ANALYSIS' %}
+                                    <i class="fa fa-user-flask" style="color: #0284c7;"></i> Bench Analyst
+                                {% elif p.status == 'QA' %}
+                                    <i class="fa fa-user-shield" style="color: #6366f1;"></i> QA Lead Officer
+                                {% elif p.status == 'APPROVED' %}
+                                    <i class="fa fa-user-check" style="color: #10b981;"></i> Technical Approver
+                                {% elif p.status == 'CREATED' or p.status == 'RECEIVED' %}
+                                    <i class="fa fa-user-gear" style="color: #f59e0b;"></i> Receiving Storekeeper
+                                {% else %}
+                                    <i class="fa fa-user"></i> {{ p.initiated_by.get_full_name|default:p.initiated_by.username|default:"Workflow Engine" }}
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            <span style="font-size: 0.72rem; color: #64748b;">
+                                {{ p.created_at|date:"Y-m-d H:i"|default:"—" }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if p.is_overdue %}
+                                <span class="pbi-pill pbi-pill--danger"><i class="fa fa-fire"></i> SLA EXCEEDED</span>
+                            {% else %}
+                                <span class="pbi-pill pbi-pill--success"><i class="fa fa-clock"></i> On Target</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if p.workflow_action_url %}
+                            <a href="{{ p.workflow_action_url }}" class="ca-btn-futuristic" style="padding: 5px 12px; font-size: 0.72rem;" title="{{ p.workflow_action_label }}">
+                                <i class="fa fa-play"></i> {% if p.workflow_has_task %}Continue{% else %}Open{% endif %}
+                            </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" style="text-align: center; padding: 2rem; color: #64748b;">
+                            <i class="fa fa-circle-check" style="font-size: 2.2rem; color: #10b981; display: block; margin-bottom: 0.5rem;"></i>
+                            <strong>No active processes waiting in queue.</strong>
+                            <p style="font-size: 0.78rem; margin-top: 0.25rem;">Click "Receive Batch" above to initiate a new chemical analysis process.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<style>
+.ca-workflow-exceptions{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.65rem;margin:0 0 .8rem}.ca-exception-card{display:flex;align-items:center;gap:.7rem;padding:.7rem .85rem;border:1px solid rgba(148,163,184,.25);border-radius:.8rem;text-decoration:none;color:inherit;background:rgba(15,23,42,.38)}.ca-exception-card>i{font-size:1.1rem}.ca-exception-card span{display:grid;gap:.15rem}.ca-exception-card small{opacity:.75}.ca-exception-card--hold{border-color:rgba(245,158,11,.5);color:#fbbf24}.ca-exception-card--quality{border-color:rgba(239,68,68,.5);color:#fca5a5}.ca-exception-card--stalled{border-color:rgba(56,189,248,.5);color:#7dd3fc}.ca-exception-card--clear{border-color:rgba(34,197,94,.4);color:#86efac}.ca-stage-aging{margin:.3rem 0 1rem;border:1px solid rgba(56,189,248,.22);border-radius:.8rem;background:rgba(8,20,40,.45);color:inherit}.ca-stage-aging summary{cursor:pointer;padding:.65rem .8rem;font-size:.82rem;font-weight:700}.ca-stage-aging__grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:.55rem;padding:0 .8rem .8rem}.ca-stage-aging__item{display:grid;gap:.2rem;padding:.6rem;border-radius:.6rem;background:rgba(148,163,184,.08)}.ca-stage-aging__item span{color:#7dd3fc;font-size:.8rem}.ca-stage-aging__item small{opacity:.7}
+</style>
+
+<script>
+function caFilterWorkflowStage(stage) {
+    const rows = document.querySelectorAll(".ca-proc-row");
+    if (!rows.length) return;
+
+    rows.forEach(function(r) {
+        const rowStage = r.getAttribute("data-stage") || "";
+        if (stage === "ALL") {
+            r.style.display = "";
+        } else if (stage === "INTAKE" && (rowStage === "CREATED" || rowStage === "RECEIVED" || rowStage === "REQUESTED" || rowStage === "ASSIGNED" || rowStage === "CHECKLIST")) {
+            r.style.display = "";
+        } else if (stage === "TESTING" && (rowStage === "ASSIGNED" || rowStage === "ANALYSIS" || rowStage === "RETEST")) {
+            r.style.display = "";
+        } else if (stage === "QA" && (rowStage === "QA")) {
+            r.style.display = "";
+        } else if (stage === "ASSIGNMENT" && rowStage === "ASSIGNMENT") {
+            r.style.display = "";
+        } else if (stage === "APPROVAL" && rowStage === "APPROVAL") {
+            r.style.display = "";
+        } else if (stage === "APPROVED" && r.getAttribute("data-status") === "APPROVED") {
+            r.style.display = "";
+        } else if (stage === "APPROVED" && rowStage === "APPROVED") {
+            r.style.display = "";
+        } else if (stage === "COA" && rowStage === "COA") {
+            r.style.display = "";
+        } else if (stage === "COA_APPROVAL" && rowStage === "COA_APPROVAL") {
+            r.style.display = "";
+        } else if (stage === "DISPOSITION" && rowStage === "DISPOSITION") {
+            r.style.display = "";
+        } else if (stage === "RETURN" && rowStage === "RETURN") {
+            r.style.display = "";
+        } else if (stage === "RETEST" && rowStage === "RETEST") {
+            r.style.display = "";
+        } else if (stage === "COMPLETED" && rowStage === "COMPLETED") {
+            r.style.display = "";
+        } else if (rowStage === stage) {
+            r.style.display = "";
+        } else {
+            r.style.display = "none";
+        }
+    });
+}
+</script>

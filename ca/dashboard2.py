@@ -10,7 +10,9 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from django.apps import apps
+from django.core.exceptions import PermissionDenied
 from .mixins import CaWanjalaMixin
+from .navigation import CA_DASHBOARD_DATA_PERMISSIONS
 from django.core.serializers.json import DjangoJSONEncoder
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
@@ -40,7 +42,7 @@ from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
 class Dashboard2View(CaWanjalaMixin, TemplateView):
     template_name = "ca/dashboard/pages/dashboard2.html"
-    permission_required_view = None
+    permission_required_view = "ca.view_chemicalanalysisprocess"
 
     PROCESS_STATUS = (
         "CREATED",
@@ -85,12 +87,26 @@ class Dashboard2View(CaWanjalaMixin, TemplateView):
         "REJECTED",
     }
 
+    def _utc_now_timestamp(self):
+        now = pd.Timestamp(self.now)
+        return now.tz_localize("UTC") if now.tzinfo is None else now.tz_convert("UTC")
+
     def dispatch(self, request, *args, **kwargs):
+        self.request = request
         self.now = timezone.now()
         self.user = request.user
         self.params = self._read_filters()
         self.models = self._resolve_models()
         self.scope = self._build_scope()
+        if not request.user.is_authenticated:
+            return super().dispatch(request, *args, **kwargs)
+        if not self.is_ca_superuser(request.user) and not all(
+            request.user.has_perm(permission)
+            for permission in CA_DASHBOARD_DATA_PERMISSIONS
+        ):
+            raise PermissionDenied(
+                "You do not have permission to view the full CA operations dashboard."
+            )
         self.data = self._load_data()
         self.analysis = self._build_analysis()
         return super().dispatch(request, *args, **kwargs)
@@ -875,10 +891,7 @@ class Dashboard2View(CaWanjalaMixin, TemplateView):
         ):
             return {}
 
-        now = pd.Timestamp(
-            self.now,
-            tz="UTC",
-        )
+        now = self._utc_now_timestamp()
 
         valid = df["deadline"].notna()
 
@@ -1921,10 +1934,7 @@ class Dashboard2View(CaWanjalaMixin, TemplateView):
                 "SLA Exposure"
             )
 
-        now = pd.Timestamp(
-            self.now,
-            tz="UTC",
-        )
+        now = self._utc_now_timestamp()
 
         hours = (
             df["deadline"] - now
@@ -3859,10 +3869,7 @@ class Dashboard2View(CaWanjalaMixin, TemplateView):
         ):
             return 0
 
-        now = pd.Timestamp(
-            self.now,
-            tz="UTC",
-        )
+        now = self._utc_now_timestamp()
 
         active = ~df["status"].isin(
             self.TERMINAL_STATUSES

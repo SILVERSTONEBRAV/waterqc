@@ -1,0 +1,96 @@
+{% load static %}
+
+<div id="telemetry-topbar" class="telemetry-topbar-wrapper">
+    <div class="tel-topbar-left">
+        <!-- Brand / Identity -->
+        <div class="tel-brand-badge">
+            <i class="fa-solid fa-satellite-dish"></i>
+            <span>Sensor Telemetry Matrix</span>
+        </div>
+
+        <!-- Treatment Plant Selector -->
+        <div class="tel-plant-selector-wrap">
+            <label for="plantSelect">
+                <i class="fa-solid fa-industry"></i> Plant:
+            </label>
+            <select id="plantSelect"
+                    class="tel-plant-select"
+                    name="plant"
+                    onchange="window.location.search = '?plant=' + this.value;">
+                {% for plant in plants %}
+                    <option value="{{ plant.pk }}" {% if selected_plant and selected_plant.pk == plant.pk %}selected{% endif %}>
+                        {{ plant.code }} — {{ plant.name }}
+                    </option>
+                {% empty %}
+                    <option value="">No Plants Available</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- KPI Chips -->
+        <div class="tel-kpi-strip">
+            <div class="tel-kpi-chip kpi-online" title="Online Instruments vs Total Configured">
+                <i class="fa-solid fa-microchip"></i>
+                <span>Instruments:</span>
+                <span class="kpi-num">{{ kpis.online_instruments }}/{{ kpis.total_instruments }}</span>
+            </div>
+
+            <div class="tel-kpi-chip kpi-online" title="Active Sensors Producing Normal Telemetry">
+                <i class="fa-solid fa-circle-check"></i>
+                <span>Sensors OK:</span>
+                <span class="kpi-num">{{ kpis.normal_sensors }}/{{ kpis.total_sensors }}</span>
+            </div>
+
+            {% if kpis.danger_sensors > 0 %}
+            <div class="tel-kpi-chip kpi-alert" title="Sensors Out of Detection Bounds or Quality Invalid">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span>Alerts:</span>
+                <span class="kpi-num">{{ kpis.danger_sensors }}</span>
+            </div>
+            {% endif %}
+
+            {% if kpis.warning_sensors > 0 %}
+            <div class="tel-kpi-chip kpi-warning" title="Sensors with Suspect Drift or Calibration Due">
+                <i class="fa-solid fa-circle-exclamation"></i>
+                <span>Suspect:</span>
+                <span class="kpi-num">{{ kpis.warning_sensors }}</span>
+            </div>
+            {% endif %}
+
+            {% if kpis.stale_sensors > 0 %}
+            <div class="tel-kpi-chip kpi-offline" title="Sensors with Stale or Missing Telemetry">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+                <span>Stale:</span>
+                <span class="kpi-num">{{ kpis.stale_sensors }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="tel-topbar-right">
+        <!-- Live Connection Pulse -->
+        <div class="tel-pulse-pill" title="Live sensor telemetry feed active">
+            <span class="pulse-dot"></span>
+            <span>Live Feed</span>
+        </div>
+
+        <!-- Compare with Manual QC Link -->
+        <a href="/qca/results/cards/{% if selected_plant %}?plant={{ selected_plant.pk }}{% endif %}"
+           class="tel-sync-btn"
+           title="Switch to QCA Manual Analytical Worksheet">
+            <i class="fa-solid fa-clipboard-check"></i>
+            <span>Manual QC Cards</span>
+        </a>
+
+        <!-- Force Refresh Button -->
+        <button type="button"
+                class="tel-sync-btn"
+                hx-get="?partial=grid{% if selected_plant %}&plant={{ selected_plant.pk }}{% endif %}"
+                hx-target="#telemetry-cards-container"
+                hx-swap="innerHTML"
+                title="Refresh sensor data now">
+            <i class="fa-solid fa-arrows-rotate"></i>
+            <span>Sync</span>
+        </button>
+    </div>
+</div>

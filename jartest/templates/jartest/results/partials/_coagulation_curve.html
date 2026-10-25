@@ -1,0 +1,120 @@
+{% load custom_filters %}
+
+<div class="jt-side-container" id="coagulation-side-panel">
+    <!-- Card 1: Coagulation Breakpoint Curve Canvas -->
+    <div class="jt-curve-container">
+        <div class="jt-curve-header">
+            <div class="d-flex align-items-center gap-2">
+                <i class="fa-solid fa-chart-line text-cyan"></i>
+                <h6 class="m-0 fw-bold">Coagulation Breakpoint Curve</h6>
+            </div>
+            <div class="jt-curve-legend">
+                <span class="legend-item"><span class="dot dot-turb"></span> Turbidity</span>
+                <span class="legend-item"><span class="dot dot-colr"></span> Color</span>
+                <span class="legend-item"><span class="dot dot-opt"></span> Optimal Dose</span>
+            </div>
+        </div>
+
+        <!-- SVG Curve Canvas -->
+        <div class="jt-svg-wrapper">
+            <svg id="coagulationCurveSvg" viewBox="0 0 350 170" class="jt-curve-svg" preserveAspectRatio="none">
+                <!-- Dynamically rendered & updated by jartest_dashboard.js -->
+            </svg>
+        </div>
+    </div>
+
+    <!-- Card 2: Treatment Plant Dosing Optimization Telemetry -->
+    <div class="jt-plant-impact-card">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+            <span class="impact-title">
+                <i class="fa-solid fa-seedling me-1 text-emerald"></i> Plant Dosing Optimization
+            </span>
+            <span class="badge bg-emerald-subtle text-emerald px-1 py-0" style="font-size:0.62rem;">Live Benchmark</span>
+        </div>
+
+        <div class="jt-impact-grid">
+            <div class="jt-impact-box">
+                <div class="l">Plant Applied:</div>
+                <div class="v text-cyan">{{ raw_metrics.coagulant_ppm|default:"18.5" }} ppm</div>
+            </div>
+            <div class="jt-impact-box">
+                <div class="l">Jar Test Optimal:</div>
+                <div class="v text-emerald">
+                    {% if jartest.established_dosage_mg_per_l %}
+                        {{ jartest.established_dosage_mg_per_l }} mg/L
+                    {% else %}
+                        -- mg/L
+                    {% endif %}
+                </div>
+            </div>
+            <div class="jt-impact-box">
+                <div class="l">Latest Approved:</div>
+                <div class="v text-primary">{{ latest_approved_dosage|default:"--" }} mg/L</div>
+            </div>
+            <div class="jt-impact-box">
+                <div class="l">Raw Baseline Turb:</div>
+                <div class="v text-warning">{{ raw_metrics.turbidity|default:"48.5" }} NTU</div>
+            </div>
+        </div>
+
+        <!-- Net Chemical Variance Banner -->
+        {% if dosage_delta is not None %}
+            {% if dosage_savings_type == "decrease" %}
+            <div class="jt-delta-banner savings" title="Chemical savings relative to current plant dosing">
+                <span><i class="fa-solid fa-arrow-down-long me-1"></i> Coagulant Savings</span>
+                <span class="fw-bold font-mono">{{ dosage_delta|stringformat:'.2f'|cut:'-' }} mg/L reduction</span>
+            </div>
+            {% elif dosage_savings_type == "increase" %}
+            <div class="jt-delta-banner increase" title="Dosage increase required to avoid turbidity breakthrough">
+                <span><i class="fa-solid fa-arrow-up-long me-1"></i> Dosage Adjustment</span>
+                <span class="fw-bold font-mono">+{{ dosage_delta|stringformat:'.2f' }} mg/L needed</span>
+            </div>
+            {% else %}
+            <div class="jt-delta-banner optimal">
+                <span><i class="fa-solid fa-check-double me-1"></i> Balanced Dosing</span>
+                <span class="fw-bold">Plant on optimal breakpoint</span>
+            </div>
+            {% endif %}
+        {% else %}
+            <div class="jt-delta-banner optimal">
+                <span><i class="fa-solid fa-gauge-simple me-1"></i> Dosage Tracking</span>
+                <span>Input jar measurements to compute variance</span>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Card 3: Multi-Jar Performance Leaderboard -->
+    <div class="jt-leaderboard-card">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+            <span class="impact-title">
+                <i class="fa-solid fa-ranking-star me-1 text-cyan"></i> Performance Leaderboard
+            </span>
+            <span style="font-size:0.62rem; color:#6ee7b7; font-family:'JetBrains Mono',monospace;">
+                {% if optimal_jar %}Top: Jar {{ optimal_jar.jar_number }} ({{ optimal_jar.dosage }} mg/L){% endif %}
+            </span>
+        </div>
+
+        <div class="jt-leader-list">
+            {% for jar in jars %}
+            <div class="jt-leader-row {% if jar.is_optimal %}optimal{% endif %}">
+                <div class="d-flex align-items-center gap-1">
+                    {% if jar.is_optimal %}
+                        <i class="fa-solid fa-crown text-warning" style="font-size:0.65rem;"></i>
+                    {% else %}
+                        <span style="color:#64748b;">#{{ jar.rank|default:forloop.counter }}</span>
+                    {% endif %}
+                    <span class="fw-semibold">Jar {{ jar.jar_number }}</span>
+                    <span style="color:#94a3b8;">({{ jar.dosage }} mg/L)</span>
+                </div>
+
+                <div class="d-flex align-items-center gap-2 font-mono">
+                    <span style="color:#38bdf8;">{{ jar.turbidity|default:"0.0" }} NTU</span>
+                    {% if jar.turbidity_removal %}
+                        <span style="color:#10b981; font-weight:700;">{{ jar.turbidity_removal|floatformat:1 }}%</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>

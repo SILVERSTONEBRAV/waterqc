@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from contextlib import contextmanager
 from functools import wraps
 from io import BytesIO
@@ -13,8 +14,9 @@ from channels.layers import get_channel_layer
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import transaction
-from django.db.models.signals import post_save
+from django.db.models.signals import m2m_changed, post_save, pre_save
 from django.dispatch import Signal, receiver
+from django.utils import timezone
 from PIL import Image
 
 from audit_logs.models import AuditLogEntry
@@ -24,6 +26,11 @@ from .models import (
     ChemicalAnalysisRequest,
     ChemicalBatch,
     ChemicalCoA,
+    ChemicalBatchHold,
+    ChemicalInventoryMovement,
+    ChemicalAnalysisProcess,
+    ChemicalWorkflowEvent,
+    ChemicalWorkflowAlert,
     ChecklistForWaterTreatmentChemicalAnalysis,
 )
 from .utils.coa_pdf import generate_coa_pdf, generate_qr_code
@@ -32,8 +39,157 @@ from .utils.coa_pdf import generate_coa_pdf, generate_qr_code
 logger = logging.getLogger(__name__)
 
 
-batch_status_changed = Signal()
-request_status_changed = Signal()
+@receiver(post_save, dispatch_uid="ca.persist_domain_invalidation")
+def persist_domain_invalidation(sender, instance, created=False, raw=False, **kwargs):
+    """Write important CA refresh hints to the outbox in the entity transaction."""
+    if raw or sender not in {
+        ChemicalBatch,
+        ChemicalAnalysisRequest,
+        ChemicalAnalysisProcess,
+        BatchTestResult,
+        ChecklistForWaterTreatmentChemicalAnalysis,
+        ChemicalCoA,
+        ChemicalWorkflowAlert,
+        ChemicalBatchHold,
+        ChemicalInventoryMovement,
+    }:
+        return
+    from ca.services.outbox import enqueue_ca_event
+
+    batch = getattr(instance, "batch", None)
+    if batch is None and getattr(instance, "batch_id", None):
+        batch = instance.batch
+    if batch is None and isinstance(instance, ChecklistForWaterTreatmentChemicalAnalysis):
+        request = instance.chemical_analysis_request
+        batch = request.batch if request and request.batch_id else None
+    if batch is None and getattr(instance, "analysis_request_id", None):
+        request = instance.analysis_request
+        batch = request.batch if request and request.batch_id else None
+    plant_id = getattr(batch, "treatment_plant_id", None)
+    if not plant_id and isinstance(instance, ChemicalBatch):
+        plant_id = instance.treatment_plant_id
+    batch_id = instance.pk if isinstance(instance, ChemicalBatch) else getattr(batch, "pk", None)
+    # Some audited writes deliberately omit ``updated_at`` from update_fields;
+    # a timestamp-based key would then suppress later invalidations for the
+    # same row. These events are idempotent invalidation hints, so assign each
+    # committed model save its own durable event key.
+    event_key = f"{sender._meta.model_name}:{instance.pk}:{uuid.uuid4()}"
+    enqueue_ca_event(
+        event_type="created" if created else "updated",
+        aggregate_type=sender._meta.model_name,
+        aggregate_id=instance.pk,
+        idempotency_key=event_key,
+        payload={
+            "plant_id": plant_id,
+            "batch_id": getattr(instance, "batch_id", None) or batch_id,
+        },
+    )
+
+
+@receiver(pre_save, sender=ChemicalAnalysisProcess, dispatch_uid="ca.capture_process_status")
+def capture_chemical_process_status(sender, instance, raw=False, **kwargs):
+    if raw or not instance.pk:
+        instance._ca_previous_status = None
+        return
+    instance._ca_previous_status = sender.objects.filter(pk=instance.pk).values_list("status", flat=True).first()
+
+
+@receiver(post_save, sender=ChemicalAnalysisProcess, dispatch_uid="ca.journal_process_status")
+def journal_chemical_process_status(sender, instance, created=False, raw=False, **kwargs):
+    if raw or not instance.batch_id:
+        return
+    old_status = getattr(instance, "_ca_previous_status", None)
+    if not created and old_status == instance.status:
+        return
+    request = get_audit_request()
+    actor = getattr(request, "user", None) if request else None
+    if not getattr(actor, "is_authenticated", False):
+        actor = None
+    ChemicalWorkflowEvent.objects.create(
+        process=instance,
+        batch=instance.batch,
+        analysis_request=instance.analysis_request if instance.analysis_request_id else None,
+        event_type="process_created" if created else "process_status_changed",
+        action="process initialized" if created else "status transition",
+        from_status=str(old_status or ""),
+        to_status=str(instance.status or ""),
+        actor=actor,
+        details={"process_id": instance.pk},
+    )
+    broadcast_dashboard_event(
+        "chemical_workflow_event",
+        {"process_id": instance.pk, "batch_id": instance.batch_id, "status": str(instance.status)},
+    )
+    if not created and old_status != instance.status:
+        ChemicalWorkflowAlert.objects.filter(
+            batch_id=instance.batch_id,
+            alert_type="ca_workflow_stalled",
+            acknowledged_at__isnull=True,
+        ).update(acknowledged_at=timezone.now())
+
+
+@receiver(m2m_changed, sender=ChemicalAnalysisRequest._meta.get_field("assigned_analysts").remote_field.through, dispatch_uid="ca.journal_analyst_assignment")
+def journal_chemical_analyst_assignment(sender, instance, action, reverse, model, pk_set, **kwargs):
+    if action not in {"post_add", "post_remove", "post_clear"} or reverse or not instance.batch_id:
+        return
+
+    if action == "post_add" and pk_set:
+        ChemicalWorkflowAlert.objects.filter(
+            analysis_request=instance,
+            alert_type="ca_analysis_assignment",
+            acknowledged_at__isnull=True,
+        ).exclude(
+            recipient_id__in=instance.assigned_analysts.values("pk")
+        ).update(acknowledged_at=timezone.now())
+        from ca.services.workflow_notifications import notify_analysis_assignment
+
+        notify_analysis_assignment(instance)
+    elif action == "post_remove" and pk_set:
+        ChemicalWorkflowAlert.objects.filter(
+            analysis_request=instance,
+            alert_type="ca_analysis_assignment",
+            recipient_id__in=pk_set,
+            acknowledged_at__isnull=True,
+        ).update(acknowledged_at=timezone.now())
+    elif action == "post_clear":
+        ChemicalWorkflowAlert.objects.filter(
+            analysis_request=instance,
+            alert_type="ca_analysis_assignment",
+            acknowledged_at__isnull=True,
+        ).update(acknowledged_at=timezone.now())
+
+    try:
+        process = instance.analysis_process
+    except ChemicalAnalysisProcess.DoesNotExist:
+        process = None
+    if not process:
+        return
+    actor = getattr(instance, "_ca_assignment_actor", None)
+    request = get_audit_request()
+    if actor is None:
+        actor = getattr(request, "user", None) if request else None
+    if not getattr(actor, "is_authenticated", False):
+        actor = None
+    ChemicalWorkflowEvent.objects.create(
+        process=process,
+        batch=instance.batch,
+        analysis_request=instance,
+        event_type="analyst_assignment_changed",
+        action=action,
+        actor=actor,
+        from_status=str(process.status or ""),
+        to_status=str(process.status or ""),
+        details={"analyst_ids": sorted(pk_set or [])},
+    )
+    if instance.assigned_analysts.exists():
+        ChemicalWorkflowAlert.objects.filter(
+            analysis_request=instance,
+            alert_type="ca_assignment_escalation",
+            acknowledged_at__isnull=True,
+        ).update(acknowledged_at=timezone.now())
+
+
+from .events import batch_status_changed, checklist_completed, request_status_changed
 
 
 _request_local = local()
@@ -310,6 +466,21 @@ def broadcast_dashboard_event(
 ):
     payload = payload or {}
 
+    # Keep an at-least-once record for dashboards that may be disconnected when
+    # this write commits. Existing websocket consumers still receive the fast
+    # best-effort event below.
+    try:
+        from ca.services.outbox import enqueue_ca_event
+
+        enqueue_ca_event(
+            event_type=event_type,
+            aggregate_type="chemical_workflow",
+            aggregate_id=str(payload.get("batch_id") or payload.get("process_id") or ""),
+            payload=payload,
+        )
+    except Exception:
+        logger.exception("Could not persist CA dashboard invalidation")
+
     data = {
         "event": str(event_type),
         "payload": {
@@ -382,7 +553,7 @@ def _batch_sample_id(batch):
     )
 
 
-def _generate_coa_assets(instance: ChemicalCoA):
+def _generate_coa_assets(instance: ChemicalCoA, *, force=False):
     if not instance.pk:
         return
 
@@ -414,13 +585,14 @@ def _generate_coa_assets(instance: ChemicalCoA):
             and instance.pdf_file.name
         )
 
-        if qr_exists and pdf_exists:
+        if qr_exists and pdf_exists and not force:
             return
 
         with _coa_generation_guard():
             qr_io = None
+            generated_pdf_sha256 = None
 
-            if not qr_exists:
+            if not qr_exists or force:
                 qr_data = (
                     f"COA ID: {instance.pk} | "
                     f"Batch: {sample_id} | "
@@ -487,7 +659,7 @@ def _generate_coa_assets(instance: ChemicalCoA):
                         exc_info=True,
                     )
 
-            if not pdf_exists:
+            if not pdf_exists or force:
                 pdf_io = generate_coa_pdf(
                     instance,
                     qr_image=qr_io,
@@ -508,6 +680,9 @@ def _generate_coa_assets(instance: ChemicalCoA):
                     ),
                     save=False,
                 )
+                import hashlib
+
+                generated_pdf_sha256 = hashlib.sha256(pdf_io.getvalue()).hexdigest()
 
             update_fields = []
 
@@ -525,10 +700,16 @@ def _generate_coa_assets(instance: ChemicalCoA):
             ) and instance.pdf_file.name:
                 update_fields.append("pdf_file")
 
+            if generated_pdf_sha256:
+                instance.pdf_sha256 = generated_pdf_sha256
+                update_fields.append("pdf_sha256")
+
             if update_fields:
-                instance.save(
-                    update_fields=update_fields,
-                )
+                instance._ca_asset_write = True
+                try:
+                    instance.save(update_fields=update_fields)
+                finally:
+                    instance.__dict__.pop("_ca_asset_write", None)
 
         _audit_after_commit(
             instance=instance,
@@ -700,6 +881,38 @@ def log_test_result_save(
         },
     )
 
+    if not instance.batch_id:
+        return
+    if instance.status == BatchTestResult.Status.FAIL or instance.quality_flags:
+        def notify_quality_exception(result_id=instance.pk, batch_id=instance.batch_id):
+            try:
+                result = BatchTestResult.objects.select_related("batch", "parameter").get(pk=result_id)
+                flags = ", ".join(result.quality_flags or [])
+                parameter = result.parameter.parameter_name if result.parameter_id else "Chemical analysis"
+                from .services.workflow_notifications import create_workflow_alert
+
+                create_workflow_alert(
+                    batch=result.batch,
+                    alert_type="ca_quality_exception",
+                    title=f"Chemical analysis quality exception: {parameter}",
+                    message=(f"Result for {parameter} is {result.get_status_display() or result.status}. "
+                             f"{('Quality flags: ' + flags) if flags else 'Review the recorded result.'}"),
+                    url=f"/ca/results/{result.pk}/",
+                    severity="critical" if flags else "high",
+                    dedupe_key=f"quality-result:{result.pk}:revision:{result.revision_number}",
+                    permissions=("ca.review_chemical_analysis", "ca.perform_chemical_retest", "ca.record_chemical_result"),
+                )
+            except Exception:
+                logger.exception("Failed to notify reviewers about chemical result %s", result_id)
+        transaction.on_commit(notify_quality_exception)
+    else:
+        ChemicalWorkflowAlert.objects.filter(
+            batch_id=instance.batch_id,
+            alert_type="ca_quality_exception",
+            dedupe_key__startswith=f"quality-result:{instance.pk}:",
+            acknowledged_at__isnull=True,
+        ).update(acknowledged_at=timezone.now())
+
 
 @receiver(
     post_save,
@@ -811,6 +1024,31 @@ def on_request_status_changed(
 ):
     if old_status == new_status:
         return
+
+    try:
+        process = instance.analysis_process
+    except ChemicalAnalysisProcess.DoesNotExist:
+        process = None
+    if process and instance.batch_id:
+        ChemicalWorkflowEvent.objects.create(
+            process=process,
+            batch=instance.batch,
+            analysis_request=instance,
+            event_type="analysis_request_status_changed",
+            action="request status transition",
+            from_status=str(old_status or ""),
+            to_status=str(new_status or ""),
+            actor=_actor_from(performed_by),
+            details={"request_id": instance.pk},
+        )
+    if new_status in {
+        ChemicalAnalysisRequest.Status.COMPLETED,
+        ChemicalAnalysisRequest.Status.CANCELLED,
+    }:
+        ChemicalWorkflowAlert.objects.filter(
+            analysis_request=instance,
+            acknowledged_at__isnull=True,
+        ).update(acknowledged_at=timezone.now())
 
     actor = _resolve_actor(performed_by)
 
@@ -1077,64 +1315,17 @@ def auto_advance_request_on_checklist(
     ):
         return
 
+    # Saving a draft checklist must never start laboratory work. The explicit
+    # completion/start actions in ChecklistTaskView own that transition.
+    if not instance.completed:
+        return
+
     if not _is_checklist_complete(instance):
         return
 
-    request_id = getattr(
-        request,
-        "request_id",
-        request.pk,
-    )
-
-    def advance():
-        try:
-            request.refresh_from_db(
-                fields=["status"]
-            )
-
-            if (
-                request.status
-                != ChemicalAnalysisRequest.Status.PENDING
-            ):
-                return
-
-            request.start_analysis(
-                performed_by=None,
-            )
-
-            logger.info(
-                "Checklist automatically advanced analysis request",
-                extra={
-                    "checklist_id": instance.pk,
-                    "request_id": request_id,
-                    "batch_id": getattr(
-                        request,
-                        "batch_id",
-                        None,
-                    ),
-                },
-            )
-
-        except ValidationError as exc:
-            logger.warning(
-                "Checklist could not automatically advance request",
-                extra={
-                    "checklist_id": instance.pk,
-                    "request_id": request_id,
-                    "error": str(exc),
-                },
-            )
-
-        except Exception:
-            logger.exception(
-                "Unexpected checklist automation failure",
-                extra={
-                    "checklist_id": instance.pk,
-                    "request_id": request_id,
-                },
-            )
-
-    transaction.on_commit(advance)
+    # Checklist completion only records the intake result. The assigned
+    # analyst explicitly chooses whether to start analysis in the workflow.
+    return
 
 
 @receiver(

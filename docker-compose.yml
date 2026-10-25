@@ -17,7 +17,7 @@ x-django-common: &django-common
   environment:
 
     DJANGO_SETTINGS_MODULE: qad.settings
-    DJANGO_DEBUG: "False"
+    DEBUG: "False"
     HOSTNAME: ${HOSTNAME:-}
     PYTHONUNBUFFERED: "1"
     PYTHONDONTWRITEBYTECODE: "1"
@@ -105,6 +105,16 @@ x-django-common: &django-common
 
 services:
 
+  docker-proxy:
+    image: alpine:latest
+    container_name: qad-docker-proxy
+    restart: unless-stopped
+    command: sh -c "apk add --no-cache socat && socat TCP-LISTEN:2375,fork,reuseaddr UNIX-CONNECT:/var/run/docker.sock"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - backend-network
+
   db:
     image: postgres:16-alpine
 
@@ -147,7 +157,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-15432}:5432"
 
     healthcheck:
       test:
@@ -170,7 +180,7 @@ services:
       - backend-network
 
   pgbouncer:
-    image: edoburu/pgbouncer:latest
+    image: edoburu/pgbouncer:v1.25.2-p0
 
     container_name: qad-pgbouncer
 
@@ -193,7 +203,7 @@ services:
       SERVER_RESET_QUERY: DISCARD ALL
 
     ports:
-      - "6432:6432"
+      - "127.0.0.1:${PGBOUNCER_HOST_PORT:-16432}:6432"
 
     volumes:
       - ./pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
@@ -232,12 +242,12 @@ services:
       --timeout 0
       --databases 16
       --maxmemory 2gb
-      --maxmemory-policy allkeys-lru
+      --maxmemory-policy noeviction
       --io-threads 4
       --io-threads-do-reads yes
 
     ports:
-      - "6379:6379"
+      - "127.0.0.1:${REDIS_HOST_PORT:-16379}:6379"
 
     healthcheck:
       test: [ "CMD", "redis-cli", "ping" ]
@@ -593,20 +603,38 @@ services:
       start_period: 60s
 
   nginx:
-    image: nginx:1.27-alpine
+    image: qad-nginx:stable
+
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
 
     container_name: qad-nginx
 
     restart: unless-stopped
 
     depends_on:
-      - web1
-      - web2
-      - web3
-      - web4
-      - daphne1
-      - daphne2
-      - daphne3
+      web1:
+        condition: service_started
+        restart: true
+      web2:
+        condition: service_started
+        restart: true
+      web3:
+        condition: service_started
+        restart: true
+      web4:
+        condition: service_started
+        restart: true
+      daphne1:
+        condition: service_started
+        restart: true
+      daphne2:
+        condition: service_started
+        restart: true
+      daphne3:
+        condition: service_started
+        restart: true
 
     ports:
       - "8000:80"
@@ -614,9 +642,12 @@ services:
 
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/conf.d:/etc/nginx/templates:ro
       - staticfiles:/staticfiles:ro
       - media_data:/media:ro
+
+    environment:
+      NGINX_TEMPLATE: /etc/nginx/templates/nginx.template
 
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health/ >/dev/null 2>&1 || exit 1"]

@@ -2,16 +2,16 @@ import uuid
 import json
 import hashlib
 import math
-from django.db import models
+import ast
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP, ROUND_HALF_EVEN, ROUND_DOWN, ROUND_UP
+from django.apps import apps
+from django.db.models import Max
+from django.db import models, transaction
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from accounts.models import CustomUser  # Imported as requested
 from django.utils import timezone
-
-created_at = models.DateTimeField(default=timezone.now, blank=True, null=True)
-updated_at = models.DateTimeField(auto_now=True, blank=True, null=True)
-
 
 # -------------------------
 # Abstract Base Method Model
@@ -39,7 +39,7 @@ class AbstractBaseMethod(models.Model):
 # Chemical Analysis Method
 # -------------------------
 class ChemicalAnalysisMethod(AbstractBaseMethod):
-    method = models.CharField(max_length=255, unique=True)
+    method = models.CharField(max_length=255)
     kebs_reference = models.CharField(max_length=255, help_text="Official KEBS reference standard")
     formula = models.TextField(
         blank=True,
@@ -48,6 +48,16 @@ class ChemicalAnalysisMethod(AbstractBaseMethod):
     inputs_structure = models.JSONField(default=list, blank=True)
     unit = models.CharField(max_length=50, blank=True)
     rounding_precision = models.PositiveSmallIntegerField(default=2)
+    rounding_mode = models.CharField(
+        max_length=16,
+        choices=(
+            ("HALF_UP", "Half up"),
+            ("HALF_EVEN", "Half even"),
+            ("DOWN", "Toward zero"),
+            ("UP", "Away from zero"),
+        ),
+        default="HALF_UP",
+    )
     description = models.TextField(blank=True)
     category = models.CharField(max_length=100, blank=True)
     tags = models.JSONField(default=list, blank=True)
@@ -58,59 +68,234 @@ class ChemicalAnalysisMethod(AbstractBaseMethod):
         verbose_name_plural = "Chemical Analysis Methods"
         unique_together = ("method", "version")
         ordering = ["method", "-version"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(rounding_precision__gte=0, rounding_precision__lte=12),
+                name="am_rounding_precision_range",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(rounding_mode__in=["HALF_UP", "HALF_EVEN", "DOWN", "UP"]),
+                name="am_rounding_mode_valid",
+            ),
+        ]
 
     def __str__(self):
-        return f"{self.method} (v{self.version})"
+        status = "" if self.is_active else " [inactive]"
+        return f"{self.method} (v{self.version}){status}"
 
     def clean(self):
         if self.formula:
-            validate_formula_expression(self.formula)
+            from ca.models import validate_formula_expression as validate_chemical_formula
+
+            validate_chemical_formula(self.formula, allow_math_attr=True)
+            input_names = self.get_input_fields()
+            if not input_names:
+                raise ValidationError({
+                    "inputs_structure": "A formula needs at least one configured measurement input."
+                })
+            invalid_names = [
+                name for name in input_names
+                if not name.isidentifier() or name in {"math", "__builtins__"}
+            ]
+            if invalid_names:
+                raise ValidationError({
+                    "inputs_structure": "Invalid formula input name(s): " + ", ".join(invalid_names)
+                })
+            tree = ast.parse(self.formula, mode="eval")
+            unknown_names = sorted({
+                node.id
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Name) and node.id not in set(input_names) | {"math"}
+            })
+            if unknown_names:
+                raise ValidationError({
+                    "formula": "The formula references input(s) that are not configured: "
+                    + ", ".join(unknown_names)
+                })
+        if self.rounding_precision < 0 or self.rounding_precision > 12:
+            raise ValidationError({"rounding_precision": "Precision must be between 0 and 12 decimal places."})
+        if self.rounding_mode not in {"HALF_UP", "HALF_EVEN", "DOWN", "UP"}:
+            raise ValidationError({"rounding_mode": "Select a supported scientific rounding rule."})
 
     def get_input_fields(self):
-        return [i["name"] for i in self.inputs_structure if "name" in i]
+        definitions = self.inputs_structure
+        if isinstance(definitions, str):
+            return [name.strip() for name in definitions.split(",") if name.strip()]
+        if isinstance(definitions, dict):
+            definitions = [
+                {"name": name} for name in definitions
+            ]
+        if not isinstance(definitions, (list, tuple)):
+            return []
+        fields = []
+        for definition in definitions:
+            name = definition if isinstance(definition, str) else (
+                definition.get("name") if isinstance(definition, dict) else None
+            )
+            name = str(name or "").strip()
+            if name and name not in fields:
+                fields.append(name)
+        return fields
+
+    def get_input_definitions(self):
+        definitions = self.inputs_structure
+        if isinstance(definitions, dict):
+            definitions = [
+                {"name": name, **(value if isinstance(value, dict) else {"label": value})}
+                for name, value in definitions.items()
+            ]
+        elif isinstance(definitions, str):
+            definitions = [{"name": name.strip()} for name in definitions.split(",") if name.strip()]
+        if not isinstance(definitions, (list, tuple)):
+            return []
+        return [
+            {"name": definition, "required": True}
+            if isinstance(definition, str)
+            else dict(definition)
+            for definition in definitions
+            if isinstance(definition, (str, dict))
+        ]
 
     def generate_formula_hash(self):
-        raw = f"{self.method}:{self.formula}:{json.dumps(self.inputs_structure)}:{self.version}"
+        raw = json.dumps({
+            "method": self.method,
+            "reference": self.kebs_reference,
+            "formula": self.formula,
+            "inputs": self.inputs_structure,
+            "unit": self.unit,
+            "precision": self.rounding_precision,
+            "rounding_mode": self.rounding_mode,
+            "version": self.version,
+        }, sort_keys=True, separators=(",", ":"), default=str)
         return hashlib.sha256(raw.encode()).hexdigest()
 
+    @transaction.atomic
     def save(self, *args, **kwargs):
+        previous = None
+        previous_pk = self.pk
+        versioned_fields = (
+            "method", "kebs_reference", "formula", "inputs_structure", "unit",
+            "rounding_precision", "rounding_mode", "description", "category", "tags", "version",
+        )
+        if previous_pk:
+            previous = type(self).objects.filter(pk=previous_pk).first()
+        if previous is not None and any(
+            getattr(previous, field) != getattr(self, field)
+            for field in versioned_fields
+        ):
+            latest_version = type(self).objects.filter(method=self.method).aggregate(value=Max("version"))["value"] or 0
+            if previous.method == self.method:
+                next_version = max(latest_version, previous.version) + 1
+            else:
+                next_version = latest_version + 1
+            type(self).objects.filter(pk=previous_pk).update(is_active=False)
+            self.pk = uuid.uuid4()
+            self._state.adding = True
+            self.version = next_version
+            kwargs.pop("update_fields", None)
+        elif self._state.adding:
+            latest_version = type(self).objects.filter(method=self.method).aggregate(value=Max("version"))["value"] or 0
+            if self.version <= latest_version:
+                self.version = latest_version + 1
         self.formula_hash = self.generate_formula_hash()
         self.full_clean()
         super().save(*args, **kwargs)
+        if previous is not None and self.pk != previous_pk:
+            # The method change created a new immutable version. Point each
+            # current specification at it by creating a new specification
+            # version too; requests already captured against the old
+            # specification continue to use their original method snapshot.
+            specification_model = apps.get_model("ca", "ChemicalSpecification")
+            active_specifications = specification_model.objects.filter(
+                method_id=previous_pk,
+                is_active=True,
+            )
+            for specification in active_specifications.iterator():
+                specification.method = self
+                specification.save()
 
-    def evaluate(self, input_data: dict) -> float | None:
-        missing = [f["name"] for f in self.inputs_structure if f.get("required") and f["name"] not in input_data]
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Chemical analysis method versions cannot be deleted.")
+
+    def evaluate(self, input_data: dict) -> Decimal | None:
+        missing = [name for name in self.get_input_fields() if name not in input_data]
         if missing:
             raise ValidationError(f"Missing required inputs: {missing}")
 
-        try:
-            safe_context = {
-                **{key: float(input_data[key]) for key in self.get_input_fields() if key in input_data},
-                "math": math
-            }
-            result = eval(self.formula, {"__builtins__": {}}, safe_context)
-            return round(result, self.rounding_precision)
-        except Exception as e:
-            raise ValidationError(f"Evaluation error: {str(e)}")
+        from ca.services.formulas import safe_eval_formula
+
+        self.clean()
+        definitions = {item.get("name"): item for item in self.get_input_definitions()}
+        safe_context = {}
+        for key in self.get_input_fields():
+            try:
+                value = Decimal(str(input_data[key]))
+            except (InvalidOperation, TypeError, ValueError) as exc:
+                raise ValidationError({key: "Enter a valid numeric measurement."}) from exc
+            if not value.is_finite():
+                raise ValidationError({key: "Measurements must be finite numbers."})
+            definition = definitions.get(key, {})
+            minimum, maximum = definition.get("min_value"), definition.get("max_value")
+            if minimum is not None and value < Decimal(str(minimum)):
+                raise ValidationError({key: "The measurement is below its configured minimum."})
+            if maximum is not None and value > Decimal(str(maximum)):
+                raise ValidationError({key: "The measurement exceeds its configured maximum."})
+            safe_context[key] = value
+        result = safe_eval_formula(self.formula, safe_context)
+        rounding_modes = {
+            "HALF_UP": ROUND_HALF_UP,
+            "HALF_EVEN": ROUND_HALF_EVEN,
+            "DOWN": ROUND_DOWN,
+            "UP": ROUND_UP,
+        }
+        quantum = Decimal(1).scaleb(-self.rounding_precision)
+        return result.quantize(quantum, rounding=rounding_modes[self.rounding_mode])
 
     def example_input_payload(self):
-        return {inp["name"]: 0.0 for inp in self.inputs_structure if "name" in inp}
+        return {name: 0.0 for name in self.get_input_fields()}
 
     def describe_inputs(self):
-        return ", ".join(f'{i["label"]} ({i["name"]})' for i in self.inputs_structure)
+        if isinstance(self.inputs_structure, dict):
+            definitions = [
+                {"name": name, **(value if isinstance(value, dict) else {"label": value})}
+                for name, value in self.inputs_structure.items()
+            ]
+        elif isinstance(self.inputs_structure, str):
+            definitions = [{"name": name.strip()} for name in self.inputs_structure.split(",") if name.strip()]
+        else:
+            definitions = self.inputs_structure or []
+        descriptions = []
+        for definition in definitions:
+            if isinstance(definition, str):
+                name = definition
+                label = definition.replace("_", " ").title()
+            elif isinstance(definition, dict) and definition.get("name"):
+                name = definition["name"]
+                label = definition.get("label") or str(name).replace("_", " ").title()
+            else:
+                continue
+            descriptions.append(f"{label} ({name})")
+        return ", ".join(descriptions)
 
     def as_dict(self):
         return {
-            "id": self.id,
+            "id": str(self.id),
             "method": self.method,
+            "kebs_reference": self.kebs_reference,
             "description": self.description,
             "unit": self.unit,
             "inputs_structure": self.inputs_structure,
             "formula": self.formula,
+            "rounding_precision": self.rounding_precision,
+            "rounding_mode": self.rounding_mode,
+            "formula_hash": self.formula_hash,
             "example_inputs": self.example_input_payload(),
             "version": self.version,
             "category": self.category,
-            "tags": self.tags
+            "tags": self.tags,
+            "is_active": self.is_active,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
 
 # -------------------------
@@ -172,6 +357,17 @@ class WWAnalysisMethod(AbstractBaseMethod):
     def __str__(self):
         return f"{self.name} (v{self.version})"
 
+    def as_dict(self):
+        return {
+            "id": str(self.id),
+            "name": self.name,
+            "reference": self.reference,
+            "version": self.version,
+            "is_active": self.is_active,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
 # -------------------------
 # CleanWater Analysis Method
 # -------------------------
@@ -186,9 +382,22 @@ class CWAnalysisMethod(AbstractBaseMethod):
     def __str__(self):
         return f"{self.name} (v{self.version})"
 
+    def as_dict(self):
+        return {
+            "id": str(self.id),
+            "name": self.name,
+            "reference": self.reference,
+            "version": self.version,
+            "is_active": self.is_active,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
 # -------------------------
 # Utility: Formula Validator (Placeholder)
 # -------------------------
 def validate_formula_expression(expr):
-    if not isinstance(expr, str) or not expr.strip():
-        raise ValidationError("Formula must be a valid non-empty string.")
+    from ca.models import validate_formula_expression as validate_chemical_formula
+
+    validate_chemical_formula(expr, allow_math_attr=True)
+    return True

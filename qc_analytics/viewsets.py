@@ -12,6 +12,7 @@ from reportlab.lib import colors
 
 from django.http import HttpResponse, FileResponse
 from rest_framework import status, viewsets, permissions
+from core.permissions import ViewModelPermissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -45,7 +46,7 @@ class QuantumQCAnalyticsViewSet(viewsets.ViewSet):
     - /qc/analytics/orchestrator/schedule/
     """
 
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
     # -------------------------
     # Helper: Run Engine & Return Standard Payload

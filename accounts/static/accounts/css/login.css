@@ -4,9 +4,9 @@
 body {
     margin: 0;
     padding: 0;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #0f1622, #1c2b44);
-    color: #222;
+    font-family: var(--font-sans);
+    background: linear-gradient(135deg, var(--theme-bg), var(--theme-surface-muted));
+    color: var(--theme-text);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -24,11 +24,11 @@ body {
     bottom: 20px;
     left: 50%;
     transform: translateX(-50%);
-    background: #ff4444;
+    background: color-mix(in srgb, var(--color-danger) 90%, var(--theme-text));
     color: #fff;
     padding: 0.6rem 1rem;
     border-radius: 0.4rem;
-    font-size: 0.95rem;
+    font-size: var(--font-size-md);
     display: none;
     opacity: 0;
     transition: opacity 0.3s ease, transform 0.3s ease;
@@ -54,8 +54,9 @@ body {
    ========================================================= */
 .login-container {
     position: relative;
-    background: #c4c0db; /* fallback */
-    color: #222;
+    background: linear-gradient(145deg, var(--theme-surface), var(--theme-surface-muted));
+    color: var(--theme-text);
+    border: 1px solid var(--theme-border);
     border-radius: 1rem;
     box-shadow: 0 12px 35px rgba(0,0,0,0.35);
     width: 100%;
@@ -92,7 +93,7 @@ body {
     justify-content: center;
     align-items: center;
     border-radius: 50%;
-    background: #ccc;
+    background: var(--theme-surface-muted);
     box-shadow: 0 6px 18px rgba(0,0,0,0.25);
     overflow: hidden;
     transition: transform 0.4s ease, box-shadow 0.3s ease;
@@ -113,11 +114,10 @@ body {
    Company name
    ========================================================= */
 .company-name {
-    font-size: 1.7rem;
+    font-size: var(--font-size-2xl);
     font-weight: 700;
     margin-bottom: 1rem;
-    color: #004080;
-    text-shadow: 0 2px 6px rgba(0,0,0,0.35);
+    color: var(--theme-accent);
     transition: color 0.3s ease;
 }
 
@@ -128,8 +128,8 @@ body {
     width: 100%;
     margin-bottom: 1rem;
     font-weight: 600;
-    font-size: 1rem;
-    color: #0066cc;
+    font-size: var(--font-size-body);
+    color: var(--theme-accent);
     text-align: center;
     transition: all 0.3s ease;
     opacity: 0;
@@ -156,9 +156,9 @@ body {
     top: 50%;
     left: 0.75rem;
     transform: translateY(-50%);
-    color: #666;
+    color: var(--theme-muted);
     pointer-events: none;
-    font-size: 1rem;
+    font-size: var(--font-size-body);
 }
 
 /* Input styling */
@@ -167,23 +167,23 @@ input[type="password"] {
     width: 100%;
     padding: 0.55rem 2.75rem 0.55rem 2.5rem;
     border-radius: 0.5rem;
-    border: 1px solid #ccc;
+    border: 1px solid var(--theme-border-strong);
     outline: none;
-    font-size: 1rem;
-    background: #f3f3f3;
-    color: #222;
+    font-size: var(--font-size-body);
+    background: var(--theme-surface-strong);
+    color: var(--theme-text);
     box-sizing: border-box;
     transition: background 0.3s ease, border 0.3s ease, box-shadow 0.3s ease;
 }
 
 input:focus {
-    background: #fff;
-    border: 1px solid #004080;
-    box-shadow: 0 0 12px rgba(0, 64, 128, 0.35);
+    background: var(--theme-surface);
+    border: 1px solid var(--theme-accent);
+    box-shadow: var(--theme-focus-ring);
 }
 
 input::placeholder {
-    color: #888;
+    color: var(--theme-muted);
 }
 
 /* Password toggle */
@@ -193,14 +193,14 @@ input::placeholder {
     right: 0.75rem;
     transform: translateY(-50%);
     cursor: pointer;
-    color: #666;
+    color: var(--theme-muted);
     font-size: 1rem;
     z-index: 3;
     transition: color 0.3s ease;
 }
 
 .toggle-password:hover {
-    color: #004080;
+    color: var(--theme-accent);
 }
 
 /* =========================================================
@@ -211,10 +211,10 @@ button {
     padding: 0.55rem 1rem;
     border: none;
     border-radius: 2rem;
-    background: linear-gradient(90deg, #004080, #00ccff);
-    color: #fff;
+    background: var(--theme-accent);
+    color: var(--theme-on-accent);
     font-weight: 700;
-    font-size: 0.95rem;
+    font-size: var(--font-size-md);
     cursor: pointer;
     position: relative;
     overflow: hidden;
@@ -228,7 +228,7 @@ button:hover:not(:disabled) {
 }
 
 button:disabled {
-    background: #999;
+    background: var(--theme-muted);
     cursor: not-allowed;
     opacity: 0.6;
 }
@@ -251,18 +251,18 @@ button span {
    ========================================================= */
 .forgot-password {
     margin-top: 0.5rem;
-    font-size: 0.85rem;
+    font-size: var(--font-size-sm);
 }
 
 .forgot-password a {
-    color: #004080;
+    color: var(--theme-accent);
     text-decoration: none;
     transition: all 0.3s ease;
 }
 
 .forgot-password a:hover {
     text-decoration: underline;
-    color: #0066cc;
+    color: var(--theme-accent-hover);
 }
 
 /* =========================================================
@@ -271,7 +271,7 @@ button span {
 #passwordStrengthContainer {
     height: 6px;
     width: 100%;
-    background: rgba(0,0,0,0.08);
+    background: var(--theme-surface-muted);
     border-radius: 3px;
     margin-bottom: 1rem;
     transition: all 0.3s ease;
@@ -280,14 +280,14 @@ button span {
 #passwordStrengthBar {
     height: 100%;
     width: 0%;
-    background: #ff4444;
+    background: var(--color-danger);
     border-radius: 3px;
     transition: width 0.3s ease, background 0.3s ease;
 }
 
 /* Gradient glow on strong password */
 #passwordStrengthBar.strong {
-    box-shadow: 0 0 6px rgba(0,255,136,0.5);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--color-success) 55%, transparent);
 }
 
 /* =========================================================
@@ -304,6 +304,41 @@ button span {
     }
 
     .company-name {
-        font-size: 1.3rem;
+        font-size: var(--font-size-xl);
     }
+}
+
+/* =========================================================
+   Password reset status message (login page inline)
+   ========================================================= */
+.reset-status {
+    width: 100%;
+    text-align: center;
+    font-size: var(--font-size-sm);
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.4rem;
+    margin-top: 0.5rem;
+    transition: opacity 0.3s ease;
+    line-height: 1.4;
+}
+
+.reset-status.success {
+    background: color-mix(in srgb, var(--color-success, #00ff88) 12%, var(--theme-surface));
+    color: var(--color-success, #00ff88);
+    border: 1px solid color-mix(in srgb, var(--color-success, #00ff88) 25%, transparent);
+}
+
+.reset-status.error {
+    background: color-mix(in srgb, var(--color-danger, #ff4444) 12%, var(--theme-surface));
+    color: var(--color-danger, #ff4444);
+    border: 1px solid color-mix(in srgb, var(--color-danger, #ff4444) 25%, transparent);
+}
+
+.reset-status.sending {
+    color: var(--theme-muted);
+}
+
+.forgot-password a.disabled-link {
+    pointer-events: none;
+    opacity: 0.5;
 }

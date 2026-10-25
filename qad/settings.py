@@ -103,6 +103,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.humanize",
     "django.contrib.postgres",
 
     # third-party
@@ -135,7 +136,7 @@ INSTALLED_APPS = [
     "PHadjustment",  "chlorinedemand", "jartest",
     "kstw", "destw",
     "analysis_methods",
-    'duty_house', 'maintenance', 'Maintenance_Incident',
+    'duty_house', 'maintenance.apps.MaintenanceConfig', 'Maintenance_Incident',
     "itinerary",
     "heavy_metal", "microbial", "filtered_water","qc", 'qc_analytics','wc',
     "xmicalconcentration","backwashing",
@@ -144,6 +145,7 @@ INSTALLED_APPS = [
     "dashboards",
     "reports",
     "system_workflows",
+    "monitoring",
 ]
 
 
@@ -156,6 +158,9 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "core.middleware.SuperuserAuthorizationContextMiddleware",
+    "core.middleware.AnonymousForbiddenRedirectMiddleware",
+    "core.middleware.SingleDeviceSessionMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "axes.middleware.AxesMiddleware",
@@ -173,7 +178,7 @@ ASGI_APPLICATION = "qad.asgi.application"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / "templates"],
+        "DIRS": [BASE_DIR / "admin_templates", BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -187,6 +192,7 @@ TEMPLATES = [
                 "qc.context_processors.treatment_plant_context",
                 "weeklytasks.context_processors.water_treatment_chemical_analysis_context",
                 "core.context_processors.sidebar_context",
+                "sc.context_processors.shift_context",
             ],
         },
     },
@@ -213,6 +219,8 @@ if DATABASE_URL:
         }
     }
 else:
+    if ENVIRONMENT.strip().lower() in {"production", "prod"}:
+        raise RuntimeError("DATABASE_URL is required in production; SQLite is development-only")
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
@@ -237,18 +245,25 @@ SUPERUSER_LANDING_MAP = "home"
 
 LOGIN_GROUP_REDIRECT_MAP = {
     "ADMIN": "accounts:dashboard",
-    "STORES ASSISTANTS":"ca:dashboard",
-    "ICT": "accounts:dashboard",
-    "LAB": "laboratory:dashboard",
-    "LABORATORY": "laboratory:dashboard",
-    "LAB MANAGER": "laboratory:dashboard",
-    "LAB SUPERVISOR": "laboratory:dashboard",
-    "LAB ANALYST": "laboratory:dashboard",
-    "MICROBIOLOGY": "laboratory:micro_dashboard",
-    "CHEMISTRY": "laboratory:chem_dashboard",
-    "QC": "qc_sampling_schedule:dashboard",
-    "QUALITY CONTROL": "qc_sampling_schedule:dashboard",
-    "SAMPLING": "qc_sampling_schedule:dashboard",
+    "STORES ASSISTANT":"ca:dashboard",
+    "STORES SUPERVISOR": "accounts:dashboard",
+    "PROCUREMENT OFFICER": "laboratory:dashboard",
+    "LABORATORY TECHNICIAN": "qc_analytics:dashboard",
+    "LABORATORY ASSISTANT": "qc_analytics:dashboard",
+    "CHEMIST OFFICER": "qc_analytics:dashboard",
+    "QUALITY ASSURANCE OFFICER": "qc:dashboard",
+    "TREATMENT WORKS SUPERVISOR": "qc:dashboard",
+    "TREATMENT WORKS OPERATOR": "qc:dashboard",
+    "TREATMENT WORKS OFFICER": "qc:dashboard",
+    "TREATMENT WORKS CO-ORDINATOR": "qc:dashboard",
+    "QUALITY ASSURANCE  CO-ORDINATOR": "qc:dashboard",
+    "WSP CO-ORDINATOR": "qc:dashboard",
+    "QUALITY ASSURANCE MANAGER": "qc:dashboard",
+    "MANAGING DIRECTOR": "qc:dashboard",
+    "MAINTENANCE ASSISTANT": "qc:dashboard",
+    "ARTISAN": "qc:dashboard",
+    "MAINTENANCE SUPERVISOR": "qc:dashboard",
+    "MAINTENANCE OFFICER": "qc:dashboard",
 }
 
 
@@ -306,6 +321,7 @@ EMAIL_PORT = env("EMAIL_PORT", 587, int)
 EMAIL_USE_TLS = env("EMAIL_USE_TLS", True, bool)
 EMAIL_HOST_USER = env("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
 
 
 # =========================================================
@@ -457,6 +473,26 @@ CELERY_BEAT_SCHEDULE = {
         "task": "qc.generate_due_analyses",
         "schedule": 60.0,
     },
+    "qc.publish_qc_outbox_events": {
+        "task": "qc.publish_qc_outbox_events",
+        "schedule": 5.0,
+    },
+    "qc.prune_qc_outbox_events": {
+        "task": "qc.prune_qc_outbox_events",
+        "schedule": 86400.0,
+    },
+    "ca.auto_assign_due_chemical_analysts": {
+        "task": "ca.auto_assign_due_chemical_analysts",
+        "schedule": 60.0,
+    },
+    "ca.escalate_due_chemical_workflows": {
+        "task": "ca.escalate_due_chemical_workflows",
+        "schedule": 300.0,
+    },
+    "ca.publish_ca_outbox_events": {
+        "task": "ca.publish_ca_outbox_events",
+        "schedule": 15.0,
+    },
 }
 CHANNEL_LAYERS = {
     "default": {
@@ -525,6 +561,9 @@ LOGGING = {
 
 SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 SESSION_CACHE_ALIAS = "default"
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+SESSION_COOKIE_AGE = env("SESSION_COOKIE_AGE", 28800, int)
+SESSION_SAVE_EVERY_REQUEST = True
 
 
 # =========================================================
@@ -541,6 +580,12 @@ SESSION_COOKIE_HTTPONLY = env("SESSION_COOKIE_HTTPONLY", True, bool)
 
 CSRF_COOKIE_SAMESITE = env("CSRF_COOKIE_SAMESITE", "Lax")
 SESSION_COOKIE_SAMESITE = env("SESSION_COOKIE_SAMESITE", "Lax")
+
+if ENVIRONMENT.strip().lower() in {"production", "prod"}:
+    if "*" in ALLOWED_HOSTS:
+        raise RuntimeError("ALLOWED_HOSTS must list explicit production hostnames")
+    if not CSRF_COOKIE_SECURE or not SESSION_COOKIE_SECURE:
+        raise RuntimeError("Secure session and CSRF cookies are required in production")
 
 
 # =========================================================

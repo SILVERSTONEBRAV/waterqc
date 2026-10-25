@@ -1,179 +1,286 @@
 {% extends "ca/dashboard/layout/app.html" %}
+{% load static %}
 
 {% block title %}
-    {% if object %}Edit Chemical Batch{% else %}Register Chemical Batch{% endif %}
+    {% if object %}Edit Chemical Batch: {{ object.batch_number }}{% else %}Receive Chemical Batch | SOP-17025 Intake{% endif %}
+{% endblock %}
+
+{% block page_title %}
+    {% if object %}Edit Chemical Batch{% else %}Receive Chemical Batch{% endif %}
+{% endblock %}
+
+{% block page_css %}
+<link rel="stylesheet" href="{% static 'ca/css/components/futuristic_forms_modal.css' %}">
+{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="{% static 'ca/css/components/futuristic_forms_modal.css' %}">
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'ca/css/components/futuristic_forms_modal.css' %}">
 {% endblock %}
 
 {% block content %}
+<div class="ca-standalone-modal-page">
 
-<div class="ca-page">
+    <div class="ca-modal-dialog">
 
-    <div class="page-header">
-        <div>
-            <h1>
-                {% if object %}
-                    Edit Chemical Batch
-                {% else %}
-                    Register Chemical Batch
-                {% endif %}
-            </h1>
+        <!-- 1. MODAL HEADER CAPSULE -->
+        <div class="ca-modal-header">
+            <div class="ca-modal-header__left">
+                <div class="ca-modal-icon-badge">
+                    <i class="fa fa-boxes-packing"></i>
+                </div>
+                <div class="ca-modal-header__meta">
+                    <div class="ca-modal-tagline">
+                        <span class="ca-modal-tagline__dot"></span>
+                        <span>SOP-17025 REGULATORY INTAKE</span>
+                    </div>
+                    <h1 class="ca-modal-title">
+                        {% if object %}Edit Chemical Batch: {{ object.batch_number }}{% else %}Receive Chemical Batch{% endif %}
+                    </h1>
+                </div>
+            </div>
 
-            <p>
-                {% if object %}
-                    Update the chemical batch information below.
-                {% else %}
-                    Register a new chemical batch for analysis.
-                {% endif %}
-            </p>
-        </div>
-
-        <div class="page-actions">
-            <a
-                href="{% url 'ca:batch-list' %}"
-                class="btn btn-secondary"
-            >
-                Back to Batches
+            <a href="{% url 'ca:batch-list' %}" class="ca-modal-close-btn" title="Return to Batch Ledger">
+                <i class="fa fa-xmark"></i>
             </a>
         </div>
-    </div>
 
-    {% if form.non_field_errors %}
-        <div class="alert alert-danger">
-            {% for error in form.non_field_errors %}
-                <div>{{ error }}</div>
-            {% endfor %}
-        </div>
-    {% endif %}
+        <!-- 2. FORM BODY -->
+        <form method="post" novalidate id="ca-batch-standalone-form">
+            {% csrf_token %}
 
-    <form method="post" novalidate>
-        {% csrf_token %}
+            <div class="ca-modal-body">
 
-        <div class="card">
-
-            <div class="card-header">
-                <div>
-                    <h2>Batch Information</h2>
-                    <span>
-                        Enter the details of the chemical batch.
-                    </span>
-                </div>
-            </div>
-
-            <div class="card-body">
-
-                <div class="form-grid">
-
-                    {% for field in form %}
-
-                        {% if field.name != "sample_id" and field.name != "created_at" and field.name != "updated_at" %}
-
-                            <div class="form-group {% if field.errors %}has-error{% endif %}">
-
-                                <label for="{{ field.id_for_label }}">
-                                    {{ field.label }}
-
-                                    {% if field.field.required %}
-                                        <span class="required">*</span>
-                                    {% endif %}
-                                </label>
-
-                                {{ field }}
-
-                                {% if field.help_text %}
-                                    <small class="form-help">
-                                        {{ field.help_text }}
-                                    </small>
-                                {% endif %}
-
-                                {% if field.errors %}
-                                    <div class="field-errors">
-                                        {% for error in field.errors %}
-                                            <span>{{ error }}</span>
-                                        {% endfor %}
-                                    </div>
-                                {% endif %}
-
-                            </div>
-
-                        {% endif %}
-
-                    {% endfor %}
-
-                </div>
-
-            </div>
-
-        </div>
-
-        {% if object %}
-
-            <div class="card">
-
-                <div class="card-header">
-                    <h2>Batch Identification</h2>
-                </div>
-
-                <div class="card-body">
-
-                    <div class="details-grid">
-
-                        <div class="detail-item">
-                            <span class="detail-label">Sample ID</span>
-                            <span class="detail-value">
-                                {{ object.sample_id|default:"Generated automatically" }}
-                            </span>
+                {% if form.non_field_errors %}
+                    <div class="ca-field-error" style="padding: 10px 14px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 8px; margin-bottom: 14px; font-size: 0.78rem;">
+                        <i class="fa fa-triangle-exclamation"></i>
+                        <div>
+                            {% for error in form.non_field_errors %}
+                                <div>{{ error }}</div>
+                            {% endfor %}
                         </div>
+                    </div>
+                {% endif %}
 
-                        {% if object.created_at %}
-                            <div class="detail-item">
-                                <span class="detail-label">Created</span>
-                                <span class="detail-value">
-                                    {{ object.created_at|date:"d M Y H:i" }}
-                                </span>
+                <div class="ca-compact-form-grid">
+
+                    <!-- TREATMENT PLANT: AUTO-POPULATED FROM CUSTOM USER ASSIGNMENT -->
+                    <div class="ca-field-wrap ca-col-full">
+                        <label class="ca-field-label" for="id_treatment_plant">
+                            <span><i class="fa fa-industry"></i> Destination Treatment Plant</span>
+                            {% if not is_ca_superuser and user_assigned_plant %}
+                            <span class="ca-field-label__badge"><i class="fa fa-lock"></i> Auto-Bound to Assigned Scope</span>
+                            {% else %}
+                            <span class="ca-field-label__badge"><i class="fa fa-shield-halved"></i> Enterprise Admin Scope</span>
+                            {% endif %}
+                        </label>
+
+                        {% if not is_ca_superuser and user_assigned_plant %}
+                            <!-- Non-superuser assigned plant visual card -->
+                            <input type="hidden" name="treatment_plant" value="{{ user_assigned_plant.pk }}">
+                            <div class="ca-plant-locked-card">
+                                <div class="ca-plc-left">
+                                    <div class="ca-plc-icon"><i class="fa fa-building-circle-check"></i></div>
+                                    <div class="ca-plc-info">
+                                        <div class="ca-plc-name">{{ user_assigned_plant.name }}</div>
+                                        <div class="ca-plc-sub">Code: {{ user_assigned_plant.code|default:"N/A" }} &bull; Custom User Assigned Scope</div>
+                                    </div>
+                                </div>
+                                <div class="ca-plc-badge">
+                                    <i class="fa fa-check-circle"></i> Auto-Bound
+                                </div>
                             </div>
+                        {% else %}
+                            {{ form.treatment_plant }}
                         {% endif %}
 
-                        {% if object.updated_at %}
-                            <div class="detail-item">
-                                <span class="detail-label">Last Updated</span>
-                                <span class="detail-value">
-                                    {{ object.updated_at|date:"d M Y H:i" }}
-                                </span>
+                        {% if form.treatment_plant.errors %}
+                            <div class="ca-field-error">
+                                <i class="fa fa-circle-exclamation"></i> {{ form.treatment_plant.errors.0 }}
                             </div>
                         {% endif %}
+                    </div>
 
+                    <!-- CHEMICAL -->
+                    <div class="ca-field-wrap">
+                        <label class="ca-field-label" for="{{ form.chemical.id_for_label }}">
+                            <span><i class="fa fa-flask"></i> Chemical <span class="required-star">*</span></span>
+                        </label>
+                        {{ form.chemical }}
+                        {% if form.chemical.errors %}
+                            <div class="ca-field-error"><i class="fa fa-circle-exclamation"></i> {{ form.chemical.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- SUPPLIER -->
+                    <div class="ca-field-wrap">
+                        <label class="ca-field-label" for="{{ form.supplier.id_for_label }}">
+                            <span><i class="fa fa-truck-ramp-box"></i> Supplier <span class="required-star">*</span></span>
+                        </label>
+                        {{ form.supplier }}
+                        {% if form.supplier.errors %}
+                            <div class="ca-field-error"><i class="fa fa-circle-exclamation"></i> {{ form.supplier.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- STORAGE LOCATION -->
+                    <div class="ca-field-wrap">
+                        <label class="ca-field-label" for="{{ form.location.id_for_label }}">
+                            <span><i class="fa fa-location-dot"></i> Chemical Storage Location <span class="required-star">*</span></span>
+                        </label>
+                        {{ form.location }}
+                        <small id="ca-batch-location-hint" class="ca-field-help" hidden>
+                            Select a treatment plant to see its configured chemical storage locations.
+                        </small>
+                        {% if form.location.errors %}
+                            <div class="ca-field-error"><i class="fa fa-circle-exclamation"></i> {{ form.location.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- DELIVERY DATE WITH COMPACT DATE PICKER -->
+                    <div class="ca-field-wrap">
+                        <label class="ca-field-label" for="{{ form.delivery_date.id_for_label }}">
+                            <span><i class="fa fa-calendar-day"></i> Date Received <span class="required-star">*</span></span>
+                        </label>
+                        {{ form.delivery_date }}
+                        <small class="ca-field-help">{{ form.delivery_date.help_text }}</small>
+                        <div class="ca-date-quick-chips">
+                            <span class="ca-date-chip" onclick="caQuickDate('today')">Today</span>
+                            <span class="ca-date-chip" onclick="caQuickDate('yesterday')">Yesterday</span>
+                        </div>
+                        {% if form.delivery_date.errors %}
+                            <div class="ca-field-error"><i class="fa fa-circle-exclamation"></i> {{ form.delivery_date.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- DELIVERY NOTE NUMBER -->
+                    <div class="ca-field-wrap">
+                        <label class="ca-field-label" for="{{ form.delivery_note_number.id_for_label }}">
+                            <span><i class="fa fa-file-invoice"></i> Delivery Note No. <span class="required-star">*</span></span>
+                        </label>
+                        {{ form.delivery_note_number }}
+                        {% if form.delivery_note_number.errors %}
+                            <div class="ca-field-error"><i class="fa fa-circle-exclamation"></i> {{ form.delivery_note_number.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- BATCH NUMBER -->
+                    <div class="ca-field-wrap">
+                        <label class="ca-field-label" for="{{ form.batch_number.id_for_label }}">
+                            <span><i class="fa fa-barcode"></i> Batch Number <span class="required-star">*</span></span>
+                        </label>
+                        {{ form.batch_number }}
+                        {% if form.batch_number.errors %}
+                            <div class="ca-field-error"><i class="fa fa-circle-exclamation"></i> {{ form.batch_number.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- QUANTITY RECEIVED & UNIT -->
+                    <div class="ca-field-wrap">
+                        <label class="ca-field-label" for="{{ form.quantity_received.id_for_label }}">
+                            <span><i class="fa fa-scale-unbalanced"></i> Quantity Received <span class="required-star">*</span></span>
+                        </label>
+                        <div style="display: flex; gap: 8px;">
+                            <div style="flex: 1;">
+                                {{ form.quantity_received }}
+                            </div>
+                            <div style="width: 85px;">
+                                {{ form.unit }}
+                            </div>
+                        </div>
+                        {% if form.quantity_received.errors %}
+                            <div class="ca-field-error"><i class="fa fa-circle-exclamation"></i> {{ form.quantity_received.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- PACKAGE COUNT -->
+                    <div class="ca-field-wrap">
+                        <label class="ca-field-label" for="{{ form.package_count.id_for_label }}">
+                            <span><i class="fa fa-cubes-stacked"></i> Package Count</span>
+                        </label>
+                        {{ form.package_count }}
+                        {% if form.package_count.errors %}
+                            <div class="ca-field-error"><i class="fa fa-circle-exclamation"></i> {{ form.package_count.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- REMARKS -->
+                    <div class="ca-field-wrap ca-col-full">
+                        <label class="ca-field-label" for="{{ form.remarks.id_for_label }}">
+                            <span><i class="fa fa-comment-dots"></i> Intake Remarks & Physical Inspection</span>
+                            <span class="ca-field-label__badge">Vehicle Reg, Seal Integrity, Packaging Condition</span>
+                        </label>
+                        {{ form.remarks }}
+                        {% if form.remarks.errors %}
+                            <div class="ca-field-error"><i class="fa fa-circle-exclamation"></i> {{ form.remarks.errors.0 }}</div>
+                        {% endif %}
                     </div>
 
                 </div>
 
             </div>
 
-        {% endif %}
+            <!-- 3. FOOTER ACTIONS -->
+            <div class="ca-modal-footer">
+                <a href="{% url 'ca:batch-list' %}" class="ca-btn-ghost">
+                    <i class="fa fa-xmark"></i> Cancel
+                </a>
+                <button type="submit" class="ca-btn-futuristic">
+                    <i class="fa fa-check-double"></i>
+                    {% if object %}Save Batch Changes{% else %}Confirm Batch Intake{% endif %}
+                </button>
+            </div>
 
-        <div class="page-actions">
+        </form>
 
-            <a
-                href="{% url 'ca:batch-list' %}"
-                class="btn btn-secondary"
-            >
-                Cancel
-            </a>
-
-            <button
-                type="submit"
-                class="btn btn-primary"
-            >
-                {% if object %}
-                    Update Batch
-                {% else %}
-                    Register Batch
-                {% endif %}
-            </button>
-
-        </div>
-
-    </form>
+    </div>
 
 </div>
 
+<script>
+function caQuickDate(mode) {
+    const input = document.getElementById("id_delivery_date");
+    if (!input) return;
+    const now = new Date();
+    if (mode === "yesterday") now.setDate(now.getDate() - 1);
+    const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+    input.value = localDate.toISOString().split("T")[0];
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    const form = document.getElementById("ca-batch-standalone-form");
+    if (!form) return;
+
+    const plantSelect = form.querySelector('[name="treatment_plant"]');
+    const locationSelect = form.querySelector('[name="location"]');
+    const locationHint = form.querySelector("#ca-batch-location-hint");
+    if (!plantSelect || !locationSelect) return;
+
+    function filterLocationsForPlant() {
+        const plantId = plantSelect.value || "";
+        let visibleCount = 0;
+
+        Array.from(locationSelect.options).forEach(function(option) {
+            if (!option.value) return;
+            option.hidden = !plantId || option.dataset.plantId !== plantId;
+            if (!option.hidden) visibleCount += 1;
+        });
+
+        const selected = locationSelect.selectedOptions[0];
+        if (selected && selected.value && selected.hidden) locationSelect.value = "";
+        if (locationHint) {
+            locationHint.hidden = Boolean(plantId && visibleCount > 0);
+            locationHint.textContent = !plantId
+                ? "Select a treatment plant to see its configured chemical storage locations."
+                : "No chemical storage locations are configured for the selected treatment plant.";
+        }
+    }
+
+    plantSelect.addEventListener("change", filterLocationsForPlant);
+    filterLocationsForPlant();
+});
+</script>
 {% endblock %}

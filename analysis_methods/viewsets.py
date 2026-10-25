@@ -1,4 +1,5 @@
 from rest_framework import viewsets, status, filters
+from core.permissions import ViewModelPermissions
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -9,7 +10,7 @@ from .models import (
     ChemicalAnalysisMethod,
     MicrobialMethod,
     WWAnalysisMethod,
-    CWAnalysisMethod
+    CWAnalysisMethod,
 )
 from .serializers import (
     ChemicalAnalysisMethodSerializer,
@@ -24,11 +25,14 @@ from .serializers import (
 class ChemicalAnalysisMethodViewSet(viewsets.ModelViewSet):
     queryset = ChemicalAnalysisMethod.objects.all()
     serializer_class = ChemicalAnalysisMethodSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['is_active', 'category', 'tags', 'unit', 'version']
-    search_fields = ['method', 'kebs_reference', 'tags', 'description']
-    ordering_fields = ['created_at', 'updated_at', 'method']
+    filterset_fields = [
+        'is_active', 'category', 'tags', 'unit', 'version',
+        'rounding_mode', 'rounding_precision',
+    ]
+    search_fields = ['method', 'kebs_reference', 'tags', 'description', 'formula']
+    ordering_fields = ['created_at', 'updated_at', 'method', 'version', 'category', 'unit']
     ordering = ['-created_at']
 
     def get_serializer(self, *args, **kwargs):
@@ -41,19 +45,22 @@ class ChemicalAnalysisMethodViewSet(viewsets.ModelViewSet):
         return self.serializer_class(*args, **kwargs, context=self.get_serializer_context())
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        serializer.save(created_by=self.request.user, updated_by=self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save(updated_by=self.request.user)
 
 # -------------------------
-# MicrobialMethod ViewSet (New)
+# MicrobialMethod ViewSet
 # -------------------------
 class MicrobialMethodViewSet(viewsets.ModelViewSet):
     queryset = MicrobialMethod.objects.all()
     serializer_class = MicrobialMethodSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['is_active', 'status', 'version']
     search_fields = ['name', 'kebs_reference', 'confirmatory_tests', 'description']
-    ordering_fields = ['created_at', 'updated_at', 'name']
+    ordering_fields = ['created_at', 'updated_at', 'name', 'version', 'status']
     ordering = ['-created_at']
 
     def get_serializer(self, *args, **kwargs):
@@ -66,7 +73,10 @@ class MicrobialMethodViewSet(viewsets.ModelViewSet):
         return self.serializer_class(*args, **kwargs, context=self.get_serializer_context())
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        serializer.save(created_by=self.request.user, updated_by=self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save(updated_by=self.request.user)
 
     @action(detail=True, methods=['post'], url_path='increment-version')
     @transaction.atomic
@@ -86,11 +96,18 @@ class MicrobialMethodViewSet(viewsets.ModelViewSet):
 class WWAnalysisMethodViewSet(viewsets.ModelViewSet):
     queryset = WWAnalysisMethod.objects.all()
     serializer_class = WWAnalysisMethodSerializer
-    permission_classes = [IsAuthenticated]
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    permission_classes = [ViewModelPermissions]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['is_active', 'version']
     search_fields = ['name', 'reference']
-    ordering_fields = ['name']
-    ordering = ['name']
+    ordering_fields = ['created_at', 'updated_at', 'name', 'version']
+    ordering = ['-created_at']
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user, updated_by=self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save(updated_by=self.request.user)
 
 # -------------------------
 # CWAnalysisMethod ViewSet
@@ -98,8 +115,15 @@ class WWAnalysisMethodViewSet(viewsets.ModelViewSet):
 class CWAnalysisMethodViewSet(viewsets.ModelViewSet):
     queryset = CWAnalysisMethod.objects.all()
     serializer_class = CWAnalysisMethodSerializer
-    permission_classes = [IsAuthenticated]
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    permission_classes = [ViewModelPermissions]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['is_active', 'version']
     search_fields = ['name', 'reference']
-    ordering_fields = ['name']
-    ordering = ['name']
+    ordering_fields = ['created_at', 'updated_at', 'name', 'version']
+    ordering = ['-created_at']
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user, updated_by=self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save(updated_by=self.request.user)

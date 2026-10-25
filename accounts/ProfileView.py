@@ -1,5 +1,8 @@
 # accounts/ProfileView.py
 
+import csv
+import io
+import json
 import django
 from django.conf import settings
 from django.contrib import messages
@@ -67,14 +70,29 @@ class ProfileView(
 ):
     template_name = "accounts/dashboard.html"
 
+    def get_template_names(self):
+        if not self.request.user.is_superuser:
+            return ["accounts/profile/self_profile.html"]
+        return [self.template_name]
+
+    def get(self, request, *args, **kwargs):
+        export_fmt = request.GET.get("export", "").lower()
+        if export_fmt in {"csv", "xlsx", "excel", "json", "docx", "word", "pdf"}:
+            if not request.user.is_superuser and not request.user.is_staff:
+                from django.core.exceptions import PermissionDenied
+                raise PermissionDenied("Only authorized staff or administrators may export user registry data.")
+            return self.export_users(request, export_fmt)
+        return super().get(request, *args, **kwargs)
+
     def get_users_queryset(self):
         qs = (
             CustomUser.objects
-            .select_related("section")
+            .select_related("section", "assigned_treatment_plant", "assigned_lab")
             .prefetch_related(
                 "groups",
                 "user_permissions",
             )
+            .order_by("-date_joined", "-pk")
         )
 
         q = self.request.GET.get("search")
@@ -85,6 +103,8 @@ class ProfileView(
                 | Q(email__icontains=q)
                 | Q(first_name__icontains=q)
                 | Q(last_name__icontains=q)
+                | Q(mobile_number__icontains=q)
+                | Q(section__name__icontains=q)
             )
 
         status = self.request.GET.get("status")
@@ -104,7 +124,193 @@ class ProfileView(
 
         return qs
 
+    def export_users(self, request, fmt: str):
+        users = self.get_users_queryset()
+        headers = [
+            "PF Number / Username",
+            "Full Name",
+            "Email Address",
+            "Mobile Number",
+            "Section",
+            "Assigned Plant",
+            "Assigned Laboratory",
+            "Account Status",
+            "Staff Member",
+            "Superuser",
+            "MFA Enforced",
+            "Email Verified",
+            "Failed Login Attempts",
+            "Date Joined",
+            "Last Login",
+        ]
+
+        records = []
+        for u in users:
+            records.append([
+                u.username,
+                u.get_full_name() or "—",
+                u.email or "—",
+                u.mobile_number or "—",
+                u.section.name if u.section else "Unassigned",
+                u.assigned_treatment_plant.name if u.assigned_treatment_plant else "Global / All Plants",
+                u.assigned_lab.name if u.assigned_lab else "—",
+                "Locked" if u.is_locked else ("Active" if u.is_active else "Inactive"),
+                "Yes" if u.is_staff else "No",
+                "Yes" if u.is_superuser else "No",
+                "Enabled" if u.mfa_enabled else "Disabled",
+                "Verified" if u.email_verified else "Pending",
+                u.failed_login_attempts,
+                u.date_joined.strftime("%Y-%m-%d %H:%M") if u.date_joined else "—",
+                u.last_login.strftime("%Y-%m-%d %H:%M") if u.last_login else "Never",
+            ])
+
+        timestamp = timezone.now().strftime("%Y%m%d_%H%M%S")
+
+        if fmt == "csv":
+            output = io.StringIO(newline="")
+            writer = csv.writer(output)
+            writer.writerow(headers)
+            writer.writerows(records)
+            response = HttpResponse("\ufeff" + output.getvalue(), content_type="text/csv; charset=utf-8")
+            response["Content-Disposition"] = f'attachment; filename="qad_user_registry_{timestamp}.csv"'
+            return response
+
+        if fmt in {"xlsx", "excel"}:
+            from openpyxl import Workbook
+            from openpyxl.styles import Alignment, Font, PatternFill
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Users Directory"
+            ws.append(headers)
+            for cell in ws[1]:
+                cell.fill = PatternFill("solid", fgColor="0B192C")
+                cell.font = Font(color="FFFFFF", bold=True)
+                cell.alignment = Alignment(vertical="center")
+            for row in records:
+                ws.append(row)
+            ws.freeze_panes = "A2"
+            ws.auto_filter.ref = ws.dimensions
+            for col in ws.columns:
+                max_len = max(len(str(c.value or "")) for c in col)
+                col_letter = col[0].column_letter
+                ws.column_dimensions[col_letter].width = min(36, max(12, max_len + 3))
+            output = io.BytesIO()
+            wb.save(output)
+            response = HttpResponse(
+                output.getvalue(),
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+            response["Content-Disposition"] = f'attachment; filename="qad_user_registry_{timestamp}.xlsx"'
+            return response
+
+        if fmt == "json":
+            data = [dict(zip(headers, r)) for r in records]
+            response = HttpResponse(json.dumps(data, indent=2, default=str), content_type="application/json")
+            response["Content-Disposition"] = f'attachment; filename="qad_user_registry_{timestamp}.json"'
+            return response
+
+        if fmt in {"doc", "docx", "word"}:
+            from docx import Document
+            from docx.enum.section import WD_ORIENT
+            doc = Document()
+            sec = doc.sections[0]
+            sec.orientation = WD_ORIENT.LANDSCAPE
+            sec.page_width, sec.page_height = sec.page_height, sec.page_width
+            doc.add_heading("NCWSCwaterLAB — Enterprise User Registry", 0)
+            doc.add_paragraph(f"Report Generated: {timezone.localtime():%Y-%m-%d %H:%M} | Total Users: {len(records)}")
+            tbl = doc.add_table(rows=1, cols=len(headers))
+            tbl.style = "Light Shading Accent 1"
+            for c, h in zip(tbl.rows[0].cells, headers):
+                c.text = h
+            for r in records:
+                row_cells = tbl.add_row().cells
+                for c, v in zip(row_cells, r):
+                    c.text = str(v or "—")
+            output = io.BytesIO()
+            doc.save(output)
+            response = HttpResponse(
+                output.getvalue(),
+                content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
+            response["Content-Disposition"] = f'attachment; filename="qad_user_registry_{timestamp}.docx"'
+            return response
+
+        if fmt == "pdf":
+            from reportlab.lib import colors
+            from reportlab.lib.pagesizes import landscape, letter
+            from reportlab.lib.styles import getSampleStyleSheet
+            from reportlab.lib.units import inch
+            from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+            from xml.sax.saxutils import escape
+
+            output = io.BytesIO()
+            doc = SimpleDocTemplate(
+                output,
+                pagesize=landscape(letter),
+                leftMargin=0.3 * inch,
+                rightMargin=0.3 * inch,
+                topMargin=0.3 * inch,
+                bottomMargin=0.3 * inch
+            )
+            styles = getSampleStyleSheet()
+            pdf_cols = ["Username", "Full Name", "Email", "Section", "Plant", "Role", "MFA", "Status", "Last Login"]
+            pdf_data = [[Paragraph(f"<b>{escape(c)}</b>", styles["BodyText"]) for c in pdf_cols]]
+            for u in users:
+                role = "Superuser" if u.is_superuser else ("Staff" if u.is_staff else "User")
+                status = "Locked" if u.is_locked else ("Active" if u.is_active else "Inactive")
+                pdf_data.append([
+                    Paragraph(escape(u.username), styles["BodyText"]),
+                    Paragraph(escape(u.get_full_name() or "—"), styles["BodyText"]),
+                    Paragraph(escape(u.email or "—"), styles["BodyText"]),
+                    Paragraph(escape(u.section.name if u.section else "—"), styles["BodyText"]),
+                    Paragraph(escape(u.assigned_treatment_plant.name if u.assigned_treatment_plant else "Global"), styles["BodyText"]),
+                    Paragraph(escape(role), styles["BodyText"]),
+                    Paragraph(escape("Yes" if u.mfa_enabled else "No"), styles["BodyText"]),
+                    Paragraph(escape(status), styles["BodyText"]),
+                    Paragraph(escape(u.last_login.strftime("%d %b %Y %H:%M") if u.last_login else "Never"), styles["BodyText"]),
+                ])
+
+            avail_w = landscape(letter)[0] - 0.6 * inch
+            t = Table(pdf_data, colWidths=[avail_w / len(pdf_cols)] * len(pdf_cols), repeatRows=1, hAlign="LEFT")
+            t.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0B192C")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#CBD5E1")),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("FONTSIZE", (0, 0), (-1, -1), 7),
+                ("LEFTPADDING", (0, 0), (-1, -1), 3),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+            ]))
+
+            doc.build([
+                Paragraph("NCWSCwaterLAB — User Management Directory", styles["Title"]),
+                Paragraph(f"Generated: {timezone.localtime():%Y-%m-%d %H:%M} · Total Users: {len(records)}", styles["Normal"]),
+                Spacer(1, 8),
+                t
+            ])
+            response = HttpResponse(output.getvalue(), content_type="application/pdf")
+            response["Content-Disposition"] = f'attachment; filename="qad_user_registry_{timestamp}.pdf"'
+            return response
+
+        return HttpResponse("Unsupported export format.", status=400, content_type="text/plain")
+
     def get_context_data(self, **kwargs):
+        if not self.request.user.is_superuser:
+            user = self.request.user
+            return {
+                "user_obj": user,
+                "fields": {
+                    "Username": user.username,
+                    "Email": user.email,
+                    "Name": user.get_full_name(),
+                    "Mobile Number": user.mobile_number,
+                    "Section": user.section,
+                    "Treatment Plant": user.assigned_treatment_plant,
+                    "Laboratory": user.assigned_lab,
+                },
+            }
+
         context = super().get_context_data(**kwargs)
 
         user = self.request.user

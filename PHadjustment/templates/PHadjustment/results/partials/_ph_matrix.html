@@ -1,0 +1,163 @@
+{% load custom_filters %}
+
+<div class="ph-matrix-container">
+    <div class="ph-matrix-header">
+        <div class="d-flex align-items-center gap-2">
+            <i class="fa-solid fa-vial-virus text-emerald"></i>
+            <h5 class="m-0 fw-bold">6-Jar pH Neutralization Matrix</h5>
+            <span class="text-muted small">(Target: pH 7.00 ± 0.20 Neutral Zone)</span>
+        </div>
+
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <!-- Re-seed Ladder — base_dosage → PHAdjustmentJarResult.dosage_ml -->
+            <label class="small text-muted mb-0 d-flex align-items-center gap-1" title="Center dosage (mL)">
+                <span>Base</span>
+                <input type="number" step="0.1" min="0.5" name="base_dosage"
+                       value="{% if ph_test.source_jar %}{{ ph_test.source_jar.dosage_mg_per_l }}{% else %}18.00{% endif %}"
+                       class="ph-input" style="width:3.5rem;height:1.55rem;padding:0.1rem 0.25rem;font-size:0.7rem;">
+            </label>
+            <button type="submit" name="action" value="init_ladder" class="ph-btn-secondary" title="Re-generate stepped titration ladder around base dose">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                <span>Re-seed Ladder</span>
+            </button>
+
+            <!-- Save Bench Observations -->
+            <button type="submit" name="action" value="save_jars" class="ph-btn-primary" id="save-ph-btn">
+                <i class="fa-solid fa-floppy-disk"></i>
+                <span>Save &amp; Rank Titration</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 6-Jar Grid Cards -->
+    <div class="ph-matrix-grid">
+        {% for jar in jars %}
+        <div class="ph-jar-card {% if jar.is_optimal %}is-optimal-card{% endif %}" id="ph-jar-card-{{ jar.jar_number }}">
+            
+            <!-- Card Header: Jar Number & Rank Badge -->
+            <div class="jar-card-top">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="jar-badge">JAR {{ jar.jar_number }}</span>
+                    {% if jar.is_optimal %}
+                    <span class="optimal-tag">
+                        <i class="fa-solid fa-crown"></i> OPTIMAL #1
+                    </span>
+                    {% else %}
+                    <span class="rank-tag">Rank #{{ jar.rank }}</span>
+                    {% endif %}
+                </div>
+
+                <!-- Status Pill -->
+                <span class="ph-status-badge status-{{ jar.status_class }}" id="ph-badge-{{ jar.jar_number }}">
+                    {{ jar.ph_status }}
+                </span>
+            </div>
+
+            <!-- Beaker Visual with dynamic universal indicator fluid color -->
+            <div class="jar-beaker-visual">
+                <div class="beaker-container">
+                    <div class="beaker-glass">
+                        <div class="beaker-liquid" id="beaker-liquid-{{ jar.jar_number }}"
+                             style="height: 65%; background: {{ jar.ph_color }};">
+                            <div class="beaker-bubble b1"></div>
+                            <div class="beaker-bubble b2"></div>
+                            <div class="beaker-bubble b3"></div>
+                        </div>
+                        <div class="beaker-graduations">
+                            <span>1000 mL</span>
+                            <span>750 mL</span>
+                            <span>500 mL</span>
+                            <span>250 mL</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="beaker-stats">
+                    <div class="stat-row">
+                        <span class="stat-name">Resulting pH:</span>
+                        <span class="stat-num fw-bold font-mono" id="ph-stat-num-{{ jar.jar_number }}" style="color: {{ jar.ph_color }};">
+                            pH {{ jar.resulting_ph }}
+                        </span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-name">ΔpH from 7.00:</span>
+                        <span class="stat-num font-mono {% if jar.is_optimal %}text-emerald fw-bold{% else %}text-muted{% endif %}" id="ph-delta-num-{{ jar.jar_number }}">
+                            {% if jar.delta_ph > 0 %}+{% endif %}{{ jar.delta_ph }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inputs Bench Form -->
+            <div class="jar-inputs-wrapper">
+                <!-- Applied Conditioning Dose Input -->
+                <div class="input-group-custom">
+                    <label class="input-lbl">
+                        <span>Dosage</span>
+                        <span class="unit">(mL)</span>
+                    </label>
+                    <div class="stepper-wrapper">
+                        <button type="button" class="btn-step" onclick="stepPhDose({{ jar.jar_number }}, -0.5)">-</button>
+                        <input type="number"
+                               step="0.01"
+                               min="0"
+                               name="jar_{{ jar.jar_number }}_dosage"
+                               id="input-ph-dose-{{ jar.jar_number }}"
+                               value="{{ jar.dosage_ml }}"
+                               class="ph-input dose-field"
+                               oninput="recalcPhJar({{ jar.jar_number }});">
+                        <button type="button" class="btn-step" onclick="stepPhDose({{ jar.jar_number }}, 0.5)">+</button>
+                    </div>
+                </div>
+
+                <!-- Measured Resulting pH Input -->
+                <div class="input-group-custom">
+                    <label class="input-lbl">
+                        <span>Measured pH</span>
+                        <span class="unit">(0.00 - 14.00)</span>
+                    </label>
+                    <div class="stepper-wrapper">
+                        <button type="button" class="btn-step" onclick="stepResultingPh({{ jar.jar_number }}, -0.10)">-</button>
+                        <input type="number"
+                               step="0.01"
+                               min="0"
+                               max="14"
+                               name="jar_{{ jar.jar_number }}_resulting_ph"
+                               id="input-resulting-ph-{{ jar.jar_number }}"
+                               value="{{ jar.resulting_ph }}"
+                               class="ph-input ph-field {% if jar.is_optimal %}ph-optimal-highlight{% endif %}"
+                               oninput="recalcPhJar({{ jar.jar_number }});">
+                        <button type="button" class="btn-step" onclick="stepResultingPh({{ jar.jar_number }}, 0.10)">+</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- pH Target Neutrality Spectrum Gauge -->
+            <div class="jar-target-gauge">
+                <div class="d-flex justify-content-between small text-muted mb-1">
+                    <span>Neutrality Scale</span>
+                    <span class="font-mono small" id="spectrum-lbl-{{ jar.jar_number }}">pH {{ jar.resulting_ph }}</span>
+                </div>
+                <div class="ph-spectrum-bar">
+                    <div class="ph-spectrum-pointer" id="spectrum-pointer-{{ jar.jar_number }}"
+                         style="left: calc(({{ jar.resulting_ph }} / 14) * 100%);"></div>
+                </div>
+            </div>
+
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Analytical Bench Remarks Footer -->
+    <div class="ph-remarks-card">
+        <label for="ph-remarks" class="small fw-semibold text-muted mb-1 d-flex align-items-center gap-1">
+            <i class="fa-solid fa-comment-dots text-emerald"></i>
+            <span>pH Conditioning &amp; Alkalinity Stabilization Notes</span>
+        </label>
+        <textarea id="ph-remarks"
+                  name="remarks"
+                  rows="2"
+                  class="ph-textarea"
+                  placeholder="Record lime/soda ash reagent grade, solution concentration, temperature conditions, or buffering response...">{{ ph_test.remarks }}</textarea>
+    </div>
+</div>

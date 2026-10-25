@@ -5,12 +5,8 @@ import logging
 from dataclasses import dataclass
 from typing import Dict, List, Set, Tuple, Type
 
-from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
-
 from django.db import transaction
 from django.db.models import QuerySet
-from django.utils import timezone
 
 from qc.models import (
     SamplingSchedule,
@@ -72,6 +68,7 @@ class AnalysisResultGenerator:
         analysis: WaterAnalysis,
         *,
         force: bool = False,
+        emit_change: bool = True,
     ) -> GenerationResult:
 
         water_type = analysis.water_type
@@ -153,11 +150,16 @@ class AnalysisResultGenerator:
                     },
                 )
 
-                transaction.on_commit(
-                    lambda: cls._broadcast_results_created(
-                        analysis
+                if created and emit_change:
+                    from qc.services.realtime_outbox import enqueue_qc_results_changed
+
+                    enqueue_qc_results_changed(
+                        analysis_id=analysis.pk,
+                        plant_id=analysis.treatment_plant_id,
+                        water_type=water_type,
+                        action="results_generated",
+                        changed_model="wateranalysis",
                     )
-                )
 
                 logger.info(
                     "Generated results analysis=%s created=%s existing=%s",
@@ -262,38 +264,6 @@ class AnalysisResultGenerator:
                 )
 
         return rows
-
-    @staticmethod
-    def _broadcast_results_created(
-            analysis: WaterAnalysis,
-    ):
-
-        try:
-
-            channel_layer = get_channel_layer()
-
-            if channel_layer is None:
-                return
-
-            async_to_sync(
-                channel_layer.group_send
-            )(
-                f"qc-plant-{analysis.treatment_plant_id}",
-                {
-                    "type": "qc.results.updated",
-                    "analysis_id": analysis.pk,
-                    "plant_id": analysis.treatment_plant_id,
-                    "water_type": analysis.water_type,
-                    "timestamp": timezone.now().isoformat(),
-                },
-            )
-
-        except Exception:
-
-            logger.exception(
-                "Failed websocket notification for analysis=%s",
-                analysis.pk,
-            )
 
     @classmethod
     def generate_for_queryset(

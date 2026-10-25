@@ -1,0 +1,39 @@
+{% extends "admin/base.html" %}
+{% load static %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'core/css/theme.css' %}?v=20261020-enterprise-theme">
+  <link rel="stylesheet" href="{% static 'core/css/admin-console.css' %}?v=20261020-enterprise-theme">
+{% endblock %}
+
+{% block extrahead %}
+  {{ block.super }}
+  {% if company.logo %}
+    <link rel="icon" href="{{ company.logo.url }}">
+  {% elif company.favicon %}
+    <link rel="icon" href="{{ company.favicon.url }}">
+  {% else %}
+    <link rel="icon" href="{% static 'image/logo.ico' %}" type="image/x-icon">
+  {% endif %}
+  <script src="{% static 'core/js/theme.js' %}?v=20261020-enterprise-theme"></script>
+  <script src="{% static 'core/js/plant_section_user_cascade.js' %}?v=20261024-cascade"></script>
+  <script>document.documentElement.classList.remove('fullscreen-app');</script>
+{% endblock %}
+
+{% block branding %}
+  <div id="site-name" class="qad-admin-branding">
+    <a class="qad-admin-brand" href="{% url 'admin:index' %}" aria-label="{{ company.name|default:'NCWSC' }} administration home">
+      {% if company.logo %}
+        <img class="qad-admin-brand__logo" src="{{ company.logo.url }}" alt="{{ company.name|default:'NCWSC' }} logo">
+      {% else %}
+        <img class="qad-admin-brand__logo" src="{% static 'image/apple-touch-icon.png' %}" alt="">
+      {% endif %}
+      <span class="qad-admin-brand__copy">
+        <strong>{{ company.name|default:"Nairobi City Water & Sewerage Company" }}</strong>
+        <small>Water Quality Management</small>
+      </span>
+    </a>
+    <button class="qad-theme-button" type="button" data-theme-toggle aria-label="Change display theme" title="Change display theme"><span aria-hidden="true">◐</span></button>
+  </div>
+{% endblock %}

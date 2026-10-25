@@ -1,0 +1,210 @@
+{% load custom_filters %}
+
+<div class="jt-matrix-container">
+    <div class="jt-matrix-header">
+        <div class="d-flex align-items-center gap-2">
+            <i class="fa-solid fa-flask-vial text-emerald"></i>
+            <h5 class="m-0 fw-bold">6-Jar Coagulation &amp; Flocculation Matrix</h5>
+            <span class="text-muted small">(Rapid Mix 120 RPM &bull; Slow Mix 30 RPM &bull; 30m Settling Standard)</span>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <!-- Seed Ladder Preset -->
+            <button type="submit" name="action" value="seed_ladder" class="jt-btn-secondary" title="Apply Standard 10 - 35 mg/L dosage ladder">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                <span>Seed Ladder (10 - 35 mg/L)</span>
+            </button>
+
+            <!-- Save Bench Observations -->
+            <button type="submit" name="action" value="save_jars" class="jt-btn-primary" id="save-jartest-btn">
+                <i class="fa-solid fa-floppy-disk"></i>
+                <span>Save &amp; Rank Breakpoint</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 6-Jar Grid Cards: STRICTLY ALIGNED ON THE SAME ROW -->
+    <div class="jt-matrix-grid">
+        {% for jar in jars %}
+        <div class="jt-jar-card {% if jar.is_optimal %}is-optimal-card{% endif %}" id="jar-card-{{ jar.jar_number }}">
+            
+            <!-- Card Header: Jar Number & Rank Badge -->
+            <div class="jar-card-top">
+                <div class="d-flex align-items-center gap-1">
+                    <span class="jar-badge">JAR {{ jar.jar_number }}</span>
+                    {% if jar.is_optimal %}
+                    <span class="optimal-tag">
+                        <i class="fa-solid fa-crown"></i> OPTIMAL #1
+                    </span>
+                    {% else %}
+                    <span class="rank-tag">Rank #{{ jar.rank|default:jar.jar_number }}</span>
+                    {% endif %}
+                </div>
+
+                <!-- Status Pill -->
+                <span class="jt-status-badge status-{{ jar.status_class }}">
+                    {{ jar.status_label }}
+                </span>
+            </div>
+
+            <!-- Beaker Visual with dynamic fluid & animated flocs -->
+            <div class="jar-beaker-visual">
+                <div class="beaker-container">
+                    <div class="beaker-glass">
+                        <div class="beaker-liquid" style="height: 65%;">
+                            <div class="beaker-floc f1"></div>
+                            <div class="beaker-floc f2"></div>
+                            <div class="beaker-floc f3"></div>
+                        </div>
+                        <div class="beaker-graduations">
+                            <span>1000 mL</span>
+                            <span>750 mL</span>
+                            <span>500 mL</span>
+                            <span>250 mL</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="beaker-stats">
+                    <div class="stat-row">
+                        <span class="stat-name">Turb Removal:</span>
+                        <span class="stat-num text-cyan fw-bold jt-turbidity-removal-val" id="turb-rem-{{ jar.jar_number }}">
+                            {% if jar.turbidity_removal is not None %}{{ jar.turbidity_removal|floatformat:1 }}%{% else %}0.0%{% endif %}
+                        </span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-name">Color Removal:</span>
+                        <span class="stat-num text-warning fw-bold jt-color-removal-val" id="color-rem-{{ jar.jar_number }}">
+                            {% if jar.color_removal is not None %}{{ jar.color_removal|floatformat:1 }}%{% else %}0.0%{% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Applied Dosage Stepper Shelf -->
+            <div class="input-group-custom">
+                <label class="input-lbl">
+                    <span>Coagulant Dose</span>
+                    <span class="unit">(mg/L)</span>
+                </label>
+                <div class="stepper-wrapper">
+                    <button type="button" class="btn-step" onclick="stepCoagulantDose({{ jar.jar_number }}, -2.5)">-</button>
+                    <input type="number"
+                           step="0.01"
+                           min="0"
+                           name="jar_{{ jar.jar_number }}_dosage"
+                           id="input-dose-{{ jar.jar_number }}"
+                           value="{{ jar.dosage|stringformat:'.2f' }}"
+                           class="jt-input dose-field jt-dosage-input"
+                           aria-label="Dosage for Jar {{ jar.jar_number }}"
+                           oninput="triggerRecalculation();">
+                    <button type="button" class="btn-step" onclick="stepCoagulantDose({{ jar.jar_number }}, 2.5)">+</button>
+                </div>
+            </div>
+
+            <!-- Floc Observation Stopwatch Shelf -->
+            <div class="input-group-custom">
+                <label class="input-lbl">
+                    <span>Floc Formation Time</span>
+                    <i class="fa-regular fa-stopwatch text-cyan"></i>
+                </label>
+                <div class="timer-wrapper">
+                    <input type="text"
+                           name="jar_{{ jar.jar_number }}_floc_time"
+                           id="timer-display-{{ jar.jar_number }}"
+                           value="{{ jar.floc_time_str|default:'00:00' }}"
+                           class="jt-timer-display"
+                           placeholder="MM:SS"
+                           title="Observation time until visible flocs appear">
+                    <input type="hidden"
+                           id="timer-seconds-{{ jar.jar_number }}"
+                           class="jt-floc-seconds-input"
+                           value="{{ jar.floc_seconds|default:0 }}">
+
+                    <div class="timer-controls">
+                        <button type="button"
+                                class="btn-timer-toggle"
+                                id="btn-timer-toggle-{{ jar.jar_number }}"
+                                onclick="toggleFlocTimer({{ jar.jar_number }});"
+                                title="Start / Pause Stopwatch">
+                            <i class="fa-solid fa-play"></i>
+                        </button>
+                        <button type="button"
+                                class="btn-timer-reset"
+                                onclick="resetFlocTimer({{ jar.jar_number }});"
+                                title="Reset Stopwatch">
+                            <i class="fa-solid fa-rotate-left"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Parameter Measurements Shelf (Turbidity, Color, pH...) -->
+            <div class="jar-params-shelf">
+                {% for lim in limits %}
+                    {% with m=jar.measurements|get_item:lim.pk %}
+                    {% with pname=lim.parameter.name|lower %}
+                    <div class="param-row">
+                        <div class="param-head">
+                            <span class="param-name">{{ lim.parameter.name }}</span>
+                            <span class="param-spec">
+                                {% if lim.min_value and lim.max_value %}
+                                    [{{ lim.min_value }}-{{ lim.max_value }}]
+                                {% elif lim.max_value %}
+                                    [&le;{{ lim.max_value }}]
+                                {% endif %}
+                                {{ lim.parameter.unit }}
+                            </span>
+                        </div>
+
+                        <input type="number"
+                               step="0.001"
+                               min="0"
+                               name="jar_{{ jar.jar_number }}_param_{{ lim.pk }}"
+                               id="param-{{ jar.jar_number }}-{{ lim.pk }}"
+                               value="{% if m and m.value is not None %}{{ m.value }}{% endif %}"
+                               class="jt-input param-field jt-param-input {% if m and m.in_spec == False %}out-of-spec{% endif %}"
+                               {% if "turb" in pname %}data-param-type="turbidity"{% elif "color" in pname %}data-param-type="color"{% elif "ph" in pname %}data-param-type="ph"{% endif %}
+                               placeholder="0.00"
+                               oninput="recalcJarParams({{ jar.jar_number }});">
+
+                        <!-- Turbidity Removal Bar -->
+                        {% if "turb" in pname %}
+                        <div class="eff-bar-wrap" title="Turbidity Removal Progress">
+                            <div class="eff-bar-fill jt-turbidity-removal-bar"
+                                 id="turb-bar-{{ jar.jar_number }}"
+                                 style="width:{% if jar.turbidity_removal is not None %}{{ jar.turbidity_removal|floatformat:0 }}{% else %}0{% endif %}%;"></div>
+                        </div>
+                        {% endif %}
+
+                        <!-- Color Removal Bar -->
+                        {% if "color" in pname %}
+                        <div class="eff-bar-wrap" title="Color Removal Progress">
+                            <div class="eff-bar-fill eff-bar-amber jt-color-removal-bar"
+                                 id="color-bar-{{ jar.jar_number }}"
+                                 style="width:{% if jar.color_removal is not None %}{{ jar.color_removal|floatformat:0 }}{% else %}0{% endif %}%;"></div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endwith %}
+                    {% endwith %}
+                {% endfor %}
+            </div>
+
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- JarTest.remarks — model-synced -->
+    <div class="jt-remarks-card">
+        <label for="jt-remarks" class="small fw-semibold text-muted mb-1 d-flex align-items-center gap-1">
+            <i class="fa-solid fa-comment-dots text-emerald"></i>
+            <span>Jar Test Observations &amp; Coagulation Notes</span>
+        </label>
+        <textarea id="jt-remarks"
+                  name="remarks"
+                  rows="2"
+                  class="jt-textarea"
+                  placeholder="Record floc character, settling clarity, odor, temperature, or coagulant grade notes...">{{ jartest.remarks }}</textarea>
+    </div>
+</div>

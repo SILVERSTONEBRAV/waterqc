@@ -1,0 +1,94 @@
+<div class="ph-side-bench">
+    <!-- 1. pH Equilibrium & Reaction Timer -->
+    <div class="ph-card timer-card">
+        <div class="ph-card-header">
+            <div class="d-flex align-items-center gap-2">
+                <i class="fa-solid fa-stopwatch text-cyan"></i>
+                <h6 class="m-0 fw-bold">pH Equilibrium Period</h6>
+            </div>
+            <span class="badge bg-dark border border-secondary text-light font-mono" id="phTimerBadge">STANDBY</span>
+        </div>
+
+        <div class="timer-display-wrap">
+            <div class="timer-digits font-mono" id="phTimerDisplay">10:00</div>
+            <div class="timer-subtext text-muted small">Buffering equilibration &amp; electrode stabilization</div>
+        </div>
+
+        <!-- Timer Controls -->
+        <div class="timer-actions">
+            <button type="button" class="btn-timer-action btn-start" id="phTimerStartBtn" onclick="togglePhTimer();">
+                <i class="fa-solid fa-play"></i> Start
+            </button>
+            <button type="button" class="btn-timer-action btn-reset" onclick="resetPhTimer(10);">
+                <i class="fa-solid fa-rotate-left"></i> Reset
+            </button>
+        </div>
+
+        <!-- Quick Presets -->
+        <div class="timer-presets">
+            <button type="button" class="preset-btn" onclick="resetPhTimer(5);">5m Quick</button>
+            <button type="button" class="preset-btn active" onclick="resetPhTimer(10);">10m Standard</button>
+            <button type="button" class="preset-btn" onclick="resetPhTimer(15);">15m Slow Lime</button>
+        </div>
+    </div>
+
+    <!-- 2. Plant Chemical Conditioning Feed Scaler -->
+    <div class="ph-card calc-card">
+        <div class="ph-card-header">
+            <div class="d-flex align-items-center gap-2">
+                <i class="fa-solid fa-calculator text-emerald"></i>
+                <h6 class="m-0 fw-bold">Alkaline Feed Scaler</h6>
+            </div>
+            <span class="badge bg-emerald-subtle text-emerald small">Live Plant Feed</span>
+        </div>
+
+        <div class="calc-body">
+            <div class="calc-input-row">
+                <label class="calc-lbl">Reagent Type:</label>
+                <select id="reagentTypeSelect" class="ph-select-mini font-mono" onchange="calculatePhPlantFeed();">
+                    <option value="lime">Hydrated Lime Ca(OH)₂ (90%)</option>
+                    <option value="soda">Soda Ash Na₂CO₃ (99%)</option>
+                    <option value="caustic">Caustic Soda NaOH (50% Sol)</option>
+                    <option value="acid">Sulphuric Acid H₂SO₄ (98%)</option>
+                </select>
+            </div>
+
+            <div class="calc-input-row">
+                <label class="calc-lbl">Plant Flow Rate:</label>
+                <div class="input-with-unit">
+                    <input type="number" id="phPlantFlowInput" value="1000" min="1" step="50" class="ph-input font-mono" oninput="calculatePhPlantFeed();">
+                    <span class="unit-tag">m³/hr</span>
+                </div>
+            </div>
+
+            <div class="calc-input-row">
+                <label class="calc-lbl">Conditioning Dose:</label>
+                <div class="input-with-unit">
+                    <input type="number" id="phCalcDoseInput" value="{{ ph_test.established_dosage_ml|default:'18.00' }}" min="0.1" step="0.5" class="ph-input font-mono" oninput="calculatePhPlantFeed();">
+                    <span class="unit-tag">mL / L</span>
+                </div>
+            </div>
+
+            <hr class="calc-divider">
+
+            <!-- Real-world feed outputs -->
+            <div class="feed-outputs-grid">
+                <div class="feed-item">
+                    <span class="feed-title">Chemical Feed Rate</span>
+                    <span class="feed-val text-emerald font-mono" id="feedRateKgHr">18.0 kg/hr</span>
+                    <span class="feed-sub text-muted font-mono" id="feedRateKgDay">432 kg/day</span>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-title">Commercial Sacks</span>
+                    <span class="feed-val text-cyan font-mono" id="feedBagsDay">17.3 bags/day</span>
+                    <span class="feed-sub text-muted font-mono">(25 kg Sacks)</span>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-title">Dosing Pump Output</span>
+                    <span class="feed-val text-warning font-mono" id="feedPumpMlMin">300 mL/min</span>
+                    <span class="feed-sub text-muted font-mono">18.0 L/hr slurry</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

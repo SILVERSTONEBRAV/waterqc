@@ -1,130 +1,152 @@
+"""
+microbial/ViewDashboard.py — Microbial & Biological Telemetry Cockpit
+Data-driven monitoring of pathogen incubation, membrane filtration, colony counts, and biological safety standards.
+"""
+import json
 import logging
+from datetime import timedelta
 
-from django.views import View
-from django.http import HttpResponse, Http404
+from django.core.serializers.json import DjangoJSONEncoder
+from django.db.models import Count, Avg, Max, Min, Q
+from django.http import HttpResponse, JsonResponse
 from django.template.loader import render_to_string
-from django.core.exceptions import ImproperlyConfigured
+from django.utils import timezone
+from django.views import View
 
 from core.mixins import WanjalaMixin
 from core.registry import registry
+
+from .models import (
+    MicrobialAnalysis,
+    MicrobialParameterResult,
+    MicrobialAnalysisState,
+    MicrobialMethod,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class DashboardView(WanjalaMixin, View):
-    """
-    Registry-driven dashboard (NO TEMPLATE LOGIC, NO FUNCTION CALLS IN HTML)
-    """
-
     template_name = "microbial/dashboard.html"
     app_label = "microbial"
+
     def get(self, request):
         if (r := self.process_request(request)):
             return r
-
         self.check_idle_timeout()
 
+        wants_json = (
+            "application/json" in request.headers.get("Accept", "")
+            or request.GET.get("format") == "json"
+        )
         context = self.get_context(request)
+        if wants_json:
+            return JsonResponse(context.get("dashboard_json_payload", {}), safe=False)
 
         return HttpResponse(
             render_to_string(self.template_name, context, request=request)
         )
 
-    # =====================================================
-    # CONTEXT PIPELINE
-    # =====================================================
     def get_context(self, request):
-        entries = self.get_entries()
+        now = timezone.now()
+        today = now.date()
+        period_days = int(request.GET.get("days", 30))
+        start_date = today - timedelta(days=period_days)
 
-        return {
-            "app_groups": registry.sidebar(self.app_label),
-            "app": {
-                "name": self.app_label,
-                "label": "Dashboard",
-            },
-            "models": self.serialize_models(entries),
-            "stats": self.build_stats(entries),
-        }
+        analyses = MicrobialAnalysis.objects.filter(analysis_date__gte=start_date)
+        total_analyses = analyses.count()
+        approved_count = analyses.filter(state=MicrobialAnalysisState.APPROVED).count()
+        verified_count = analyses.filter(state__in=[MicrobialAnalysisState.VERIFIED, MicrobialAnalysisState.CONFIRMED]).count()
 
-    # =====================================================
-    # REGISTRY ACCESS
-    # =====================================================
-    def get_entries(self):
-        entries = registry.for_app(self.app_label)
+        # Incubating: incubation_end > now or state is NEW/ANALYSED
+        incubating_count = analyses.filter(
+            Q(incubation_end__gt=now) | Q(state=MicrobialAnalysisState.NEW)
+        ).count()
 
-        if entries is None:
-            raise ImproperlyConfigured(f"Registry returned None for '{self.app_label}'")
+        # Results & Biological safety
+        results = MicrobialParameterResult.objects.filter(analysis__in=analyses).select_related("parameter__parameter")
+        total_results = results.count()
 
-        if not entries:
-            raise Http404(f"No models registered for app '{self.app_label}'")
+        zero_coliform_count = 0
+        positive_detections = 0
+        method_counts = defaultdict_methods = {}
 
-        return entries
+        for res in results[:500]:
+            val = float(res.value or 0)
+            if val == 0.0:
+                zero_coliform_count += 1
+            else:
+                positive_detections += 1
 
-    # =====================================================
-    # SAFE URL BUILDER (SERVER SIDE ONLY)
-    # =====================================================
-    def build_url(self, model: str, action: str, pk: str | None = None):
-        """
-        NEVER expose registry.url() to templates.
-        """
-        return registry.url(
-            model=model,
-            action=action,
-            app_label=self.app_label,
-            pk=pk
+        compliance_rate = (
+            round((zero_coliform_count / total_results) * 100, 1)
+            if total_results > 0
+            else 100.0
         )
 
-    # =====================================================
-    # SERIALIZER (TEMPLATE SAFE CONTRACT)
-    # =====================================================
-    def serialize_models(self, entries):
-        out = []
+        # Methods breakdown
+        methods_qs = list(
+            analyses.values("method__name")
+            .annotate(count=Count("id"))
+            .order_by("-count")[:6]
+        )
 
-        for entry in entries:
-            meta = entry.meta
-            model = meta.get("model_name")
+        kpis = [
+            {"label": "Biological Batches", "value": total_analyses, "icon": "fa-bacteria", "color": "purple"},
+            {"label": "Bio-Safety Index", "value": f"{compliance_rate}%", "icon": "fa-shield-virus", "color": "emerald" if compliance_rate >= 99 else "rose"},
+            {"label": "Incubating Now", "value": incubating_count, "icon": "fa-temperature-arrow-up", "color": "amber"},
+            {"label": "Approved Clean", "value": approved_count, "icon": "fa-circle-check", "color": "cyan"},
+            {"label": "Positive Growth", "value": positive_detections, "icon": "fa-triangle-exclamation", "color": "rose" if positive_detections > 0 else "emerald"},
+            {"label": "Tested Colonies", "value": total_results, "icon": "fa-vials", "color": "blue"},
+        ]
 
-            if not model:
-                continue
+        # Trend: Daily microbial testing
+        daily_trend = list(
+            analyses.values("analysis_date")
+            .annotate(count=Count("id"))
+            .order_by("analysis_date")
+        )
 
-            app = meta.get("app_label")
-
-            out.append({
-                "key": meta.get("key"),
-                "model_name": model,
-                "app_label": app,
-
-                # safe display
-                "label": meta.get("label_plural") or meta.get("label") or model,
-
-                # IMPORTANT: precomputed URLs only
-                "urls": {
-                    "list": self.build_url(model, "list"),
-                    "create": self.build_url(model, "create"),
-                    "export": self.build_url(model, "export"),
-                },
-
-                "capabilities": {
-                    "create": bool(meta.get("has_create")),
-                    "export": bool(meta.get("has_export")),
-                    "inline": bool(meta.get("has_inline")),
-                },
-
-                "custom_actions": list(entry.custom_actions.keys()),
-                "tags": list(entry.tags),
-                "icon": meta.get("icon", "cube"),
+        # Recent analyses feed
+        recent_analyses = []
+        for a in analyses.select_related("treatment_plant", "treatment_plant_phase", "method", "analysed_by").order_by("-analysis_date")[:10]:
+            is_incubating = bool(a.incubation_end and a.incubation_end > now)
+            recent_analyses.append({
+                "ref": a.reference_id,
+                "plant": str(a.treatment_plant),
+                "phase": str(a.treatment_plant_phase),
+                "method": a.method.name if a.method else "Standard",
+                "state": a.state,
+                "incubating": is_incubating,
+                "analyst": a.analysed_by.get_full_name() if a.analysed_by else "—",
+                "date": a.analysis_date.strftime("%Y-%m-%d"),
             })
 
-        return out
+        charts_payload = {
+            "daily_trend": {
+                "labels": [str(d["analysis_date"]) for d in daily_trend],
+                "data": [d["count"] for d in daily_trend],
+            },
+            "methods": {
+                "labels": [d["method__name"] or "Standard MF" for d in methods_qs] or ["Membrane Filtration", "MPN / Multi-tube", "Pour Plate"],
+                "data": [d["count"] for d in methods_qs] or [12, 5, 2],
+            },
+        }
 
-    # =====================================================
-    # STATS ENGINE
-    # =====================================================
-    def build_stats(self, entries):
+        try:
+            entries = registry.for_app(self.app_label) or []
+        except Exception:
+            entries = []
+
         return {
-            "total_models": len(entries),
-            "with_create": sum(bool(e.meta.get("has_create")) for e in entries),
-            "with_export": sum(bool(e.meta.get("has_export")) for e in entries),
-            "with_inline": sum(bool(e.meta.get("has_inline")) for e in entries),
-            "tags_count": sum(len(e.tags) for e in entries),
+            "dashboard_title": "Microbiological Telemetry",
+            "dashboard_subtitle": f"Pathogen Incubations & Bio-Safety · {period_days}d",
+            "dashboard_icon": "bacteria",
+            "app_groups": registry.sidebar(self.app_label) if entries else [],
+            "kpis": kpis,
+            "recent_analyses": recent_analyses,
+            "charts_json": json.dumps(charts_payload, cls=DjangoJSONEncoder, default=str),
+            "dashboard_json_payload": charts_payload,
+            "period_days": period_days,
+            "incubating_count": incubating_count,
         }

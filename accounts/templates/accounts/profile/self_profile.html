@@ -1,0 +1,19 @@
+{% extends "accounts/base.html" %}
+{% block title %}My Profile{% endblock %}
+{% block content %}
+<section class="container py-4" aria-labelledby="profile-title">
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <h1 class="h3" id="profile-title">My Profile</h1>
+            <dl class="row mt-3">
+                {% for label, value in fields.items %}
+                <dt class="col-sm-4">{{ label }}</dt>
+                <dd class="col-sm-8">{{ value|default:"—" }}</dd>
+                {% endfor %}
+            </dl>
+            <a class="btn btn-primary" href="{% url 'accounts:profile_picture_update' %}">Change profile picture</a>
+            <a class="btn btn-outline-secondary" href="{% url 'accounts:change_password' %}">Change password</a>
+        </div>
+    </div>
+</section>
+{% endblock %}

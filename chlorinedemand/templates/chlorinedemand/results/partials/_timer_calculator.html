@@ -1,0 +1,84 @@
+<div class="cl-side-bench">
+    <!-- 1. 30-Minute Disinfection Contact Time Timer -->
+    <div class="cl-card timer-card">
+        <div class="cl-card-header">
+            <div class="d-flex align-items-center gap-2">
+                <i class="fa-solid fa-stopwatch text-cyan"></i>
+                <h6 class="m-0 fw-bold">Contact Time Incubation</h6>
+            </div>
+            <span class="badge bg-dark border border-secondary text-light font-mono" id="timer-phase-badge">STANDBY</span>
+        </div>
+
+        <div class="timer-display-wrap">
+            <div class="timer-digits font-mono" id="timerDisplay">30:00</div>
+            <div class="timer-subtext text-muted small">Standard 30-min bactericidal contact period</div>
+        </div>
+
+        <!-- Timer Controls -->
+        <div class="timer-actions">
+            <button type="button" class="btn-timer-action btn-start" id="timerStartBtn" onclick="toggleChlorineTimer();">
+                <i class="fa-solid fa-play"></i> Start
+            </button>
+            <button type="button" class="btn-timer-action btn-reset" onclick="resetChlorineTimer(30);">
+                <i class="fa-solid fa-rotate-left"></i> Reset
+            </button>
+        </div>
+
+        <!-- Quick Presets -->
+        <div class="timer-presets">
+            <button type="button" class="preset-btn" onclick="resetChlorineTimer(15);">15m Flash</button>
+            <button type="button" class="preset-btn active" onclick="resetChlorineTimer(30);">30m Standard</button>
+            <button type="button" class="preset-btn" onclick="resetChlorineTimer(45);">45m Peak</button>
+        </div>
+    </div>
+
+    <!-- 2. Plant Chemical Dosage Scaler Calculator -->
+    <div class="cl-card calc-card">
+        <div class="cl-card-header">
+            <div class="d-flex align-items-center gap-2">
+                <i class="fa-solid fa-calculator text-emerald"></i>
+                <h6 class="m-0 fw-bold">Plant Dosing Feed Scaler</h6>
+            </div>
+            <span class="badge bg-emerald-subtle text-emerald small">Real-time Feed</span>
+        </div>
+
+        <div class="calc-body">
+            <div class="calc-input-row">
+                <label class="calc-lbl">Plant Flow Rate:</label>
+                <div class="input-with-unit">
+                    <input type="number" id="plantFlowInput" value="1000" min="1" step="50" class="cl-input font-mono" oninput="calculatePlantFeed();">
+                    <span class="unit-tag">m³/hr</span>
+                </div>
+            </div>
+
+            <div class="calc-input-row">
+                <label class="calc-lbl">Active Dosage Dose:</label>
+                <div class="input-with-unit">
+                    <input type="number" id="calcDoseInput" value="{{ chlorine_test.established_dosage_mg_per_l|default:'2.00' }}" min="0.1" step="0.1" class="cl-input font-mono" oninput="calculatePlantFeed();">
+                    <span class="unit-tag">mg/L Cl₂</span>
+                </div>
+            </div>
+
+            <hr class="calc-divider">
+
+            <!-- Real-world feed outputs -->
+            <div class="feed-outputs-grid">
+                <div class="feed-item">
+                    <span class="feed-title">Chlorine Gas (100% Cl₂)</span>
+                    <span class="feed-val text-emerald font-mono" id="feedGasKgHr">2.00 kg/hr</span>
+                    <span class="feed-sub text-muted font-mono" id="feedGasKgDay">48.0 kg/day</span>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-title">Sodium Hypochlorite (10% NaOCl)</span>
+                    <span class="feed-val text-cyan font-mono" id="feedHypoLHr">16.7 L/hr</span>
+                    <span class="feed-sub text-muted font-mono" id="feedHypoLDay">400 L/day</span>
+                </div>
+                <div class="feed-item">
+                    <span class="feed-title">Calcium Hypo (65% HTH)</span>
+                    <span class="feed-val text-warning font-mono" id="feedHthKgDay">73.8 kg/day</span>
+                    <span class="feed-sub text-muted font-mono" id="feedHthBags">~ 1.5 drums/day</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

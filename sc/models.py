@@ -17,8 +17,14 @@ from django.conf import settings
 from datetime import datetime, date, timedelta
 from django.core.exceptions import ValidationError
 from django.db import models
-from core.models import Section
 from django.contrib.postgres.fields import DateTimeRangeField
+
+class SafeDateTimeRangeField(DateTimeRangeField):
+    """DateTimeRangeField compatible with both Postgres and SQLite development."""
+    def get_placeholder(self, value, compiler, connection):
+        if connection.vendor == 'postgresql':
+            return '%s::tstzrange'
+        return '%s'
 
 User = get_user_model()
 
@@ -158,6 +164,10 @@ class MonthlyDutyRosterManager(models.Manager):
 # SHIFT
 # ==========================================================
 
+def _minutes(t):
+    return t.hour * 60 + t.minute
+
+
 class Shift(SoftDeleteMixin, models.Model):
     name = models.CharField(max_length=50)
     start_time = models.TimeField()
@@ -174,7 +184,7 @@ class Shift(SoftDeleteMixin, models.Model):
         related_name="shifts",
     )
 
-    time_range = DateTimeRangeField(
+    time_range = SafeDateTimeRangeField(
         null=True,
         blank=True,
         editable=False,
@@ -412,14 +422,14 @@ class Shift(SoftDeleteMixin, models.Model):
             date.today(),
             self.end_time,
         )
-
         if self.is_overnight:
             end += timedelta(days=1)
 
-        self.time_range = (
-            start,
-            end,
-        )
+        from django.db import connection
+        if connection.vendor == 'postgresql':
+            self.time_range = (start, end)
+        else:
+            self.time_range = None
 
         super().save(*args, **kwargs)
 
@@ -533,24 +543,123 @@ class ShiftSectionRequirement(models.Model):
             <= self.maximum_allowed
         )
 
-class ShiftSupervisor(models.Model):
+    def clean(self):
+        super().clean()
+        if self.shift_id and self.section_id:
+            shift_plant_id = getattr(self.shift, "treatment_plant_id", None)
+            sec_plant_id = getattr(self.section, "treatment_plant_id", None)
+            if shift_plant_id and sec_plant_id and shift_plant_id != sec_plant_id:
+                raise ValidationError({
+                    "section": (
+                        f"Section '{self.section.name}' belongs to plant '{self.section.treatment_plant.name}', "
+                        f"which does not match shift's treatment plant '{self.shift.treatment_plant.name}'."
+                    )
+                })
+
+class ShiftSupervisor(AuditMixin, models.Model):
     treatment_plant: TreatmentPlant = models.ForeignKey(
-        TreatmentPlant, on_delete=models.CASCADE, related_name='supervisors'
+        TreatmentPlant,
+        on_delete=models.CASCADE,
+        related_name="supervisors",
+        help_text="Designated treatment plant for supervisory authority."
+    )
+    section = models.ForeignKey(
+        "core.Section",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="shift_supervisors",
+        help_text="Operational section supervised (must match user's section if assigned)."
     )
     user: settings.AUTH_USER_MODEL = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='shift_supervisor'
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="shift_supervisor",
+        help_text="User designated as shift supervisor."
     )
-    is_active: bool = models.BooleanField(default=True)
+    is_active: bool = models.BooleanField(default=True, db_index=True)
 
     class Meta:
-        unique_together = ('treatment_plant', 'user')
-
-    @property
-    def section(self) -> Optional[str]:
-        return getattr(self.user, 'section', None)
+        verbose_name = "Shift Supervisor"
+        verbose_name_plural = "Shift Supervisors"
+        unique_together = ("treatment_plant", "user")
+        indexes = [
+            models.Index(fields=["treatment_plant", "is_active"], name="sc_shiftsup_plant_act_idx"),
+            models.Index(fields=["treatment_plant", "section", "is_active"], name="sc_shiftsup_sec_act_idx"),
+        ]
 
     def __str__(self) -> str:
-        return f"{self.user.get_full_name()} @ {self.treatment_plant.name}"
+        sec_label = f" [{self.section.name}]" if self.section else ""
+        user_name = self.user.get_full_name() or getattr(self.user, "username", "Unknown")
+        plant_name = getattr(self.treatment_plant, "name", "Unknown Plant")
+        return f"{user_name}{sec_label} @ {plant_name}"
+
+    def clean(self):
+        super().clean()
+        errors = {}
+
+        if not self.user_id:
+            return
+
+        # 1. User active status validation
+        if not self.user.is_active:
+            errors["user"] = f"Inactive user '{self.user.username}' cannot be designated as a shift supervisor."
+
+        # 2. Treatment Plant Integrity
+        if self.treatment_plant_id:
+            user_plant = getattr(self.user, "assigned_treatment_plant", None)
+            if user_plant and user_plant.id != self.treatment_plant_id:
+                errors["treatment_plant"] = (
+                    f"Treatment plant integrity violation: User '{self.user.username}' is assigned to "
+                    f"'{user_plant.name}', but is being designated as supervisor for '{self.treatment_plant.name}'."
+                )
+
+        # 3. Section Integrity
+        # If section is not set on the model, default from user's assigned section
+        if not self.section_id and getattr(self.user, "section_id", None):
+            self.section = self.user.section
+
+        if self.section_id:
+            # Check section's plant vs designated treatment_plant
+            sec_plant_id = getattr(self.section, "treatment_plant_id", None)
+            if sec_plant_id and self.treatment_plant_id and sec_plant_id != self.treatment_plant_id:
+                errors["section"] = (
+                    f"Treatment plant integrity violation: Section '{self.section.name}' belongs to "
+                    f"'{self.section.treatment_plant.name}', but supervisor is being designated for '{self.treatment_plant.name}'."
+                )
+
+            user_sec = getattr(self.user, "section", None)
+            if user_sec and user_sec.id != self.section_id:
+                errors["section"] = (
+                    f"Section integrity violation: User '{self.user.username}' belongs to section "
+                    f"'{user_sec.name}', but supervisor role is assigned to section '{self.section.name}'."
+                )
+
+            # Ensure section is active
+            if hasattr(self.section, "is_active") and not self.section.is_active:
+                errors["section"] = f"Section '{self.section.name}' is inactive and cannot have supervisors assigned."
+
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        # Auto-synchronize section from user if missing
+        if not self.section_id and getattr(self.user, "section_id", None):
+            self.section = self.user.section
+
+        # Synchronize user plant if previously unassigned
+        if self.user_id and self.treatment_plant_id:
+            if not getattr(self.user, "assigned_treatment_plant_id", None):
+                self.user.assigned_treatment_plant = self.treatment_plant
+                self.user.save(update_fields=["assigned_treatment_plant"])
+
+            # Synchronize user section if previously unassigned
+            if self.section_id and not getattr(self.user, "section_id", None):
+                self.user.section = self.section
+                self.user.save(update_fields=["section"])
+
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 
 class ShiftAssignment(AuditMixin, SoftDeleteMixin, models.Model):
@@ -1188,8 +1297,10 @@ class ShiftHandover(AuditMixin, models.Model):
             ('taken_over_at', self.expected_takeover_time, "Takeover")
         ]:
             actual = getattr(self, dt_field)
-            if actual:
+            if actual and expected_time:
                 expected_dt = datetime.combine(self.date, expected_time)
+                if timezone.is_aware(actual):
+                    expected_dt = timezone.make_aware(expected_dt, timezone.get_current_timezone())
                 window_start = expected_dt - timedelta(minutes=15)
                 window_end = expected_dt + timedelta(minutes=15)
                 if not (window_start <= actual <= window_end):

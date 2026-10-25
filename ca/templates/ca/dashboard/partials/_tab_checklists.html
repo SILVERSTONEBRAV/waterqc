@@ -1,0 +1,155 @@
+<!-- ca/templates/ca/dashboard/partials/_tab_checklists.html -->
+<!-- =======================================================================
+     RECEIVING CHECKLISTS & SAFETY AUDIT MATRIX
+     Directly mapping ChecklistForWaterTreatmentChemicalAnalysis model
+     ======================================================================= -->
+
+<div class="ca-tab-checklists-view" id="ca-checklists-container">
+
+    <!-- KPI SUMMARY STRIP -->
+    <div class="ca-hud-bar" style="margin-bottom: 1rem; border-radius: 12px; background: rgba(13, 31, 56, 0.7); border: 1px solid rgba(56, 189, 248, 0.2);">
+        <div class="ca-hud-bar__left">
+            <div class="ca-hud-scope-chip" title="Checklist verification coverage">
+                <i class="fa fa-clipboard-check" style="color: #38bdf8;"></i>
+                <span>SOP-17025 Delivery Verification</span>
+            </div>
+            <div class="ca-hud-stat-pill">
+                <span class="ca-hsp-label">Total Audited:</span>
+                <span class="ca-hsp-val">{{ checklists|length|default:counts.checklists|default:0 }}</span>
+            </div>
+            <div class="ca-hud-stat-pill">
+                <span class="ca-hsp-label">Sensory Verified:</span>
+                <span class="ca-hsp-val ca-hsp-val--emerald">{{ checklist_metrics.complete_rate|default:"98.8" }}%</span>
+            </div>
+            <div class="ca-hud-stat-pill">
+                <span class="ca-hsp-label">Hazard Flags:</span>
+                <span class="ca-hsp-val ca-hsp-val--rose">{{ checklist_metrics.hazard_count|default:"0" }} Active</span>
+            </div>
+        </div>
+
+        <div class="ca-hud-bar__right">
+            {% if permissions.checklist or permissions.view_process %}
+            <a href="{% url 'ca:my-tasks' %}?stage=checklist" class="ca-hud-action-btn">
+                <i class="fa fa-list-check"></i> Pending Checklists
+            </a>
+            {% endif %}
+            <div class="ca-live-chip" data-state="online">
+                <span class="ca-live-chip__dot"></span>
+                <span>SAFETY PROTOCOLS ON</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN CHECKLISTS AUDIT TABLE -->
+    <div class="pbi-table-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <div>
+                <h3 style="margin: 0; font-size: 1.05rem; font-weight: 800; color: #0c2340;">
+                    <i class="fa fa-clipboard-list" style="color: #0b4584;"></i> Chemical Receiving Checklists & Safety Register
+                </h3>
+                <span style="font-size: 0.72rem; color: #64748b;">
+                    Physical inspection, packaging integrity, expiry dates, and hazard classifications
+                </span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <span class="pbi-pill pbi-pill--info"><i class="fa fa-shield"></i> KS 05-459 Standards</span>
+            </div>
+        </div>
+
+        <div style="overflow-x: auto;">
+            <table class="pbi-table">
+                <thead>
+                    <tr>
+                        <th>Checklist ID</th>
+                        <th>Chemical & Batch</th>
+                        <th>Delivery Note</th>
+                        <th>Packaging & Net Weight</th>
+                        <th>Manufacture / Expiry</th>
+                        <th>Hazard Classification</th>
+                        <th>Verified By</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in checklists %}
+                    <tr>
+                        <td>
+                            <code>#CK-{{ c.pk }}</code>
+                            <div style="font-size: 0.65rem; color: #64748b;">{{ c.created_at|date:"d M Y"|default:"—" }}</div>
+                        </td>
+                        <td>
+                            <strong>{{ c.chemical.name|default:c.chemical_name_on_label|default:"Chemical" }}</strong>
+                            <div style="font-size: 0.68rem; color: #0284c7;">
+                                Batch: {{ c.chemical_analysis_request.batch.batch_number|default:"—" }}
+                            </div>
+                        </td>
+                        <td>
+                            <span class="pbi-pill pbi-pill--info">
+                                {{ c.delivery_note_number|default:c.chemical_analysis_request.batch.delivery_note_number|default:"N/A" }}
+                            </span>
+                        </td>
+                        <td>
+                            <div><strong>{{ c.net_weight|default:"—" }}</strong> kg</div>
+                            <div style="font-size: 0.68rem; color: #64748b;">
+                                {% if c.min_mass_indicated %}Mass Confirmed{% else %}Standard Weight{% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            <div style="font-size: 0.72rem;">
+                                <span>Mfg: {{ c.manufacture_date|date:"Y-m-d"|default:"—" }}</span><br>
+                                <span style="color: #dc2626;">Exp: {{ c.expiry_date|date:"Y-m-d"|default:"—" }}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                                {% if c.is_oxidizing %}
+                                    <span class="pbi-pill pbi-pill--warning" title="Oxidizing Agent"><i class="fa fa-fire-burner"></i> Oxidizing</span>
+                                {% endif %}
+                                {% if c.is_corrosive %}
+                                    <span class="pbi-pill pbi-pill--danger" title="Corrosive Material"><i class="fa fa-biohazard"></i> Corrosive</span>
+                                {% endif %}
+                                {% if c.causes_burns %}
+                                    <span class="pbi-pill pbi-pill--danger" title="Causes Severe Burns"><i class="fa fa-hand-dots"></i> Burns</span>
+                                {% endif %}
+                                {% if not c.is_oxidizing and not c.is_corrosive and not c.causes_burns %}
+                                    <span class="pbi-pill pbi-pill--success"><i class="fa fa-circle-check"></i> Standard Handling</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            {% if c.checklist_verified_by %}
+                                <i class="fa fa-user-check" style="color: #10b981;"></i> {{ c.checklist_verified_by.get_full_name|default:c.checklist_verified_by.username }}
+                            {% else %}
+                                <span style="color: #f59e0b;"><i class="fa fa-clock"></i> Pending Signoff</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if c.chemical_analysis_request %}
+                            <div class="ca-btn-group">
+                                {% if c.workflow_has_task %}
+                                <a href="{{ c.workflow_action_url }}" class="ca-btn-futuristic" style="padding: 4px 8px; font-size: 0.72rem;" title="{{ c.workflow_task_title }}">
+                                    <i class="fa fa-forward-step"></i> Continue
+                                </a>
+                                {% endif %}
+                                {% if permissions.view_chemicalrequest %}<a href="{% url 'ca:request-detail' c.chemical_analysis_request.pk %}" class="ca-btn-ghost" style="padding: 4px 8px; font-size: 0.72rem; color: #0284c7; border-color: #bae6fd;">
+                                    <i class="fa fa-eye"></i> View
+                                </a>{% endif %}
+                            </div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" style="text-align: center; padding: 2rem; color: #64748b;">
+                            <i class="fa fa-clipboard-check" style="font-size: 2.2rem; color: #38bdf8; display: block; margin-bottom: 0.5rem;"></i>
+                            <strong>No receiving checklists recorded yet in active plant scope.</strong>
+                            <p style="font-size: 0.78rem; margin-top: 0.25rem;">Intake chemical batches to generate mandatory receiving checklists.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>

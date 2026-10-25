@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from rest_framework import viewsets, permissions, filters
+from core.permissions import ViewModelPermissions
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django_filters.rest_framework import DjangoFilterBackend
@@ -28,7 +29,7 @@ class BaseActiveViewSet(viewsets.ModelViewSet):
       * Only return is_active=True by default.
       * Adds search/filter support.
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     search_fields: list[str] = []
     ordering_fields: list[str] = ["created_at", "updated_at"]

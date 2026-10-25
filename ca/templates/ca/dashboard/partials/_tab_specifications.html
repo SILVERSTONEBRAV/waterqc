@@ -1,0 +1,134 @@
+<!-- ca/templates/ca/dashboard/partials/_tab_specifications.html -->
+<!-- =======================================================================
+     CHEMICAL SPECIFICATIONS & QUALITY COMPLIANCE CRITERIA
+     Directly mapping ChemicalSpecification & ChemicalSpecificationRemark models
+     ======================================================================= -->
+
+<div class="ca-tab-specifications-view" id="ca-specifications-container">
+
+    <!-- KPI SUMMARY STRIP -->
+    <div class="ca-hud-bar" style="margin-bottom: 1rem; border-radius: 12px; background: rgba(13, 31, 56, 0.7); border: 1px solid rgba(56, 189, 248, 0.2);">
+        <div class="ca-hud-bar__left">
+            <div class="ca-hud-scope-chip" title="Chemical quality criteria">
+                <i class="fa fa-book-bookmark" style="color: #38bdf8;"></i>
+                <span>KS 05-459 Standards Matrix</span>
+            </div>
+            <div class="ca-hud-stat-pill">
+                <span class="ca-hsp-label">Total Specs:</span>
+                <span class="ca-hsp-val">{{ counts.specifications|default:specifications|length|default:0 }}</span>
+            </div>
+            <div class="ca-hud-stat-pill">
+                <span class="ca-hsp-label">Chemicals Covered:</span>
+                <span class="ca-hsp-val ca-hsp-val--emerald">{{ chemicals|length|default:6 }}</span>
+            </div>
+            <div class="ca-hud-stat-pill">
+                <span class="ca-hsp-label">Standards Status:</span>
+                <span class="ca-hsp-val ca-hsp-val--emerald">Active v1 &bull; ISO 17025</span>
+            </div>
+        </div>
+
+        <div class="ca-hud-bar__right">
+            <a href="{% url 'ca:specification-list' %}" class="ca-hud-action-btn">
+                <i class="fa fa-sliders"></i> All Specifications
+            </a>
+            <div class="ca-live-chip" data-state="online">
+                <span class="ca-live-chip__dot"></span>
+                <span>CRITERIA VERIFIED</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN SPECIFICATIONS MATRIX TABLE -->
+    <div class="pbi-table-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <div>
+                <h3 style="margin: 0; font-size: 1.05rem; font-weight: 800; color: #0c2340;">
+                    <i class="fa fa-ruler-combined" style="color: #0b4584;"></i> Regulatory Quality Specifications & Limits
+                </h3>
+                <span style="font-size: 0.72rem; color: #64748b;">
+                    Official acceptance thresholds, testing methods, and boundary tolerances per water treatment chemical
+                </span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <span class="pbi-pill pbi-pill--info"><i class="fa fa-certificate"></i> Mandatory Criteria</span>
+            </div>
+        </div>
+
+        <div style="overflow-x: auto;">
+            <table class="pbi-table">
+                <thead>
+                    <tr>
+                        <th>Chemical</th>
+                        <th>Parameter Name</th>
+                        <th>Approved Method</th>
+                        <th>Acceptance Threshold (Min – Max)</th>
+                        <th>Unit</th>
+                        <th>Mandatory</th>
+                        <th>Version</th>
+                        <th>Facility Scope</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for spec in specifications %}
+                    <tr>
+                        <td>
+                            <strong>{{ spec.chemical.name }}</strong>
+                            <div style="font-size: 0.68rem; color: #0284c7;">
+                                Code: {{ spec.chemical.code|default:spec.chemical.name|slice:":4"|upper }}
+                            </div>
+                        </td>
+                        <td>
+                            <strong style="color: #0c2340;">{{ spec.parameter_name }}</strong>
+                        </td>
+                        <td>
+                            <span class="pbi-pill pbi-pill--info">
+                                {{ spec.method.name|default:"Standard KS 05-459" }}
+                            </span>
+                        </td>
+                        <td>
+                            <strong style="font-size: 0.9rem; color: #0f172a;">
+                                {% if spec.min_limit is not None and spec.max_limit is not None %}
+                                    {{ spec.min_limit }} – {{ spec.max_limit }}
+                                {% elif spec.min_limit is not None %}
+                                    &ge; {{ spec.min_limit }}
+                                {% elif spec.max_limit is not None %}
+                                    &le; {{ spec.max_limit }}
+                                {% else %}
+                                    Declared Value
+                                {% endif %}
+                            </strong>
+                        </td>
+                        <td>
+                            <code>{{ spec.unit }}</code>
+                        </td>
+                        <td>
+                            {% if spec.is_required %}
+                                <span class="pbi-pill pbi-pill--danger"><i class="fa fa-lock"></i> Required</span>
+                            {% else %}
+                                <span class="pbi-pill pbi-pill--warning">Optional</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <code>v{{ spec.version|default:1 }}</code>
+                        </td>
+                        <td>
+                            <span style="font-size: 0.72rem; color: #475569;">
+                                {{ spec.treatment_plant.name|default:"All Facilities" }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" style="text-align: center; padding: 2rem; color: #64748b;">
+                            <i class="fa fa-book-open" style="font-size: 2.2rem; color: #38bdf8; display: block; margin-bottom: 0.5rem;"></i>
+                            <strong>No chemical specifications configured yet.</strong>
+                            <p style="font-size: 0.78rem; margin-top: 0.25rem;">Configure specifications in the administration module to enable analytical limits.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>

@@ -1,28 +1,82 @@
 {
+  "id": "/ncwsc-waterlab-app",
   "name": "NCWSCwaterLAB - Quality Assurance Platform",
   "short_name": "NCWSCwaterLAB",
   "description": "NCWSC Enterprise Water Quality Assurance & Laboratory Information Management System",
   "start_url": "/",
   "scope": "/",
   "display": "fullscreen",
-  "display_override": ["fullscreen", "standalone"],
+  "display_override": [
+    "fullscreen"
+  ],
   "orientation": "any",
-  "background_color": "#0a0f1a",
-  "theme_color": "#0f172a",
-  "categories": ["utilities", "productivity", "analytics"],
+  "background_color": "#0b1220",
+  "theme_color": "#417690",
+  "lang": "en-KE",
+  "dir": "ltr",
+  "categories": [
+    "utilities",
+    "productivity",
+    "analytics",
+    "business"
+  ],
   "prefer_related_applications": false,
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
   "icons": [
     {
-      "src": "/static/core/img/logo.png",
+      "src": "/static/pwa/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "/static/core/img/logo.png",
+      "src": "/static/pwa/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/static/pwa/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Quality Control Sentinel",
+      "short_name": "QC Sentinel",
+      "url": "/qc/scada/",
+      "icons": [
+        {
+          "src": "/static/pwa/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Chemical Analysis",
+      "short_name": "Chemical Analysis",
+      "url": "/ca/",
+      "icons": [
+        {
+          "src": "/static/pwa/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Laboratory Analytics",
+      "short_name": "QCA Analytics",
+      "url": "/qca/",
+      "icons": [
+        {
+          "src": "/static/pwa/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }

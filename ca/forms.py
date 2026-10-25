@@ -8,7 +8,7 @@ from typing import Any
 from django import forms
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.db.models import Q
+from django.db.models import F, Q
 from django.utils import timezone
 
 from t.models import TreatmentPlant
@@ -21,6 +21,7 @@ from .models import (
     ChemicalAnalysisProcess,
     ChemicalAnalysisRequest,
     ChemicalBatch,
+    ChemicalBatchHold,
     ChemicalCertApprover,
     ChemicalCoA,
     ChemicalLocation,
@@ -49,11 +50,27 @@ CHEMICAL_ANALYSIS_TASK_NAME = "Water Treatment Chemical Analysis"
 
 
 def apply_field_classes(form: forms.BaseForm) -> None:
-    for field in form.fields.values():
-        if isinstance(field.widget, forms.CheckboxInput):
-            field.widget.attrs.setdefault("class", CHECKBOX_CLASS)
+    for name, field in form.fields.items():
+        widget = field.widget
+        if isinstance(widget, forms.CheckboxInput):
+            widget.attrs.setdefault("class", "ca-compact-checkbox")
+        elif isinstance(widget, forms.CheckboxSelectMultiple):
+            widget.attrs.setdefault("class", "analyst-option")
+        elif isinstance(widget, (forms.DateInput, forms.DateTimeInput)) or "date" in name.lower():
+            if isinstance(widget, forms.DateInput):
+                widget.input_type = "date"
+            elif isinstance(widget, forms.DateTimeInput):
+                widget.input_type = "datetime-local"
+            widget.attrs["class"] = (widget.attrs.get("class", "") + " ca-compact-input ca-date-picker").strip()
+            widget.attrs.setdefault("autocomplete", "off")
+        elif isinstance(widget, forms.Select):
+            widget.attrs["class"] = (widget.attrs.get("class", "") + " ca-compact-select").strip()
+        elif isinstance(widget, forms.Textarea):
+            widget.attrs["class"] = (widget.attrs.get("class", "") + " ca-compact-textarea").strip()
+            if "rows" not in widget.attrs:
+                widget.attrs["rows"] = 2
         else:
-            field.widget.attrs.setdefault("class", FORM_CONTROL_CLASS)
+            widget.attrs["class"] = (widget.attrs.get("class", "") + " ca-compact-input").strip()
 
 
 def _pk(value):
@@ -248,7 +265,7 @@ def chemical_analysis_task_queryset(
         )
         |
         Q(
-            shift__start_time__gt=shift__end_time,
+            shift__start_time__gt=F("shift__end_time"),
         )
         & (
             Q(shift__start_time__lte=current_time)
@@ -280,35 +297,43 @@ def chemical_analysis_task_queryset(
 def chemical_analysis_analyst_queryset(
     *,
     treatment_plant=None,
-    section=None,
+    batch=None,
+    analysis_request=None,
     assignment_date=None,
     current_time=None,
 ):
-    user_ids = (
-        chemical_analysis_task_queryset(
-            treatment_plant=treatment_plant,
-            section=section,
-            assignment_date=assignment_date,
-            current_time=current_time,
+    analysis_request = analysis_request or getattr(batch, "analysis_request", None)
+    queryset = User.objects.filter(is_active=True)
+    if treatment_plant is not None:
+        queryset = queryset.filter(
+            Q(is_superuser=True)
+            | Q(assigned_treatment_plant_id=_plant_id(treatment_plant))
         )
-        .values_list(
-            "user_id",
-            flat=True,
-        )
-        .distinct()
-    )
 
-    return (
-        User.objects.filter(
-            pk__in=user_ids,
-            is_active=True,
-        )
-        .distinct()
-        .order_by(
-            "first_name",
-            "last_name",
-            "username",
-        )
+    # Manual assignment is plant scoped, not section scoped. When the request
+    # exists its eligibility query applies all required permissions together;
+    # avoid separately querying start/result permissions before that check.
+    if analysis_request is not None:
+        queryset = analysis_request.eligible_analysts(queryset)
+    else:
+        # Keep the standalone form case aligned with assign_analysts(). Each
+        # permission query is independent so a grant may come from any group.
+        for permission in (
+            "ca.start_chemical_analysis",
+            "ca.record_chemical_result",
+            "ca.complete_receiving_checklist",
+            "ca.complete_chemical_analysis",
+        ):
+            permitted = permission_user_queryset(
+                permission,
+                treatment_plant=treatment_plant,
+            )
+            queryset = queryset.filter(pk__in=permitted.values("pk"))
+
+    return queryset.distinct().order_by(
+        "first_name",
+        "last_name",
+        "username",
     )
 
 
@@ -445,6 +470,9 @@ def _normalise_input_definitions(
             for key, value in definitions.items()
         ]
 
+    if not isinstance(definitions, (list, tuple)):
+        return []
+
     result = []
 
     for definition in definitions:
@@ -504,6 +532,12 @@ def _normalise_input_definitions(
                     definition,
                     "max_value",
                 ),
+                "unit": str(
+                    _input_definition_value(definition, "unit", "") or ""
+                ).strip(),
+                "help_text": str(
+                    _input_definition_value(definition, "help_text", "") or ""
+                ).strip(),
                 "choices": choices,
             }
         )
@@ -826,6 +860,7 @@ class ChemicalLocationForm(forms.ModelForm):
 
 
 class ChemicalSpecificationForm(forms.ModelForm):
+    # Keep the instrument requirement explicit in the controlled specification.
     class Meta:
         model = ChemicalSpecification
         fields = (
@@ -837,6 +872,7 @@ class ChemicalSpecificationForm(forms.ModelForm):
             "max_limit",
             "unit",
             "is_required",
+            "requires_instrument",
             "method",
         )
         widgets = {
@@ -946,30 +982,6 @@ class ChemicalSpecificationForm(forms.ModelForm):
         version = cleaned.get(
             "version"
         )
-
-        if (
-            chemical
-            and plant
-            and parameter
-            and version
-        ):
-            queryset = ChemicalSpecification.objects.filter(
-                chemical=chemical,
-                treatment_plant=plant,
-                parameter_name__iexact=parameter,
-                version=version,
-            )
-
-            if self.instance.pk:
-                queryset = queryset.exclude(
-                    pk=self.instance.pk
-                )
-
-            if queryset.exists():
-                self.add_error(
-                    "parameter_name",
-                    "This specification version already exists.",
-                )
 
         return cleaned
 
@@ -1283,7 +1295,53 @@ class PackagingForm(forms.Form):
         apply_field_classes(self)
 
 
+class PlantScopedLocationSelect(forms.Select):
+    """Expose each location's plant so batch intake can filter options live."""
+
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(
+            name, value, label, selected, index, subindex=subindex, attrs=attrs
+        )
+        location = getattr(value, "instance", None)
+        if location is not None:
+            option["attrs"]["data-plant-id"] = str(
+                location.treatment_plant_id or ""
+            )
+        return option
+
+
 class ChemicalBatchForm(forms.ModelForm):
+    intake_discrepancies = forms.MultipleChoiceField(
+        required=False,
+        choices=ChemicalBatchHold.Issue.choices,
+        widget=forms.CheckboxSelectMultiple,
+        label="Intake discrepancies",
+    )
+    hold_reason = forms.CharField(
+        required=False,
+        max_length=3000,
+        widget=forms.Textarea(attrs={"rows": 2}),
+        label="Hold details",
+    )
+    location = forms.ModelChoiceField(
+        queryset=ChemicalLocation.objects.none(),
+        required=True,
+        label="Chemical Storage Location",
+        widget=PlantScopedLocationSelect(),
+    )
+    delivery_date = forms.DateField(
+        required=True,
+        label="Date Received",
+        initial=timezone.localdate,
+        widget=forms.DateInput(
+            attrs={
+                "type": "date",
+                "class": "ca-compact-input ca-date-picker",
+            }
+        ),
+        help_text="Required. Defaults to today's date.",
+    )
+
     class Meta:
         model = ChemicalBatch
         fields = (
@@ -1292,6 +1350,8 @@ class ChemicalBatchForm(forms.ModelForm):
             "chemical",
             "supplier",
             "treatment_plant",
+            "location",
+            "delivery_date",
             "quantity_received",
             "unit",
             "package_count",
@@ -1302,16 +1362,27 @@ class ChemicalBatchForm(forms.ModelForm):
                 attrs={
                     "min": "0.0001",
                     "step": "any",
+                    "placeholder": "e.g. 5000",
                 }
             ),
             "package_count": forms.NumberInput(
                 attrs={
                     "min": "1",
                     "step": "1",
+                    "placeholder": "e.g. 100 bags / 20 drums",
                 }
             ),
             "remarks": forms.Textarea(
-                attrs={"rows": 3}
+                attrs={
+                    "rows": 2,
+                    "placeholder": "Delivery notes, vehicle reg, seal numbers, physical condition...",
+                }
+            ),
+            "delivery_note_number": forms.TextInput(
+                attrs={"placeholder": "e.g. DN-2026-9842"}
+            ),
+            "batch_number": forms.TextInput(
+                attrs={"placeholder": "e.g. BATCH-ALUM-2026-04"}
             ),
         }
 
@@ -1320,10 +1391,17 @@ class ChemicalBatchForm(forms.ModelForm):
         *args,
         user=None,
         treatment_plant=None,
+        is_superuser=None,
         **kwargs,
     ):
         self.user = user
-        self.treatment_plant = _effective_plant(
+        self.is_superuser = (
+            _user_is_superuser(user)
+            if is_superuser is None
+            else bool(is_superuser)
+        )
+        assigned = getattr(user, "assigned_treatment_plant", None) if user else None
+        self.treatment_plant = treatment_plant or assigned or _effective_plant(
             user,
             treatment_plant,
         )
@@ -1350,22 +1428,61 @@ class ChemicalBatchForm(forms.ModelForm):
         )
 
         if self.treatment_plant is not None:
-            plants = plants.filter(
-                pk=_plant_id(
-                    self.treatment_plant
+            if user and not self.is_superuser:
+                plants = plants.filter(
+                    pk=_plant_id(
+                        self.treatment_plant
+                    )
                 )
-            )
+                self.fields["treatment_plant"].empty_label = None
+            self.fields[
+                "treatment_plant"
+            ].initial = self.treatment_plant
+        elif assigned is not None:
+            self.fields["treatment_plant"].initial = assigned
 
         self.fields[
             "treatment_plant"
         ].queryset = plants
 
-        if self.treatment_plant is not None:
-            self.fields[
-                "treatment_plant"
-            ].initial = self.treatment_plant
+        locations = ChemicalLocation.objects.select_related(
+            "treatment_plant"
+        ).order_by("treatment_plant__name", "name")
+        if user and not self.is_superuser:
+            assigned_id = _user_plant_id(user)
+            if assigned_id:
+                locations = locations.filter(treatment_plant_id=assigned_id)
+            else:
+                locations = locations.none()
+        self.fields["location"].queryset = locations
+
+        if not self.initial.get("unit"):
+            self.fields["unit"].initial = "kg"
 
         apply_field_classes(self)
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        if self.user and not instance.received_by_id:
+            instance.received_by = self.user
+
+        if self.user and not self.is_superuser:
+            assigned_id = getattr(self.user, "assigned_treatment_plant_id", None)
+            if assigned_id:
+                instance.treatment_plant_id = assigned_id
+        elif not instance.treatment_plant_id and self.treatment_plant:
+            instance.treatment_plant_id = _plant_id(self.treatment_plant)
+
+        instance.received_date = self.cleaned_data["delivery_date"]
+
+        if commit:
+            instance.save()
+            # ``save_m2m`` is only installed by ModelForm.save(commit=False).
+            # On the normal commit=True path, use Django's m2m persistence
+            # hook directly (the current batch form has no m2m fields, but
+            # retaining this keeps the override correct if one is added).
+            self._save_m2m()
+        return instance
 
     def clean_delivery_note_number(self):
         value = (
@@ -1455,6 +1572,7 @@ class ChemicalBatchForm(forms.ModelForm):
         plant = cleaned.get(
             "treatment_plant"
         )
+        location = cleaned.get("location")
 
         if plant:
             _validate_plant_access(
@@ -1462,18 +1580,27 @@ class ChemicalBatchForm(forms.ModelForm):
                 plant,
             )
 
+        if location and plant and location.treatment_plant_id != plant.pk:
+            self.add_error(
+                "location",
+                "The storage location must belong to the selected treatment plant.",
+            )
+
         chemical = cleaned.get(
             "chemical"
         )
 
+        if cleaned.get("intake_discrepancies") and not (cleaned.get("hold_reason") or "").strip():
+            self.add_error("hold_reason", "Describe the discrepancy before placing the batch on hold.")
+
         if (
             chemical
             and plant
-            and not ChemicalSpecification.objects.filter(
+            and not ChemicalSpecification.current_for(ChemicalSpecification.objects.filter(
                 chemical=chemical,
                 treatment_plant=plant,
                 is_required=True,
-            ).exists()
+            )).exists()
         ):
             self._form_warnings = [
                 "No required analytical specifications are configured "
@@ -1499,6 +1626,7 @@ class ReceiveChemicalBatchForm(forms.Form):
         self,
         *args,
         batch=None,
+        process=None,
         user=None,
         **kwargs,
     ):
@@ -1548,7 +1676,6 @@ class ChemicalAnalysisRequestForm(forms.ModelForm):
         fields = (
             "batch",
             "delivery_date",
-            "location",
         )
         widgets = {
             "delivery_date": forms.DateInput(
@@ -1608,26 +1735,6 @@ class ChemicalAnalysisRequestForm(forms.ModelForm):
             "batch"
         ].queryset = batches
 
-        locations = (
-            ChemicalLocation.objects
-            .select_related(
-                "treatment_plant"
-            )
-            .order_by(
-                "treatment_plant__name",
-                "name",
-            )
-        )
-
-        if self.treatment_plant is not None:
-            locations = locations.filter(
-                treatment_plant=self.treatment_plant
-            )
-
-        self.fields[
-            "location"
-        ].queryset = locations
-
         if not self.instance.pk:
             self.fields[
                 "delivery_date"
@@ -1656,9 +1763,6 @@ class ChemicalAnalysisRequestForm(forms.ModelForm):
         batch = cleaned.get(
             "batch"
         )
-        location = cleaned.get(
-            "location"
-        )
 
         if batch is None:
             return cleaned
@@ -1675,17 +1779,6 @@ class ChemicalAnalysisRequestForm(forms.ModelForm):
             self.add_error(
                 "batch",
                 "Only received chemical batches can be submitted for analysis.",
-            )
-
-        if (
-            location
-            and batch.treatment_plant_id
-            and location.treatment_plant_id
-            != batch.treatment_plant_id
-        ):
-            self.add_error(
-                "location",
-                "The analysis location must belong to the batch treatment plant.",
             )
 
         if (
@@ -1745,6 +1838,7 @@ class ChecklistForm(forms.ModelForm):
             "expiry_date",
             "storage_conditions",
             "net_weight",
+            "country_of_origin",
             "handling_instructions",
             "is_oxidizing",
             "is_corrosive",
@@ -1778,15 +1872,27 @@ class ChecklistForm(forms.ModelForm):
         *args,
         request=None,
         user=None,
+        process=None,
+        batch=None,
         **kwargs,
     ):
         self.analysis_request = request
         self.user = user
+        self.process = process
+        self.batch = batch or getattr(request, "batch", None)
 
         super().__init__(
             *args,
             **kwargs,
         )
+
+        # The analysis request is workflow context, not a user-editable field.
+        # Set it on the model instance before ModelForm validation so the
+        # model's clean() method can validate the checklist against its batch.
+        # Otherwise it raises a field error for this excluded FK and Django
+        # raises ValueError because the form has no such field.
+        if request is not None:
+            self.instance.chemical_analysis_request = request
 
         queryset = Chemical.objects.order_by(
             "name"
@@ -1906,10 +2012,12 @@ class CompleteChecklistForm(forms.Form):
         self,
         *args,
         process=None,
+        batch=None,
         user=None,
         **kwargs,
     ):
         self.process = process
+        self.batch = batch
         self.user = user
         super().__init__(*args, **kwargs)
         apply_field_classes(self)
@@ -1966,6 +2074,8 @@ class BatchTestResultForm(forms.ModelForm):
             "value",
             "textual_result",
             "status",
+            "instrument",
+            "revision_reason",
         )
         widgets = {
             "value": forms.NumberInput(
@@ -1997,25 +2107,33 @@ class BatchTestResultForm(forms.ModelForm):
             **kwargs,
         )
 
-        if self.batch is not None:
-            queryset = (
-                ChemicalSpecification.objects
-                .filter(
-                    chemical_id=self.batch.chemical_id,
-                    treatment_plant_id=self.batch.treatment_plant_id,
-                    is_required=True,
+        if self.batch is not None and self.process is not None:
+            queryset = self.process.required_specifications()
+        elif self.batch is not None:
+            analysis_request = getattr(self.batch, "analysis_request", None)
+            if analysis_request is not None:
+                queryset = analysis_request.get_required_specifications()
+            else:
+                queryset = ChemicalSpecification.current_for(
+                    ChemicalSpecification.objects.filter(
+                        chemical_id=self.batch.chemical_id,
+                        treatment_plant_id=self.batch.treatment_plant_id,
+                        is_required=True,
+                    ).select_related("chemical", "method")
                 )
-                .select_related(
-                    "chemical",
-                    "method",
-                )
-                .order_by(
-                    "parameter_name",
-                    "-version",
-                )
-            )
         else:
             queryset = ChemicalSpecification.objects.none()
+
+        try:
+            from instruments.models import Instrument
+
+            instruments = Instrument.objects.filter(is_active=True)
+            if self.batch is not None:
+                instruments = instruments.filter(treatment_plant_id=self.batch.treatment_plant_id)
+            self.fields["instrument"].queryset = instruments.order_by("name")
+            self.fields["instrument"].required = False
+        except Exception:
+            self.fields["instrument"].queryset = self.fields["instrument"].queryset.none()
 
         self.fields[
             "parameter"
@@ -2132,20 +2250,21 @@ class BatchTestResultForm(forms.ModelForm):
                 and value < minimum
                 and status == BatchTestResult.Status.PASS
             ):
-                self.add_error(
-                    "status",
-                    "The result is below the minimum specification limit.",
-                )
+                cleaned["status"] = BatchTestResult.Status.FAIL
 
             if (
                 maximum is not None
                 and value > maximum
                 and status == BatchTestResult.Status.PASS
             ):
-                self.add_error(
-                    "status",
-                    "The result exceeds the maximum specification limit.",
-                )
+                cleaned["status"] = BatchTestResult.Status.FAIL
+
+            changed = self.instance.pk and any(
+                self.has_changed() and field in self.changed_data
+                for field in ("value", "textual_result", "status", "instrument")
+            )
+            if changed and not (cleaned.get("revision_reason") or "").strip():
+                self.add_error("revision_reason", "Explain why this result is being amended or retested.")
 
             duplicates = BatchTestResult.objects.filter(
                 batch=self.batch,
@@ -2217,6 +2336,9 @@ class ChemicalAnalysisInputForm(forms.ModelForm):
         if process is not None:
             queryset = queryset.filter(
                 batch=process.batch
+            )
+            queryset = queryset.filter(
+                parameter__in=process.required_specifications()
             )
 
         if test_result is not None:
@@ -2437,14 +2559,16 @@ class DynamicChemicalAnalysisInputForm(forms.Form):
 
         if method is not None:
             definitions = _normalise_input_definitions(
-                method.get_input_fields()
+                method.inputs_structure
             )
 
             for definition in definitions:
                 name = definition["name"]
-                label = definition["label"]
+                unit = definition["unit"]
+                label = definition["label"] + (f" ({unit})" if unit else "")
                 required = definition["required"]
                 field_type = definition["type"]
+                help_text = definition["help_text"]
 
                 minimum = definition[
                     "min_value"
@@ -2460,6 +2584,7 @@ class DynamicChemicalAnalysisInputForm(forms.Form):
                     field = forms.CharField(
                         required=required,
                         label=label,
+                        help_text=help_text,
                     )
                 elif field_type in {
                     "integer",
@@ -2468,6 +2593,7 @@ class DynamicChemicalAnalysisInputForm(forms.Form):
                     field = forms.IntegerField(
                         required=required,
                         label=label,
+                        help_text=help_text,
                     )
                 elif field_type in {
                     "boolean",
@@ -2476,6 +2602,7 @@ class DynamicChemicalAnalysisInputForm(forms.Form):
                     field = forms.BooleanField(
                         required=required,
                         label=label,
+                        help_text=help_text,
                     )
                 elif field_type in {
                     "choice",
@@ -2487,6 +2614,7 @@ class DynamicChemicalAnalysisInputForm(forms.Form):
                         choices=definition[
                             "choices"
                         ],
+                        help_text=help_text,
                     )
                 else:
                     field = forms.DecimalField(
@@ -2508,6 +2636,7 @@ class DynamicChemicalAnalysisInputForm(forms.Form):
                             if maximum is not None
                             else None
                         ),
+                        help_text=help_text,
                     )
 
                 self.fields[name] = field
@@ -2528,6 +2657,99 @@ class DynamicChemicalAnalysisInputForm(forms.Form):
         }
 
 
+class FormulaDrivenChemicalAnalysisForm(forms.Form):
+    """Collect method measurements and leave result/status calculation to the system."""
+
+    def __init__(
+        self,
+        *args,
+        parameter=None,
+        batch=None,
+        process=None,
+        analyst=None,
+        **kwargs,
+    ):
+        self.parameter = parameter
+        self.batch = batch
+        self.process = process
+        self.analyst = analyst
+        super().__init__(*args, **kwargs)
+
+        method = getattr(parameter, "method", None)
+        self.setup_errors = []
+        if method is None:
+            self.setup_errors.append(
+                "No analytical method is assigned to this specification. Configure its method before recording results."
+            )
+        definitions = _normalise_input_definitions(
+            getattr(method, "inputs_structure", None)
+        )
+        self.input_names = []
+
+        for definition in definitions:
+            name = definition["name"]
+            if not name.isidentifier() or name in {"math", "__builtins__"}:
+                self.setup_errors.append(
+                    f"The analysis method has an invalid input name: {name}."
+                )
+                continue
+            unit = definition["unit"]
+            label = definition["label"] + (f" ({unit})" if unit else "")
+            help_text = definition["help_text"]
+            minimum = definition["min_value"]
+            maximum = definition["max_value"]
+            self.fields[name] = forms.DecimalField(
+                required=True,
+                label=label,
+                help_text=help_text,
+                max_digits=20,
+                decimal_places=8,
+                min_value=Decimal(str(minimum)) if minimum is not None else None,
+                max_value=Decimal(str(maximum)) if maximum is not None else None,
+                widget=forms.NumberInput(attrs={"step": "any"}),
+            )
+            self.input_names.append(name)
+
+        if parameter is not None and parameter.requires_instrument:
+            try:
+                from instruments.models import Instrument
+
+                instruments = Instrument.objects.filter(is_active=True)
+                if batch is not None:
+                    instruments = instruments.filter(
+                        treatment_plant_id=batch.treatment_plant_id
+                    )
+                self.fields["instrument"] = forms.ModelChoiceField(
+                    queryset=instruments.order_by("name"),
+                    empty_label="Select calibrated instrument",
+                    required=True,
+                    label="Calibrated instrument",
+                )
+            except Exception:
+                self.setup_errors.append(
+                    "The instrument register is unavailable, so the required instrument cannot be selected."
+                )
+
+        if not self.input_names:
+            self.setup_errors.append(
+                "This formula based method has no input measurements configured. "
+                "Configure its input fields before recording results."
+            )
+        apply_field_classes(self)
+
+    def clean(self):
+        cleaned = super().clean()
+        if self.setup_errors:
+            raise ValidationError(self.setup_errors)
+        return cleaned
+
+    def as_input_dictionary(self):
+        return {
+            name: float(self.cleaned_data[name])
+            for name in self.input_names
+        }
+
+
 class StartAnalysisForm(forms.Form):
     confirm = forms.BooleanField(
         required=True,
@@ -2539,10 +2761,12 @@ class StartAnalysisForm(forms.Form):
         *args,
         process=None,
         user=None,
+        batch=None,
         **kwargs,
     ):
         self.process = process
         self.user = user
+        self.batch = batch or getattr(process, "batch", None)
 
         super().__init__(
             *args,
@@ -2610,10 +2834,12 @@ class CompleteAnalysisForm(forms.Form):
         *args,
         process=None,
         user=None,
+        batch=None,
         **kwargs,
     ):
         self.process = process
         self.user = user
+        self.batch = batch or getattr(process, "batch", None)
 
         super().__init__(
             *args,
@@ -2684,10 +2910,12 @@ class QAReviewForm(forms.Form):
         *args,
         user=None,
         process=None,
+        batch=None,
         **kwargs,
     ):
         self.user = user
         self.process = process
+        self.batch = batch or getattr(process, "batch", None)
 
         super().__init__(
             *args,
@@ -2758,7 +2986,6 @@ class ApprovalForm(forms.Form):
     decision = forms.ChoiceField(
         choices=(
             ("APPROVE", "Approve"),
-            ("REJECT", "Reject"),
         )
     )
     remarks = forms.CharField(
@@ -2778,10 +3005,12 @@ class ApprovalForm(forms.Form):
         *args,
         user=None,
         process=None,
+        batch=None,
         **kwargs,
     ):
         self.user = user
         self.process = process
+        self.batch = batch or getattr(process, "batch", None)
 
         super().__init__(
             *args,
@@ -2857,10 +3086,12 @@ class RejectAnalysisForm(forms.Form):
         *args,
         user=None,
         process=None,
+        batch=None,
         **kwargs,
     ):
         self.user = user
         self.process = process
+        self.batch = batch or getattr(process, "batch", None)
 
         super().__init__(
             *args,
@@ -2917,10 +3148,12 @@ class RetestForm(forms.Form):
         *args,
         process=None,
         user=None,
+        batch=None,
         **kwargs,
     ):
         self.process = process
         self.user = user
+        self.batch = batch or getattr(process, "batch", None)
 
         super().__init__(
             *args,
@@ -3010,10 +3243,12 @@ class CAPAForm(forms.Form):
         *args,
         user=None,
         process=None,
+        batch=None,
         **kwargs,
     ):
         self.user = user
         self.process = process
+        self.batch = batch or getattr(process, "batch", None)
 
         super().__init__(
             *args,
@@ -3065,10 +3300,12 @@ class CoAGenerationForm(forms.Form):
         *args,
         process=None,
         user=None,
+        batch=None,
         **kwargs,
     ):
         self.process = process
         self.user = user
+        self.batch = batch or getattr(process, "batch", None)
 
         super().__init__(
             *args,
@@ -3118,10 +3355,12 @@ class CoAApprovalForm(forms.Form):
         *args,
         user=None,
         process=None,
+        batch=None,
         **kwargs,
     ):
         self.user = user
         self.process = process
+        self.batch = batch or getattr(process, "batch", None)
 
         super().__init__(
             *args,
@@ -3177,10 +3416,12 @@ class ConfirmActionForm(forms.Form):
         *args,
         batch=None,
         user=None,
+        process=None,
         **kwargs,
     ):
-        self.batch = batch
+        self.batch = batch or getattr(process, "batch", None)
         self.user = user
+        self.process = process
 
         super().__init__(
             *args,
@@ -3735,7 +3976,7 @@ class UtilizationForm(forms.Form):
     )
     quantity_used = forms.DecimalField(
         required=False,
-        min_value=Decimal("0"),
+        min_value=Decimal("0.000001"),
         max_digits=16,
         decimal_places=6,
         widget=forms.NumberInput(
@@ -3826,7 +4067,7 @@ class ReturnToSupplierForm(forms.Form):
     )
     quantity_returned = forms.DecimalField(
         required=False,
-        min_value=Decimal("0"),
+        min_value=Decimal("0.000001"),
         max_digits=16,
         decimal_places=6,
         widget=forms.NumberInput(
@@ -4019,16 +4260,12 @@ class TestResultFilterForm(forms.Form):
             user=user,
         )
 
-        self.fields[
-            "parameter"
-        ].queryset = _scope_plant_queryset(
-            ChemicalSpecification.objects
-            .select_related(
-                "chemical",
-                "treatment_plant",
-            ),
-            user=user,
-            treatment_plant=treatment_plant,
+        self.fields["parameter"].queryset = ChemicalSpecification.current_for(
+            _scope_plant_queryset(
+                ChemicalSpecification.objects.select_related("chemical", "treatment_plant"),
+                user=user,
+                treatment_plant=treatment_plant,
+            )
         ).order_by(
             "chemical__name",
             "parameter_name",
@@ -4159,7 +4396,11 @@ class AnalystAssignmentForm(forms.Form):
     analysts = forms.ModelMultipleChoiceField(
         queryset=User.objects.none(),
         required=True,
-        widget=forms.SelectMultiple(attrs={"size": 8}),
+        widget=forms.CheckboxSelectMultiple(
+            attrs={
+                "aria-label": "Select analysts permitted to perform chemical analysis",
+            }
+        ),
     )
     confirm = forms.BooleanField(required=True, label="Confirm analyst assignment")
 
@@ -4167,11 +4408,34 @@ class AnalystAssignmentForm(forms.Form):
         self.process = process
         self.user = user
         super().__init__(*args, **kwargs)
-        plant = getattr(getattr(process, "batch", None), "treatment_plant", None)
-        self.fields["analysts"].queryset = (
-            chemical_analysis_analyst_queryset(treatment_plant=plant)
+        plant = getattr(process, "treatment_plant", None)
+        if plant is None:
+            plant = getattr(getattr(process, "batch", None), "treatment_plant", None)
+        batch = getattr(process, "batch", None)
+        analyst_queryset = (
+            chemical_analysis_analyst_queryset(
+                treatment_plant=plant,
+                batch=batch,
+                analysis_request=process if isinstance(process, ChemicalAnalysisRequest) else None,
+            )
             if plant is not None else User.objects.none()
         )
+        analyst_field = self.fields["analysts"]
+        analyst_field.queryset = analyst_queryset
+        analyst_field.label_from_instance = lambda analyst: (
+            f"{analyst.full_name} · @{analyst.get_username()}"
+            if analyst.full_name
+            else analyst.get_username()
+        )
+        analyst_candidates = list(analyst_queryset)
+        self.analyst_count = len(analyst_candidates)
+        analyst_field.choices = [
+            (
+                str(analyst.pk),
+                analyst_field.label_from_instance(analyst),
+            )
+            for analyst in analyst_candidates
+        ]
         if process is not None:
             self.initial["analysts"] = process.assigned_analysts.values_list("pk", flat=True)
         apply_field_classes(self)
@@ -4185,6 +4449,58 @@ class AnalystAssignmentForm(forms.Form):
         _validate_plant_access(self.user, self.process.treatment_plant)
         if not cleaned.get("analysts"):
             raise ValidationError("At least one analyst must be assigned.")
+        return cleaned
+
+
+class ChemicalBatchHoldResolutionForm(forms.Form):
+    resolution = forms.CharField(
+        label="Resolution / corrective action",
+        min_length=5,
+        widget=forms.Textarea(attrs={"rows": 4}),
+    )
+    reject_batch = forms.BooleanField(
+        required=False,
+        label="Reject the batch and stop the workflow",
+    )
+
+    def __init__(self, *args, user=None, hold=None, **kwargs):
+        self.user = user
+        self.hold = hold
+        super().__init__(*args, **kwargs)
+        apply_field_classes(self)
+
+    def clean(self):
+        cleaned = super().clean()
+        _require_active_user(self.user)
+        _require_permission(self.user, "ca.resolve_chemical_batch_hold")
+        if self.hold is None:
+            raise ValidationError("A chemical batch hold is required.")
+        _validate_plant_access(self.user, self.hold.batch.treatment_plant)
+        if self.hold.status != ChemicalBatchHold.Status.OPEN:
+            raise ValidationError("This hold has already been closed.")
+        return cleaned
+
+
+class ChemicalCustodyRecordForm(forms.Form):
+    from_location = forms.CharField(label="From location", max_length=255, required=False)
+    to_location = forms.CharField(label="To location", max_length=255, required=True)
+    seal_number = forms.CharField(label="Seal / container identifier", max_length=100, required=False)
+    evidence = forms.FileField(label="Evidence attachment", required=False)
+    remarks = forms.CharField(label="Transfer notes", widget=forms.Textarea(attrs={"rows": 3}))
+
+    def __init__(self, *args, user=None, batch=None, **kwargs):
+        self.user = user
+        self.batch = batch
+        super().__init__(*args, **kwargs)
+        apply_field_classes(self)
+
+    def clean(self):
+        cleaned = super().clean()
+        _require_active_user(self.user)
+        _require_permission(self.user, "ca.record_chemical_custody")
+        if self.batch is None:
+            raise ValidationError("A chemical batch is required.")
+        _validate_plant_access(self.user, self.batch.treatment_plant)
         return cleaned
 
 

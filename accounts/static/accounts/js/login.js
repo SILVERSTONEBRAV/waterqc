@@ -246,6 +246,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const container = document.querySelector('.login-container');
                 container.style.transition = 'opacity 0.5s';
                 container.style.opacity = 0;
+                sessionStorage.setItem('qad_active_session', 'active');
+                sessionStorage.setItem('qad_session_start', Date.now().toString());
                 setTimeout(() => window.location.href = json.redirect, 500);
             } else if (json?.error) {
                 showError(json.error);
@@ -323,6 +325,64 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Prevent clickjacking / iframe embedding
     if (window.top !== window.self) window.top.location = window.location;
+
+    // -----------------------------
+    // Forgot Password (AJAX)
+    // -----------------------------
+    const forgotLink = document.getElementById('forgotPasswordLink');
+    const resetMsg = document.getElementById('resetMessage');
+
+    if (forgotLink) {
+        forgotLink.addEventListener('click', async (e) => {
+            e.preventDefault();
+            if (forgotLink.classList.contains('disabled-link')) return;
+
+            const username = usernameInput.value.trim();
+            if (!username) {
+                showError('Please verify your username first.');
+                return;
+            }
+
+            const url = forgotLink.dataset.url;
+            forgotLink.classList.add('disabled-link');
+
+            // Show sending state
+            resetMsg.style.display = 'block';
+            resetMsg.className = 'reset-status sending';
+            resetMsg.innerHTML = '<i class="fas fa-spinner fa-spin"></i>&nbsp; Sending reset email…';
+
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRFToken': getCSRFToken(),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: `username=${encodeURIComponent(username)}`
+                });
+
+                const data = await res.json();
+
+                if (data.success) {
+                    resetMsg.className = 'reset-status success';
+                    resetMsg.innerHTML = '<i class="fas fa-check-circle"></i>&nbsp; ' + data.message;
+                } else {
+                    resetMsg.className = 'reset-status error';
+                    resetMsg.innerHTML = '<i class="fas fa-exclamation-circle"></i>&nbsp; ' + data.message;
+                }
+            } catch (err) {
+                console.error(err);
+                resetMsg.className = 'reset-status error';
+                resetMsg.innerHTML = '<i class="fas fa-exclamation-circle"></i>&nbsp; Network error. Please try again.';
+            }
+
+            // Re-enable after 30s cooldown
+            setTimeout(() => {
+                forgotLink.classList.remove('disabled-link');
+            }, 30000);
+        });
+    }
 
     // -----------------------------
     // Initial focus and UI state

@@ -5,23 +5,30 @@
   "start_url": "/qc/cards/",
   "scope": "/qc/",
   "display": "fullscreen",
-  "display_override": ["fullscreen", "standalone", "window-controls-overlay"],
-  "orientation": "landscape-primary",
-  "background_color": "#0a0f1a",
-  "theme_color": "#0f172a",
+  "display_override": ["fullscreen"],
+  "launch_handler": { "client_mode": "navigate-existing" },
+  "orientation": "any",
+  "background_color": "#f4f6f8",
+  "theme_color": "#417690",
   "categories": ["utilities", "productivity", "analytics"],
   "icons": [
     {
-      "src": "/static/core/img/logo.png",
+      "src": "/static/pwa/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "/static/core/img/logo.png",
+      "src": "/static/pwa/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/static/pwa/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "shortcuts": [

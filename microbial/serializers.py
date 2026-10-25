@@ -29,11 +29,22 @@ class MicrobialMethodSerializer(serializers.ModelSerializer):
 # Microbial Parameter Result Serializer
 class MicrobialParameterResultSerializer(serializers.ModelSerializer):
     parameter_name = serializers.CharField(source='parameter.parameter.name', read_only=True)
+    result_value = serializers.FloatField(source='value')
+    entry_status = serializers.CharField(read_only=True)
 
     class Meta:
         model = MicrobialParameterResult
-        fields = ['id', 'parameter', 'parameter_name', 'result_value', 'created_at', 'updated_at']
+        fields = ['id', 'parameter', 'parameter_name', 'result_value', 'entry_status', 'created_at', 'updated_at']
         read_only_fields = ['created_at', 'updated_at']
+
+    def create(self, validated_data):
+        validated_data['entry_status'] = MicrobialParameterResult.EntryStatus.RECORDED
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        if 'value' in validated_data:
+            instance.entry_status = MicrobialParameterResult.EntryStatus.RECORDED
+        return super().update(instance, validated_data)
 
 
 # Treated Water Parameter Result Serializer

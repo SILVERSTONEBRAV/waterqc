@@ -1,6 +1,7 @@
 #qc/models.py
 import string
 import random
+import uuid
 from decimal import Decimal
 from datetime import datetime, timedelta, time as dt_time
 from django.apps import apps
@@ -653,6 +654,7 @@ class WaterAnalysis(TimeStampedModel):
         from qc.services.result_generator import AnalysisResultGenerator
         return AnalysisResultGenerator.generate_for_analysis(self)
 
+    @transaction.atomic
     def save(self, *args, **kwargs):
         if not self.reference_id:
             self.reference_id = self.generate_reference()
@@ -749,6 +751,7 @@ class BaseResult(TimeStampedModel):
                 "phase": "This treatment plant has no phases."
             })
 
+    @transaction.atomic
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
@@ -973,3 +976,37 @@ class WaterAnalysisLog(TimeStampedModel):
 
     def __str__(self):
         return f"{self.action} on {self.analysis.reference_id} by {self.actor or 'System'}"
+
+
+class QCRealtimeOutboxEvent(models.Model):
+    """Durable, plant-scoped invalidation event waiting for WebSocket delivery."""
+
+    event_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    event_type = models.CharField(max_length=80, db_index=True)
+    aggregate_type = models.CharField(max_length=80)
+    aggregate_id = models.CharField(max_length=80)
+    plant_id = models.PositiveBigIntegerField(db_index=True)
+    payload = models.JSONField(default=dict)
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+    available_at = models.DateTimeField(default=timezone.now, db_index=True)
+    attempt_count = models.PositiveIntegerField(default=0)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ("created_at", "event_id")
+        indexes = [
+            models.Index(
+                fields=("delivered_at", "available_at"),
+                name="qc_outbox_pending_idx",
+            ),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(attempt_count__gte=0),
+                name="qc_outbox_attempts_nonneg",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.event_type} · {self.aggregate_type} {self.aggregate_id}"

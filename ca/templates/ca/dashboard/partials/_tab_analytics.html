@@ -1,0 +1,289 @@
+<!-- ca/dashboard/partials/_tab_analytics.html -->
+<div class="ca-analytics-workspace" id="ca-analytics-container">
+
+    <!-- ANALYTICS CONTROLS TOOLBAR -->
+    <div class="ca-analytics-toolbar">
+        <div class="ca-analytics-toolbar__group">
+            <label class="ca-tool-label" for="analytics-chem-select"><i class="fa fa-flask"></i> Chemical:</label>
+            <select id="analytics-chem-select" class="ca-tool-select" onchange="CA_Analytics.refresh()">
+                <option value="all" {% if analytics.selected_chemical_id == "all" %}selected{% endif %}>All Water Chemicals</option>
+                {% for chem in analytics.all_chemicals %}
+                <option value="{{ chem.id }}" {% if analytics.selected_chemical_id == chem.id|stringformat:"s" %}selected{% endif %}>
+                    {{ chem.name }} ({{ chem.code }})
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="ca-analytics-toolbar__group">
+            <label class="ca-tool-label" for="analytics-param-select"><i class="fa fa-sliders"></i> Parameter:</label>
+            <select id="analytics-param-select" class="ca-tool-select" onchange="CA_Analytics.refresh()">
+                {% for param in analytics.available_parameters %}
+                <option value="{{ param }}" {% if analytics.selected_parameter == param %}selected{% endif %}>{{ param }}</option>
+                {% empty %}
+                <option value="pH">pH (1% soln)</option>
+                <option value="Turbidity">Turbidity (NTU)</option>
+                <option value="Specific Gravity">Specific Gravity</option>
+                <option value="Active Component %">Active Component %</option>
+                <option value="Insoluble Matter %">Insoluble Matter %</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="ca-analytics-toolbar__group">
+            <label class="ca-tool-label" for="analytics-days-select"><i class="fa fa-calendar-days"></i> Window:</label>
+            <select id="analytics-days-select" class="ca-tool-select" onchange="CA_Analytics.refresh()">
+                <option value="7" {% if analytics.horizon_days == 7 %}selected{% endif %}>Last 7 Days</option>
+                <option value="30" {% if analytics.horizon_days == 30 %}selected{% endif %}>Last 30 Days</option>
+                <option value="90" {% if analytics.horizon_days == 90 %}selected{% endif %}>Last 90 Days</option>
+                <option value="180" {% if analytics.horizon_days == 180 %}selected{% endif %}>Last 6 Months</option>
+                <option value="365" {% if analytics.horizon_days == 365 %}selected{% endif %}>Last 1 Year</option>
+                <option value="0" {% if analytics.horizon_days == 0 %}selected{% endif %}>All Records</option>
+            </select>
+        </div>
+
+        <div class="ca-analytics-toolbar__group">
+            <label class="ca-tool-label" for="analytics-mode-select"><i class="fa fa-brain"></i> Analytical Engine:</label>
+            <select id="analytics-mode-select" class="ca-tool-select" onchange="CA_Analytics.refresh()">
+                <option value="spc" {% if analytics.mode == "spc" %}selected{% endif %}>Shewhart SPC Control Charts</option>
+                <option value="forecast" {% if analytics.mode == "forecast" %}selected{% endif %}>Statsmodels Exponential Forecasting</option>
+                <option value="anomalies" {% if analytics.mode == "anomalies" %}selected{% endif %}>Scikit-Learn IsolationForest ML</option>
+                <option value="suppliers" {% if analytics.mode == "suppliers" %}selected{% endif %}>Supplier Variance ANOVA & Distribution</option>
+                <option value="correlation" {% if analytics.mode == "correlation" %}selected{% endif %}>Cross-Parameter Heatmap Correlation</option>
+                <option value="capability" {% if analytics.mode == "capability" %}selected{% endif %}>Process Capability (Cp, Cpk & Sigma)</option>
+            </select>
+        </div>
+
+        <button type="button" class="ca-mt-btn ca-mt-btn--glow" onclick="CA_Analytics.refresh()">
+            <i class="fa fa-rotate"></i> Recalculate
+        </button>
+    </div>
+
+    <!-- STATISTICAL SUMMARY METRICS STRIP -->
+    <div class="ca-analytics-kpis" id="ca-analytics-kpis">
+        <div class="ca-analytics-kpi">
+            <span class="ca-akpi-label">Target Parameter</span>
+            <span class="ca-akpi-val" id="kpi-param-name">{{ analytics.selected_parameter }}</span>
+        </div>
+        <div class="ca-analytics-kpi">
+            <span class="ca-akpi-label">Process Mean (μ)</span>
+            <span class="ca-akpi-val ca-akpi-val--cyan" id="kpi-mean">{{ analytics.mean|default:"—" }}</span>
+        </div>
+        <div class="ca-analytics-kpi">
+            <span class="ca-akpi-label">Std Deviation (σ)</span>
+            <span class="ca-akpi-val" id="kpi-std">{{ analytics.std|default:"—" }}</span>
+        </div>
+        {% if analytics.mode == "spc" %}
+        <div class="ca-analytics-kpi">
+            <span class="ca-akpi-label">Control Limits (UCL / LCL)</span>
+            <span class="ca-akpi-val" id="kpi-limits">{{ analytics.ucl|default:"—" }} / {{ analytics.lcl|default:"—" }}</span>
+        </div>
+        <div class="ca-analytics-kpi">
+            <span class="ca-akpi-label">Capability (Cpk)</span>
+            <span class="ca-akpi-val ca-akpi-val--emerald" id="kpi-cpk">{{ analytics.cpk|default:"—" }}</span>
+        </div>
+        <div class="ca-analytics-kpi">
+            <span class="ca-akpi-label">Rule Violations</span>
+            <span class="ca-akpi-val {% if analytics.violations_count %}ca-akpi-val--rose{% else %}ca-akpi-val--emerald{% endif %}" id="kpi-violations">{{ analytics.violations_count|default:0 }}</span>
+        </div>
+        {% elif analytics.mode == "forecast" %}
+        <div class="ca-analytics-kpi">
+            <span class="ca-akpi-label">Forecast Horizon</span>
+            <span class="ca-akpi-val ca-akpi-val--cyan">14 Days Forward</span>
+        </div>
+        <div class="ca-analytics-kpi">
+            <span class="ca-akpi-label">Projected Mean</span>
+            <span class="ca-akpi-val ca-akpi-val--amber">{{ analytics.forecast_mean|default:"—" }}</span>
+        </div>
+        <div class="ca-analytics-kpi">
+            <span class="ca-akpi-label">Trend Trajectory</span>
+            <span class="ca-akpi-val ca-akpi-val--emerald">{{ analytics.trend_direction|default:"Stable" }}</span>
+        </div>
+        {% elif analytics.mode == "anomalies" %}
+        <div class="ca-analytics-kpi">
+            <span class="ca-akpi-label">Algorithm</span>
+            <span class="ca-akpi-val ca-akpi-val--cyan">IsolationForest</span>
+        </div>
+        <div class="ca-analytics-kpi">
+            <span class="ca-akpi-label">Detected Outliers</span>
+            <span class="ca-akpi-val {% if analytics.anomalies_count %}ca-akpi-val--rose{% else %}ca-akpi-val--emerald{% endif %}">{{ analytics.anomalies_count|default:0 }}</span>
+        </div>
+        <div class="ca-analytics-kpi">
+            <span class="ca-akpi-label">Contamination Rate</span>
+            <span class="ca-akpi-val">{{ analytics.contamination_rate|default:"0.0%" }}</span>
+        </div>
+        {% elif analytics.mode == "suppliers" %}
+        <div class="ca-analytics-kpi">
+            <span class="ca-akpi-label">Active Suppliers</span>
+            <span class="ca-akpi-val ca-akpi-val--cyan">{{ analytics.supplier_count|default:0 }}</span>
+        </div>
+        <div class="ca-analytics-kpi">
+            <span class="ca-akpi-label">ANOVA F-Statistic</span>
+            <span class="ca-akpi-val">{{ analytics.anova_f_stat|default:"—" }}</span>
+        </div>
+        <div class="ca-analytics-kpi">
+            <span class="ca-akpi-label">Significant Variance (p &lt; 0.05)</span>
+            <span class="ca-akpi-val {% if analytics.is_significant %}ca-akpi-val--rose{% else %}ca-akpi-val--emerald{% endif %}">{% if analytics.is_significant %}Yes (Divergent){% else %}No (Uniform){% endif %}</span>
+        </div>
+        {% elif analytics.mode == "capability" %}
+        <div class="ca-analytics-kpi">
+            <span class="ca-akpi-label">Process Capability (Cp)</span>
+            <span class="ca-akpi-val ca-akpi-val--cyan">{{ analytics.cp|default:"—" }}</span>
+        </div>
+        <div class="ca-analytics-kpi">
+            <span class="ca-akpi-label">Process Capability (Cpk)</span>
+            <span class="ca-akpi-val ca-akpi-val--emerald">{{ analytics.cpk|default:"—" }}</span>
+        </div>
+        <div class="ca-analytics-kpi">
+            <span class="ca-akpi-label">Six Sigma Level</span>
+            <span class="ca-akpi-val ca-akpi-val--emerald">{{ analytics.sigma_level|default:"—" }}</span>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- MAIN PLOTLY CHART CONTAINER -->
+    <div class="ca-analytics-chart-panel">
+        <div class="ca-analytics-chart-panel__head">
+            <div class="ca-chart-title">
+                <i class="fa fa-chart-line"></i>
+                <span id="chart-main-title">{{ analytics.title|default:"Laboratory Quality Analytics" }}</span>
+            </div>
+            <div class="ca-chart-badges">
+                <span class="ca-mt-pill ca-mt-pill--cyan"><i class="fa fa-microchip"></i> Plotly 6.0 Engine</span>
+                <span class="ca-mt-pill ca-mt-pill--emerald"><i class="fa fa-database"></i> {{ analytics.total_points|default:0 }} Data Points</span>
+            </div>
+        </div>
+
+        <div class="ca-chart-wrapper" id="plotly-chart-viewport" style="min-height: 380px; position: relative;">
+            <div id="ca-plotly-render" style="width: 100%; height: 380px;"></div>
+            <div id="ca-chart-loader" class="ca-chart-loader" style="display: none;">
+                <div class="ca-spinner"></div>
+                <span>Computing analytical model via Scikit-Learn / Statsmodels...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ANOMALIES & RULE VIOLATIONS DETAIL TABLE -->
+    <div class="ca-analytics-details-grid">
+        <div class="ca-mt-panel">
+            <div class="ca-mt-panel__head">
+                <span class="ca-mt-panel__title"><i class="fa fa-triangle-exclamation"></i> Out-of-Control & Western Electric Signals</span>
+                <span class="ca-mt-pill ca-mt-pill--amber">{{ analytics.violations|length|default:0 }} Events</span>
+            </div>
+            <div class="ca-mt-panel__body">
+                <ul class="ca-violations-list">
+                    {% for v in analytics.violations %}
+                    <li class="ca-violation-item"><i class="fa fa-circle-exclamation"></i> {{ v }}</li>
+                    {% empty %}
+                    <li class="ca-violation-item is-clean"><i class="fa fa-circle-check"></i> Process operating in statistical control. No Western Electric runs or limit breaches detected.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <div class="ca-mt-panel">
+            <div class="ca-mt-panel__head">
+                <span class="ca-mt-panel__title"><i class="fa fa-shield-halved"></i> Quality Assurance Recommendations</span>
+            </div>
+            <div class="ca-mt-panel__body">
+                <div class="ca-analytics-recommendation">
+                    <div class="ca-rec-item">
+                        <i class="fa fa-flask-vial ca-rec-icon--cyan"></i>
+                        <div class="ca-rec-text">
+                            <strong>Sampling Frequency Guidance</strong>
+                            <p>Current process capability indicates standard frequency is adequate. Maintain 1 test per 10 metric tonnes received.</p>
+                        </div>
+                    </div>
+                    <div class="ca-rec-item">
+                        <i class="fa fa-truck ca-rec-icon--emerald"></i>
+                        <div class="ca-rec-text">
+                            <strong>Supplier Variance Action</strong>
+                            <p>Suppliers exhibit consistent batch delivery. Review Certificate of Analysis baseline against lab titrations monthly.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Plotly CDN script if not already on page -->
+<script src="{% static 'js/plotly.min.js' %}" defer></script>
+
+<script>
+window.CA_Analytics = {
+    chartData: {{ analytics.chart_json|safe|default:"{}" }},
+
+    init: function() {
+        if (typeof Plotly === "undefined") {
+            setTimeout(window.CA_Analytics.init, 100);
+            return;
+        }
+        window.CA_Analytics.render(window.CA_Analytics.chartData);
+    },
+
+    render: function(spec) {
+        var el = document.getElementById("ca-plotly-render");
+        if (!el || !spec || !spec.data) return;
+
+        var config = {
+            responsive: true,
+            displayModeBar: true,
+            displaylogo: false,
+            modeBarButtonsToRemove: ['lasso2d', 'select2d']
+        };
+
+        Plotly.newPlot(el, spec.data, spec.layout || {}, config);
+    },
+
+    refresh: function() {
+        var chem = document.getElementById("analytics-chem-select").value;
+        var param = document.getElementById("analytics-param-select").value;
+        var days = document.getElementById("analytics-days-select").value;
+        var mode = document.getElementById("analytics-mode-select").value;
+
+        var loader = document.getElementById("ca-chart-loader");
+        if (loader) loader.style.display = "flex";
+
+        var url = "{% url 'ca:analytics-data' %}?chem=" + encodeURIComponent(chem) +
+                  "&param=" + encodeURIComponent(param) +
+                  "&days=" + encodeURIComponent(days) +
+                  "&mode=" + encodeURIComponent(mode);
+
+        fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                if (loader) loader.style.display = "none";
+                if (data.title) {
+                    var titleEl = document.getElementById("chart-main-title");
+                    if (titleEl) titleEl.textContent = data.title;
+                }
+                if (data.chart_json) {
+                    var spec = typeof data.chart_json === "string" ? JSON.parse(data.chart_json) : data.chart_json;
+                    window.CA_Analytics.render(spec);
+                }
+                // Update mean & std
+                if (data.mean !== undefined) {
+                    var mEl = document.getElementById("kpi-mean");
+                    if (mEl) mEl.textContent = data.mean;
+                }
+                if (data.std !== undefined) {
+                    var sEl = document.getElementById("kpi-std");
+                    if (sEl) sEl.textContent = data.std;
+                }
+            })
+            .catch(function(err) {
+                if (loader) loader.style.display = "none";
+                console.error("Failed to refresh analytics:", err);
+            });
+    }
+};
+
+document.addEventListener("DOMContentLoaded", function() {
+    window.CA_Analytics.init();
+});
+if (document.readyState === "complete" || document.readyState === "interactive") {
+    window.CA_Analytics.init();
+}
+</script>

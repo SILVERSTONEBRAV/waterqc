@@ -7,7 +7,7 @@ from django.db.models import Q
 from core.engine.super_user import SuperUserEngine
 from core.mixins import WanjalaMixin
 
-from .navigation import build_ca_sidebar
+from .navigation import CA_TASK_ACTION_PERMISSIONS, build_ca_sidebar
 
 
 PLANT_SESSION_KEY = "ca_selected_treatment_plant"
@@ -48,6 +48,12 @@ class CaWanjalaMixin(WanjalaMixin):
     def dispatch(self, request, *args, **kwargs):
         self.request = request
         self._normalize_permission_required()
+
+        # This module-level check runs before LoginRequiredMixin.dispatch().
+        # Let the standard login redirect handle anonymous users instead of
+        # turning a missing session into a 403 response.
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
 
         if not self.has_ca_module_access(request.user):
             raise PermissionDenied(
@@ -127,7 +133,16 @@ class CaWanjalaMixin(WanjalaMixin):
         return self.get_selected_plant()
 
     def get_available_plants(self):
-        return self.get_user_plants().order_by("name")
+        from t.models import TreatmentPlant
+        user = getattr(self.request, "user", None)
+        if self.is_ca_superuser():
+            return TreatmentPlant.objects.all().order_by("name")
+        assigned = getattr(user, "assigned_treatment_plant", None) if user else None
+        if assigned:
+            return TreatmentPlant.objects.filter(pk=assigned.pk)
+        if user and user.is_authenticated:
+            return TreatmentPlant.objects.filter(assigned_users=user).order_by("name")
+        return TreatmentPlant.objects.none()
 
     def get_selected_plant(self):
         from t.models import TreatmentPlant
@@ -208,6 +223,63 @@ class CaWanjalaMixin(WanjalaMixin):
                 "available_plants": plant_context.get("available_plants", []),
                 "selected_plant_id": plant_context.get("plant_id"),
                 "ca_sidebar_sections": build_ca_sidebar(self.request),
+                "can_view_my_tasks": self.is_ca_superuser()
+                or self.request.user.has_perm("ca.view_chemicalanalysisprocess")
+                or any(
+                    self.request.user.has_perm(permission)
+                    for permission in CA_TASK_ACTION_PERMISSIONS
+                ),
             }
         )
+        if "dashboard" in getattr(self, "template_name", ""):
+            from .models import (
+                Chemical,
+                ChemicalBatch,
+                ChemicalLocation,
+                Supplier,
+            )
+
+            may_view_batches = self.is_ca_superuser() or self.request.user.has_perm(
+                "ca.view_chemicalbatch"
+            )
+            if may_view_batches:
+                batches = self.scope_queryset(
+                    ChemicalBatch.objects.all(),
+                    field="treatment_plant_id",
+                )
+                chemical_ids = batches.values_list(
+                    "chemical_id", flat=True
+                ).distinct()
+                supplier_ids = batches.values_list(
+                    "supplier_id", flat=True
+                ).distinct()
+                context.setdefault(
+                    "chemicals",
+                    list(
+                        Chemical.objects.filter(pk__in=chemical_ids).order_by(
+                            "name"
+                        )
+                    ),
+                )
+                context.setdefault(
+                    "suppliers",
+                    list(
+                        Supplier.objects.filter(pk__in=supplier_ids).order_by(
+                            "name"
+                        )
+                    ),
+                )
+                locations = ChemicalLocation.objects.select_related(
+                    "treatment_plant"
+                ).order_by("treatment_plant__name", "name")
+                plant_id = plant_context.get("plant_id")
+                if plant_id is not None:
+                    locations = locations.filter(treatment_plant_id=plant_id)
+                elif not plant_context.get("is_superuser"):
+                    locations = locations.none()
+                context["chemical_locations"] = list(locations)
+            else:
+                context.setdefault("chemicals", [])
+                context.setdefault("suppliers", [])
+                context["chemical_locations"] = []
         return context

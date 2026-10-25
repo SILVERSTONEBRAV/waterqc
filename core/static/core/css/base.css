@@ -345,4 +345,51 @@ html.is-fullscreen-mode .topbar {
     padding-top: var(--safe-area-inset-top);
     padding-left: max(var(--space-6), var(--safe-area-inset-left));
     padding-right: max(var(--space-6), var(--safe-area-inset-right));
-}
+}
+/* =========================================================
+   APP SHELL — overflow-safe viewport pattern
+========================================================= */
+.app-shell {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    height: 100%;
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+}
+
+.app-content {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.app-content .table-responsive,
+.app-shell .table-responsive {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.app-content .card,
+.app-shell .card {
+    max-width: 100%;
+    overflow: hidden;
+}
+
+body:has(.app-shell) .content {
+    overflow: hidden !important;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}

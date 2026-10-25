@@ -148,10 +148,15 @@ class PHAdjustmentTest(ReviewMixin):
         for idx, jar in enumerate(scored, start=1):
             jar.performance_rank = idx
             jar.is_optimal = (idx == 1)
-            jar.save(update_fields=['performance_rank', 'is_optimal'])
+            PHAdjustmentJarResult.objects.filter(pk=jar.pk).update(
+                performance_rank=idx,
+                is_optimal=(idx == 1)
+            )
 
         self.established_dosage_ml = scored[0].dosage_ml
-        self.save(update_fields=['established_dosage_ml'])
+        PHAdjustmentTest.objects.filter(pk=self.pk).update(
+            established_dosage_ml=scored[0].dosage_ml
+        )
 
 
 # ============================
@@ -186,7 +191,13 @@ class PHAdjustmentJarResult(models.Model):
             raise ValidationError("Resulting pH must be between 0 and 14.")
 
     def save(self, *args, **kwargs):
+        if "update_fields" in kwargs and kwargs["update_fields"]:
+            fields = set(kwargs["update_fields"])
+            if fields.issubset({"performance_rank", "is_optimal"}):
+                super().save(*args, **kwargs)
+                return
+
         super().save(*args, **kwargs)
         # Auto-rank when six jars exist
-        if self.test.results.count() == 6:
+        if self.pk and self.test.results.count() == 6:
             self.test.rank_results()

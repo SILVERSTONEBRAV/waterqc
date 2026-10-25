@@ -82,58 +82,30 @@ def treatment_plant_context(request):
 
 
         # =================================================
-        # OPTIONAL PHASE SUPPORT
+        # OPTIONAL PHASE SUPPORT & WATER TYPES (CACHED)
         # =================================================
+        from django.core.cache import cache
 
-        phases = []
+        cache_key = f"qc_plant_meta:{plant.pk}"
+        meta = cache.get(cache_key)
+        if meta is None:
+            try:
+                phases = list(plant.phases.all()) if hasattr(plant, "phases") else []
+            except Exception:
+                phases = []
 
-        try:
-
-            if hasattr(
-                plant,
-                "phases",
-            ):
-
-                phases = list(
-                    plant.phases.all()
-                )
-
-        except Exception:
-
-            phases = []
-
-
-
-        # =================================================
-        # AVAILABLE WATER TYPES
-        # =================================================
-
-        water_types = []
-
-
-        try:
-
-            if hasattr(
-                plant,
-                "sampling_schedules",
-            ):
-
+            try:
                 water_types = list(
+                    plant.sampling_schedules.values_list("water_type", flat=True).distinct()
+                ) if hasattr(plant, "sampling_schedules") else []
+            except Exception:
+                water_types = []
 
-                    plant.sampling_schedules
-
-                    .values_list(
-                        "water_type",
-                        flat=True,
-                    )
-
-                    .distinct()
-
-                )
-
-        except Exception:
-
-            water_types = []
+            meta = {"phases": phases, "water_types": water_types}
+            cache.set(cache_key, meta, 300)
+        else:
+            phases = meta.get("phases", [])
+            water_types = meta.get("water_types", [])
 
 
 

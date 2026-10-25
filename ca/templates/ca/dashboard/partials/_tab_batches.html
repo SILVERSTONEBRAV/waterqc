@@ -1,0 +1,204 @@
+<!-- ca/templates/ca/dashboard/partials/_tab_batches.html -->
+{% load static %}
+
+<!-- BATCHES TELEMETRY STRIP -->
+<div class="ca-mt-kpis">
+    <div class="ca-mt-kpi">
+        <div class="ca-mt-kpi__label"><i class="fa fa-boxes-stacked"></i> Total Batches In Scope</div>
+        <div class="ca-mt-kpi__value">{{ counts.batches|default:batches|length|default:0 }}</div>
+        <div class="ca-mt-kpi__sub">Assigned to {{ plant_context.plant_name }}</div>
+    </div>
+    <div class="ca-mt-kpi">
+        <div class="ca-mt-kpi__label"><i class="fa fa-hourglass-half"></i> Inactive / Quarantine</div>
+        <div class="ca-mt-kpi__value ca-val--amber">{{ queue_counts.received|default:0 }}</div>
+        <div class="ca-mt-kpi__sub">Awaiting QA & Lab intake</div>
+    </div>
+    <div class="ca-mt-kpi">
+        <div class="ca-mt-kpi__label"><i class="fa fa-circle-check"></i> Quality Approved</div>
+        <div class="ca-mt-kpi__value ca-val--emerald">{{ counts.approved_batches|default:coa_metrics.approved|default:0 }}</div>
+        <div class="ca-mt-kpi__sub">Certified for water dosing</div>
+    </div>
+    <div class="ca-mt-kpi">
+        <div class="ca-mt-kpi__label"><i class="fa fa-triangle-exclamation"></i> Out-of-Spec / Rejected</div>
+        <div class="ca-mt-kpi__value ca-val--crimson">{{ counts.rejected_batches|default:0 }}</div>
+        <div class="ca-mt-kpi__sub">Quarantined / return pending</div>
+    </div>
+</div>
+
+<!-- ADVANCED BATCHES CONTROLS & TABLE -->
+<div class="ca-mt-panel">
+    <div class="ca-mt-panel__head">
+        <div class="ca-panel-title-group">
+            <span class="ca-mt-panel__title">
+                <i class="fa fa-cubes"></i> Chemical Batch Registry & Inventory Controls
+            </span>
+            <span class="ca-badge ca-badge--glass">{{ batches|length }} In-View</span>
+        </div>
+
+        <div class="ca-toolbar-actions">
+            <div class="ca-search-input-wrap">
+                <i class="fa fa-search ca-search-icon"></i>
+                <input type="text" id="ca-batch-filter-input" class="ca-input-search" placeholder="Search batch, chemical, supplier..." onkeyup="filterBatchesTable()">
+            </div>
+            {% if permissions.receive %}<a class="ca-mt-btn ca-mt-btn--primary" href="{% url 'ca:batch-create' %}">
+                <i class="fa fa-plus"></i> Intake New Batch
+            </a>{% endif %}
+            {% if permissions.view_chemicalbatch %}<a class="ca-mt-btn" href="{% url 'ca:batch-list' %}">
+                <i class="fa fa-list"></i> Full Directory
+            </a>{% endif %}
+        </div>
+    </div>
+
+    <!-- STATUS CHIP QUICK FILTERS -->
+    <div class="ca-table-filters-bar">
+        <button class="ca-filter-chip is-active" onclick="filterBatchesByStatus('ALL', this)">All Batches</button>
+        <button class="ca-filter-chip" onclick="filterBatchesByStatus('RECEIVED', this)">Received</button>
+        <button class="ca-filter-chip" onclick="filterBatchesByStatus('ANALYSED', this)">Analysed</button>
+        <button class="ca-filter-chip" onclick="filterBatchesByStatus('APPROVED', this)">Approved</button>
+        <button class="ca-filter-chip" onclick="filterBatchesByStatus('REJECTED', this)">Rejected</button>
+        <button class="ca-filter-chip" onclick="filterBatchesByStatus('UTILIZED', this)">Utilized</button>
+    </div>
+
+    <div class="ca-mt-panel__body ca-table-responsive">
+        <table class="ca-mt-table" id="ca-batches-table">
+            <thead>
+                <tr>
+                    <th>Sample & Batch ID</th>
+                    <th>Chemical & Grade</th>
+                    <th>Supplier</th>
+                    <th>Volume / Units</th>
+                    <th>Plant Scope</th>
+                    <th>Received Date</th>
+                    <th>CoA Status</th>
+                    <th>Disposition Status</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for b in batches %}
+                <tr class="ca-batch-row" data-status="{{ b.status|upper }}" data-search="{{ b.sample_id }} {{ b.batch_number }} {{ b.delivery_note_number }} {{ b.chemical.name }} {{ b.supplier.name }}">
+                    <td>
+                        <div class="ca-sample-cell">
+                            <span class="ca-sample-id"><i class="fa fa-barcode"></i> {{ b.sample_id|default:b.batch_number|default:b.pk }}</span>
+                            {% if b.delivery_note_number %}
+                            <span class="ca-sub-note">DN: {{ b.delivery_note_number }}</span>
+                            {% elif b.batch_number %}
+                            <span class="ca-sub-note">Batch: {{ b.batch_number }}</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="ca-chem-cell">
+                            <strong>{{ b.chemical.name|default:"Unspecified" }}</strong>
+                            {% if b.chemical.code or b.chemical.grade %}
+                            <span class="ca-chem-badge">{{ b.chemical.code|default:b.chemical.grade }}</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="ca-supplier-cell">
+                            <i class="fa fa-building text-muted"></i>
+                            <span>{{ b.supplier.name|default:"—" }}</span>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="ca-qty-cell">
+                            <strong>{{ b.quantity_received|default:"0" }}</strong> <span class="ca-unit">{{ b.unit|default:"kg" }}</span>
+                            {% if b.package_count %}
+                            <span class="ca-pkg-tag">({{ b.package_count }} pkgs)</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        <span class="ca-plant-tag"><i class="fa fa-industry"></i> {{ b.treatment_plant.name|default:plant_context.plant_name }}</span>
+                    </td>
+                    <td>
+                        <span class="ca-date-text">{{ b.received_date|date:"M d, Y"|default:b.created_at|date:"M d, Y"|default:"—" }}</span>
+                    </td>
+                    <td>
+                        {% if b.coa_generated %}
+                        <span class="ca-status-pill ca-status-pill--emerald"><i class="fa fa-certificate"></i> CoA Issued</span>
+                        {% else %}
+                        <span class="ca-status-pill ca-status-pill--slate"><i class="fa fa-clock"></i> Pending CoA</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if b.status == 'APPROVED' %}
+                            <span class="ca-status-pill ca-status-pill--emerald ca-glow-emerald"><i class="fa fa-check-circle"></i> Approved</span>
+                        {% elif b.status == 'REJECTED' %}
+                            <span class="ca-status-pill ca-status-pill--crimson ca-glow-crimson"><i class="fa fa-ban"></i> Rejected</span>
+                        {% elif b.status == 'ANALYSED' %}
+                            <span class="ca-status-pill ca-status-pill--cyan"><i class="fa fa-vial"></i> Analysed</span>
+                        {% elif b.status == 'UTILIZED' %}
+                            <span class="ca-status-pill ca-status-pill--purple"><i class="fa fa-droplet"></i> Utilized</span>
+                        {% elif b.status == 'RETURNED' %}
+                            <span class="ca-status-pill ca-status-pill--slate"><i class="fa fa-rotate-left"></i> Returned</span>
+                        {% else %}
+                            <span class="ca-status-pill ca-status-pill--amber ca-glow-amber"><i class="fa fa-inbox"></i> {{ b.status|default:"Received" }}</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align: right;">
+                        <div class="ca-btn-group">
+                            {% if b.workflow_has_task %}
+                            <a class="ca-mt-btn ca-mt-btn--sm ca-mt-btn--primary" href="{{ b.workflow_action_url }}" title="{{ b.workflow_task_title }}">
+                                <i class="fa fa-forward-step"></i> Continue workflow
+                            </a>
+                            {% endif %}
+                            {% if permissions.view_chemicalbatch %}
+                            <a class="ca-mt-btn ca-mt-btn--sm" href="{% url 'ca:batch-detail' b.pk %}" title="Open Batch Dossier">
+                                <i class="fa fa-folder-open"></i> Dossier
+                            </a>
+                            {% endif %}
+                            {% if permissions.update_batch and permissions.view_chemicalbatch %}
+                            <a class="ca-mt-btn ca-mt-btn--sm ca-mt-btn--ghost" href="{% url 'ca:batch-update' b.pk %}" title="Update Batch Metadata">
+                                <i class="fa fa-pencil"></i>
+                            </a>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="9">
+                        <div class="ca-empty-state">
+                            <i class="fa fa-flask-vial ca-empty-state__icon"></i>
+                            <h3>No Chemical Batches Registered</h3>
+                            <p>No chemical batches match the active plant scope ({{ plant_context.plant_name }}).</p>
+                            {% if permissions.receive %}<a class="ca-mt-btn ca-mt-btn--primary" href="{% url 'ca:batch-create' %}">
+                                <i class="fa fa-plus"></i> Intake First Batch
+                            </a>{% endif %}
+                        </div>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+function filterBatchesTable() {
+    const input = document.getElementById('ca-batch-filter-input');
+    const filter = input.value.toUpperCase();
+    const rows = document.querySelectorAll('.ca-batch-row');
+    rows.forEach(row => {
+        const text = row.getAttribute('data-search').toUpperCase();
+        row.style.display = text.indexOf(filter) > -1 ? '' : 'none';
+    });
+}
+
+function filterBatchesByStatus(status, btn) {
+    document.querySelectorAll('.ca-table-filters-bar .ca-filter-chip').forEach(b => b.classList.remove('is-active'));
+    if (btn) btn.classList.add('is-active');
+
+    const rows = document.querySelectorAll('.ca-batch-row');
+    rows.forEach(row => {
+        const rowStatus = row.getAttribute('data-status');
+        if (status === 'ALL' || rowStatus === status) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+</script>

@@ -1,0 +1,1822 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Self Monitoring · QAD Infrastructure Command Center</title>
+<link rel="stylesheet" href="{% static 'css/font_awesome/all.min.css' %}">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   QUANTUM INFRASTRUCTURE COMMAND CENTER — DESIGN SYSTEM
+═══════════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root {
+  --void:       #010409;
+  --space:      #0b0f17;
+  --deep:       #111622;
+  --surface:    #161d2b;
+  --surface2:   #1f283b;
+  --border:     rgba(48,64,94,0.6);
+  --border-g:   rgba(56,189,248,0.3);
+
+  --cyan:       #38bdf8;
+  --cyan-d:     #0ea5e9;
+  --green:      #22c55e;
+  --green-d:    #16a34a;
+  --amber:      #f59e0b;
+  --red:        #ef4444;
+  --red-d:      #dc2626;
+  --violet:     #a78bfa;
+  --pink:       #f472b6;
+  --indigo:     #6366f1;
+  --teal:       #2dd4bf;
+  --orange:     #fb923c;
+
+  --text:       #f0f6fc;
+  --muted:      #8b949e;
+  --subtle:     #484f58;
+
+  --glass:      rgba(255,255,255,0.04);
+  --glass-h:    rgba(255,255,255,0.08);
+  --glass-b:    rgba(255,255,255,0.12);
+
+  --glow-cyan:  0 0 30px rgba(56,189,248,0.25);
+  --glow-green: 0 0 25px rgba(34,197,94,0.25);
+  --glow-red:   0 0 25px rgba(239,68,68,0.3);
+
+  --r:    10px;
+  --r-lg: 16px;
+  --r-xl: 22px;
+
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+
+body {
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: radial-gradient(circle at 10% 10%, #0d1527 0%, var(--void) 90%);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--space); }
+::-webkit-scrollbar-thumb { background: var(--subtle); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* ══════════════════════════════════════════════════════════════
+   TOP NAV BAR (WITH UNIVERSAL HOME AT LEFT & USER DROPDOWN AT RIGHT)
+══════════════════════════════════════════════════════════════ */
+.topbar {
+  flex: 0 0 auto;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 20px;
+  background: linear-gradient(90deg, rgba(14,23,42,0.95), rgba(17,24,39,0.95));
+  border-bottom: 1px solid var(--border-g);
+  backdrop-filter: blur(20px);
+  z-index: 1000;
+  position: relative;
+}
+
+/* Universal Home Link at Top Left */
+.home-redirect-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  background: linear-gradient(135deg, rgba(56,189,248,0.18), rgba(99,102,241,0.15));
+  border: 1px solid rgba(56,189,248,0.4);
+  border-radius: var(--r);
+  color: var(--cyan);
+  text-decoration: none;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  box-shadow: 0 0 15px rgba(56,189,248,0.15);
+  transition: all 0.25s ease;
+  white-space: nowrap;
+}
+.home-redirect-link:hover {
+  background: linear-gradient(135deg, rgba(56,189,248,0.3), rgba(99,102,241,0.25));
+  border-color: var(--cyan);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 0 20px rgba(56,189,248,0.35);
+}
+
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+}
+
+.topbar-icon {
+  width: 38px; height: 38px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #0284c7, #8b5cf6);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.15rem;
+  box-shadow: var(--glow-cyan);
+  animation: pulse-icon 3s ease-in-out infinite;
+}
+@keyframes pulse-icon {
+  0%,100% { box-shadow: 0 0 15px rgba(56,189,248,0.3); }
+  50%      { box-shadow: 0 0 30px rgba(56,189,248,0.7); }
+}
+
+.topbar-title {
+  font-size: 1rem; font-weight: 800; letter-spacing: 0.5px;
+  background: linear-gradient(90deg, var(--cyan), #c084fc);
+  -webkit-background-clip: text; color: transparent;
+}
+.topbar-sub { font-size: 0.68rem; color: var(--muted); margin-top: 2px; }
+
+.topbar-spacer { flex: 1; }
+
+/* Realtime Telemetry Pulse Badge */
+.telemetry-pulse {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 12px;
+  background: rgba(34,197,94,0.08);
+  border: 1px solid rgba(34,197,94,0.3);
+  border-radius: 20px;
+  font-size: 0.72rem; color: var(--green);
+  font-family: var(--font-mono);
+}
+.telemetry-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 10px var(--green);
+  animation: radar-ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@keyframes radar-ping {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34,197,94,0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(34,197,94,0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+}
+
+.topbar-time {
+  font-family: var(--font-mono);
+  font-size: 0.78rem; color: var(--cyan); letter-spacing: 0.5px;
+}
+
+/* User Dropdown at Top Right */
+.user-menu-wrapper {
+  position: relative;
+}
+.user-menu-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.user-menu-btn:hover, .user-menu-btn.active {
+  background: var(--surface2);
+  border-color: var(--border-g);
+  box-shadow: 0 0 15px rgba(56,189,248,0.2);
+}
+.user-avatar {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--cyan), var(--indigo));
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700;
+  font-size: 0.8rem;
+  position: relative;
+}
+.user-avatar-online {
+  position: absolute;
+  bottom: 0; right: 0;
+  width: 8px; height: 8px;
+  background: var(--green);
+  border: 1.5px solid var(--surface);
+  border-radius: 50%;
+}
+.user-info-text {
+  display: flex; flex-direction: column; text-align: left;
+}
+.user-fullname { font-size: 0.78rem; font-weight: 700; line-height: 1.2; }
+.user-role-badge { font-size: 0.62rem; color: var(--muted); }
+.user-chevron { font-size: 0.68rem; color: var(--muted); transition: transform 0.2s; }
+.user-menu-btn.active .user-chevron { transform: rotate(180deg); }
+
+/* Dropdown Menu Box */
+.user-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 260px;
+  background: rgba(22, 29, 43, 0.98);
+  border: 1px solid var(--border-g);
+  border-radius: var(--r-lg);
+  box-shadow: 0 16px 36px rgba(0,0,0,0.6), var(--glow-cyan);
+  backdrop-filter: blur(25px);
+  padding: 8px;
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 2000;
+  animation: dropIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.user-dropdown-menu.show { display: flex; }
+@keyframes dropIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.dropdown-user-header {
+  padding: 10px 12px;
+  background: var(--surface2);
+  border-radius: var(--r);
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dropdown-user-avatar {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--cyan), var(--indigo));
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 0.9rem; color: #fff;
+}
+.dropdown-user-details strong { display: block; font-size: 0.82rem; font-weight: 700; color: var(--text); }
+.dropdown-user-details small { font-size: 0.68rem; color: var(--muted); }
+
+.dropdown-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.78rem;
+  font-weight: 500;
+  border-radius: var(--r);
+  transition: all 0.15s;
+}
+.dropdown-item i { width: 16px; text-align: center; color: var(--cyan); font-size: 0.85rem; }
+.dropdown-item:hover { background: var(--surface2); color: #fff; }
+
+.dropdown-logout-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  color: var(--red);
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: var(--r);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.dropdown-logout-btn i { width: 16px; text-align: center; }
+.dropdown-logout-btn:hover { background: rgba(239,68,68,0.15); color: #ff6b6b; }
+
+/* ══════════════════════════════════════════════════════════════
+   REALTIME TELEMETRY WAVE BAR (ADVANCED REALTIME MONITORING)
+══════════════════════════════════════════════════════════════ */
+.telemetry-strip {
+  flex: 0 0 auto;
+  height: 48px;
+  background: rgba(11, 15, 23, 0.85);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 20px;
+  font-size: 0.74rem;
+}
+.telemetry-pill {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.telemetry-pill strong { font-family: var(--font-mono); color: var(--cyan); }
+.rate-select {
+  padding: 3px 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.72rem;
+  font-family: inherit;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   LAYOUT
+══════════════════════════════════════════════════════════════ */
+.layout { display: flex; flex: 1; min-height: 0; }
+
+.sidebar {
+  flex: 0 0 220px;
+  background: var(--space);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  padding: 12px 10px;
+  gap: 4px;
+  overflow-y: auto;
+}
+
+.sidebar-label {
+  font-size: 0.62rem; font-weight: 800; letter-spacing: 2px;
+  text-transform: uppercase; color: var(--subtle);
+  padding: 8px 10px 4px;
+}
+
+.tab-btn {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--r);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 0.82rem; font-weight: 500;
+  width: 100%; text-align: left;
+  transition: all 0.2s;
+  position: relative;
+}
+.tab-btn .tab-icon { font-size: 0.95rem; width: 20px; text-align: center; }
+.tab-btn:hover { background: var(--glass-h); color: var(--text); }
+.tab-btn.active {
+  background: linear-gradient(90deg, rgba(56,189,248,0.18), rgba(56,189,248,0.05));
+  color: var(--cyan);
+  border-left: 3px solid var(--cyan);
+  font-weight: 700;
+}
+.tab-btn .badge {
+  margin-left: auto;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 0.6rem; font-weight: 700;
+  background: rgba(239,68,68,0.2);
+  color: var(--red);
+  display: none;
+}
+.tab-btn .badge.show { display: inline-block; }
+
+.content { flex: 1; min-width: 0; overflow-y: auto; padding: 20px 24px; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; animation: fadeIn 0.2s ease-in-out; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* ══════════════════════════════════════════════════════════════
+   SHARED UI COMPONENTS & METRIC CARDS
+══════════════════════════════════════════════════════════════ */
+.section-hdr {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 16px;
+}
+.section-hdr h2 {
+  font-size: 1.15rem; font-weight: 800;
+  background: linear-gradient(90deg, var(--text), var(--muted));
+  -webkit-background-clip: text; color: transparent;
+}
+.section-hdr .pill {
+  padding: 3px 10px; border-radius: 20px;
+  font-size: 0.65rem; font-weight: 700; letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.metric-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 14px 16px;
+  display: flex; flex-direction: column;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+.metric-card:hover { border-color: var(--border-g); transform: translateY(-2px); }
+.metric-label { font-size: 0.68rem; font-weight: 700; color: var(--muted); text-transform: uppercase; margin-bottom: 6px; }
+.metric-value { font-size: 1.5rem; font-weight: 900; font-family: var(--font-mono); color: var(--text); }
+.metric-unit { font-size: 0.68rem; color: var(--muted); margin-top: 4px; }
+.metric-sub { font-size: 0.72rem; color: var(--cyan); margin-top: 2px; font-weight: 600; }
+
+.progress-wrap { margin-top: 8px; }
+.progress-bar { height: 5px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 3px; background: var(--cyan); transition: width 0.4s ease; }
+.progress-fill.warn { background: var(--amber); }
+.progress-fill.danger { background: var(--red); }
+
+/* ── Live Wave Charts Grid ── */
+.wave-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.wave-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+}
+.wave-card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.wave-card-title { font-size: 0.82rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.wave-card-stat { font-family: var(--font-mono); font-size: 1.15rem; font-weight: 800; color: var(--cyan); }
+.wave-canvas { width: 100%; height: 90px; display: block; }
+
+/* ── Action Buttons ── */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  color: var(--text);
+  font-size: 0.76rem; font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+.btn:hover { background: var(--glass-h); border-color: var(--border-g); }
+.btn.primary { background: linear-gradient(135deg, #0284c7, #2563eb); border: none; color: #fff; }
+.btn.primary:hover { opacity: 0.9; }
+.btn.danger { background: rgba(239,68,68,0.18); border-color: rgba(239,68,68,0.4); color: var(--red); }
+.btn.danger:hover { background: rgba(239,68,68,0.3); }
+.btn.success { background: rgba(34,197,94,0.18); border-color: rgba(34,197,94,0.4); color: var(--green); }
+
+/* ── Data Tables ── */
+.table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.data-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+.data-table th {
+  background: var(--surface2);
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 700;
+  font-size: 0.68rem;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+.data-table td {
+  padding: 11px 14px;
+  border-bottom: 1px solid rgba(48,64,94,0.3);
+  vertical-align: middle;
+}
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+/* Status Badges */
+.status {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 8px; border-radius: 12px;
+  font-size: 0.65rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.status.running, .status.healthy { background: rgba(34,197,94,0.15); color: var(--green); border: 1px solid rgba(34,197,94,0.3); }
+.status.exited, .status.error, .status.unhealthy { background: rgba(239,68,68,0.15); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+.status.paused, .status.warning, .status.starting { background: rgba(245,158,11,0.15); color: var(--amber); border: 1px solid rgba(245,158,11,0.3); }
+
+/* Security Ring */
+.score-ring-wrap {
+  display: flex; align-items: center; gap: 28px;
+  padding: 24px; background: var(--surface);
+  border: 1px solid var(--border-g); border-radius: var(--r-lg);
+  margin-bottom: 20px;
+}
+.score-ring { position: relative; width: 120px; height: 120px; flex-shrink: 0; }
+.score-ring svg { transform: rotate(-90deg); }
+.score-ring .ring-bg { fill: none; stroke: var(--surface2); stroke-width: 10; }
+.score-ring .ring-val { fill: none; stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset 1s ease; }
+.score-center {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.score-num { font-size: 1.8rem; font-weight: 900; font-family: var(--font-mono); }
+.score-grade { font-size: 0.75rem; color: var(--muted); font-weight: 700; }
+
+.risk-list { display: flex; flex-direction: column; gap: 10px; }
+.risk-item {
+  display: grid; grid-template-columns: auto 1fr;
+  gap: 14px; padding: 14px 18px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); transition: 0.2s;
+}
+.risk-item:hover { border-color: var(--border-g); background: var(--surface2); }
+.risk-icon { font-size: 1.4rem; padding-top: 2px; }
+.risk-body h4 { font-size: 0.86rem; font-weight: 700; margin-bottom: 4px; }
+.risk-body p { font-size: 0.75rem; color: var(--muted); margin-bottom: 6px; }
+.risk-rec { font-size: 0.72rem; color: var(--cyan); font-weight: 600; }
+
+/* Filter strip */
+.filter-strip { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.filter-strip input, .filter-strip select {
+  padding: 6px 12px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); color: var(--text);
+  font-size: 0.78rem; font-family: inherit;
+}
+.filter-strip input:focus, .filter-strip select:focus { outline: none; border-color: var(--border-g); }
+
+/* Health check grid */
+.health-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(260px,1fr)); gap: 12px; margin-bottom: 20px; }
+.health-card {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--r);
+  transition: 0.2s;
+}
+.health-card:hover { border-color: var(--border-g); }
+.health-card .h-icon { font-size: 1.4rem; }
+.health-card .h-name { font-size: 0.84rem; font-weight: 600; }
+.health-card .h-detail { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+.health-card .h-status { margin-left: auto; }
+
+/* Terminal Log Viewer */
+.log-viewer-card {
+  background: var(--void);
+  border: 1px solid var(--border-g);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+.log-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 14px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.log-viewer {
+  padding: 14px;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: #4ade80;
+  max-height: 480px;
+  min-height: 280px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.5;
+}
+
+/* Spinner */
+.spinner {
+  width: 20px; height: 20px;
+  border: 2px solid rgba(255,255,255,0.1);
+  border-top-color: var(--cyan);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-center {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 10px; padding: 40px; color: var(--muted); font-size: 0.8rem;
+}
+
+/* Toast */
+#toast { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.toast-msg {
+  padding: 10px 16px; border-radius: var(--r);
+  font-size: 0.8rem; font-weight: 600; backdrop-filter: blur(20px); border: 1px solid;
+  pointer-events: auto; animation: slideIn 0.3s ease;
+}
+.toast-msg.ok   { background: rgba(34,197,94,0.18); border-color: rgba(34,197,94,0.4); color: var(--green); }
+.toast-msg.err  { background: rgba(239,68,68,0.18); border-color: rgba(239,68,68,0.4); color: var(--red); }
+.toast-msg.info { background: rgba(56,189,248,0.15); border-color: rgba(56,189,248,0.3); color: var(--cyan); }
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+/* Confirm modal */
+#confirm-modal {
+  position: fixed; inset: 0; z-index: 9998;
+  background: rgba(1,4,9,0.85); backdrop-filter: blur(12px);
+  display: none; align-items: center; justify-content: center;
+}
+#confirm-modal.open { display: flex; }
+.confirm-box {
+  background: var(--surface); border: 1px solid var(--border-g);
+  border-radius: var(--r-xl); padding: 28px; max-width: 420px; width: 90%;
+  box-shadow: var(--glow-cyan);
+}
+.confirm-box h3 { font-size: 1.05rem; font-weight: 800; margin-bottom: 8px; }
+.confirm-box p { font-size: 0.84rem; color: var(--muted); margin-bottom: 20px; line-height: 1.4; }
+.confirm-box .actions { display: flex; gap: 10px; justify-content: flex-end; }
+</style>
+</head>
+<body>
+
+<!-- ── TOP BAR (UNIVERSAL HOME REDIRECT AT LEFT & USER DROPDOWN AT RIGHT) ── -->
+<header class="topbar">
+  <!-- Top Left: Universal Home Redirect Link -->
+  <a href="{{ landing_url|default:'/' }}" class="home-redirect-link" id="universalHomeLink" title="Return to Universal Home / Assigned Dashboard">
+    <i class="fa fa-home"></i>
+    <span>Home</span>
+  </a>
+
+  <!-- Brand Logo & Title -->
+  <a href="{{ landing_url|default:'/' }}" class="topbar-brand" title="QAD Infrastructure Command Center">
+    <div class="topbar-icon"><i class="fa fa-satellite-dish" style="color:#fff"></i></div>
+    <div>
+      <div class="topbar-title">QAD · Self Monitoring Command Center</div>
+      <div class="topbar-sub">Real-time Container Fleet &amp; Subsystem Intelligence</div>
+    </div>
+  </a>
+
+  <div class="topbar-spacer"></div>
+
+  <!-- Telemetry Streaming Pulse -->
+  <div class="telemetry-pulse">
+    <span class="telemetry-dot"></span>
+    <span id="telemetry-rate-label">REALTIME 1s</span>
+    <span style="opacity:0.6">·</span>
+    <span id="telemetry-latency">-- ms</span>
+  </div>
+
+  <div class="topbar-time" id="clock">--:--:--</div>
+
+  <!-- Top Right: User Dropdown -->
+  <div class="user-menu-wrapper">
+    <button class="user-menu-btn" id="userMenuToggleBtn" aria-haspopup="true" aria-expanded="false" onclick="toggleUserDropdown(event)">
+      <div class="user-avatar">
+        {{ request.user.first_name|default:request.user.username|slice:":1"|upper }}
+        <span class="user-avatar-online"></span>
+      </div>
+      <div class="user-info-text">
+        <span class="user-fullname">{{ request.user.full_name|default:request.user.username }}</span>
+        <span class="user-role-badge">{{ user_role|default:"Administrator" }}</span>
+      </div>
+      <i class="fa fa-chevron-down user-chevron"></i>
+    </button>
+
+    <!-- Dropdown Menu Box -->
+    <div class="user-dropdown-menu" id="userDropdownMenu">
+      <div class="dropdown-user-header">
+        <div class="dropdown-user-avatar">
+          {{ request.user.first_name|default:request.user.username|slice:":1"|upper }}
+        </div>
+        <div class="dropdown-user-details">
+          <strong>{{ request.user.full_name|default:request.user.username }}</strong>
+          <small>{{ request.user.email|default:user_role }}</small>
+        </div>
+      </div>
+
+      <div class="dropdown-divider"></div>
+
+      <!-- Universal Home link -->
+      <a href="{{ landing_url|default:'/' }}" class="dropdown-item">
+        <i class="fa fa-home"></i> Universal Home
+      </a>
+
+      <!-- Workflow & Command links -->
+      <a href="{% url 'ca:dashboard' %}" class="dropdown-item">
+        <i class="fa fa-diagram-project"></i> Command Center
+      </a>
+      <a href="{% url 'ca:process-list' %}" class="dropdown-item">
+        <i class="fa fa-chart-line"></i> Process Monitor
+      </a>
+      <a href="{% url 'ca:batch-list' %}" class="dropdown-item">
+        <i class="fa fa-flask-vial"></i> Chemical Batches
+      </a>
+
+      {% if request.user.is_staff or request.user.is_superuser %}
+      <a href="/admin/" class="dropdown-item">
+        <i class="fa fa-shield-halved"></i> Django Administration
+      </a>
+      {% endif %}
+
+      <a href="{% url 'accounts:change_password' %}" class="dropdown-item">
+        <i class="fa fa-key"></i> Change Password
+      </a>
+
+      <div class="dropdown-divider"></div>
+
+      <!-- Sign Out Form with CSRF -->
+      <form method="post" action="{% url 'accounts:logout' %}">
+        {% csrf_token %}
+        <button type="submit" class="dropdown-logout-btn">
+          <i class="fa fa-sign-out-alt"></i> Sign Out
+        </button>
+      </form>
+    </div>
+  </div>
+</header>
+
+<!-- ── REALTIME TELEMETRY CONTROL STRIP ── -->
+<div class="telemetry-strip">
+  <div class="telemetry-pill">
+    <span>OS CPU:</span> <strong id="strip-cpu">0.0%</strong>
+  </div>
+  <div class="telemetry-pill">
+    <span>RAM:</span> <strong id="strip-mem">0.0%</strong>
+  </div>
+  <div class="telemetry-pill">
+    <span>PostgreSQL Pool:</span> <strong id="strip-db">0 conn</strong>
+  </div>
+  <div class="telemetry-pill">
+    <span>Buffer Cache Hit:</span> <strong id="strip-db-hit">99.8%</strong>
+  </div>
+  <div class="telemetry-pill">
+    <span>Redis Ops/s:</span> <strong id="strip-redis-ops">0</strong>
+  </div>
+  <div class="telemetry-pill">
+    <span>Containers:</span> <strong id="strip-containers">0</strong>
+  </div>
+
+  <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+    <span style="color:var(--muted)">Poll Frequency:</span>
+    <select class="rate-select" id="pollRateSelect" onchange="changePollRate(this.value)">
+      <option value="1000" selected>1s (Ultra Realtime)</option>
+      <option value="2000">2s (Fast)</option>
+      <option value="5000">5s (Standard)</option>
+      <option value="10000">10s (Eco)</option>
+      <option value="0">Pause Telemetry</option>
+    </select>
+  </div>
+</div>
+
+<div class="layout">
+  <!-- ── SIDEBAR NAVIGATION ── -->
+  <nav class="sidebar">
+    <div class="sidebar-label">Monitoring</div>
+    <button class="tab-btn active" data-tab="overview"><span class="tab-icon">📊</span> Overview</button>
+    <button class="tab-btn" data-tab="realtime"><span class="tab-icon">📈</span> Live Waves</button>
+    <button class="tab-btn" data-tab="docker"><span class="tab-icon">🐳</span> Docker Containers</button>
+    <button class="tab-btn" data-tab="compose"><span class="tab-icon">🧩</span> Compose Fleet</button>
+    <button class="tab-btn" data-tab="system"><span class="tab-icon">🖥️</span> System Internals</button>
+    <button class="tab-btn" data-tab="k8s"><span class="tab-icon">☸️</span> Kubernetes</button>
+
+    <div class="sidebar-label" style="margin-top:10px">Intelligence &amp; Control</div>
+    <button class="tab-btn" data-tab="health"><span class="tab-icon">💚</span> App Health</button>
+    <button class="tab-btn" data-tab="security"><span class="tab-icon">🛡️</span> Security <span class="badge" id="sec-badge">!</span></button>
+    <button class="tab-btn" data-tab="logs"><span class="tab-icon">📋</span> Live Terminal Logs</button>
+    <button class="tab-btn" data-tab="report"><span class="tab-icon">📑</span> Daily Audit Report</button>
+  </nav>
+
+  <!-- ── MAIN CONTENT AREA ── -->
+  <main class="content">
+
+    <!-- ═══════════ TAB: OVERVIEW ═══════════ -->
+    <div class="tab-panel active" id="tab-overview">
+      <div class="section-hdr">
+        <h2>Infrastructure Performance Overview</h2>
+        <span class="pill" style="background:rgba(56,189,248,0.15);color:var(--cyan);border:1px solid rgba(56,189,248,0.25)">LIVE TELEMETRY</span>
+        <div style="margin-left:auto;display:flex;gap:8px">
+          <button class="btn primary" onclick="refreshAll()"><i class="fa fa-rotate"></i> Refresh All</button>
+        </div>
+      </div>
+
+      <!-- Overview Metric Cards -->
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-label">⚡ Overall CPU</div>
+          <div class="metric-value" id="ov-cpu">0.0%</div>
+          <div class="progress-wrap"><div class="progress-bar"><div class="progress-fill" id="ov-cpu-bar" style="width:0%"></div></div></div>
+          <div class="metric-unit" id="ov-cpu-sub">Host &amp; Container load</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">🧠 Memory Allocation</div>
+          <div class="metric-value" id="ov-mem">0.0%</div>
+          <div class="progress-wrap"><div class="progress-bar"><div class="progress-fill" id="ov-mem-bar" style="width:0%"></div></div></div>
+          <div class="metric-unit" id="ov-mem-detail">0 MB / 0 MB</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">🗄️ PostgreSQL Cache Hit</div>
+          <div class="metric-value" style="color:var(--green)" id="ov-db-hit">99.8%</div>
+          <div class="metric-sub" id="ov-db-backends">0 active connections</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">⚡ Redis In-Memory</div>
+          <div class="metric-value" style="color:var(--violet)" id="ov-redis-mem">0M</div>
+          <div class="metric-sub" id="ov-redis-ops">0 ops / second</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">🐳 Docker Containers</div>
+          <div class="metric-value" style="color:var(--cyan)" id="ov-containers">—</div>
+          <div class="metric-sub" id="ov-containers-sub">Scanning fleet…</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">🛡️ Security Rating</div>
+          <div class="metric-value" id="ov-sec">—</div>
+          <div class="metric-sub" id="ov-sec-grade">—</div>
+        </div>
+      </div>
+
+      <!-- Realtime Wave Cards Snapshot -->
+      <div class="section-hdr"><h2>Real-Time Wave Monitors</h2></div>
+      <div class="wave-charts-grid">
+        <div class="wave-card">
+          <div class="wave-card-header">
+            <span class="wave-card-title"><i class="fa fa-microchip" style="color:var(--cyan)"></i> CPU Utilization Wave</span>
+            <span class="wave-card-stat" id="wave-cpu-stat">0.0%</span>
+          </div>
+          <canvas id="canvas-cpu-wave" class="wave-canvas"></canvas>
+        </div>
+        <div class="wave-card">
+          <div class="wave-card-header">
+            <span class="wave-card-title"><i class="fa fa-memory" style="color:var(--violet)"></i> RAM Usage Wave</span>
+            <span class="wave-card-stat" id="wave-mem-stat" style="color:var(--violet)">0.0%</span>
+          </div>
+          <canvas id="canvas-mem-wave" class="wave-canvas"></canvas>
+        </div>
+      </div>
+
+      <!-- Subsystems Health Grid -->
+      <div class="section-hdr"><h2>Subsystems Operational Health</h2></div>
+      <div class="health-grid" id="overview-health">
+        <div class="loading-center"><div class="spinner"></div><span>Inspecting subsystem components…</span></div>
+      </div>
+    </div>
+
+    <!-- ═══════════ TAB: LIVE WAVES (ULTRA REALTIME MONITORING) ═══════════ -->
+    <div class="tab-panel" id="tab-realtime">
+      <div class="section-hdr">
+        <h2>Advanced Realtime Wave Oscilloscopes</h2>
+        <span class="pill" style="background:rgba(34,197,94,0.15);color:var(--green);border:1px solid rgba(34,197,94,0.3)">1000ms TELEMETRY STREAM</span>
+      </div>
+
+      <div class="wave-charts-grid" style="grid-template-columns: 1fr;">
+        <!-- High-res CPU Wave -->
+        <div class="wave-card">
+          <div class="wave-card-header">
+            <span class="wave-card-title"><i class="fa fa-bolt" style="color:var(--cyan)"></i> Processor Core Waveform (Rolling 60-second window)</span>
+            <span class="wave-card-stat" id="rt-cpu-val">0.0%</span>
+          </div>
+          <canvas id="canvas-rt-cpu" class="wave-canvas" style="height:140px"></canvas>
+        </div>
+
+        <!-- High-res Memory Wave -->
+        <div class="wave-card">
+          <div class="wave-card-header">
+            <span class="wave-card-title"><i class="fa fa-brain" style="color:var(--violet)"></i> Dynamic Memory Allocations</span>
+            <span class="wave-card-stat" id="rt-mem-val" style="color:var(--violet)">0.0%</span>
+          </div>
+          <canvas id="canvas-rt-mem" class="wave-canvas" style="height:140px"></canvas>
+        </div>
+
+        <!-- Database & Redis Live Pulse -->
+        <div class="wave-card">
+          <div class="wave-card-header">
+            <span class="wave-card-title"><i class="fa fa-database" style="color:var(--green)"></i> Database Connection Pool &amp; Redis Throughput</span>
+            <span class="wave-card-stat" id="rt-db-val" style="color:var(--green)">0 Conn / 0 Ops</span>
+          </div>
+          <canvas id="canvas-rt-db" class="wave-canvas" style="height:140px"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ TAB: DOCKER CONTAINERS ═══════════ -->
+    <div class="tab-panel" id="tab-docker">
+      <div class="section-hdr">
+        <h2>Docker Container Fleet</h2>
+        <button class="btn primary" onclick="loadDocker()"><i class="fa fa-rotate"></i> Rescan Fleet</button>
+      </div>
+
+      <div class="filter-strip">
+        <i class="fa fa-search" style="color:var(--muted)"></i>
+        <input type="text" id="docker-filter" placeholder="Filter container name or image…" oninput="filterDockerTable()">
+        <select id="docker-state-filter" onchange="filterDockerTable()">
+          <option value="">All States</option>
+          <option value="running">Running</option>
+          <option value="exited">Exited</option>
+          <option value="paused">Paused</option>
+        </select>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Container</th>
+              <th>Image</th>
+              <th>Status</th>
+              <th>CPU %</th>
+              <th>Memory (Usage / Limit)</th>
+              <th>Network I/O</th>
+              <th>Ports Mapping</th>
+              <th>Quick Actions</th>
+            </tr>
+          </thead>
+          <tbody id="docker-tbody">
+            <tr><td colspan="8" class="loading-center"><div class="spinner"></div><span>Querying Docker Engine…</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ═══════════ TAB: COMPOSE FLEET ═══════════ -->
+    <div class="tab-panel" id="tab-compose">
+      <div class="section-hdr">
+        <h2>Docker Compose Fleet Services</h2>
+        <button class="btn" onclick="loadCompose()"><i class="fa fa-rotate"></i> Refresh Compose</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Service Name</th>
+              <th>Image</th>
+              <th>State</th>
+              <th>Health Status</th>
+              <th>Ports / Network</th>
+            </tr>
+          </thead>
+          <tbody id="compose-tbody">
+            <tr><td colspan="5" class="loading-center"><div class="spinner"></div><span>Inspecting compose services…</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ═══════════ TAB: SYSTEM INTERNALS ═══════════ -->
+    <div class="tab-panel" id="tab-system">
+      <div class="section-hdr">
+        <h2>Host Server &amp; Kernel Internals</h2>
+        <button class="btn" onclick="loadSystem()"><i class="fa fa-rotate"></i> Refresh</button>
+      </div>
+
+      <div class="metrics-grid">
+        <div class="metric-card"><div class="metric-label">⚡ CPU</div><div class="metric-value" id="sys-cpu">—</div><div class="progress-wrap"><div class="progress-bar"><div class="progress-fill" id="sys-cpu-bar" style="width:0%"></div></div></div></div>
+        <div class="metric-card"><div class="metric-label">🧠 Memory</div><div class="metric-value" id="sys-mem">—</div><div class="metric-unit" id="sys-mem-d">—</div></div>
+        <div class="metric-card"><div class="metric-label">💾 Root Disk</div><div class="metric-value" id="sys-disk">—</div><div class="metric-unit" id="sys-disk-d">—</div></div>
+        <div class="metric-card"><div class="metric-label">⏱ Host Uptime</div><div class="metric-value" id="sys-uptime">—</div><div class="metric-unit">Active uptime</div></div>
+        <div class="metric-card"><div class="metric-label">📦 CPU Cores</div><div class="metric-value" id="sys-cores">—</div><div class="metric-unit">Logical threads</div></div>
+        <div class="metric-card"><div class="metric-label">📊 Load Average</div><div class="metric-value" id="sys-load">—</div><div class="metric-unit">1m / 5m / 15m</div></div>
+        <div class="metric-card"><div class="metric-label">🌐 Hostname</div><div class="metric-value" style="font-size:0.95rem" id="sys-host">—</div></div>
+        <div class="metric-card"><div class="metric-label">🖥 Kernel/OS</div><div class="metric-value" style="font-size:0.68rem;line-height:1.3" id="sys-platform">—</div></div>
+      </div>
+
+      <div class="section-hdr"><h2>Per-Core Processor Breakdown</h2></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin-bottom:20px" id="core-grid">
+        <div class="loading-center"><div class="spinner"></div></div>
+      </div>
+
+      <div class="section-hdr"><h2>Top Active Server Processes</h2></div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>PID</th><th>Command / Process</th><th>CPU %</th><th>Memory %</th><th>Process State</th></tr></thead>
+          <tbody id="proc-tbody"><tr><td colspan="5" class="loading-center"><div class="spinner"></div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ═══════════ TAB: KUBERNETES ═══════════ -->
+    <div class="tab-panel" id="tab-k8s">
+      <div class="section-hdr">
+        <h2>Kubernetes Cluster Inspection</h2>
+        <button class="btn" onclick="loadK8s()"><i class="fa fa-rotate"></i> Query K8s</button>
+      </div>
+      <div class="filter-strip">
+        <select id="k8s-resource" onchange="loadK8s()">
+          <option value="pods">Pods</option>
+          <option value="nodes">Nodes</option>
+          <option value="services">Services</option>
+          <option value="deployments">Deployments</option>
+        </select>
+        <input type="text" id="k8s-ns" placeholder="Namespace (default)" value="default">
+        <button class="btn primary" onclick="loadK8s()"><i class="fa fa-magnifying-glass"></i> Inspect</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Name</th><th>Namespace</th><th>Phase</th><th>Ready</th><th>Restarts</th><th>Node</th><th>Created</th></tr></thead>
+          <tbody id="k8s-tbody"><tr><td colspan="7" class="loading-center"><div class="spinner"></div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ═══════════ TAB: APP HEALTH ═══════════ -->
+    <div class="tab-panel" id="tab-health">
+      <div class="section-hdr">
+        <h2>Application Subsystem Diagnostics</h2>
+        <button class="btn primary" onclick="loadHealth()"><i class="fa fa-rotate"></i> Re-check Subsystems</button>
+      </div>
+      <div class="health-grid" id="health-grid">
+        <div class="loading-center"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- ═══════════ TAB: SECURITY ═══════════ -->
+    <div class="tab-panel" id="tab-security">
+      <div class="section-hdr">
+        <h2>Deep Security &amp; Vulnerability Matrix</h2>
+        <button class="btn danger" onclick="loadSecurity()"><i class="fa fa-shield-virus"></i> Run Security Scan</button>
+      </div>
+
+      <div class="score-ring-wrap" id="sec-score-wrap" style="display:none">
+        <div class="score-ring">
+          <svg viewBox="0 0 100 100" width="120" height="120">
+            <circle class="ring-bg" cx="50" cy="50" r="42"/>
+            <circle class="ring-val" id="ring-val" cx="50" cy="50" r="42" stroke-dasharray="264" stroke-dashoffset="264" stroke="#22c55e"/>
+          </svg>
+          <div class="score-center">
+            <span class="score-num" id="sec-score-num">100</span>
+            <span class="score-grade" id="sec-grade">Grade A+</span>
+          </div>
+        </div>
+        <div class="score-meta">
+          <h3>Security Posture Rating</h3>
+          <p>Continuous threat detection across authentication, docker networking, open ports, and configurations</p>
+          <div style="display:flex;gap:20px;margin-top:14px">
+            <div><strong id="sec-critical" style="font-size:1.2rem;color:var(--red)">0</strong> <small style="color:var(--muted);display:block">CRITICAL</small></div>
+            <div><strong id="sec-high" style="font-size:1.2rem;color:var(--amber)">0</strong> <small style="color:var(--muted);display:block">HIGH</small></div>
+            <div><strong id="sec-medium" style="font-size:1.2rem;color:var(--indigo)">0</strong> <small style="color:var(--muted);display:block">MEDIUM</small></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-hdr"><h2>Security Audit Findings</h2></div>
+      <div class="risk-list" id="risk-list">
+        <div class="loading-center"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- ═══════════ TAB: LIVE LOGS ═══════════ -->
+    <div class="tab-panel" id="tab-logs">
+      <div class="section-hdr">
+        <h2>Live Container Console &amp; Terminal Logs</h2>
+      </div>
+      <div class="filter-strip">
+        <select id="log-container" style="min-width:240px">
+          <option value="">— Select Docker Container —</option>
+        </select>
+        <select id="log-tail">
+          <option value="50">Last 50 lines</option>
+          <option value="150" selected>Last 150 lines</option>
+          <option value="300">Last 300 lines</option>
+          <option value="600">Last 600 lines</option>
+        </select>
+        <button class="btn primary" onclick="fetchLogs()"><i class="fa fa-terminal"></i> Stream Logs</button>
+        <button class="btn" onclick="clearLogs()"><i class="fa fa-eraser"></i> Clear</button>
+        <button class="btn" onclick="copyLogs()"><i class="fa fa-copy"></i> Copy Output</button>
+      </div>
+
+      <div class="log-viewer-card">
+        <div class="log-toolbar">
+          <span style="font-size:0.75rem;color:var(--muted)" id="log-target-title">Console Output</span>
+          <span style="font-size:0.7rem;color:var(--green);font-family:var(--font-mono)">● LIVE STREAM</span>
+        </div>
+        <div class="log-viewer" id="log-viewer">Select a container and click Stream Logs…</div>
+      </div>
+    </div>
+
+    <!-- ═══════════ TAB: DAILY AUDIT REPORT ═══════════ -->
+    <div class="tab-panel" id="tab-report">
+      <div class="section-hdr">
+        <h2>24-Hour Automated Operations Report</h2>
+        <button class="btn primary" onclick="loadReport()"><i class="fa fa-rotate"></i> Regenerate Report</button>
+      </div>
+      <div class="metrics-grid" id="report-grid">
+        <div class="loading-center"><div class="spinner"></div></div>
+      </div>
+      <div class="section-hdr" style="margin-top:20px"><h2>Incident Intelligence &amp; Alerts</h2></div>
+      <div id="report-alerts"></div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Confirmation Modal -->
+<div id="confirm-modal">
+  <div class="confirm-box">
+    <h3 id="confirm-title">Confirm Action</h3>
+    <p id="confirm-msg">Are you sure you want to proceed?</p>
+    <div class="actions">
+      <button class="btn" onclick="closeConfirm()">Cancel</button>
+      <button class="btn danger" id="confirm-ok">Execute</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast notifications container -->
+<div id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   MONITORING DASHBOARD ENGINE (JAVASCRIPT)
+═══════════════════════════════════════════════════════════════ */
+const CSRF = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+
+// ── Clock ──
+function updateClock() {
+  const el = document.getElementById('clock');
+  if (el) el.textContent = new Date().toLocaleTimeString('en-KE');
+}
+setInterval(updateClock, 1000); updateClock();
+
+// ── Toast Alert ──
+function toast(msg, type = 'info') {
+  const el = document.createElement('div');
+  el.className = `toast-msg ${type}`;
+  el.innerHTML = msg;
+  document.getElementById('toast').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+// ── User Dropdown Toggle & Click Outside ──
+function toggleUserDropdown(e) {
+  if (e) e.stopPropagation();
+  const btn = document.getElementById('userMenuToggleBtn');
+  const menu = document.getElementById('userDropdownMenu');
+  const isExpanded = btn.getAttribute('aria-expanded') === 'true';
+  btn.setAttribute('aria-expanded', !isExpanded);
+  btn.classList.toggle('active', !isExpanded);
+  menu.classList.toggle('show', !isExpanded);
+}
+
+document.addEventListener('click', (e) => {
+  const menu = document.getElementById('userDropdownMenu');
+  const btn = document.getElementById('userMenuToggleBtn');
+  if (menu && menu.classList.contains('show')) {
+    if (!menu.contains(e.target) && !btn.contains(e.target)) {
+      menu.classList.remove('show');
+      btn.classList.remove('active');
+      btn.setAttribute('aria-expanded', 'false');
+    }
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const menu = document.getElementById('userDropdownMenu');
+    const btn = document.getElementById('userMenuToggleBtn');
+    if (menu) {
+      menu.classList.remove('show');
+      btn.classList.remove('active');
+      btn.setAttribute('aria-expanded', 'false');
+    }
+    closeConfirm();
+  }
+});
+
+// ── Navigation Tabs ──
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    const tab = btn.dataset.tab;
+    const panel = document.getElementById('tab-' + tab);
+    if (panel) panel.classList.add('active');
+
+    if (tab === 'docker') loadDocker();
+    if (tab === 'compose') loadCompose();
+    if (tab === 'k8s') loadK8s();
+    if (tab === 'health') loadHealth();
+    if (tab === 'security') loadSecurity();
+    if (tab === 'system') loadSystem();
+    if (tab === 'report') loadReport();
+    if (tab === 'logs') populateLogContainers();
+  });
+});
+
+// ── Confirmation Modal ──
+let _confirmCb = null;
+function confirmAction(title, msg, cb) {
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-msg').textContent = msg;
+  _confirmCb = cb;
+  document.getElementById('confirm-modal').classList.add('open');
+}
+function closeConfirm() {
+  document.getElementById('confirm-modal').classList.remove('open');
+  _confirmCb = null;
+}
+document.getElementById('confirm-ok').onclick = () => {
+  const cb = _confirmCb;
+  closeConfirm();
+  if (cb) cb();
+};
+
+// ── AJAX Helpers ──
+async function api(url) {
+  const t0 = performance.now();
+  const r = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+  const latency = Math.round(performance.now() - t0);
+  document.getElementById('telemetry-latency').textContent = `${latency} ms`;
+  return r.json();
+}
+
+async function apiPost(url, data) {
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest' },
+    body: JSON.stringify(data),
+  });
+  return r.json();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WAVE CHARTS (CANVAS OSCILLOSCOPES)
+// ═══════════════════════════════════════════════════════════════
+class WaveMonitor {
+  constructor(canvasId, color, maxPoints = 50) {
+    this.canvas = document.getElementById(canvasId);
+    this.color = color;
+    this.maxPoints = maxPoints;
+    this.data = new Array(maxPoints).fill(0);
+    this.ctx = this.canvas ? this.canvas.getContext('2d') : null;
+    this.resize();
+    window.addEventListener('resize', () => this.resize());
+  }
+
+  resize() {
+    if (!this.canvas) return;
+    const rect = this.canvas.getBoundingClientRect();
+    this.canvas.width = rect.width * (window.devicePixelRatio || 1);
+    this.canvas.height = rect.height * (window.devicePixelRatio || 1);
+    this.draw();
+  }
+
+  push(val) {
+    this.data.push(val);
+    if (this.data.length > this.maxPoints) this.data.shift();
+    this.draw();
+  }
+
+  draw() {
+    if (!this.ctx || !this.canvas) return;
+    const ctx = this.ctx;
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    if (this.data.length < 2) return;
+
+    // Grid lines
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    ctx.lineWidth = 1;
+    for (let y = 0.25; y <= 0.75; y += 0.25) {
+      ctx.beginPath();
+      ctx.moveTo(0, h * y);
+      ctx.lineTo(w, h * y);
+      ctx.stroke();
+    }
+
+    const step = w / (this.maxPoints - 1);
+
+    // Gradient fill under the curve
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, this.color.replace(')', ', 0.35)').replace('rgb', 'rgba'));
+    grad.addColorStop(1, this.color.replace(')', ', 0.0)').replace('rgb', 'rgba'));
+
+    ctx.beginPath();
+    this.data.forEach((val, i) => {
+      const clamped = Math.max(0, Math.min(100, val));
+      const x = i * step;
+      const y = h - (clamped / 100) * (h * 0.88) - 4;
+      if (i === 0) ctx.moveTo(x, y);
+      else {
+        const prevX = (i - 1) * step;
+        const prevVal = Math.max(0, Math.min(100, this.data[i - 1]));
+        const prevY = h - (prevVal / 100) * (h * 0.88) - 4;
+        const cx = (prevX + x) / 2;
+        ctx.bezierCurveTo(cx, prevY, cx, y, x, y);
+      }
+    });
+
+    // Close path for fill
+    ctx.lineTo(w, h);
+    ctx.lineTo(0, h);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Stroke line
+    ctx.beginPath();
+    this.data.forEach((val, i) => {
+      const clamped = Math.max(0, Math.min(100, val));
+      const x = i * step;
+      const y = h - (clamped / 100) * (h * 0.88) - 4;
+      if (i === 0) ctx.moveTo(x, y);
+      else {
+        const prevX = (i - 1) * step;
+        const prevVal = Math.max(0, Math.min(100, this.data[i - 1]));
+        const prevY = h - (prevVal / 100) * (h * 0.88) - 4;
+        const cx = (prevX + x) / 2;
+        ctx.bezierCurveTo(cx, prevY, cx, y, x, y);
+      }
+    });
+    ctx.strokeStyle = this.color;
+    ctx.lineWidth = 2 * (window.devicePixelRatio || 1);
+    ctx.stroke();
+  }
+}
+
+// Instantiate Wave Monitors
+const cpuWaveOv = new WaveMonitor('canvas-cpu-wave', 'rgb(56, 189, 248)');
+const memWaveOv = new WaveMonitor('canvas-mem-wave', 'rgb(167, 139, 250)');
+const rtCpuWave = new WaveMonitor('canvas-rt-cpu', 'rgb(56, 189, 248)', 70);
+const rtMemWave = new WaveMonitor('canvas-rt-mem', 'rgb(167, 139, 250)', 70);
+const rtDbWave  = new WaveMonitor('canvas-rt-db', 'rgb(34, 197, 94)', 70);
+
+// ═══════════════════════════════════════════════════════════════
+// REALTIME TELEMETRY STREAMING
+// ═══════════════════════════════════════════════════════════════
+let telemetryTimer = null;
+let currentPollInterval = 1000;
+
+async function fetchRealtimeTelemetry() {
+  try {
+    const d = await api('/monitoring/api/realtime/');
+    if (!d.ok) return;
+
+    const cpu = d.cpu || 0;
+    const memPct = d.mem_percent || 0;
+    const db = d.db || {};
+    const redis = d.redis || {};
+    const containers = d.containers || {};
+
+    // Strip indicators
+    document.getElementById('strip-cpu').textContent = `${cpu.toFixed(1)}%`;
+    document.getElementById('strip-mem').textContent = `${memPct.toFixed(1)}%`;
+    document.getElementById('strip-db').textContent = `${db.backends || 0} conn`;
+    document.getElementById('strip-db-hit').textContent = `${db.hit_ratio || 99.8}%`;
+    document.getElementById('strip-redis-ops').textContent = `${redis.ops_per_sec || 0}`;
+    document.getElementById('strip-containers').textContent = `${containers.running || 0}/${containers.total || 0}`;
+
+    // Overview cards
+    document.getElementById('ov-cpu').textContent = `${cpu.toFixed(1)}%`;
+    document.getElementById('ov-cpu-bar').style.width = `${Math.min(100, cpu)}%`;
+    document.getElementById('ov-mem').textContent = `${memPct.toFixed(1)}%`;
+    document.getElementById('ov-mem-bar').style.width = `${Math.min(100, memPct)}%`;
+    document.getElementById('ov-mem-detail').textContent = `${d.mem_used_mb || 0} MB / ${d.mem_total_mb || 0} MB`;
+    document.getElementById('ov-db-hit').textContent = `${db.hit_ratio || 99.8}%`;
+    document.getElementById('ov-db-backends').textContent = `${db.backends || 0} active pool connections`;
+    document.getElementById('ov-redis-mem').textContent = redis.used_memory_human || '0M';
+    document.getElementById('ov-redis-ops').textContent = `${redis.ops_per_sec || 0} ops/sec · ${redis.connected_clients || 0} clients`;
+
+    // Push into wave monitors
+    document.getElementById('wave-cpu-stat').textContent = `${cpu.toFixed(1)}%`;
+    document.getElementById('wave-mem-stat').textContent = `${memPct.toFixed(1)}%`;
+    cpuWaveOv.push(cpu);
+    memWaveOv.push(memPct);
+
+    // Live Waves Tab
+    document.getElementById('rt-cpu-val').textContent = `${cpu.toFixed(1)}%`;
+    document.getElementById('rt-mem-val').textContent = `${memPct.toFixed(1)}%`;
+    document.getElementById('rt-db-val').textContent = `${db.backends || 0} Conn / ${redis.ops_per_sec || 0} Ops`;
+    rtCpuWave.push(cpu);
+    rtMemWave.push(memPct);
+    rtDbWave.push(Math.min(100, (db.backends || 0) * 2));
+
+  } catch (err) {
+    console.warn('Realtime telemetry poll warning:', err);
+  }
+}
+
+function startTelemetryLoop(ms) {
+  if (telemetryTimer) clearInterval(telemetryTimer);
+  if (ms <= 0) {
+    document.getElementById('telemetry-rate-label').textContent = 'PAUSED';
+    return;
+  }
+  document.getElementById('telemetry-rate-label').textContent = ms === 1000 ? 'REALTIME 1s' : `${ms/1000}s RATE`;
+  telemetryTimer = setInterval(fetchRealtimeTelemetry, ms);
+  fetchRealtimeTelemetry();
+}
+
+function changePollRate(val) {
+  currentPollInterval = parseInt(val, 10);
+  startTelemetryLoop(currentPollInterval);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LOAD: DOCKER CONTAINERS (DIRECT DOCKER ENGINE API)
+// ═══════════════════════════════════════════════════════════════
+let _dockerData = [];
+
+async function loadDocker() {
+  const tbody = document.getElementById('docker-tbody');
+  tbody.innerHTML = '<tr><td colspan="8" class="loading-center"><div class="spinner"></div><span>Querying Docker Engine…</span></td></tr>';
+
+  try {
+    const d = await api('/monitoring/api/docker/containers/');
+    _dockerData = d.containers || [];
+
+    // Overview counters
+    const running = _dockerData.filter(c => (c.state || '').toLowerCase() === 'running').length;
+    document.getElementById('ov-containers').textContent = `${running} / ${_dockerData.length}`;
+    document.getElementById('ov-containers-sub').textContent = `${running} running, ${_dockerData.length - running} stopped`;
+
+    renderDockerTable(_dockerData);
+    populateLogContainers();
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="8" style="color:var(--red);padding:20px;text-align:center"><i class="fa fa-triangle-exclamation"></i> Error loading containers: ${e.message}</td></tr>`;
+  }
+}
+
+function renderDockerTable(containers) {
+  const tbody = document.getElementById('docker-tbody');
+  if (!containers.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px">No Docker containers found on system.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = containers.map(c => {
+    const state = (c.state || '').toLowerCase();
+    const actionBtns = `
+      <div style="display:flex;gap:4px;flex-wrap:wrap">
+        ${state === 'running'
+          ? `<button class="btn danger" title="Stop Container" onclick="triggerDockerAction('stop','${c.name}')"><i class="fa fa-stop"></i></button>`
+          : `<button class="btn success" title="Start Container" onclick="triggerDockerAction('start','${c.name}')"><i class="fa fa-play"></i></button>`}
+        <button class="btn" title="Restart Container" onclick="triggerDockerAction('restart','${c.name}')"><i class="fa fa-rotate-right"></i></button>
+        ${state === 'running' ? `<button class="btn" title="Pause Container" onclick="triggerDockerAction('pause','${c.name}')"><i class="fa fa-pause"></i></button>` : ''}
+        ${state === 'paused' ? `<button class="btn" title="Unpause Container" onclick="triggerDockerAction('unpause','${c.name}')"><i class="fa fa-play"></i></button>` : ''}
+        <button class="btn primary" title="View Container Console Logs" onclick="viewContainerLogs('${c.name}')"><i class="fa fa-terminal"></i></button>
+      </div>`;
+
+    const cpu = c.cpu ? `<span style="color:var(--cyan);font-weight:700">${c.cpu}</span>` : '—';
+    const mem = c.mem ? `<span style="color:var(--violet);font-weight:600">${c.mem}</span> <small style="color:var(--muted)">(${c.mem_perc || '0%'})</small>` : '—';
+    const net = c.net || '—';
+
+    return `<tr>
+      <td>
+        <strong style="color:var(--text);font-size:0.84rem">${c.name}</strong>
+        <br><small style="color:var(--muted);font-family:var(--font-mono)">${c.id || ''}</small>
+      </td>
+      <td style="color:var(--muted);font-family:var(--font-mono);font-size:0.72rem">${c.image}</td>
+      <td>
+        <span class="status ${state}">${c.state}</span>
+        <br><small style="color:var(--muted);font-size:0.68rem">${c.status || ''}</small>
+      </td>
+      <td>${cpu}</td>
+      <td>${mem}</td>
+      <td style="font-family:var(--font-mono);font-size:0.7rem;color:var(--muted)">${net}</td>
+      <td style="font-family:var(--font-mono);font-size:0.68rem;color:var(--muted)">${c.ports || '—'}</td>
+      <td>${actionBtns}</td>
+    </tr>`;
+  }).join('');
+}
+
+function filterDockerTable() {
+  const q = document.getElementById('docker-filter').value.toLowerCase();
+  const st = document.getElementById('docker-state-filter').value.toLowerCase();
+  const filtered = _dockerData.filter(c =>
+    (c.name || '').toLowerCase().includes(q) ||
+    (c.image || '').toLowerCase().includes(q)
+  ).filter(c => !st || (c.state || '').toLowerCase() === st);
+  renderDockerTable(filtered);
+}
+
+async function triggerDockerAction(action, container) {
+  confirmAction(
+    `Confirm Docker ${action.toUpperCase()}`,
+    `Are you sure you want to execute '${action}' on container '${container}'?`,
+    async () => {
+      toast(`Executing ${action} on ${container}…`, 'info');
+      try {
+        const res = await apiPost('/monitoring/api/docker/action/', { action, container });
+        if (res.ok) {
+          toast(`✓ ${container} ${action} completed successfully.`, 'ok');
+          setTimeout(() => loadDocker(), 1500);
+        } else {
+          toast(`✗ Action failed: ${res.output || res.error}`, 'err');
+        }
+      } catch (err) {
+        toast(`Error: ${err.message}`, 'err');
+      }
+    }
+  );
+}
+
+function viewContainerLogs(name) {
+  const sel = document.getElementById('log-container');
+  if (sel) sel.value = name;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelector('[data-tab="logs"]').classList.add('active');
+  document.getElementById('tab-logs').classList.add('active');
+  fetchLogs();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LOAD: DOCKER COMPOSE FLEET
+// ═══════════════════════════════════════════════════════════════
+async function loadCompose() {
+  const tbody = document.getElementById('compose-tbody');
+  tbody.innerHTML = '<tr><td colspan="5" class="loading-center"><div class="spinner"></div><span>Querying Compose Fleet…</span></td></tr>';
+  try {
+    const d = await api('/monitoring/api/docker/compose/');
+    const svcs = d.services || [];
+    if (!svcs.length) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px">No compose services discovered.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = svcs.map(s => `<tr>
+      <td><strong style="color:var(--text)">${s.Service || s.Name}</strong></td>
+      <td style="font-family:var(--font-mono);font-size:0.72rem;color:var(--muted)">${s.Image}</td>
+      <td><span class="status ${s.State}">${s.State}</span></td>
+      <td><span class="status ${s.Health}">${s.Health || 'none'}</span></td>
+      <td style="font-family:var(--font-mono);font-size:0.68rem;color:var(--muted)">${s.Ports || '—'}</td>
+    </tr>`).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" style="color:var(--red);padding:20px">${err.message}</td></tr>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LOAD: SYSTEM INTERNALS
+// ═══════════════════════════════════════════════════════════════
+async function loadSystem() {
+  try {
+    const d = await api('/monitoring/api/system/');
+    const cpu = d.cpu || 0;
+    const mem = d.memory || {};
+    const disk = d.disk || {};
+
+    document.getElementById('sys-cpu').textContent = `${cpu.toFixed(1)}%`;
+    document.getElementById('sys-cpu-bar').style.width = `${Math.min(100, cpu)}%`;
+    document.getElementById('sys-mem').textContent = `${(mem.percent || 0).toFixed(1)}%`;
+    document.getElementById('sys-mem-d').textContent = `${Math.round((mem.used||0)/(1024*1024))}MB / ${Math.round((mem.total||0)/(1024*1024))}MB`;
+    document.getElementById('sys-disk').textContent = `${(disk.percent || 0).toFixed(1)}%`;
+    document.getElementById('sys-disk-d').textContent = `${Math.round((disk.used||0)/(1024**3))}GB / ${Math.round((disk.total||0)/(1024**3))}GB`;
+    document.getElementById('sys-cores').textContent = d.cpu_count || 1;
+    document.getElementById('sys-load').textContent = (d.load || [0,0,0]).map(x => x.toFixed(2)).join(' / ');
+    document.getElementById('sys-host').textContent = d.hostname || '—';
+    document.getElementById('sys-platform').textContent = d.platform || '—';
+
+    // Per core breakdown
+    const cores = d.cpu_cores || [];
+    const cg = document.getElementById('core-grid');
+    if (cores.length) {
+      cg.innerHTML = cores.map((c, i) => `
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:10px">
+          <div style="font-size:0.65rem;color:var(--muted);margin-bottom:4px">Core ${i}</div>
+          <div style="font-family:var(--font-mono);font-size:0.86rem;font-weight:700;color:var(--cyan)">${c.toFixed(1)}%</div>
+          <div class="progress-wrap"><div class="progress-bar"><div class="progress-fill" style="width:${Math.min(100, c)}%"></div></div></div>
+        </div>`).join('');
+    }
+
+    // Top processes
+    const procTbody = document.getElementById('proc-tbody');
+    const procs = d.top_processes || [];
+    procTbody.innerHTML = procs.length ? procs.map(p => `
+      <tr>
+        <td style="font-family:var(--font-mono);color:var(--muted)">${p.pid}</td>
+        <td><strong>${p.name}</strong></td>
+        <td style="font-family:var(--font-mono);color:var(--cyan)">${p.cpu}%</td>
+        <td style="font-family:var(--font-mono);color:var(--violet)">${p.mem}%</td>
+        <td><span class="status healthy">${p.status}</span></td>
+      </tr>`).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">No process data.</td></tr>';
+
+  } catch (err) {
+    console.error('System load error:', err);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LOAD: KUBERNETES
+// ═══════════════════════════════════════════════════════════════
+async function loadK8s() {
+  const tbody = document.getElementById('k8s-tbody');
+  tbody.innerHTML = '<tr><td colspan="7" class="loading-center"><div class="spinner"></div><span>Querying Kubernetes API…</span></td></tr>';
+  const resource = document.getElementById('k8s-resource').value;
+  const ns = document.getElementById('k8s-ns').value || 'default';
+
+  try {
+    const d = await api(`/monitoring/api/k8s/?resource=${resource}&namespace=${ns}`);
+    if (!d.ok) {
+      tbody.innerHTML = `<tr><td colspan="7" style="color:var(--amber);padding:20px;text-align:center"><i class="fa fa-triangle-exclamation"></i> ${d.error}</td></tr>`;
+      return;
+    }
+    const items = d.items || [];
+    tbody.innerHTML = items.length ? items.map(item => `
+      <tr>
+        <td><strong>${item.name}</strong></td>
+        <td><span style="background:rgba(99,102,241,0.15);color:var(--indigo);padding:2px 8px;border-radius:10px;font-size:0.68rem;font-weight:700">${item.namespace}</span></td>
+        <td><span class="status ${item.phase?.toLowerCase()}">${item.phase}</span></td>
+        <td>${item.ready ? '<span style="color:var(--green)">✓ Ready</span>' : '<span style="color:var(--red)">✗ Not Ready</span>'}</td>
+        <td style="font-family:var(--font-mono)">${item.restarts}</td>
+        <td style="color:var(--muted);font-size:0.72rem">${item.node || '—'}</td>
+        <td style="color:var(--muted);font-size:0.72rem">${item.age ? new Date(item.age).toLocaleDateString() : '—'}</td>
+      </tr>`).join('') : '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">No Kubernetes resources found in namespace.</td></tr>';
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--red);padding:20px">${err.message}</td></tr>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LOAD: APP HEALTH
+// ═══════════════════════════════════════════════════════════════
+async function loadHealth() {
+  try {
+    const d = await api('/monitoring/api/health/');
+    const checks = d.checks || [];
+    const html = checks.map(c => `
+      <div class="health-card">
+        <div class="h-icon">${c.icon}</div>
+        <div>
+          <div class="h-name">${c.name}</div>
+          <div class="h-detail">${c.detail}</div>
+        </div>
+        <div class="h-status"><span class="status ${c.status}">${c.status}</span></div>
+      </div>`).join('');
+
+    document.getElementById('health-grid').innerHTML = html;
+    document.getElementById('overview-health').innerHTML = html;
+  } catch (err) {
+    document.getElementById('health-grid').innerHTML = `<div style="color:var(--red);padding:20px">${err.message}</div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LOAD: SECURITY POSTURE
+// ═══════════════════════════════════════════════════════════════
+async function loadSecurity() {
+  document.getElementById('risk-list').innerHTML = '<div class="loading-center"><div class="spinner"></div><span>Analyzing attack surface…</span></div>';
+  try {
+    const d = await api('/monitoring/api/security/');
+    const score = d.score || 0;
+    const circumference = 2 * Math.PI * 42;
+    const offset = circumference - (score / 100) * circumference;
+
+    const ring = document.getElementById('ring-val');
+    const color = score >= 90 ? '#22c55e' : score >= 75 ? '#38bdf8' : score >= 50 ? '#f59e0b' : '#ef4444';
+    ring.style.stroke = color;
+    ring.style.strokeDashoffset = offset;
+
+    document.getElementById('sec-score-num').textContent = score;
+    document.getElementById('sec-score-num').style.color = color;
+    document.getElementById('sec-grade').textContent = `Grade ${d.grade}`;
+    document.getElementById('ov-sec').textContent = `${score}/100`;
+    document.getElementById('ov-sec-grade').textContent = `Grade ${d.grade}`;
+
+    document.getElementById('sec-critical').textContent = d.critical || 0;
+    document.getElementById('sec-high').textContent = d.high || 0;
+    document.getElementById('sec-medium').textContent = d.medium || 0;
+    document.getElementById('sec-score-wrap').style.display = 'flex';
+
+    const badge = document.getElementById('sec-badge');
+    if ((d.critical || 0) > 0) {
+      badge.textContent = `${d.critical} CRIT`;
+      badge.classList.add('show');
+    } else {
+      badge.classList.remove('show');
+    }
+
+    const risks = d.risks || [];
+    document.getElementById('risk-list').innerHTML = risks.length ? risks.map(r => `
+      <div class="risk-item">
+        <div class="risk-icon">${r.severity === 'CRITICAL' ? '🚨' : r.severity === 'HIGH' ? '⚠️' : '🔶'}</div>
+        <div class="risk-body">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+            <h4>${r.title}</h4>
+            <span class="status ${r.severity.toLowerCase()}">${r.severity}</span>
+            <span style="background:var(--surface2);padding:2px 8px;border-radius:10px;font-size:0.68rem;color:var(--muted)">${r.category}</span>
+          </div>
+          <p>${r.detail}</p>
+          <div class="risk-rec"><i class="fa fa-shield-halved"></i> <strong>Remediation:</strong> ${r.recommendation}</div>
+        </div>
+      </div>`).join('') :
+      '<div style="color:var(--green);text-align:center;padding:24px"><i class="fa fa-circle-check" style="font-size:2rem;margin-bottom:8px;display:block"></i>No critical security risks identified. Infrastructure is hardened.</div>';
+
+  } catch (err) {
+    document.getElementById('risk-list').innerHTML = `<div style="color:var(--red);padding:20px">${err.message}</div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LOAD: TERMINAL LOGS
+// ═══════════════════════════════════════════════════════════════
+function populateLogContainers() {
+  const sel = document.getElementById('log-container');
+  if (!sel || !_dockerData.length) return;
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— Select Docker Container —</option>' +
+    _dockerData.map(c => `<option value="${c.name}">${c.name} (${c.state})</option>`).join('');
+  if (prev) sel.value = prev;
+}
+
+async function fetchLogs() {
+  const sel = document.getElementById('log-container');
+  const container = sel ? sel.value : '';
+  const tail = document.getElementById('log-tail').value;
+  const viewer = document.getElementById('log-viewer');
+
+  if (!container) {
+    toast('Please select a container from the dropdown.', 'err');
+    return;
+  }
+
+  document.getElementById('log-target-title').textContent = `Logs for: ${container}`;
+  viewer.textContent = `Streaming last ${tail} lines from container '${container}'…\n`;
+
+  try {
+    const res = await api(`/monitoring/api/docker/logs/?container=${container}&tail=${tail}`);
+    viewer.textContent = res.logs || '(No log output returned from container stdout/stderr)';
+    viewer.scrollTop = viewer.scrollHeight;
+  } catch (err) {
+    viewer.textContent = `Error streaming logs: ${err.message}`;
+  }
+}
+
+function clearLogs() {
+  document.getElementById('log-viewer').textContent = 'Console cleared.';
+}
+
+function copyLogs() {
+  const text = document.getElementById('log-viewer').textContent;
+  navigator.clipboard.writeText(text).then(() => toast('✓ Logs copied to clipboard.', 'ok'));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LOAD: DAILY AUDIT REPORT
+// ═══════════════════════════════════════════════════════════════
+async function loadReport() {
+  const grid = document.getElementById('report-grid');
+  grid.innerHTML = '<div class="loading-center"><div class="spinner"></div></div>';
+  try {
+    const d = await api('/monitoring/api/report/daily/');
+    const stats = d.stats || {};
+    const items = [
+      { label: 'Active Directory Users', val: stats.active_users || 0, sub: 'Registered operators' },
+      { label: 'Successful Logins (24h)', val: stats.successful_logins || 0, sub: 'Authorized sessions' },
+      { label: 'Failed Login Attempts (24h)', val: stats.failed_logins || 0, sub: 'Auth failure events' },
+      { label: 'Locked User Accounts', val: stats.locked_users || 0, sub: 'Security lockouts' },
+      { label: 'Containers Running', val: `${stats.containers_running || 0}/${stats.containers_total || 0}`, sub: 'Docker engine fleet' },
+    ];
+
+    grid.innerHTML = items.map(s => `
+      <div class="metric-card">
+        <div class="metric-label">${s.label}</div>
+        <div class="metric-value">${s.val}</div>
+        <div class="metric-unit">${s.sub}</div>
+      </div>`).join('');
+
+    const alerts = d.alerts || [];
+    document.getElementById('report-alerts').innerHTML = alerts.map(a => `
+      <div class="risk-item" style="border-left:4px solid ${a.level === 'CRITICAL' ? 'var(--red)' : a.level === 'WARNING' ? 'var(--amber)' : 'var(--cyan)'}">
+        <div class="risk-icon">${a.level === 'CRITICAL' ? '🚨' : a.level === 'WARNING' ? '⚠️' : 'ℹ️'}</div>
+        <div class="risk-body">
+          <h4>${a.level} Priority Intelligence</h4>
+          <p>${a.msg}</p>
+        </div>
+      </div>`).join('');
+  } catch (err) {
+    grid.innerHTML = `<div style="color:var(--red);padding:20px">${err.message}</div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INITIALIZATION
+// ═══════════════════════════════════════════════════════════════
+async function refreshAll() {
+  await Promise.all([
+    loadDocker(),
+    loadHealth(),
+    loadSecurity(),
+    loadSystem(),
+    loadCompose(),
+  ]);
+}
+
+// Start continuous real-time telemetry stream
+startTelemetryLoop(1000);
+
+// Initial bootstrap
+(async () => {
+  await refreshAll();
+})();
+</script>
+</body>
+</html>

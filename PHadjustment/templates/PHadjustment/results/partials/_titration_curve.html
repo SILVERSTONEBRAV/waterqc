@@ -1,0 +1,86 @@
+<div class="ph-curve-container">
+    <div class="ph-curve-header">
+        <div class="d-flex align-items-center gap-2">
+            <i class="fa-solid fa-chart-line text-emerald"></i>
+            <h6 class="m-0 fw-bold">pH Neutralization &amp; Titration Curve</h6>
+        </div>
+        <div class="ph-curve-legend">
+            <span class="legend-item"><span class="dot dot-target"></span> Target pH 7.00</span>
+            <span class="legend-item"><span class="dot dot-band"></span> Neutral Band (6.5 - 7.5)</span>
+            <span class="legend-item"><span class="dot dot-titration"></span> Titration Response</span>
+            <span class="legend-item"><span class="dot dot-optimal"></span> Optimal Dose</span>
+        </div>
+    </div>
+
+    <!-- SVG Titration Curve Canvas -->
+    <div class="ph-svg-wrapper">
+        <svg id="titrationCurveSvg" viewBox="0 0 700 280" class="ph-curve-svg" preserveAspectRatio="none">
+            <defs>
+                <pattern id="phGrid" width="40" height="40" patternUnits="userSpaceOnUse">
+                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(51, 65, 85, 0.25)" stroke-width="1"/>
+                </pattern>
+                <!-- Area gradient -->
+                <linearGradient id="phAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#10b981" stop-opacity="0.3"/>
+                    <stop offset="100%" stop-color="#06b6d4" stop-opacity="0.0"/>
+                </linearGradient>
+                <filter id="phGlow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="3" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                </filter>
+            </defs>
+
+            <!-- Background grid -->
+            <rect width="100%" height="100%" fill="url(#phGrid)" />
+
+            <!-- Neutral Buffer Zone Shading (pH 6.50 to 7.50) -->
+            <!-- We will map pH range 5.0 to 9.0 on Y axis (height 215) -->
+            <rect id="phNeutralBand" x="60" y="95" width="610" height="55" fill="rgba(16, 185, 129, 0.12)" stroke="rgba(16, 185, 129, 0.3)" stroke-dasharray="4,4" />
+            <text x="660" y="108" text-anchor="end" fill="#34d399" font-size="9" font-weight="bold">NEUTRAL BAND (6.5 - 7.5)</text>
+
+            <!-- Target pH 7.00 Line -->
+            <line id="phTargetLine" x1="60" y1="122" x2="670" y2="122" stroke="#10b981" stroke-width="2" stroke-dasharray="6,3" />
+            <text x="660" y="134" text-anchor="end" fill="#10b981" font-size="10" font-weight="bold">TARGET pH 7.00</text>
+
+            <!-- Axis lines -->
+            <line x1="60" y1="240" x2="670" y2="240" stroke="#475569" stroke-width="2" />
+            <line x1="60" y1="20" x2="60" y2="240" stroke="#475569" stroke-width="2" />
+
+            <!-- Y-Axis labels (pH 5.0 to 9.0) -->
+            <text x="50" y="244" text-anchor="end" fill="#64748b" font-size="10">5.0</text>
+            <text x="50" y="185" text-anchor="end" fill="#64748b" font-size="10">6.0</text>
+            <text x="50" y="126" text-anchor="end" fill="#10b981" font-size="10" font-weight="bold">7.0</text>
+            <text x="50" y="68" text-anchor="end" fill="#64748b" font-size="10">8.0</text>
+            <text x="50" y="24" text-anchor="end" fill="#64748b" font-size="10">9.0</text>
+
+            <!-- Curve Paths -->
+            <path id="phAreaPath" d="" fill="url(#phAreaGrad)" />
+            <path id="phCurvePath" d="" fill="none" stroke="#10b981" stroke-width="3.5" filter="url(#phGlow)" />
+
+            <!-- Dynamic Points Group -->
+            <g id="phPointsGroup"></g>
+        </svg>
+    </div>
+
+    <!-- Telemetry Insight Cards -->
+    <div class="ph-curve-insights">
+        <div class="insight-pill">
+            <span class="ins-title">Established Conditioning Dose</span>
+            <span class="ins-val text-emerald" id="ins-ph-dose">
+                {{ ph_test.established_dosage_ml|default:"18.00" }} mL / L
+            </span>
+        </div>
+        <div class="insight-pill">
+            <span class="ins-title">Target Deviation (ΔpH)</span>
+            <span class="ins-val text-cyan" id="ins-ph-delta">
+                {% if optimal_jar %}{{ optimal_jar.delta_ph }} pH{% else %}0.00 pH{% endif %}
+            </span>
+        </div>
+        <div class="insight-pill">
+            <span class="ins-title">Resulting pH @ Optimal</span>
+            <span class="ins-val text-emerald" id="ins-ph-val">
+                {% if optimal_jar %}pH {{ optimal_jar.resulting_ph }}{% else %}pH 7.00{% endif %}
+            </span>
+        </div>
+    </div>
+</div>

@@ -5,176 +5,94 @@
 ========================================================= */
 
 /* ---------------- GLOBAL TYPOGRAPHY & BASE TOKENS ---------------- */
+/* Enterprise typography, component geometry, and default Django Admin palette. */
 :root {
-    --font-sans: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    --font-mono: 'JetBrains Mono', SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+    --font-sans: "Segoe UI", system-ui, Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    --font-heading: var(--font-sans);
+    --font-mono: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    --font-arabic: "Noto Sans Arabic", "Segoe UI", Tahoma, Arial, sans-serif;
+
+    --font-size-2xs: 0.6875rem;
+    --font-size-xs: 0.75rem;
+    --font-size-sm: 0.8125rem;
+    --font-size-body: 0.875rem;
+    --font-size-md: 0.9375rem;
+    --font-size-lg: 1rem;
+    --font-size-xl: 1.25rem;
+    --font-size-2xl: 1.5rem;
+    --font-size-3xl: 1.75rem;
+    --line-height-tight: 1.25;
+    --line-height-normal: 1.5;
+    --line-height-relaxed: 1.65;
+    --font-weight-regular: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+    --font-weight-extrabold: 800;
+    --tracking-tight: -0.02em;
+    --tracking-normal: 0;
+    --tracking-wide: 0.04em;
+    --tracking-caps: 0.08em;
+
+    /* Global Stacking Context Layers */
+    --z-header: 10000;
+    --z-dropdown: 10050;
+    --z-modal: 11000;
 
     --ease-fluid: cubic-bezier(.22, 1, .36, 1);
     --ease-smooth: cubic-bezier(.4, 0, .2, 1);
-
-    --radius-xs: 4px;
-    --radius-sm: 8px;
-    --radius-md: 12px;
-    --radius-lg: 16px;
-    --radius-xl: 20px;
+    --transition-fast: 120ms var(--ease-smooth);
+    --transition-normal: 180ms var(--ease-smooth);
+    --radius-xs: 3px;
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
     --radius-pill: 9999px;
 
-    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
-    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
-    --shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.08), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
-    --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+    --shadow-xs: 0 1px 2px rgba(16, 24, 40, .05);
+    --shadow-sm: 0 1px 3px rgba(16, 24, 40, .08), 0 1px 2px rgba(16, 24, 40, .04);
+    --shadow-md: 0 4px 10px -2px rgba(16, 24, 40, .10), 0 2px 4px -2px rgba(16, 24, 40, .06);
+    --shadow-lg: 0 12px 24px -6px rgba(16, 24, 40, .14), 0 6px 10px -6px rgba(16, 24, 40, .08);
 
-    --color-success: #10b981;
-    --color-warning: #f59e0b;
-    --color-danger: #ef4444;
-    --color-info: #0284c7;
-
-    /* ---------------- LIGHT MODE (DEFAULT NCWSC BLUE) ---------------- */
-    --theme-bg: #f8fafc;
+    /* Default: restrained, familiar Django Admin blue with neutral surfaces. */
+    --theme-bg: #f4f6f8;
     --theme-surface: #ffffff;
     --theme-surface-strong: #ffffff;
-    --theme-surface-muted: #f1f5f9;
-    --theme-text: #0f172a;
-    --theme-text-secondary: #334155;
-    --theme-muted: #64748b;
-    --theme-border: #e2e8f0;
-    --theme-border-strong: #cbd5e1;
+    --theme-surface-muted: #f2f4f7;
+    --theme-text: #182230;
+    --theme-text-secondary: #344054;
+    --theme-muted: #596579;
+    --theme-border: #d0d5dd;
+    --theme-border-strong: #98a2b3;
+    --theme-accent: #417690;
+    --theme-accent-hover: #315a6e;
+    --theme-accent-soft: rgba(65, 118, 144, .10);
+    --theme-accent-glow: rgba(65, 118, 144, .24);
+    --theme-on-accent: #ffffff;
+    --theme-selection: rgba(65, 118, 144, .18);
+    --theme-focus-ring: 0 0 0 3px rgba(65, 118, 144, .24);
 
-    --theme-accent: #0284c7;
-    --theme-accent-hover: #0369a1;
-    --theme-accent-soft: rgba(2, 132, 199, 0.10);
-    --theme-accent-glow: rgba(2, 132, 199, 0.25);
-
-    --topbar-bg: #ffffff;
-    --topbar-border: #e2e8f0;
-    --sidebar-bg: #ffffff;
-    --sidebar-border: #e2e8f0;
-}
-
-/* =========================================================
-   THEMES PALETTES
-========================================================= */
-
-/* ---------------- 1. DARK MODE (CHARCOAL SLATE) ---------------- */
-html[data-theme="dark"],
-html[data-theme="oled"],
-html[data-theme="amoled"] {
-    --theme-bg: #0b1329;
-    --theme-surface: #162238;
-    --theme-surface-strong: #0f172a;
-    --theme-surface-muted: #1e293b;
-    --theme-text: #f8fafc;
-    --theme-text-secondary: #cbd5e1;
-    --theme-muted: #94a3b8;
-    --theme-border: #293548;
-    --theme-border-strong: #334155;
-
-    --theme-accent: #38bdf8;
-    --theme-accent-hover: #7dd3fc;
-    --theme-accent-soft: rgba(56, 189, 248, 0.16);
-    --theme-accent-glow: rgba(56, 189, 248, 0.35);
-
-    --topbar-bg: #111c30;
-    --topbar-border: #293548;
-    --sidebar-bg: #0f172a;
-    --sidebar-border: #293548;
-
-    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.4);
-    --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.5);
-    --shadow-lg: 0 12px 30px rgba(0, 0, 0, 0.6);
-}
-
-/* ---------------- 2. EMERALD THEME (ENVIRONMENTAL / WATER LAB) ---------------- */
-html[data-theme="emerald"] {
-    --theme-bg: #f0fdf4;
-    --theme-surface: #ffffff;
-    --theme-surface-strong: #ffffff;
-    --theme-surface-muted: #dcfce7;
-    --theme-text: #064e3b;
-    --theme-text-secondary: #065f46;
-    --theme-muted: #047857;
-    --theme-border: #bbf7d0;
-    --theme-border-strong: #86efac;
-
-    --theme-accent: #059669;
-    --theme-accent-hover: #047857;
-    --theme-accent-soft: rgba(5, 150, 105, 0.12);
-    --theme-accent-glow: rgba(5, 150, 105, 0.28);
+    --color-success: #067647;
+    --color-warning: #8a4b08;
+    --color-danger: #b42318;
+    --color-info: #175cd3;
 
     --topbar-bg: #ffffff;
-    --topbar-border: #bbf7d0;
-    --sidebar-bg: #ffffff;
-    --sidebar-border: #bbf7d0;
-}
-
-html[data-theme="emerald-dark"] {
-    --theme-bg: #022c22;
-    --theme-surface: #064e3b;
-    --theme-surface-strong: #022c22;
-    --theme-surface-muted: #065f46;
-    --theme-text: #ecfdf5;
-    --theme-text-secondary: #a7f3d0;
-    --theme-muted: #6ee7b7;
-    --theme-border: #047857;
-    --theme-border-strong: #059669;
-
-    --theme-accent: #10b981;
-    --theme-accent-hover: #34d399;
-    --theme-accent-soft: rgba(16, 185, 129, 0.18);
-    --theme-accent-glow: rgba(16, 185, 129, 0.35);
-
-    --topbar-bg: #03362a;
-    --topbar-border: #047857;
-    --sidebar-bg: #022c22;
-    --sidebar-border: #047857;
-}
-
-/* ---------------- 3. OCEAN THEME (DEEP MARINE WATER) ---------------- */
-html[data-theme="ocean"] {
-    --theme-bg: #f0f9ff;
-    --theme-surface: #ffffff;
-    --theme-surface-strong: #ffffff;
-    --theme-surface-muted: #e0f2fe;
-    --theme-text: #082f49;
-    --theme-text-secondary: #0369a1;
-    --theme-muted: #0284c7;
-    --theme-border: #bae6fd;
-    --theme-border-strong: #7dd3fc;
-
-    --theme-accent: #0284c7;
-    --theme-accent-hover: #0369a1;
-    --theme-accent-soft: rgba(2, 132, 199, 0.12);
-    --theme-accent-glow: rgba(2, 132, 199, 0.28);
-
-    --topbar-bg: #ffffff;
-    --topbar-border: #bae6fd;
-    --sidebar-bg: #ffffff;
-    --sidebar-border: #bae6fd;
-}
-
-/* ---------------- 4. AURORA & CELESTIAL ALIASES ---------------- */
-html[data-theme="aurora"],
-html[data-theme="celestial"] {
-    --theme-bg: #0c1222;
-    --theme-surface: #141e34;
-    --theme-surface-strong: #0c1222;
-    --theme-surface-muted: #1c2947;
-    --theme-text: #f1f5f9;
-    --theme-text-secondary: #cbd5e1;
-    --theme-muted: #94a3b8;
-    --theme-border: #233354;
-    --theme-border-strong: #334b79;
-
-    --theme-accent: #38bdf8;
-    --theme-accent-hover: #818cf8;
-    --theme-accent-soft: rgba(56, 189, 248, 0.18);
-    --theme-accent-glow: rgba(129, 140, 248, 0.35);
-
-    --topbar-bg: #0f172a;
-    --topbar-border: #233354;
-    --sidebar-bg: #0c1222;
-    --sidebar-border: #233354;
+    --topbar-border: #d0d5dd;
+    --sidebar-bg: #f9fafb;
+    --sidebar-border: #d0d5dd;
+    --panel-bg: var(--theme-surface);
+    --panel-bg-soft: color-mix(in srgb, var(--theme-surface) 92%, transparent);
+    --panel-border: var(--theme-border);
+    --input-bg: var(--theme-surface-strong);
+    --hud-bg: linear-gradient(135deg, var(--theme-surface), var(--theme-surface-muted));
+    --table-header-bg: var(--theme-surface-muted);
+    --row-hover-bg: var(--theme-accent-soft);
+    --cyber-bg-glass: var(--panel-bg-soft);
+    --cyber-bg-card: var(--theme-surface);
+    --cyber-bg-input: var(--input-bg);
+    --cyber-border-glow: var(--theme-accent-glow);
 }
 
 /* =========================================================
@@ -185,9 +103,11 @@ html[data-theme="celestial"] {
 }
 
 html, body {
+    height: 100%;
+    margin: 0;
     font-family: var(--font-sans) !important;
-    font-size: 14.5px;
-    line-height: 1.55;
+    font-size: var(--font-size-body);
+    line-height: var(--line-height-normal);
     background-color: var(--theme-bg) !important;
     color: var(--theme-text) !important;
     -webkit-font-smoothing: antialiased;
@@ -197,15 +117,31 @@ html, body {
 
 h1, h2, h3, h4, h5, h6,
 .h1, .h2, .h3, .h4, .h5, .h6 {
-    font-family: var(--font-sans) !important;
-    font-weight: 700;
+    font-family: var(--font-heading) !important;
+    font-weight: var(--font-weight-bold);
+    line-height: var(--line-height-tight);
     color: var(--theme-text) !important;
-    letter-spacing: -0.02em;
+    letter-spacing: var(--tracking-tight);
 }
+
+h1, .h1 { font-size: var(--font-size-2xl); }
+h2, .h2 { font-size: var(--font-size-xl); }
+h3, .h3 { font-size: var(--font-size-lg); }
+h4, .h4 { font-size: var(--font-size-md); }
+h5, .h5, h6, .h6 { font-size: var(--font-size-body); }
 
 p, span, label, small {
     font-family: var(--font-sans);
 }
+
+button, input, textarea, select {
+    font-family: var(--font-sans);
+    font-size: var(--font-size-sm);
+}
+
+small, .text-small { font-size: var(--font-size-xs); }
+::selection { background: var(--theme-selection); color: var(--theme-text); }
+:focus-visible { outline: none; box-shadow: var(--theme-focus-ring); }
 
 code, pre, kbd, samp, .font-mono {
     font-family: var(--font-mono) !important;
@@ -273,10 +209,10 @@ code, pre, kbd, samp, .font-mono {
 .table th {
     background-color: var(--theme-surface-muted) !important;
     color: var(--theme-muted) !important;
-    font-size: 0.78rem;
+    font-size: var(--font-size-xs);
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: var(--tracking-wide);
     border-bottom: 1px solid var(--theme-border) !important;
 }
 
@@ -349,169 +285,837 @@ code, pre, kbd, samp, .font-mono {
     border-radius: var(--radius-pill);
 }
 
-/* =========================================================
-   TIME-OF-DAY THEMES — DAWN · DAY · DUSK · NIGHT
-========================================================= */
-
-/* ---------------- DAWN (05:00–09:00) Warm Amber Sunrise ---------------- */
-html[data-theme="dawn"] {
-    --theme-bg: #fffbeb;
-    --theme-surface: #ffffff;
-    --theme-surface-strong: #fef9c3;
-    --theme-surface-muted: #fef3c7;
-    --theme-text: #451a03;
-    --theme-text-secondary: #78350f;
-    --theme-muted: #92400e;
-    --theme-border: #fde68a;
-    --theme-border-strong: #fbbf24;
-    --theme-accent: #d97706;
-    --theme-accent-hover: #b45309;
-    --theme-accent-soft: rgba(217, 119, 6, 0.12);
-    --theme-accent-glow: rgba(251, 191, 36, 0.35);
-    --topbar-bg: #fffbeb;
-    --topbar-border: #fde68a;
-    --sidebar-bg: #fef9c3;
-    --sidebar-border: #fde68a;
+/* Enterprise baseline and accessible day, season, and lighting variations. */
+html[data-theme="day"],
+html[data-theme="light"],
+html[data-theme="default"],
+html[data-theme="standard"],
+html[data-theme="enterprise"] {
+    color-scheme: light;
 }
 
-/* ---------------- DAY (09:00–17:00) Crisp Blue-White ---------------- */
-html[data-theme="day"] {
-    --theme-bg: #f8fafc;
+html[data-theme="dawn"], html[data-theme="gold"] {
+    color-scheme: light;
+    --theme-bg: #fff9f2;
     --theme-surface: #ffffff;
     --theme-surface-strong: #ffffff;
-    --theme-surface-muted: #f1f5f9;
-    --theme-text: #0f172a;
-    --theme-text-secondary: #334155;
-    --theme-muted: #64748b;
-    --theme-border: #e2e8f0;
-    --theme-border-strong: #cbd5e1;
-    --theme-accent: #0284c7;
-    --theme-accent-hover: #0369a1;
-    --theme-accent-soft: rgba(2, 132, 199, 0.10);
-    --theme-accent-glow: rgba(2, 132, 199, 0.25);
-    --topbar-bg: #ffffff;
-    --topbar-border: #e2e8f0;
-    --sidebar-bg: #ffffff;
-    --sidebar-border: #e2e8f0;
+    --theme-surface-muted: #f7efe5;
+    --theme-text: #30251c;
+    --theme-text-secondary: #49382a;
+    --theme-muted: #6a5848;
+    --theme-border: #e7d8c7;
+    --theme-border-strong: #c6a989;
+    --theme-accent: #8c531e;
+    --theme-accent-hover: #704017;
+    --theme-accent-soft: rgba(140, 83, 30, .10);
+    --theme-accent-glow: rgba(140, 83, 30, .24);
+    --theme-on-accent: #ffffff;
+    --theme-selection: rgba(140, 83, 30, .17);
+    --theme-focus-ring: 0 0 0 3px rgba(140, 83, 30, .25);
+    --topbar-bg: #fffdf9;
+    --topbar-border: #e7d8c7;
+    --sidebar-bg: #fbf6ef;
+    --sidebar-border: #e7d8c7;
 }
 
-/* Alias 'light' → same as 'day' for backwards compatibility */
-html[data-theme="light"] {
-    --theme-bg: #f8fafc;
+/* Ocean / summer: clear, bright ambient light with a blue-green brand accent. */
+html[data-theme="ocean"], html[data-theme="summer"] {
+    color-scheme: light;
+    --theme-bg: #f2f8fa;
     --theme-surface: #ffffff;
     --theme-surface-strong: #ffffff;
-    --theme-surface-muted: #f1f5f9;
-    --theme-text: #0f172a;
-    --theme-text-secondary: #334155;
-    --theme-muted: #64748b;
-    --theme-border: #e2e8f0;
-    --theme-border-strong: #cbd5e1;
-    --theme-accent: #0284c7;
-    --theme-accent-hover: #0369a1;
-    --theme-accent-soft: rgba(2, 132, 199, 0.10);
-    --theme-accent-glow: rgba(2, 132, 199, 0.25);
+    --theme-surface-muted: #e8f1f4;
+    --theme-text: #18303b;
+    --theme-text-secondary: #344d5b;
+    --theme-muted: #566f7b;
+    --theme-border: #d0dfe5;
+    --theme-border-strong: #9eb8c3;
+    --theme-accent: #326d83;
+    --theme-accent-hover: #285568;
+    --theme-accent-soft: rgba(50, 109, 131, .10);
+    --theme-accent-glow: rgba(50, 109, 131, .24);
+    --theme-on-accent: #ffffff;
+    --theme-selection: rgba(50, 109, 131, .17);
+    --theme-focus-ring: 0 0 0 3px rgba(50, 109, 131, .25);
     --topbar-bg: #ffffff;
-    --topbar-border: #e2e8f0;
-    --sidebar-bg: #ffffff;
-    --sidebar-border: #e2e8f0;
+    --topbar-border: #d0dfe5;
+    --sidebar-bg: #f8fbfc;
+    --sidebar-border: #d0dfe5;
 }
 
-/* ---------------- DUSK (17:00–21:00) Warm Violet Sunset ---------------- */
-html[data-theme="dusk"] {
-    --theme-bg: #1e1128;
-    --theme-surface: #2d1b3d;
-    --theme-surface-strong: #1e1128;
-    --theme-surface-muted: #3b2252;
-    --theme-text: #fdf4ff;
-    --theme-text-secondary: #e9d5ff;
-    --theme-muted: #c084fc;
-    --theme-border: #4c1d6a;
-    --theme-border-strong: #7c3aed;
-    --theme-accent: #a855f7;
-    --theme-accent-hover: #c084fc;
-    --theme-accent-soft: rgba(168, 85, 247, 0.18);
-    --theme-accent-glow: rgba(168, 85, 247, 0.40);
-    --topbar-bg: #271036;
-    --topbar-border: #4c1d6a;
-    --sidebar-bg: #1e1128;
-    --sidebar-border: #4c1d6a;
+/* Spring: restrained environmental green on the shared enterprise surfaces. */
+html[data-theme="emerald"], html[data-theme="spring"] {
+    color-scheme: light;
+    --theme-bg: #f4f8f5;
+    --theme-surface: #ffffff;
+    --theme-surface-strong: #ffffff;
+    --theme-surface-muted: #eaf2ec;
+    --theme-text: #1b3025;
+    --theme-text-secondary: #344c3e;
+    --theme-muted: #596e61;
+    --theme-border: #d2e0d6;
+    --theme-border-strong: #9db7a4;
+    --theme-accent: #3c7557;
+    --theme-accent-hover: #2e5d44;
+    --theme-accent-soft: rgba(60, 117, 87, .10);
+    --theme-accent-glow: rgba(60, 117, 87, .24);
+    --theme-on-accent: #ffffff;
+    --theme-selection: rgba(60, 117, 87, .17);
+    --theme-focus-ring: 0 0 0 3px rgba(60, 117, 87, .25);
+    --topbar-bg: #ffffff;
+    --topbar-border: #d2e0d6;
+    --sidebar-bg: #f9fbf9;
+    --sidebar-border: #d2e0d6;
 }
 
-/* ---------------- NIGHT (21:00–05:00) Deep Dark OLED ---------------- */
-html[data-theme="night"],
-html[data-theme="dark"],
-html[data-theme="oled"],
-html[data-theme="amoled"] {
-    --theme-bg: #040810;
-    --theme-surface: #0d1524;
-    --theme-surface-strong: #07101e;
-    --theme-surface-muted: #111d30;
-    --theme-text: #f1f5f9;
-    --theme-text-secondary: #cbd5e1;
-    --theme-muted: #94a3b8;
-    --theme-border: #1e2d42;
-    --theme-border-strong: #2d4060;
-    --theme-accent: #38bdf8;
-    --theme-accent-hover: #7dd3fc;
-    --theme-accent-soft: rgba(56, 189, 248, 0.16);
-    --theme-accent-glow: rgba(56, 189, 248, 0.35);
-    --topbar-bg: #060c18;
-    --topbar-border: #1e2d42;
-    --sidebar-bg: #040810;
-    --sidebar-border: #1e2d42;
-    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.5);
-    --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.6);
-    --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.7);
-    --shadow-lg: 0 12px 30px rgba(0, 0, 0, 0.8);
+/* Autumn: warm mineral and amber accents; text and component contrast stay standard. */
+html[data-theme="autumn"] {
+    color-scheme: light;
+    --theme-bg: #faf7f2;
+    --theme-surface: #ffffff;
+    --theme-surface-strong: #ffffff;
+    --theme-surface-muted: #f3ede4;
+    --theme-text: #30271e;
+    --theme-text-secondary: #4c4034;
+    --theme-muted: #6c5c4a;
+    --theme-border: #e2d7c9;
+    --theme-border-strong: #c3ad95;
+    --theme-accent: #81512a;
+    --theme-accent-hover: #673f21;
+    --theme-accent-soft: rgba(129, 81, 42, .10);
+    --theme-accent-glow: rgba(129, 81, 42, .24);
+    --theme-on-accent: #ffffff;
+    --theme-selection: rgba(129, 81, 42, .17);
+    --theme-focus-ring: 0 0 0 3px rgba(129, 81, 42, .25);
+    --topbar-bg: #fffdfa;
+    --topbar-border: #e2d7c9;
+    --sidebar-bg: #faf7f2;
+    --sidebar-border: #e2d7c9;
 }
 
-/* Clean Overrides for Utility Classes in dark themes */
-html[data-theme="dark"] .bg-white,
-html[data-theme="dark"] .bg-light,
-html[data-theme="oled"] .bg-white,
-html[data-theme="oled"] .bg-light,
-html[data-theme="night"] .bg-white,
-html[data-theme="night"] .bg-light,
-html[data-theme="dusk"] .bg-white,
-html[data-theme="dusk"] .bg-light {
-    background-color: var(--theme-surface) !important;
-    color: var(--theme-text) !important;
+/* Winter: cool daylight and muted blue accents for bright, reflective rooms. */
+html[data-theme="winter"] {
+    color-scheme: light;
+    --theme-bg: #f4f7fb;
+    --theme-surface: #ffffff;
+    --theme-surface-strong: #ffffff;
+    --theme-surface-muted: #eaf0f6;
+    --theme-text: #1b2938;
+    --theme-text-secondary: #35485d;
+    --theme-muted: #5b6e82;
+    --theme-border: #d4dee9;
+    --theme-border-strong: #a4b5c7;
+    --theme-accent: #46688f;
+    --theme-accent-hover: #355271;
+    --theme-accent-soft: rgba(70, 104, 143, .10);
+    --theme-accent-glow: rgba(70, 104, 143, .24);
+    --theme-on-accent: #ffffff;
+    --theme-selection: rgba(70, 104, 143, .17);
+    --theme-focus-ring: 0 0 0 3px rgba(70, 104, 143, .25);
+    --topbar-bg: #ffffff;
+    --topbar-border: #d4dee9;
+    --sidebar-bg: #f8fafc;
+    --sidebar-border: #d4dee9;
 }
 
-html[data-theme="dark"] .text-muted,
-html[data-theme="oled"] .text-muted,
-html[data-theme="night"] .text-muted,
-html[data-theme="dusk"] .text-muted {
-    color: var(--theme-muted) !important;
+/* Dusk: warm, low-light surfaces for the end of a long operational shift. */
+html[data-theme="dusk"], html[data-theme="inferno"] {
+    color-scheme: dark;
+    --theme-bg: #211f24;
+    --theme-surface: #2b2930;
+    --theme-surface-strong: #252329;
+    --theme-surface-muted: #37343c;
+    --theme-text: #f3eee8;
+    --theme-text-secondary: #d8cfc5;
+    --theme-muted: #b3a79a;
+    --theme-border: #49444d;
+    --theme-border-strong: #665b60;
+    --theme-accent: #e0ad79;
+    --theme-accent-hover: #f0c496;
+    --theme-accent-soft: rgba(224, 173, 121, .15);
+    --theme-accent-glow: rgba(224, 173, 121, .30);
+    --theme-on-accent: #251a11;
+    --theme-selection: rgba(224, 173, 121, .25);
+    --theme-focus-ring: 0 0 0 3px rgba(224, 173, 121, .32);
+    --color-success: #6ce9a6;
+    --color-warning: #fec84b;
+    --color-danger: #fda29b;
+    --color-info: #84caff;
+    --topbar-bg: #29262d;
+    --topbar-border: #49444d;
+    --sidebar-bg: #252329;
+    --sidebar-border: #49444d;
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, .18);
+    --shadow-sm: 0 2px 6px rgba(0, 0, 0, .20);
+    --shadow-md: 0 6px 16px rgba(0, 0, 0, .24);
+    --shadow-lg: 0 12px 28px rgba(0, 0, 0, .28);
 }
 
-html[data-theme="dark"] .border,
-html[data-theme="dark"] .border-top,
-html[data-theme="dark"] .border-bottom,
-html[data-theme="oled"] .border,
-html[data-theme="night"] .border,
-html[data-theme="night"] .border-top,
-html[data-theme="night"] .border-bottom,
-html[data-theme="dusk"] .border,
-html[data-theme="dusk"] .border-top,
-html[data-theme="dusk"] .border-bottom {
-    border-color: var(--theme-border) !important;
+/* Night: neutral low-light mode; avoid pure black and reduce visual glare. */
+html[data-theme="night"], html[data-theme="dark"], html[data-theme="oled"], html[data-theme="amoled"] {
+    color-scheme: dark;
+    --theme-bg: #171c22;
+    --theme-surface: #20272f;
+    --theme-surface-strong: #1c2229;
+    --theme-surface-muted: #2a333d;
+    --theme-text: #f0f3f6;
+    --theme-text-secondary: #d0d8e0;
+    --theme-muted: #aab6c3;
+    --theme-border: #3a4652;
+    --theme-border-strong: #536271;
+    --theme-accent: #8cc7db;
+    --theme-accent-hover: #b2deeb;
+    --theme-accent-soft: rgba(140, 199, 219, .15);
+    --theme-accent-glow: rgba(140, 199, 219, .30);
+    --theme-on-accent: #10232b;
+    --theme-selection: rgba(140, 199, 219, .24);
+    --theme-focus-ring: 0 0 0 3px rgba(140, 199, 219, .34);
+    --color-success: #6ce9a6;
+    --color-warning: #fec84b;
+    --color-danger: #fda29b;
+    --color-info: #84caff;
+    --topbar-bg: #1d232a;
+    --topbar-border: #3a4652;
+    --sidebar-bg: #1c2229;
+    --sidebar-border: #3a4652;
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, .18);
+    --shadow-sm: 0 2px 6px rgba(0, 0, 0, .20);
+    --shadow-md: 0 6px 16px rgba(0, 0, 0, .24);
+    --shadow-lg: 0 12px 28px rgba(0, 0, 0, .28);
 }
 
-/* =========================================================
-   FULLSCREEN-ALWAYS — All apps run fullscreen at all times
-   Fullscreen toggle button is removed; auto-enter on load.
-========================================================= */
+/* Aurora: cool midnight variation for dark environments. */
+html[data-theme="aurora"], html[data-theme="celestial"] {
+    color-scheme: dark;
+    --theme-bg: #151d2c;
+    --theme-surface: #1e2a3c;
+    --theme-surface-strong: #192435;
+    --theme-surface-muted: #29374c;
+    --theme-text: #edf3fa;
+    --theme-text-secondary: #cfdae7;
+    --theme-muted: #a6b5c7;
+    --theme-border: #3b4d65;
+    --theme-border-strong: #586f8e;
+    --theme-accent: #9bb8f2;
+    --theme-accent-hover: #bfd0fa;
+    --theme-accent-soft: rgba(155, 184, 242, .15);
+    --theme-accent-glow: rgba(155, 184, 242, .30);
+    --theme-on-accent: #18233a;
+    --theme-selection: rgba(155, 184, 242, .24);
+    --theme-focus-ring: 0 0 0 3px rgba(155, 184, 242, .34);
+    --color-success: #6ce9a6;
+    --color-warning: #fec84b;
+    --color-danger: #fda29b;
+    --color-info: #84caff;
+    --topbar-bg: #1b2739;
+    --topbar-border: #3b4d65;
+    --sidebar-bg: #192435;
+    --sidebar-border: #3b4d65;
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, .18);
+    --shadow-sm: 0 2px 6px rgba(0, 0, 0, .20);
+    --shadow-md: 0 6px 16px rgba(0, 0, 0, .24);
+    --shadow-lg: 0 12px 28px rgba(0, 0, 0, .28);
+}
 
-/* Prevent any scrollbars on fullscreen pages */
-html.fullscreen-app,
-html.fullscreen-app body {
-    overflow: hidden !important;
-    height: 100vh !important;
-    width: 100vw !important;
+/* Emerald Night: dark green environmental palette with the same neutral hierarchy. */
+html[data-theme="emerald-dark"] {
+    color-scheme: dark;
+    --theme-bg: #16221d;
+    --theme-surface: #202f28;
+    --theme-surface-strong: #1b2923;
+    --theme-surface-muted: #2a3c33;
+    --theme-text: #eef5f0;
+    --theme-text-secondary: #d0dfd4;
+    --theme-muted: #a8bdb0;
+    --theme-border: #40584a;
+    --theme-border-strong: #5b7967;
+    --theme-accent: #8bcba7;
+    --theme-accent-hover: #b4e2c5;
+    --theme-accent-soft: rgba(139, 203, 167, .15);
+    --theme-accent-glow: rgba(139, 203, 167, .30);
+    --theme-on-accent: #14261b;
+    --theme-selection: rgba(139, 203, 167, .24);
+    --theme-focus-ring: 0 0 0 3px rgba(139, 203, 167, .34);
+    --color-success: #6ce9a6;
+    --color-warning: #fec84b;
+    --color-danger: #fda29b;
+    --color-info: #84caff;
+    --topbar-bg: #1c2a23;
+    --topbar-border: #40584a;
+    --sidebar-bg: #1b2923;
+    --sidebar-border: #40584a;
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, .18);
+    --shadow-sm: 0 2px 6px rgba(0, 0, 0, .20);
+    --shadow-md: 0 6px 16px rgba(0, 0, 0, .24);
+    --shadow-lg: 0 12px 28px rgba(0, 0, 0, .28);
+}
+
+/* High-contrast light palette for strong ambient glare or accessibility needs. */
+html[data-theme="high-contrast"], html[data-theme="contrast"] {
+    color-scheme: light;
+    --theme-bg: #ffffff;
+    --theme-surface: #ffffff;
+    --theme-surface-strong: #ffffff;
+    --theme-surface-muted: #f1f3f5;
+    --theme-text: #101820;
+    --theme-text-secondary: #202b36;
+    --theme-muted: #394754;
+    --theme-border: #66727e;
+    --theme-border-strong: #394754;
+    --theme-accent: #005fcc;
+    --theme-accent-hover: #004a9f;
+    --theme-accent-soft: rgba(0, 95, 204, .12);
+    --theme-accent-glow: rgba(0, 95, 204, .30);
+    --theme-on-accent: #ffffff;
+    --theme-selection: rgba(0, 95, 204, .22);
+    --theme-focus-ring: 0 0 0 3px rgba(0, 95, 204, .4);
+    --topbar-bg: #ffffff;
+    --topbar-border: #66727e;
+    --sidebar-bg: #f8f9fa;
+    --sidebar-border: #66727e;
+    --shadow-xs: 0 1px 2px rgba(16, 24, 32, .12);
+    --shadow-sm: 0 1px 3px rgba(16, 24, 32, .14);
+    --shadow-md: 0 4px 10px rgba(16, 24, 32, .16);
+    --shadow-lg: 0 10px 22px rgba(16, 24, 32, .20);
 }
 
 /* Theme Flash Removal */
 .theme-flash {
     display: none !important;
+}
+
+/* =========================================================
+   ULTRAMODERN & FUTURISTIC LIMS COCKPIT DESIGN SYSTEM
+   Standardized Single-Viewport Telemetry Across All QAD Apps
+   ========================================================= */
+
+:root {
+    --cyber-glow-cyan: var(--theme-accent-glow);
+    --cyber-glow-emerald: color-mix(in srgb, var(--color-success) 35%, transparent);
+    --cyber-glow-purple: color-mix(in srgb, var(--theme-accent) 30%, transparent);
+    --cyber-glow-amber: color-mix(in srgb, var(--color-warning) 35%, transparent);
+    --cyber-glow-rose: color-mix(in srgb, var(--color-danger) 35%, transparent);
+    /* --cyber-bg-* and --cyber-border-glow set with theme tokens above */
+}
+
+/* Universal Viewport-Fit Root: Strictly fits 100vh with zero outer page scroll */
+body:has(.qad-cockpit-viewport),
+html:has(.qad-cockpit-viewport) {
+    overflow: hidden !important;
+}
+
+body:has(.qad-cockpit-viewport) .content {
+    padding: 0 !important;
+    overflow: hidden !important;
+    height: calc(100vh - var(--header-height, 62px)) !important;
+    max-height: calc(100vh - var(--header-height, 62px)) !important;
+}
+
+.qad-cockpit-viewport {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - var(--header-height, 62px));
+    max-height: calc(100vh - var(--header-height, 62px));
+    min-height: 0;
+    overflow: hidden;
+    padding: 0.65rem 1rem;
+    gap: 0.65rem;
+    background:
+        radial-gradient(circle at 12% 10%, var(--theme-accent-soft) 0%, transparent 42%),
+        radial-gradient(circle at 88% 90%, var(--theme-accent-soft) 0%, transparent 40%),
+        var(--theme-bg);
+    color: var(--theme-text);
+    box-sizing: border-box;
+}
+
+/* Glassmorphic Cyber Card — token-backed for day + night */
+.cyber-card {
+    background: var(--cyber-bg-card);
+    border: 1px solid var(--theme-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    position: relative;
+    color: var(--theme-text);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.cyber-card:hover {
+    border-color: var(--theme-accent);
+    box-shadow: var(--shadow-md), 0 0 14px var(--theme-accent-soft);
+}
+
+.cyber-card--glow-cyan {
+    border-color: var(--theme-accent);
+    box-shadow: 0 0 15px var(--cyber-glow-cyan);
+}
+
+.cyber-card--glow-emerald {
+    border-color: var(--color-success);
+    box-shadow: 0 0 15px var(--cyber-glow-emerald);
+}
+
+/* Executive Telemetry Header / Topbar */
+.cyber-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--hud-bg);
+    border: 1px solid var(--theme-border);
+    border-radius: var(--radius-sm);
+    padding: 0.35rem 0.85rem;
+    min-height: 40px;
+    gap: 0.75rem;
+    flex-shrink: 0;
+    backdrop-filter: blur(8px);
+    color: var(--theme-text);
+}
+
+/* Cyber Metric Pill / Badge */
+.cyber-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.15rem 0.55rem;
+    border-radius: 6px;
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    font-family: var(--font-mono, monospace);
+    white-space: nowrap;
+    border: 1px solid transparent;
+}
+
+.cyber-badge--cyan {
+    background: color-mix(in srgb, var(--theme-accent) 14%, transparent);
+    color: var(--theme-accent);
+    border-color: color-mix(in srgb, var(--theme-accent) 38%, transparent);
+}
+
+.cyber-badge--emerald {
+    background: color-mix(in srgb, var(--color-success) 14%, transparent);
+    color: var(--color-success);
+    border-color: color-mix(in srgb, var(--color-success) 38%, transparent);
+}
+
+.cyber-badge--amber {
+    background: color-mix(in srgb, var(--color-warning) 14%, transparent);
+    color: var(--color-warning);
+    border-color: color-mix(in srgb, var(--color-warning) 38%, transparent);
+}
+
+.cyber-badge--rose {
+    background: color-mix(in srgb, var(--color-danger) 14%, transparent);
+    color: var(--color-danger);
+    border-color: color-mix(in srgb, var(--color-danger) 38%, transparent);
+}
+
+.cyber-badge--purple {
+    background: color-mix(in srgb, var(--theme-accent) 14%, transparent);
+    color: var(--theme-accent);
+    border-color: color-mix(in srgb, var(--theme-accent) 38%, transparent);
+}
+
+/* Live Pulse Indicator */
+.cyber-live-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 10px #10b981;
+    display: inline-block;
+    animation: cyber-pulse 2s infinite ease-in-out;
+}
+
+@keyframes cyber-pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.3); opacity: 0.6; }
+}
+
+/* Internal Precision Scroll Area: Allows scrolling inside bounded cards without page spill */
+.cockpit-scroll-pane {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(56, 189, 248, 0.3) transparent;
+}
+
+.cockpit-scroll-pane::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+
+.cockpit-scroll-pane::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.cockpit-scroll-pane::-webkit-scrollbar-thumb {
+    background: rgba(56, 189, 248, 0.3);
+    border-radius: 9999px;
+}
+
+.cockpit-scroll-pane::-webkit-scrollbar-thumb:hover {
+    background: rgba(56, 189, 248, 0.6);
+}
+/* =========================================================
+   APP SHELL / COCKPIT — constrain .content flex children
+========================================================= */
+body:has(.app-shell) .content,
+body:has(.qad-cockpit-viewport) .content {
+    overflow: hidden !important;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.content > .app-shell,
+.content > .qad-cockpit-viewport {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    max-width: 100%;
+    width: 100%;
+}
+
+/* Nested cockpit fills the shell instead of re-applying 100vh */
+.app-shell > .qad-cockpit-viewport {
+    height: 100%;
+    max-height: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+/* Tables never spill the viewport Â¡Âª scroll inside the container */
+.table-responsive,
+.app-content .table-responsive,
+.app-shell .table-responsive,
+.qad-cockpit-viewport .table-responsive {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+/* =========================================================
+   SHARED QAD COMPONENTS + CROSS-APP THEME BRIDGE
+   All microservices inherit day (blue/white) / night via tokens.
+   See qad/design.md
+========================================================= */
+
+/* --- Shared primitives --- */
+.qad-panel,
+.qad-kpi,
+.qad-toolbar {
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius-md);
+    color: var(--theme-text);
+    box-shadow: var(--shadow-sm);
+}
+
+.qad-panel__head,
+.qad-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.qad-panel__title {
+    font-size: var(--font-size-md);
+    font-weight: 700;
+    color: var(--theme-text);
+}
+
+.qad-kpi {
+    padding: 0.75rem 0.95rem;
+    min-width: 0;
+}
+.qad-kpi__label {
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 700;
+    color: var(--theme-muted);
+}
+.qad-kpi__value {
+    font-size: var(--font-size-2xl);
+    font-weight: 800;
+    color: var(--theme-text);
+    letter-spacing: -0.02em;
+}
+
+.qad-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.4rem 0.8rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    color: var(--theme-muted);
+    text-decoration: none;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    background: transparent;
+}
+.qad-tab:hover {
+    color: var(--theme-text);
+    background: var(--theme-surface-muted);
+}
+.qad-tab.is-active {
+    color: var(--theme-accent);
+    background: var(--theme-accent-soft);
+    border-color: var(--theme-border-strong);
+    box-shadow: 0 0 0 1px var(--theme-accent-soft);
+}
+
+.qad-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.7rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--theme-border);
+    background: var(--theme-surface);
+    color: var(--theme-text);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+}
+.qad-btn:hover {
+    border-color: var(--theme-accent);
+    color: var(--theme-accent);
+}
+.qad-btn--primary {
+    background: var(--theme-accent);
+    border-color: var(--theme-accent);
+    color: var(--theme-on-accent, #ffffff);
+}
+.qad-btn--primary:hover {
+    background: var(--theme-accent-hover);
+    color: var(--theme-on-accent, #ffffff);
+}
+
+.qad-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: var(--radius-pill);
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    border: 1px solid var(--theme-border);
+    background: var(--theme-surface-muted);
+    color: var(--theme-text-secondary);
+}
+
+.qad-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-sm);
+    color: var(--theme-text);
+}
+.qad-table th {
+    background: var(--table-header-bg);
+    color: var(--theme-muted);
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.5rem 0.65rem;
+    border-bottom: 1px solid var(--theme-border);
+    text-align: left;
+}
+.qad-table td {
+    padding: 0.5rem 0.65rem;
+    border-bottom: 1px solid var(--theme-border);
+    color: var(--theme-text);
+}
+.qad-table tr:hover td {
+    background: var(--row-hover-bg);
+}
+
+.qad-input,
+.qad-select {
+    background: var(--input-bg);
+    border: 1px solid var(--theme-border-strong);
+    border-radius: var(--radius-sm);
+    color: var(--theme-text);
+    padding: 0.35rem 0.6rem;
+    font-size: var(--font-size-sm);
+}
+.qad-input:focus,
+.qad-select:focus {
+    outline: none;
+    border-color: var(--theme-accent);
+    box-shadow: 0 0 0 3px var(--theme-accent-soft);
+}
+
+/* --- Cross-app surface bridge (legacy dark cards → tokens) --- */
+.ca-mt-panel,
+.ca-mt-kpi,
+.ca-mt__nav,
+.ca-hud-bar,
+.ca-analytics-toolbar,
+.ca-analytics-kpi,
+.ca-analytics-chart-panel,
+.ca-reports-toolbar,
+.ca-report-document-sheet,
+.ca-action-card,
+.ca-pipe-step,
+.ca-mt-node,
+.ca-alarm-card,
+.ca-hud-stat-pill,
+.jt-matrix-container,
+.jt-jar-card,
+.jt-curve-container,
+.jt-plant-impact-card,
+.jt-footer-toolbar,
+.jt-control-bar,
+.jt-telemetry-bar,
+.jt-remarks-card,
+.cl-matrix-container,
+.cl-jar-card,
+.cl-remarks-card,
+.cl-telemetry-bar,
+.cl-session-bar,
+.ph-matrix-container,
+.ph-jar-card,
+.ph-remarks-card,
+.ph-telemetry-bar,
+.ph-control-bar,
+.maint-panel,
+.maint-shell,
+.kpi-card,
+.panel,
+.app-panel,
+.dashboard-panel {
+    background: var(--panel-bg) !important;
+    border-color: var(--panel-border) !important;
+    color: var(--theme-text) !important;
+    box-shadow: var(--shadow-sm);
+}
+
+.ca-mt-kpi__value,
+.ca-mt-panel__title,
+.ca-pipe-step__name,
+.ca-alarm-title,
+.ca-chart-title,
+.ca-doc-title,
+.ca-doc-kpi-v,
+.ca-action-card__content strong,
+.ca-empty-state h3,
+.ca-sample-id,
+.jt-hud-optimal .hud-dosage,
+.maint-panel__title {
+    color: var(--theme-text) !important;
+}
+
+.ca-mt-kpi__label,
+.ca-mt-kpi__sub,
+.ca-hsp-label,
+.ca-tool-label,
+.ca-mt-table th,
+.ca-doc-kpi-k,
+.ca-sub-note,
+.ca-empty-state p,
+.ca-action-card__content span,
+.ca-mt-node__label,
+.ca-pipe-step__num {
+    color: var(--theme-muted) !important;
+}
+
+.ca-mt-table td,
+.ca-doc-table td,
+.ca-hsp-val {
+    color: var(--theme-text) !important;
+}
+
+.ca-mt__tab {
+    color: var(--theme-muted) !important;
+}
+.ca-mt__tab:hover {
+    color: var(--theme-text) !important;
+    background: var(--theme-surface-muted) !important;
+}
+.ca-mt__tab.is-active {
+    color: var(--theme-accent) !important;
+    background: var(--theme-accent-soft) !important;
+    border-color: var(--theme-border-strong) !important;
+}
+
+.ca-mt-btn,
+.ca-hud-action-btn,
+.ca-filter-chip,
+.ca-tool-select,
+.ca-input-search,
+.jt-btn-secondary,
+.jt-btn-primary,
+.cl-btn-secondary,
+.ph-btn-secondary {
+    background: var(--theme-surface) !important;
+    border-color: var(--theme-border) !important;
+    color: var(--theme-text) !important;
+}
+
+.ca-mt-btn--primary,
+.ca-mt-btn--glow,
+.ca-hud-action-btn:hover,
+.jt-btn-primary,
+.btn-jt-save,
+.cl-btn-primary,
+.ph-btn-primary {
+    background: var(--theme-accent) !important;
+    border-color: var(--theme-accent) !important;
+    color: var(--theme-on-accent, #ffffff) !important;
+}
+
+.ca-hud-bar,
+.ca-mt__nav,
+.ca-analytics-toolbar,
+.ca-reports-toolbar,
+.ca-table-filters-bar {
+    background: var(--hud-bg) !important;
+    border-color: var(--panel-border) !important;
+}
+
+.ca-doc-table th,
+.ca-mt-table th {
+    background: var(--table-header-bg) !important;
+}
+
+.ca-tool-select,
+.ca-input-search,
+.jt-input,
+.jt-textarea,
+.cl-input,
+.ph-input,
+.ph-textarea {
+    background: var(--input-bg) !important;
+    border-color: var(--theme-border-strong) !important;
+    color: var(--theme-text) !important;
+}
+
+/* Workspace roots — no forced black page */
+.jt-workspace-root,
+.cl-workspace-root,
+.ph-workspace-root,
+.ca-app-shell,
+.ca-main,
+.maint-shell,
+.app-shell {
+    background: var(--theme-bg) !important;
+    color: var(--theme-text) !important;
+}
+
+/* The same palette-aware page wash for every light theme. */
+html.theme-light :is(.jt-workspace-root, .cl-workspace-root, .ph-workspace-root) {
+    background:
+        radial-gradient(circle at 10% 0%, var(--theme-accent-soft), transparent 45%),
+        var(--theme-bg) !important;
 }

@@ -54,6 +54,9 @@ pyvenv.cfg
 *.pfx
 nginx/certs/
 certs/
+k8s/secrets.yaml
+k8s/userlist.txt
+pgbouncer/userlist.txt
 
 # ==============================================================================
 # Django Files & Local Databases

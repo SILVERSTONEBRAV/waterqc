@@ -1,138 +1,164 @@
-{% extends "o/base.html" %}
+{% extends "core/cockpit/base_cockpit.html" %}
 {% load static %}
 
-{% block content %}
-
-<div class="container-fluid mt-3">
-
-    <!-- ================= HEADER ================= -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h3 class="mb-0">
-                📊 {{ app.label }}
-            </h3>
-            <small class="text-muted">
-                Registry-driven overview for "{{ app.name }}"
-            </small>
+{% block kpi_strip %}
+<div class="kpi-strip">
+    {% for kpi in kpis %}
+    <div class="kpi-card">
+        <div class="kpi-card__icon kpi-card__icon--{{ kpi.color }}">
+            <i class="fa-solid {{ kpi.icon }}"></i>
         </div>
-
-        <div class="text-muted small">
-            Total: {{ stats.total_models }} models
+        <div class="kpi-card__body">
+            <div class="kpi-card__value">{{ kpi.value }}</div>
+            <div class="kpi-card__label">{{ kpi.label }}</div>
         </div>
     </div>
-
-
-    <!-- ================= STATS ================= -->
-    <div class="row g-3 mb-4">
-
-        {% for key, value in stats.items %}
-        <div class="col-md-3">
-            <div class="card shadow-sm border-0">
-                <div class="card-body">
-                    <small class="text-muted">{{ key|title }}</small>
-                    <h3 class="mb-0">{{ value }}</h3>
-                </div>
-            </div>
-        </div>
-        {% endfor %}
-
-    </div>
-
-
-    <!-- ================= MODELS ================= -->
-    <div class="card shadow-sm border-0">
-
-        <div class="card-header bg-light">
-            <strong>Registered Models</strong>
-        </div>
-
-        <div class="card-body p-0">
-
-            {% for m in models %}
-
-                <div class="d-flex justify-content-between align-items-center px-3 py-3 border-bottom">
-
-                    <!-- LEFT -->
-                    <div class="d-flex align-items-center">
-
-                        <div class="me-3">
-                            <i class="fas fa-{{ m.icon|default:'cube' }} fa-lg text-primary"></i>
-                        </div>
-
-                        <div>
-                            <div class="fw-semibold">
-                                {{ m.label }}
-                            </div>
-
-                            <small class="text-muted">
-                                {{ m.key }}
-                            </small>
-
-                            <!-- TAGS (pure registry-driven) -->
-                            <div class="mt-1">
-                                {% for tag in m.tags %}
-                                    <span class="badge bg-secondary">{{ tag }}</span>
-                                {% empty %}
-                                    <span class="text-muted small">No tags</span>
-                                {% endfor %}
-                            </div>
-                        </div>
-                    </div>
-
-
-                    <!-- RIGHT ACTIONS (registry-driven ONLY) -->
-                    <div class="d-flex align-items-center gap-2">
-
-                        {% with r=m.routes c=m.capabilities %}
-
-                            <a href="{{ r.list }}"
-                               class="btn btn-sm btn-outline-primary">
-                                <i class="fas fa-list"></i>
-                                List
-                            </a>
-
-                            {% if c.create %}
-                                <a href="{{ r.create }}"
-                                   class="btn btn-sm btn-outline-success">
-                                    <i class="fas fa-plus"></i>
-                                    Create
-                                </a>
-                            {% endif %}
-
-                            {% if c.export %}
-                                <a href="{{ r.export }}"
-                                   class="btn btn-sm btn-outline-warning">
-                                    <i class="fas fa-file-export"></i>
-                                    Export
-                                </a>
-                            {% endif %}
-
-                            {% if c.inline %}
-                                <a href="{{ r.update }}"
-                                   class="btn btn-sm btn-outline-info">
-                                    <i class="fas fa-edit"></i>
-                                    Inline
-                                </a>
-                            {% endif %}
-
-                        {% endwith %}
-
-                    </div>
-
-                </div>
-
-            {% empty %}
-
-                <div class="text-center text-muted py-5">
-                    <i class="fas fa-database fa-2x mb-2"></i>
-                    <div>No models registered for this app</div>
-                </div>
-
-            {% endfor %}
-
-        </div>
-    </div>
-
+    {% endfor %}
 </div>
+{% endblock %}
 
+{% block cockpit_grid %}
+<div class="cockpit-grid cockpit-grid--3col" style="flex:1;min-height:0;">
+
+    <!-- ═══ USAGE TREND ═══ -->
+    <div class="panel panel--span-2">
+        <div class="panel__header">
+            <span class="panel__title"><i class="fa-solid fa-chart-line"></i> Chemical Usage Trend (kg/day)</span>
+            <span class="pill pill--cyan">{{ period_days }}d</span>
+        </div>
+        <div class="panel__body">
+            <div class="chart-wrap"><canvas id="usageTrendChart"></canvas></div>
+        </div>
+    </div>
+
+    <!-- ═══ CATEGORY BREAKDOWN ═══ -->
+    <div class="panel">
+        <div class="panel__header">
+            <span class="panel__title"><i class="fa-solid fa-chart-pie"></i> Category Mix</span>
+        </div>
+        <div class="panel__body" style="display:flex;align-items:center;justify-content:center;">
+            <div class="chart-wrap" style="max-width:200px;max-height:200px;"><canvas id="categoryChart"></canvas></div>
+        </div>
+    </div>
+
+    <!-- ═══ STOCK LEVELS ═══ -->
+    <div class="panel panel--span-2">
+        <div class="panel__header">
+            <span class="panel__title"><i class="fa-solid fa-warehouse"></i> Chemical Stock Levels (kg)</span>
+        </div>
+        <div class="panel__body">
+            <div class="chart-wrap"><canvas id="stockChart"></canvas></div>
+        </div>
+    </div>
+
+    <!-- ═══ PUMP STATUS ═══ -->
+    <div class="panel">
+        <div class="panel__header">
+            <span class="panel__title"><i class="fa-solid fa-pump-medical"></i> Pump Status</span>
+            <span class="live-tag">LIVE</span>
+        </div>
+        <div class="panel__body">
+            <table class="panel-table">
+                <thead><tr><th>Pump</th><th>Status</th><th>Cat</th></tr></thead>
+                <tbody>
+                    {% for ps in pump_statuses %}
+                    <tr>
+                        <td>{{ ps.name }}</td>
+                        <td>
+                            <span class="status-dot status-dot--{% if ps.status == 'working' %}ok{% elif ps.status == 'faulty' %}danger{% elif ps.status == 'maintenance' %}warning{% else %}idle{% endif %} status-dot--pulse"></span>
+                            {{ ps.status|title }}
+                        </td>
+                        <td><span class="pill pill--slate">{{ ps.category }}</span></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3" class="empty-state"><i class="fa-solid fa-plug-circle-xmark"></i> No pumps</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ═══ DOSAGE COMPLIANCE ═══ -->
+    <div class="panel">
+        <div class="panel__header">
+            <span class="panel__title"><i class="fa-solid fa-bullseye"></i> Dosage Compliance</span>
+        </div>
+        <div class="panel__body" id="compliancePanel" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.5rem;">
+            <!-- Filled by JS -->
+        </div>
+    </div>
+
+    <!-- ═══ RECENT DOSING ═══ -->
+    <div class="panel panel--span-2">
+        <div class="panel__header">
+            <span class="panel__title"><i class="fa-solid fa-clock-rotate-left"></i> Recent Dosing Records</span>
+        </div>
+        <div class="panel__body">
+            <table class="panel-table">
+                <thead><tr><th>Type</th><th>Chemical</th><th>Actual</th><th>Expected</th><th>Flow</th><th>Date</th><th>By</th></tr></thead>
+                <tbody>
+                    {% for d in recent_dosing %}
+                    <tr>
+                        <td><span class="pill pill--{% if d.type == 'Coagulant' %}blue{% elif d.type == 'pH Adj' %}purple{% elif d.type == 'Disinfect' %}emerald{% else %}amber{% endif %}">{{ d.type }}</span></td>
+                        <td>{{ d.chemical }}</td>
+                        <td>{{ d.dosage|floatformat:1 }}</td>
+                        <td>{{ d.expected|floatformat:1|default:"—" }}</td>
+                        <td>{{ d.flow|floatformat:0 }}</td>
+                        <td>{{ d.date }}</td>
+                        <td>{{ d.operator }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="7" class="empty-state"><i class="fa-solid fa-vial"></i> No dosing records</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block dashboard_scripts %}
+{{ charts_json|json_script:"ops-charts-data" }}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    var raw = JSON.parse(document.getElementById("ops-charts-data").textContent);
+
+    // Usage Trend
+    if (raw.usage_trend && raw.usage_trend.labels.length) {
+        QADCockpit.line("usageTrendChart", raw.usage_trend.labels, [
+            QADCockpit.dataset("Usage (kg)", raw.usage_trend.data, "cyan", true)
+        ]);
+    }
+
+    // Category Doughnut
+    if (raw.category_breakdown) {
+        QADCockpit.doughnut("categoryChart", raw.category_breakdown.labels, raw.category_breakdown.data,
+            ["blue","purple","emerald","amber"]);
+    }
+
+    // Stock Bar
+    if (raw.stock_levels && raw.stock_levels.labels.length) {
+        QADCockpit.bar("stockChart", raw.stock_levels.labels, [
+            QADCockpit.dataset("Stock (kg)", raw.stock_levels.data, "emerald")
+        ]);
+    }
+
+    // Compliance
+    var cp = document.getElementById("compliancePanel");
+    if (cp && raw.compliance) {
+        var c = raw.compliance;
+        var color = c.rate >= 85 ? "emerald" : c.rate >= 60 ? "amber" : "rose";
+        cp.innerHTML =
+            '<div class="kpi-card__value" style="font-size:2rem;">' + c.rate + '%</div>' +
+            '<div class="kpi-card__label">Compliance Rate</div>' +
+            '<div style="margin-top:0.5rem;">' +
+            '<span class="pill pill--emerald">' + c.compliant + ' OK</span> ' +
+            '<span class="pill pill--slate">' + c.total + ' Total</span>' +
+            '</div>' +
+            '<div class="progress-micro" style="width:80%;margin-top:0.5rem;">' +
+            '<div class="progress-micro__fill progress-micro__fill--' + color + '" style="width:' + c.rate + '%"></div>' +
+            '</div>';
+    }
+});
+</script>
 {% endblock %}

@@ -1,4 +1,5 @@
 from rest_framework import viewsets, status, filters, permissions, throttling
+from core.permissions import ViewModelPermissions
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
@@ -39,7 +40,7 @@ class PHAdjustmentTestViewSet(viewsets.ModelViewSet):
         "verified_by", "confirmed_by", "approved_by"
     ).prefetch_related("jar_results")
 
-    permission_classes = [permissions.IsAuthenticated, IsAnalystOrReadOnly]
+    permission_classes = [ViewModelPermissions, IsAnalystOrReadOnly]
     throttle_classes = [BurstRateThrottle]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['treatment_plant', 'test_date', 'verified_by', 'confirmed_by', 'approved_by']
@@ -166,7 +167,7 @@ class PHAdjustmentTestViewSet(viewsets.ModelViewSet):
 class PHAdjustmentJarResultViewSet(viewsets.ModelViewSet):
     queryset = PHAdjustmentJarResult.objects.select_related("test")
     serializer_class = PHAdjustmentJarResultSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
     throttle_classes = [BurstRateThrottle]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['test', 'jar_number', 'is_optimal']

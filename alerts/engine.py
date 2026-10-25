@@ -34,14 +34,26 @@ class AlertEngine:
     """
 
     @staticmethod
-    def trigger_alert(instance, alert_types=None, audit_notes=None):
+    def trigger_alert(instance, alert_types=None, alert_type=None, audit_notes=None):
         """
         Trigger alerts relevant to an instance.
-        - `alert_types`: list of alert_type strings to filter alerts
+        - `alert_types`: list of alert_type strings to filter alerts (preferred)
+        - `alert_type`:  single alert_type string — convenience alias for signals
         - `audit_notes`: optional notes for logs
         """
+        # Normalise: accept either singular or plural kwarg
+        if alert_type and not alert_types:
+            alert_types = [alert_type]
+
         serialized = InstanceSerializer.serialize(instance)
         geo_context = GeoContextAnalyzer.detect(serialized)
+        plant_id = (
+            getattr(instance, "treatment_plant_id", None)
+            or getattr(getattr(instance, "analysis", None), "treatment_plant_id", None)
+            or getattr(getattr(instance, "treatment_plant", None), "pk", None)
+        )
+        if plant_id:
+            geo_context["plant_id"] = str(plant_id)
 
         alerts = AlertConfig.objects.filter(active=True)
         if alert_types:
@@ -61,24 +73,45 @@ class AlertEngine:
                     alert.priority = predicted_priority
                     alert.save(update_fields=['priority'])
 
-                # Format messages
-                subject = alert.template.subject_template.format(**serialized)
-                body = alert.template.body_template.format(**serialized)
+                # Format messages safely
+                try:
+                    subject = alert.template.subject_template.format(**serialized)
+                except Exception:
+                    subject = alert.template.subject_template or f"Alert: {alert.alert_type}"
+
+                try:
+                    body = alert.template.body_template.format(**serialized)
+                except Exception:
+                    body = alert.template.body_template or str(instance)
+
                 recipients = list(alert.recipients.all())
 
-                # Async dispatch
-                dispatch_alerts.delay(subject, body, [u.id for u in recipients])
-                if alert.template.auto_voice_enabled:
-                    generate_voice_notification.delay(body)
-                send_websocket_notification.delay(body, group='alerts_stream')
-
-                # Record alert state
+                # Record alert state first so voice alert can link to it
                 state = AlertState.objects.create(
                     alert_config=alert,
                     instance_ref=str(instance),
                     state=AlertState.StateChoices.QUEUED,
                     geo_context=geo_context,
                 )
+
+                # Generate persistent voice alert with audio file URL
+                voice_url = None
+                try:
+                    from .models import VoiceAlert
+                    voice_alert = VoiceAlert.generate_persistent_voice_alert(
+                        message=body,
+                        title=subject,
+                        alert_config=alert,
+                        alert_state=state,
+                    )
+                    if voice_alert and voice_alert.audio_file:
+                        voice_url = voice_alert.audio_file.url
+                except Exception as v_err:
+                    logger.warning(f"[AlertEngine] Voice alert generation notice: {v_err}")
+
+                # Async dispatch (email, SMS, etc.)
+                dispatch_alerts.delay(subject, body, recipients)
+                send_websocket_notification.delay(body, group='alerts_stream', title=subject, voice_url=voice_url)
 
                 # Record audit log
                 AlertLog.objects.create(
@@ -96,17 +129,26 @@ class AlertEngine:
                 alert.save(update_fields=['last_triggered'])
                 triggered_alerts.append(state)
 
-                # Real-time push via channels
-                async_to_sync(get_channel_layer().group_send)(
-                    'alerts_stream',
-                    {
-                        'type': 'alert_state',
-                        'message': f"Alert triggered: {alert.alert_type} → {state.state}",
-                        'geo': geo_context,
-                        'instance': serialized,
-                        'priority': alert.priority,
-                    },
-                )
+                # Real-time push via channels directly to active dashboard streams
+                try:
+                    channel_layer = get_channel_layer()
+                    if channel_layer:
+                        ws_payload = {
+                            'type': 'alert.message',
+                            'title': subject,
+                            'message': body,
+                            'voice_url': voice_url,
+                            'priority': alert.priority,
+                            'alert_type': alert.alert_type,
+                            'instance_ref': str(getattr(instance, 'id', instance)),
+                            'timestamp': timezone.now().isoformat(),
+                        }
+                        async_to_sync(channel_layer.group_send)('alerts_stream', ws_payload)
+                        async_to_sync(channel_layer.group_send)('alerts_group', ws_payload)
+                        for u in recipients:
+                            async_to_sync(channel_layer.group_send)(f'user_{u.id}_alerts', ws_payload)
+                except Exception as ws_err:
+                    logger.warning(f"[AlertEngine] WebSocket broadcast notice: {ws_err}")
 
             except Exception as e:
                 logger.exception(f"[AlertEngine] Failed triggering alert for {instance}: {e}")

@@ -1,0 +1,145 @@
+/* =========================================================
+   COCKPIT FULLSCREEN / PWA FIT — QCA-parity viewport lock
+   Used by backwashing, xmicalconcentration, and other cockpits
+   ========================================================= */
+
+html.dashboard-locked,
+body.dashboard-fullscreen:has(.qad-cockpit-viewport),
+html:has(.qad-cockpit-viewport.cockpit-fs) {
+    height: 100vh !important;
+    max-height: 100vh !important;
+    width: 100vw !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+}
+
+/* Collapse app chrome — full-bleed telemetry surface */
+body:has(.qad-cockpit-viewport.cockpit-fs) .sidebar,
+body.cockpit-fs-active .sidebar {
+    display: none !important;
+}
+
+body:has(.qad-cockpit-viewport.cockpit-fs) .content-wrapper,
+body.cockpit-fs-active .content-wrapper {
+    width: 100% !important;
+    margin-left: 0 !important;
+    padding-top: var(--header-height, 54px) !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+}
+
+body:has(.qad-cockpit-viewport.cockpit-fs) .content,
+body.cockpit-fs-active .content,
+body:has(.qad-cockpit-viewport.cockpit-fs) .app-shell,
+body:has(.qad-cockpit-viewport.cockpit-fs) .app-content {
+    padding: 0 !important;
+    overflow: hidden !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+.qad-cockpit-viewport.cockpit-fs {
+    height: calc(100vh - var(--header-height, 54px)) !important;
+    max-height: calc(100vh - var(--header-height, 54px)) !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    padding: 0.4rem 0.55rem !important;
+    gap: 0.4rem !important;
+    box-sizing: border-box;
+}
+
+.qad-cockpit-viewport.cockpit-fs .cockpit-topbar {
+    min-height: 34px !important;
+    padding: 0.25rem 0.65rem !important;
+    flex-shrink: 0;
+}
+
+.qad-cockpit-viewport.cockpit-fs .kpi-strip {
+    flex-shrink: 0;
+    gap: 0.35rem !important;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)) !important;
+}
+
+.qad-cockpit-viewport.cockpit-fs .kpi-card {
+    padding: 0.4rem 0.55rem !important;
+    min-height: 0 !important;
+}
+
+.qad-cockpit-viewport.cockpit-fs .kpi-card__value {
+    font-size: 1.05rem !important;
+}
+
+.qad-cockpit-viewport.cockpit-fs .kpi-card__label {
+    font-size: 0.62rem !important;
+}
+
+.qad-cockpit-viewport.cockpit-fs .kpi-card__icon {
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 0.8rem !important;
+}
+
+/* Dense fill grid — all panels share remaining viewport */
+.qad-cockpit-viewport.cockpit-fs .cockpit-grid {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    gap: 0.4rem !important;
+    align-content: stretch;
+}
+
+.qad-cockpit-viewport.cockpit-fs .cockpit-grid--fit-2x3 {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    grid-template-rows: repeat(2, minmax(0, 1fr)) !important;
+}
+
+.qad-cockpit-viewport.cockpit-fs .cockpit-grid--fit-2x4 {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    grid-template-rows: repeat(2, minmax(0, 1fr)) !important;
+}
+
+.qad-cockpit-viewport.cockpit-fs .panel,
+.qad-cockpit-viewport.cockpit-fs .cyber-card.cockpit-panel {
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+.qad-cockpit-viewport.cockpit-fs .panel__header,
+.qad-cockpit-viewport.cockpit-fs .cockpit-panel__header {
+    padding: 0.35rem 0.55rem !important;
+}
+
+.qad-cockpit-viewport.cockpit-fs .panel__body,
+.qad-cockpit-viewport.cockpit-fs .cockpit-panel__body {
+    min-height: 0 !important;
+    overflow: auto !important;
+    padding: 0.35rem 0.5rem !important;
+}
+
+.qad-cockpit-viewport.cockpit-fs .chart-wrap {
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+}
+
+.qad-cockpit-viewport.cockpit-fs .activity-feed {
+    max-height: 100%;
+    overflow-y: auto;
+}
+
+@media (max-width: 1100px) {
+    .qad-cockpit-viewport.cockpit-fs .cockpit-grid--fit-2x3,
+    .qad-cockpit-viewport.cockpit-fs .cockpit-grid--fit-2x4 {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        grid-template-rows: repeat(3, minmax(0, 1fr)) !important;
+    }
+    .qad-cockpit-viewport.cockpit-fs .panel--span-2 {
+        grid-column: span 2;
+    }
+}

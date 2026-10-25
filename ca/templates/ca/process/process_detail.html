@@ -34,30 +34,24 @@
             Process Data
         </a>
 
-        {% if process.status == "RECEIVED" %}
-            <a
-                href="{% url 'ca:process-action-form' process.pk %}"
-                class="btn btn-primary"
-            >
-                Continue Workflow
-            </a>
-        {% elif process.status == "ANALYSIS" %}
-            <a
-                href="{% url 'ca:process-action-form' process.pk %}"
-                class="btn btn-primary"
-            >
-                Record Analysis
-            </a>
-        {% elif process.status == "QA" %}
-            <a
-                href="{% url 'ca:process-action-form' process.pk %}"
-                class="btn btn-warning"
-            >
-                QA Review
-            </a>
-        {% endif %}
     </div>
 </div>
+
+{% if workflow_prompt %}
+<section class="card" aria-labelledby="workflow-next-step-title">
+    <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+        <div>
+            <h2 id="workflow-next-step-title" style="margin:0 0 .35rem">
+                {% if workflow_prompt.complete %}Workflow complete{% else %}Next step{% endif %}
+            </h2>
+            <p style="margin:0">{{ workflow_prompt.body }}</p>
+        </div>
+        <a href="{{ workflow_prompt.url }}" class="btn {% if workflow_prompt.complete %}btn-secondary{% else %}btn-primary{% endif %}">
+            {{ workflow_prompt.action }}
+        </a>
+    </div>
+</section>
+{% endif %}
 
 <div class="details-grid">
     <div class="card">
@@ -216,7 +210,7 @@
                     <div class="detail-item">
                         <span class="detail-label">Received</span>
                         <span class="detail-value">
-                            {{ process.batch.received_date|date:"d M Y H:i" }}
+                            {{ process.batch.received_date|date:"d M Y" }}
                         </span>
                     </div>
                 </div>
@@ -230,6 +224,32 @@
 </div>
 
 {% if process.analysis_request %}
+{% if corrective_actions %}
+<section class="card ca-audit-card" aria-labelledby="process-capa-title">
+    <div class="card-header">
+        <h2 id="process-capa-title">Corrective and preventive actions</h2>
+        <span>{{ corrective_actions|length }} record{{ corrective_actions|length|pluralize }}</span>
+    </div>
+    <div class="card-body">
+        <ol class="ca-audit-list">
+            {% for action in corrective_actions %}
+                <li>
+                    <strong>{{ action.get_status_display }}</strong>
+                    · submitted {{ action.submitted_at|date:"d M Y H:i" }}
+                    {% if action.submitted_by %} · {{ action.submitted_by.get_full_name|default:action.submitted_by.get_username }}{% endif %}
+                    <p><strong>QA observation:</strong> {{ action.qa_observation }}</p>
+                    <p><strong>Corrective action:</strong> {{ action.corrective_action }}</p>
+                    <p><strong>Preventive action:</strong> {{ action.preventive_action }}</p>
+                    {% if action.reviewed_at %}
+                        <p><strong>QA verification:</strong> {{ action.review_notes }} · {{ action.reviewed_at|date:"d M Y H:i" }}{% if action.reviewed_by %} · {{ action.reviewed_by.get_full_name|default:action.reviewed_by.get_username }}{% endif %}</p>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ol>
+    </div>
+</section>
+{% endif %}
+
 <div class="card">
     <div class="card-header">
         <div>
@@ -263,7 +283,7 @@
             <div class="detail-item">
                 <span class="detail-label">Location</span>
                 <span class="detail-value">
-                    {{ process.analysis_request.location|default:"—" }}
+                    {{ process.batch.location|default:"—" }}
                 </span>
             </div>
 
@@ -453,6 +473,13 @@
                     {{ process.get_status_display|default:process.status }}
                 </span>
             </div>
+
+            {% if process.rejection_reason %}
+            <div class="detail-item">
+                <span class="detail-label">Rejection Reason</span>
+                <span class="detail-value">{{ process.rejection_reason }}</span>
+            </div>
+            {% endif %}
 
             {% if process.analysis_started_at %}
             <div class="detail-item">

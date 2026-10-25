@@ -14,18 +14,35 @@ from django.contrib.auth.signals import user_logged_in, user_logged_out
 from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
+
+
 class Section(models.Model):
     code = models.CharField(max_length=50, unique=True, db_index=True)
     name = models.CharField(max_length=100)
+    treatment_plant = models.ForeignKey(
+        "t.TreatmentPlant",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="sections",
+        help_text="Treatment plant this section belongs to.",
+    )
     is_active = models.BooleanField(default=True)
 
     class Meta:
         ordering = ["name"]
         verbose_name = "Section"
         verbose_name_plural = "Sections"
+        indexes = [
+            models.Index(
+                fields=["treatment_plant", "is_active"],
+                name="core_section_plant_active_idx",
+            ),
+        ]
 
     def __str__(self) -> str:
-        return self.name
+        plant_label = f" ({self.treatment_plant})" if self.treatment_plant_id else ""
+        return f"{self.name}{plant_label}"
 
 
 # -------------------------------
@@ -303,6 +320,115 @@ def track_login(sender, request, user, **kwargs):
 @receiver(user_logged_out)
 def track_logout(sender, request, user, **kwargs):
     UserSession.objects.filter(user=user, session_key=request.session.session_key).update(terminated=True)
+
+
+# -------------------------------
+# Group Dashboard Redirect (Admin-managed Login Redirect Map)
+# -------------------------------
+class GroupDashboardRedirect(models.Model):
+    """
+    Database-backed mapping of auth Group → post-login dashboard URL.
+    Replaces the hard-coded LOGIN_GROUP_REDIRECT_MAP in settings.
+    When records exist here, they take precedence over settings.
+    """
+
+    group = models.OneToOneField(
+        "auth.Group",
+        on_delete=models.CASCADE,
+        related_name="dashboard_redirect",
+        verbose_name="Group",
+        help_text="Auth group whose members will be redirected to the dashboard URL on login.",
+    )
+    redirect_url = models.CharField(
+        max_length=500,
+        verbose_name="Redirect URL",
+        help_text=(
+            "URL or Django named URL to redirect to on login. "
+            "Examples: /ca/  or  ca:dashboard  or  /monitoring/"
+        ),
+    )
+    label = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name="Friendly Label",
+        help_text="Optional display label for this mapping (e.g. 'Chemical Analyst Dashboard').",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        db_index=True,
+        verbose_name="Active",
+        help_text="Inactive mappings are ignored at login.",
+    )
+    priority = models.PositiveSmallIntegerField(
+        default=10,
+        verbose_name="Priority",
+        help_text=(
+            "Lower number = higher priority when a user belongs to multiple mapped groups."
+        ),
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["priority", "group__name"]
+        verbose_name = "Group Dashboard Redirect"
+        verbose_name_plural = "Group Dashboard Redirects"
+        indexes = [
+            models.Index(fields=["is_active", "priority"], name="core_gdr_active_priority_idx"),
+        ]
+
+    def __str__(self):
+        status = "✓" if self.is_active else "✗"
+        label = f" ({self.label})" if self.label else ""
+        return f"{status} {self.group.name}{label} → {self.redirect_url}"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError as VE
+        url = (self.redirect_url or "").strip()
+        if not url:
+            raise VE({"redirect_url": "Redirect URL must not be empty."})
+        self.redirect_url = url
+
+    @classmethod
+    def get_redirect_map(cls) -> dict:
+        """
+        Returns a normalized group-name → URL dict.
+        Results are cached for 5 minutes keyed by 'gdr:redirect_map'.
+        """
+        cache_key = "gdr:redirect_map"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+        try:
+            mapping = {}
+            qs = (
+                cls.objects
+                .filter(is_active=True)
+                .select_related("group")
+                .order_by("priority", "group__name")
+            )
+            for entry in qs:
+                key = entry.group.name.strip().upper()
+                if key not in mapping:
+                    mapping[key] = entry.redirect_url
+            cache.set(cache_key, mapping, timeout=300)
+            return mapping
+        except Exception as exc:
+            logger.exception("GroupDashboardRedirect.get_redirect_map failed: %s", exc)
+            return {}
+
+    def _bust_cache(self):
+        cache.delete("gdr:redirect_map")
+
+
+@receiver(post_save, sender=GroupDashboardRedirect)
+def bust_gdr_cache_on_save(sender, instance, **kwargs):
+    instance._bust_cache()
+
+
+@receiver(post_delete, sender=GroupDashboardRedirect)
+def bust_gdr_cache_on_delete(sender, instance, **kwargs):
+    instance._bust_cache()
 
 
 # -------------------------------

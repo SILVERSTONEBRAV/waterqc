@@ -1,0 +1,125 @@
+{% load static %}
+
+<div class="scada-tab-pane" id="pane-sentinel">
+    <!-- Sentinel Header -->
+    <div style="background: var(--scada-panel); border: 1px solid var(--scada-border); border-radius: 8px; padding: 0.85rem 1.25rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+        <div>
+            <h4 style="font-size: 0.95rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--scada-text-main); margin: 0 0 0.2rem 0;">
+                <i class="fa-solid fa-satellite-dish" style="color: var(--scada-rose); margin-right: 0.4rem;"></i> Anomaly Sentinel Radar — Active Alarm Feed
+            </h4>
+            <div style="font-size: 0.74rem; color: var(--scada-text-muted);">
+                Automated SCADA anomaly detection engine continuously cross-references online IoT sensor telemetry against laboratory analytical worksheets to surface significant variance alarms.
+            </div>
+        </div>
+
+        <!-- Alarm Summary Chips -->
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <div class="scada-kpi-chip kpi-danger">
+                <i class="fa-solid fa-circle-xmark"></i>
+                <span>Critical:</span>
+                <span class="kpi-val">{{ alarms|length }}</span>
+            </div>
+            <div class="scada-kpi-chip kpi-warning">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span>Warnings:</span>
+                <span class="kpi-val">{{ total_drift_warnings }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div style="background: #090e1a; border: 1px solid var(--scada-border); border-radius: 6px; padding: 0.5rem 0.85rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+        <span style="font-size: 0.72rem; font-weight: 700; color: var(--scada-text-muted); text-transform: uppercase; letter-spacing: 0.04em;">
+            <i class="fa-solid fa-filter"></i> Filter:
+        </span>
+        <button type="button" class="scada-btn-icon scada-alarm-filter active" data-severity="all" onclick="filterAlarms('all', this)">
+            <i class="fa-solid fa-layer-group"></i> All
+        </button>
+        <button type="button" class="scada-btn-icon scada-alarm-filter" data-severity="CRITICAL" onclick="filterAlarms('CRITICAL', this)">
+            <i class="fa-solid fa-circle-xmark" style="color: #ef4444;"></i> Critical Only
+        </button>
+        <button type="button" class="scada-btn-icon scada-alarm-filter" data-severity="WARNING" onclick="filterAlarms('WARNING', this)">
+            <i class="fa-solid fa-triangle-exclamation" style="color: #f59e0b;"></i> Warnings Only
+        </button>
+    </div>
+
+    <!-- Alarm Cards Grid -->
+    {% if alarms %}
+    <div class="scada-alarms-grid" id="sentinel-alarms-grid">
+        {% for alarm in alarms %}
+        <div class="scada-alarm-card {% if alarm.severity == 'CRITICAL' %}alarm-card-critical{% else %}alarm-card-warning{% endif %}" data-severity="{{ alarm.severity }}">
+            <!-- Alarm Header -->
+            <div class="alarm-header">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="font-family: var(--scada-mono-font); font-size: 0.72rem; color: #64748b; background: #090e1a; padding: 0.15rem 0.45rem; border-radius: 4px;">
+                        {{ alarm.alarm_id }}
+                    </span>
+                    <span class="alarm-title">{{ alarm.title }}</span>
+                </div>
+                <span class="recon-badge {% if alarm.severity == 'CRITICAL' %}badge-mismatch{% else %}badge-drift{% endif %}">
+                    {% if alarm.severity == 'CRITICAL' %}
+                    <i class="fa-solid fa-circle-xmark"></i>
+                    {% else %}
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    {% endif %}
+                    {{ alarm.severity }}
+                </span>
+            </div>
+
+            <!-- Alarm Location -->
+            <div style="font-size: 0.75rem; color: var(--scada-text-muted); margin-bottom: 0.4rem;">
+                <i class="fa-solid fa-location-dot" style="color: var(--scada-cyan);"></i>
+                {{ alarm.stage_title }} &bull; {{ alarm.phase_name }}
+                <span style="margin-left: 0.5rem; color: #475569;">|</span>
+                <span style="margin-left: 0.5rem;">
+                    <i class="fa-regular fa-clock"></i>
+                    Detected: {{ alarm.detected_at|date:"H:i:s" }}
+                </span>
+            </div>
+
+            <!-- Description -->
+            <div style="font-size: 0.78rem; color: #cbd5e1; margin-bottom: 0.5rem;">
+                {{ alarm.description }}
+            </div>
+
+            <!-- Metrics Strip -->
+            <div class="alarm-metrics-strip">
+                <div style="display: flex; flex-direction: column; align-items: center; flex: 1;">
+                    <span style="font-size: 0.62rem; color: #64748b; text-transform: uppercase; font-weight: 700;">Sensor</span>
+                    <span style="font-size: 1.05rem; font-weight: 800; color: #38bdf8;">{{ alarm.sensor_value_display }}</span>
+                </div>
+                <div style="width: 1px; height: 28px; background: var(--scada-border);"></div>
+                <div style="display: flex; flex-direction: column; align-items: center; flex: 1;">
+                    <span style="font-size: 0.62rem; color: #64748b; text-transform: uppercase; font-weight: 700;">Laboratory</span>
+                    <span style="font-size: 1.05rem; font-weight: 800; color: #a78bfa;">{{ alarm.manual_value_display }}</span>
+                </div>
+                <div style="width: 1px; height: 28px; background: var(--scada-border);"></div>
+                <div style="display: flex; flex-direction: column; align-items: center; flex: 1;">
+                    <span style="font-size: 0.62rem; color: #64748b; text-transform: uppercase; font-weight: 700;">Variance (Δ)</span>
+                    <span style="font-size: 1.05rem; font-weight: 800; color: {% if alarm.severity == 'CRITICAL' %}#f87171{% else %}#fbbf24{% endif %};">{{ alarm.delta_display }}</span>
+                </div>
+            </div>
+
+            <!-- Advisory -->
+            <div class="alarm-advisory">
+                <i class="fa-solid fa-wand-magic-sparkles" style="color: var(--scada-cyan); margin-right: 0.3rem;"></i>
+                <strong>SCADA Advisory:</strong> {{ alarm.advisory }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <!-- No Alarms - Clean State -->
+    <div style="background: var(--scada-panel); border: 1px dashed var(--scada-border); border-radius: 10px; padding: 3rem; text-align: center;">
+        <div style="font-size: 3rem; margin-bottom: 0.75rem; color: #10b981;">
+            <i class="fa-solid fa-shield-check"></i>
+        </div>
+        <h3 style="font-weight: 800; color: #34d399; margin: 0 0 0.5rem 0; text-transform: uppercase; letter-spacing: 0.05em;">
+            ALL CLEAR — NO ANOMALIES DETECTED
+        </h3>
+        <p style="font-size: 0.82rem; color: var(--scada-text-muted); max-width: 500px; margin: 0 auto;">
+            All online sensor telemetry readings are within nominal analytical concordance with laboratory manual results. The SCADA sentinel has not flagged any discrepancies for this plant and date.
+        </p>
+    </div>
+    {% endif %}
+</div>

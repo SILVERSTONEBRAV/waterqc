@@ -1,0 +1,135 @@
+{% load static %}
+
+<div class="scada-tab-pane" id="pane-overview">
+    <!-- Treatment Chemical Dosing & Process Conditions Ticker -->
+    <div style="background: var(--scada-panel); border: 1px solid var(--scada-border); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+        <div style="display: flex; align-items: center; gap: 0.6rem; font-size: 0.8rem; font-weight: 700; color: var(--scada-cyan);">
+            <i class="fa-solid fa-flask-vial"></i>
+            <span>PLANT CHEMICAL DOSING & PROCESS FEED:</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+            {% for dosage in current_dosages %}
+            <div style="background: rgba(17,28,51,0.9); border: 1px solid var(--scada-border); padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.75rem; display: flex; align-items: center; gap: 0.4rem;">
+                <span style="color: var(--scada-text-muted);">{{ dosage.label }}:</span>
+                <span style="font-family: var(--scada-mono-font); font-weight: 700; color: #ffffff;">{{ dosage.value_display|default:"—" }}</span>
+                <span style="font-size: 0.68rem; color: #94a3b8;">{{ dosage.unit }}</span>
+            </div>
+            {% empty %}
+            <span style="font-size: 0.75rem; color: var(--scada-text-muted);">No active chemical dosing logged today</span>
+            {% endfor %}
+
+            {% for phase in phase_concentrations %}
+                {% for item in phase.items %}
+                <div style="background: rgba(17,28,51,0.9); border: 1px solid var(--scada-border); padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.75rem; display: flex; align-items: center; gap: 0.4rem;">
+                    <span style="color: var(--scada-text-muted);">{{ phase.name }} · {{ item.chemical }}:</span>
+                    <span style="font-family: var(--scada-mono-font); font-weight: 700; color: #ffffff;">{{ item.value_display|default:"—" }}</span>
+                    <span style="font-size: 0.68rem; color: #94a3b8;">{{ item.unit }}</span>
+                </div>
+                {% endfor %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Treatment Stage Flow Pipeline Grid -->
+    <div style="margin-bottom: 0.6rem; display: flex; align-items: center; justify-content: space-between;">
+        <h4 style="font-size: 0.95rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--scada-text-main); margin: 0;">
+            <i class="fa-solid fa-diagram-project" style="color: var(--scada-cyan); margin-right: 0.4rem;"></i> Treatment Process Stages (Sensor vs Lab Synch)
+        </h4>
+        <span style="font-size: 0.75rem; color: var(--scada-text-muted);">Real-time analytical pipeline</span>
+    </div>
+
+    <div class="scada-pipeline-strip">
+        {% for stage in stages %}
+        <div class="scada-stage-node" style="border-top: 3px solid {{ stage.status_color }};">
+            <div>
+                <div class="stage-node-header">
+                    <span class="stage-node-title">{{ stage.stage_title }}</span>
+                    <span class="recon-badge" style="background: {{ stage.status_color }}22; color: {{ stage.status_color }}; border: 1px solid {{ stage.status_color }}66;">
+                        {{ stage.status_badge }}
+                    </span>
+                </div>
+
+                <div class="stage-health-meter">
+                    <span class="stage-health-num" style="color: {{ stage.status_color }};">{{ stage.health_score }}</span>
+                    <span style="font-size: 0.75rem; color: var(--scada-text-muted);">/100 Health</span>
+                </div>
+
+                <div class="stage-node-stats">
+                    <div class="stage-stat-row">
+                        <span>Monitored Parameters:</span>
+                        <strong>{{ stage.total_parameters }}</strong>
+                    </div>
+                    <div class="stage-stat-row">
+                        <span>Synchronized (In Synch):</span>
+                        <strong style="color: #34d399;">{{ stage.in_synch_count }}</strong>
+                    </div>
+                    {% if stage.drift_count > 0 %}
+                    <div class="stage-stat-row">
+                        <span>Drift Warnings:</span>
+                        <strong style="color: #fbbf24;">{{ stage.drift_count }}</strong>
+                    </div>
+                    {% endif %}
+                    {% if stage.critical_count > 0 %}
+                    <div class="stage-stat-row">
+                        <span>Critical Discrepancies:</span>
+                        <strong style="color: #f87171;">{{ stage.critical_count }}</strong>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Mini Live Values Preview -->
+            <div style="margin-top: 0.85rem; padding-top: 0.65rem; border-top: 1px solid var(--scada-border);">
+                <div style="font-size: 0.68rem; color: var(--scada-text-muted); text-transform: uppercase; margin-bottom: 0.35rem; font-weight: 700;">
+                    Sample Parameter Stream:
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                    {% for comp in stage.comparisons|slice:":3" %}
+                    <div style="display: flex; justify-content: space-between; align-items: baseline; font-size: 0.75rem; background: #090e1a; padding: 0.25rem 0.5rem; border-radius: 4px;">
+                        <span style="color: #cbd5e1; font-weight: 600;">{{ comp.parameter_name }}:</span>
+                        <div style="display: flex; gap: 0.4rem; font-family: var(--scada-mono-font); font-size: 0.75rem;">
+                            <span style="color: #38bdf8;" title="Sensor: {{ comp.sensor_display }}">{{ comp.sensor_display }}</span>
+                            <span style="color: #64748b;">|</span>
+                            <span style="color: #a78bfa;" title="Lab: {{ comp.manual_display }}">{{ comp.manual_display }}</span>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <span style="font-size: 0.72rem; color: #64748b; font-style: italic;">No parameters logged</span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Active Discrepancy Highlights Banner -->
+    {% if alarms %}
+    <div style="margin-top: 1.5rem; background: var(--scada-panel); border: 1px solid #ef444455; border-radius: 10px; padding: 1.25rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 0.6rem; color: #f87171; font-weight: 800; font-size: 0.95rem;">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span>ANOMALY SENTINEL: {{ alarms|length }} DISCREPANCIES DETECTED BETWEEN SENSORS & LAB RESULTS</span>
+            </div>
+            <a href="javascript:void(0)"
+               onclick="switchScadaTab('sentinel')"
+               class="scada-btn-icon" style="color: #38bdf8; border-color: #38bdf8;">
+                <span>View All Alarms</span> <i class="fa-solid fa-arrow-right"></i>
+            </a>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.75rem;">
+            {% for alarm in alarms|slice:":3" %}
+            <div style="background: #090e1a; border-left: 3px solid {% if alarm.severity == 'CRITICAL' %}#ef4444{% else %}#f59e0b{% endif %}; padding: 0.65rem 0.85rem; border-radius: 6px;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.72rem; font-weight: 700; color: #94a3b8; margin-bottom: 0.25rem;">
+                    <span>{{ alarm.stage_title }} · {{ alarm.phase_name }}</span>
+                    <span style="color: {% if alarm.severity == 'CRITICAL' %}#f87171{% else %}#fbbf24{% endif %};">{{ alarm.severity }}</span>
+                </div>
+                <div style="font-size: 0.82rem; font-weight: 700; color: #ffffff;">{{ alarm.title }}</div>
+                <div style="font-size: 0.74rem; color: #cbd5e1; margin-top: 0.25rem;">
+                    Sensor: <strong style="color: #38bdf8;">{{ alarm.sensor_value_display }}</strong> vs Lab: <strong style="color: #a78bfa;">{{ alarm.manual_value_display }}</strong> (Δ = {{ alarm.delta_display }})
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>

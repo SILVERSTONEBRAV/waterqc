@@ -1,0 +1,170 @@
+{% load custom_filters %}
+
+<div id="ph-topbars" class="ph-topbar-wrapper">
+    <!-- 1. Real-time Process pH Telemetry Ticker -->
+    <div class="ph-telemetry-bar">
+        <div class="ph-live-badge">
+            <span class="ph-pulse-beacon"></span>
+            <span>{% if telemetry.is_live %}QC pH TELEMETRY{% else %}BASELINE pH TELEMETRY{% endif %}</span>
+            <span class="badge bg-emerald-subtle text-emerald px-1 py-0" style="font-size:0.65rem; border:1px solid #10b981;">Target pH: {{ target_ph }} ± 0.2</span>
+        </div>
+
+        <div class="ph-telemetry-ticker">
+            <div class="ph-ticker-chip">
+                <span class="chip-label">Plant:</span>
+                <span class="chip-val">{{ plant.name|default:"Main Plant" }}</span>
+            </div>
+            <div class="ph-ticker-chip">
+                <span class="chip-label">Raw Water pH:</span>
+                <span class="chip-val" style="color:#38bdf8;">{{ telemetry.raw_ph }}</span>
+            </div>
+            <div class="ph-ticker-chip">
+                <span class="chip-label">Post-Coagulation pH:</span>
+                <span class="chip-val" style="color:#fbbf24;">{{ telemetry.coagulated_ph }}</span>
+            </div>
+            <div class="ph-ticker-chip">
+                <span class="chip-label">Finished Water pH:</span>
+                <span class="chip-val" style="color:#10b981;">{{ telemetry.treated_ph }}</span>
+            </div>
+            <div class="ph-ticker-chip">
+                <span class="chip-label">Water Temp:</span>
+                <span class="chip-val" style="color:#a78bfa;">{{ telemetry.water_temp }}</span>
+            </div>
+            <div class="ph-ticker-chip">
+                <span class="chip-label">Alkalinity:</span>
+                <span class="chip-val" style="color:#2dd4bf;">{{ telemetry.alkalinity }}</span>
+            </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="ph-btn-mini" onclick="window.location.reload();" title="Refresh Live QC Feed">
+                <i class="fa-solid fa-arrows-rotate"></i>
+                <span>Refresh</span>
+            </button>
+            <div class="ph-meta-pill" style="font-family:'JetBrains Mono', monospace; font-size:0.75rem;">
+                <i class="fa-regular fa-clock"></i>
+                <span>{% now "H:i:s" %}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Session Parameters, Linked Source Jar, Optimal Crown HUD & 3-Tier Approvals -->
+    <div class="ph-control-bar">
+        <!-- Left: Plant, Date & Linked Source Jar -->
+        <div class="ph-session-meta">
+            <div class="ph-meta-pill">
+                <i class="fa-solid fa-industry text-emerald"></i>
+                <select name="plant" id="plant-select" class="ph-select" onchange="const u = new URL(window.location); u.searchParams.set('plant', this.value); window.location = u;">
+                    {% for p in available_plants %}
+                    <option value="{{ p.pk }}" {% if plant.pk == p.pk %}selected{% endif %}>
+                        {{ p.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="ph-meta-pill">
+                <i class="fa-regular fa-calendar-days text-cyan"></i>
+                <input type="date"
+                       name="date"
+                       value="{{ test_date|date:'Y-m-d' }}"
+                       class="ph-date-input"
+                       onchange="const u = new URL(window.location); u.searchParams.set('date', this.value); window.location = u;">
+            </div>
+
+            <div class="ph-meta-pill">
+                <i class="fa-solid fa-link text-warning"></i>
+                <label for="source-jar-select" class="small text-muted me-1">Source:</label>
+                <select name="source_jar" id="source-jar-select" class="ph-select" title="PHAdjustmentTest.source_jar → JarResult">
+                    {% for sj in available_source_jars %}
+                    <option value="{{ sj.pk }}" {% if ph_test.source_jar.pk == sj.pk %}selected{% endif %}>
+                        J{{ sj.jar_number }} · {{ sj.dosage_mg_per_l }} mg/L
+                    </option>
+                    {% empty %}
+                    <option value="">J3 · 18.00 mg/L</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="ph-meta-pill">
+                <i class="fa-solid fa-user-gear text-muted"></i>
+                <span class="small text-muted">Analyst:</span>
+                <span class="fw-semibold">{{ ph_test.analyst.get_username|default:request.user.username }}</span>
+            </div>
+        </div>
+
+        <!-- Center: Established Neutralization Dosage Crown HUD -->
+        <div class="ph-hud-optimal">
+            <div class="hud-crown">
+                <i class="fa-solid fa-vial-circle-check"></i>
+            </div>
+            <div class="hud-content">
+                <span class="hud-title">Optimal Conditioning Dosage</span>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="hud-dosage">
+                        {% if ph_test.established_dosage_ml %}
+                            {{ ph_test.established_dosage_ml }} <span style="font-size:0.75rem;font-weight:600;">mL / L</span>
+                        {% else %}
+                            -- mL
+                        {% endif %}
+                    </span>
+                    {% if optimal_jar %}
+                    <span class="hud-jar-tag">
+                        Jar {{ optimal_jar.jar_number }} (pH {{ optimal_jar.resulting_ph }})
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: 3-Tier Multi-Role QA Verification Pipeline -->
+        <div class="ph-review-strip">
+            <!-- 1. Verify -->
+            {% if ph_test.verified_at %}
+                <div class="ph-review-step completed" title="Verified by {{ ph_test.verified_by.username }} on {{ ph_test.verified_at|date:'M d, H:i' }}">
+                    <i class="fa-solid fa-circle-check"></i>
+                    <span>Verified: {{ ph_test.verified_by.username }}</span>
+                </div>
+            {% else %}
+                <button type="submit" name="action" value="verify" class="ph-action-btn btn-verify" title="Verify titration observations">
+                    <i class="fa-solid fa-check-double"></i>
+                    <span>Verify</span>
+                </button>
+            {% endif %}
+
+            <!-- 2. Confirm -->
+            {% if ph_test.confirmed_at %}
+                <div class="ph-review-step completed" title="Confirmed by {{ ph_test.confirmed_by.username }} on {{ ph_test.confirmed_at|date:'M d, H:i' }}">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <span>Confirmed: {{ ph_test.confirmed_by.username }}</span>
+                </div>
+            {% elif ph_test.verified_at %}
+                <button type="submit" name="action" value="confirm" class="ph-action-btn btn-confirm" title="Confirm neutralization dosage">
+                    <i class="fa-solid fa-shield-heart"></i>
+                    <span>Confirm</span>
+                </button>
+            {% endif %}
+
+            <!-- 3. Approve -->
+            {% if ph_test.approved_at %}
+                <div class="ph-review-step completed" title="Authorized by {{ ph_test.approved_by.username }} on {{ ph_test.approved_at|date:'M d, H:i' }}">
+                    <i class="fa-solid fa-stamp"></i>
+                    <span>Approved: {{ ph_test.approved_by.username }}</span>
+                </div>
+            {% elif ph_test.confirmed_at %}
+                <button type="submit" name="action" value="approve" class="ph-action-btn btn-approve" title="Authorize and lock treatment plant dosing">
+                    <i class="fa-solid fa-stamp"></i>
+                    <span>Approve</span>
+                </button>
+            {% endif %}
+
+            <!-- Revert Action -->
+            {% if ph_test.verified_at and not ph_test.approved_at %}
+                <button type="submit" name="action" value="revert_verification" class="ph-action-btn btn-revert" title="Revert to allow edits">
+                    <i class="fa-solid fa-arrow-rotate-left"></i>
+                    <span>Revert</span>
+                </button>
+            {% endif %}
+        </div>
+    </div>
+</div>

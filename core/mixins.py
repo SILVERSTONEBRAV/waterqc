@@ -54,7 +54,20 @@ class WanjalaMixin(LoginRequiredMixin):
     include_list_html = False
     breadcrumbs = []
 
-    raise_exception = False
+    # Keep permission failures closed, while letting anonymous users reach login.
+    raise_exception = True
+
+    def handle_no_permission(self):
+        """Redirect anonymous requests to login even when permission checks are strict."""
+        if not self.request.user.is_authenticated:
+            from django.contrib.auth.views import redirect_to_login
+
+            return redirect_to_login(
+                self.request.get_full_path(),
+                self.get_login_url(),
+                self.get_redirect_field_name(),
+            )
+        return super().handle_no_permission()
 
     permission_required_create = None
     permission_required_update = None
@@ -424,7 +437,13 @@ class WanjalaMixin(LoginRequiredMixin):
         if self.request.user.is_superuser:
             return True
         perm = self.get_required_permission(action)
-        if perm and not self.request.user.has_perm(perm):
+        if not perm:
+            if self.raise_exception:
+                raise PermissionDenied(
+                    f"No permission is configured for '{action or self.action}'."
+                )
+            return False
+        if not self.request.user.has_perm(perm):
             if self.raise_exception:
                 raise PermissionDenied(f"Permission '{perm}' required for '{action}'")
             return False
@@ -433,10 +452,14 @@ class WanjalaMixin(LoginRequiredMixin):
     def get_ui_permissions(self):
         user = self.request.user
 
+        def allowed(action):
+            permission = self.get_required_permission(action)
+            return bool(permission and user.has_perm(permission))
+
         return {
-            "can_create": user.has_perm(self.get_required_permission("create")),
-            "can_update": user.has_perm(self.get_required_permission("update")),
-            "can_delete": user.has_perm(self.get_required_permission("delete")),
+            "can_create": allowed("create"),
+            "can_update": allowed("update"),
+            "can_delete": allowed("delete"),
             "can_export": user.has_perm(f"{self.model._meta.app_label}.export_{self.model._meta.model_name}"),
         }
 
@@ -680,7 +703,12 @@ class WanjalaMixin(LoginRequiredMixin):
         self.object = self.get_object()
         obj_id = self.object.pk
         self.before_delete(self.object)
-        self.object.delete()
+        if request.user.is_superuser:
+            from core.engine.superuser_authorization import force_delete_objects
+
+            force_delete_objects([self.object], actor=request.user)
+        else:
+            self.object.delete()
         self.after_delete(obj_id)
         if self.is_partial():
             response = self.json_response(self.build_response(success=True, action="delete", object_id=obj_id))
@@ -900,9 +928,13 @@ class WanjalaMixin(LoginRequiredMixin):
     def export_pdf(self):
         qs = self.get_export_queryset()
         fields = self.get_export_fields()
+        rows = [
+            [self.format_export_value(obj, field) for field in fields]
+            for obj in qs
+        ]
 
         context = {
-            "objects": qs,
+            "rows": rows,
             "fields": fields,
             "title": self.model._meta.verbose_name_plural.title()
         }
@@ -938,7 +970,12 @@ class WanjalaMixin(LoginRequiredMixin):
         obj = get_object_or_404(self.model, pk=pk)
         if hasattr(self, "check_permission"):
             self.check_permission("delete")
-        obj.delete()
+        if request.user.is_superuser:
+            from core.engine.superuser_authorization import force_delete_objects
+
+            force_delete_objects([obj], actor=request.user)
+        else:
+            obj.delete()
         if request.headers.get("HX-Request"):
             return HttpResponse(status=204)
         return redirect(getattr(self, "success_url", "/"))

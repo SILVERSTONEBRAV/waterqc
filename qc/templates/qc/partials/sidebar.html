@@ -23,6 +23,54 @@
                     </span>
                 </a>
             </li>
+            <li class="sidebar-item {% if request.resolver_match.url_name == 'quality_control' or request.resolver_match.url_name == 'quality_control_noslash' or request.resolver_match.url_name == 'dashboard1' %}active{% endif %}">
+                <a
+                    href="{% url 'qc:quality_control' %}"
+                    class="nav-link"
+                    title="QC Analytical Matrix"
+                    aria-label="QC Analytical Matrix"
+                >
+                    <i class="fas fa-chart-line sidebar-icon"></i>
+                    <span class="label">
+                        QC Matrix
+                    </span>
+                </a>
+            </li>
+            <li class="sidebar-item {% if request.resolver_match.url_name == 'scada_dashboard' %}active{% endif %}">
+                <a
+                    href="{% url 'qc:scada_dashboard' %}"
+                    class="nav-link"
+                    title="SCADA Command Center"
+                    aria-label="SCADA Command Center"
+                >
+                    <i class="fas fa-compass-drafting sidebar-icon"></i>
+                    <span class="label">
+                        SCADA Center
+                    </span>
+                </a>
+            </li>
+
+            <li class="sidebar-section-title">
+                <span class="label">Process Optimization</span>
+            </li>
+            <li class="sidebar-item {% if 'jartest' in request.path %}active{% endif %}">
+                <a href="{% url 'jartest:dashboard' %}" class="nav-link" title="Jar Test Optimization" aria-label="Jar Test Optimization">
+                    <i class="fas fa-vial-circle-check sidebar-icon"></i>
+                    <span class="label">Jar Testing</span>
+                </a>
+            </li>
+            <li class="sidebar-item {% if 'chlorinedemand' in request.path %}active{% endif %}">
+                <a href="{% url 'chlorinedemand:dashboard' %}" class="nav-link" title="Chlorine Demand & Breakpoint" aria-label="Chlorine Demand & Breakpoint">
+                    <i class="fas fa-shield-virus sidebar-icon"></i>
+                    <span class="label">Chlorine Demand</span>
+                </a>
+            </li>
+            <li class="sidebar-item {% if 'PHadjustment' in request.path %}active{% endif %}">
+                <a href="{% url 'PHadjustment:dashboard' %}" class="nav-link" title="pH Adjustment & Titration" aria-label="pH Adjustment & Titration">
+                    <i class="fas fa-flask sidebar-icon"></i>
+                    <span class="label">pH Adjustment</span>
+                </a>
+            </li>
 
 
             {# ====================================================== #}

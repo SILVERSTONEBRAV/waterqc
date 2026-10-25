@@ -1,0 +1,100 @@
+<section id="jt-reports-panel" class="jt-tab-panel jt-reports-panel" role="tabpanel"
+         aria-labelledby="jt-reports-tab" data-jt-panel="reports" hidden>
+    <div class="jt-reports-shell">
+        <header class="jt-reports-heading">
+            <div><span class="jt-kicker">JAR-TEST BI · STATISTICAL REPORTING</span><h1>Jar-test reports</h1></div>
+            <span class="jt-report-scope"><i class="fa-solid fa-location-dot"></i>{{ plant.name }}</span>
+        </header>
+
+        <form method="get" action="{% url 'jartest:dashboard' %}" class="jt-report-filter-form" id="jt-report-filter-form">
+            <input type="hidden" name="plant" value="{{ plant.pk }}">
+            <input type="hidden" name="tab" value="reports">
+            <label class="jt-report-search"><i class="fa-solid fa-magnifying-glass"></i>
+                <input type="search" name="report_q" value="{{ request.GET.report_q }}" placeholder="Search coagulant, analyst, source, remarks…" aria-label="Search jar-test reports">
+            </label>
+            <label><span>From</span><input type="date" name="report_from" value="{{ request.GET.report_from }}"></label>
+            <label><span>To</span><input type="date" name="report_to" value="{{ request.GET.report_to }}"></label>
+            <label><span>Coagulant</span><select name="report_coagulant"><option value="">All coagulants</option>
+                {% for chemical in available_coagulants %}<option value="{{ chemical.pk }}" {% if request.GET.report_coagulant == chemical.pk|stringformat:'s' %}selected{% endif %}>{{ chemical.name }}</option>{% endfor %}
+            </select></label>
+            <label><span>Stage</span><select name="report_status">
+                <option value="">All stages</option>
+                <option value="in_progress" {% if request.GET.report_status == 'in_progress' %}selected{% endif %}>In progress</option>
+                <option value="verified" {% if request.GET.report_status == 'verified' %}selected{% endif %}>Verified</option>
+                <option value="confirmed" {% if request.GET.report_status == 'confirmed' %}selected{% endif %}>Confirmed</option>
+                <option value="approved" {% if request.GET.report_status == 'approved' %}selected{% endif %}>Approved</option>
+                <option value="needs_review" {% if request.GET.report_status == 'needs_review' %}selected{% endif %}>Needs review</option>
+            </select></label>
+            <label><span>Raw-water parameter</span><select name="report_parameter"><option value="">Any parameter</option>
+                {% for item in report_parameters %}<option value="{{ item.pk }}" {% if request.GET.report_parameter == item.pk|stringformat:'s' %}selected{% endif %}>{{ item.parameter.name }} · {{ item.parameter.unit }}</option>{% endfor %}
+            </select></label>
+            <label><span>Min raw value</span><input type="number" min="0" step="any" name="report_min_parameter" value="{{ request.GET.report_min_parameter }}" placeholder="Parameter unit"></label>
+            <label><span>Max raw value</span><input type="number" min="0" step="any" name="report_max_parameter" value="{{ request.GET.report_max_parameter }}" placeholder="Parameter unit"></label>
+            <label><span>Min dose</span><input type="number" min="0" step="0.01" name="report_min_dose" value="{{ request.GET.report_min_dose }}" placeholder="mg/L"></label>
+            <label><span>Max dose</span><input type="number" min="0" step="0.01" name="report_max_dose" value="{{ request.GET.report_max_dose }}" placeholder="mg/L"></label>
+            <label><span>Sort by</span><select name="report_sort">
+                <option value="newest" {% if request.GET.report_sort != 'oldest' and request.GET.report_sort != 'dose_high' and request.GET.report_sort != 'dose_low' and request.GET.report_sort != 'coagulant' and request.GET.report_sort != 'analyst' and request.GET.report_sort != 'status' %}selected{% endif %}>Newest first</option>
+                <option value="oldest" {% if request.GET.report_sort == 'oldest' %}selected{% endif %}>Oldest first</option>
+                <option value="dose_high" {% if request.GET.report_sort == 'dose_high' %}selected{% endif %}>Dose: high to low</option>
+                <option value="dose_low" {% if request.GET.report_sort == 'dose_low' %}selected{% endif %}>Dose: low to high</option>
+                <option value="coagulant" {% if request.GET.report_sort == 'coagulant' %}selected{% endif %}>Coagulant</option>
+                <option value="analyst" {% if request.GET.report_sort == 'analyst' %}selected{% endif %}>Analyst</option>
+                <option value="status" {% if request.GET.report_sort == 'status' %}selected{% endif %}>Review stage</option>
+            </select></label>
+            <div class="jt-report-filter-actions">
+                <button type="submit" name="apply" value="1" class="jt-report-apply"><i class="fa-solid fa-filter"></i> Apply</button>
+                <a href="{% url 'jartest:dashboard' %}?plant={{ plant.pk }}&amp;tab=reports" class="jt-report-reset">Reset</a>
+            </div>
+            <div class="jt-report-exports" role="group" aria-label="Export filtered jar-test report">
+                <span>Export filtered results</span>
+                <button type="submit" name="export" value="csv" title="Export CSV"><i class="fa-solid fa-file-csv"></i> CSV</button>
+                <button type="submit" name="export" value="xlsx" title="Export Excel workbook"><i class="fa-solid fa-file-excel"></i> XLSX</button>
+                <button type="submit" name="export" value="pdf" title="Export PDF"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+                <button type="submit" name="export" value="docx" title="Export Word document"><i class="fa-solid fa-file-word"></i> DOC</button>
+            </div>
+        </form>
+
+        <div class="jt-report-kpis" aria-live="polite">
+            <article><span>Filtered tests</span><strong>{{ jar_test_reports.summary.records }}</strong></article>
+            <article><span>With established dose</span><strong>{{ jar_test_reports.summary.with_dose }}</strong></article>
+            <article><span>Approved</span><strong>{{ jar_test_reports.summary.approved }}</strong></article>
+            <article><span>Median dose</span><strong>{% if jar_test_reports.summary.median != None %}{{ jar_test_reports.summary.median }} <small>mg/L</small>{% else %}—{% endif %}</strong></article>
+            <article><span>Interquartile range</span><strong>{% if jar_test_reports.summary.q1 != None %}{{ jar_test_reports.summary.q1 }}–{{ jar_test_reports.summary.q3 }} <small>mg/L</small>{% else %}—{% endif %}</strong></article>
+            <article><span>Robust trend</span><strong>{% if jar_test_reports.summary.trend_per_day != None %}{{ jar_test_reports.summary.trend_per_day }} <small>mg/L/day</small>{% else %}—{% endif %}</strong></article>
+        </div>
+
+        <section class="jt-report-chart-grid" aria-label="Jar-test statistical analytics">
+            <article class="jt-glass-card jt-report-chart-card"><div><h2>Dose control chart</h2><p>Median centerline and robust ±3 MAD limits</p></div><div id="jt-report-control-chart" class="jt-report-plot" role="img" aria-label="Established dosage control chart over time"></div></article>
+            <article class="jt-glass-card jt-report-chart-card"><div><h2>Raw-water response</h2><p>Parameter association with established dose</p><select id="jt-report-association-select" aria-label="Raw-water parameter for association chart">
+                {% for item in report_parameters %}<option value="raw:{{ item.pk }}" {% if selected_report_association_id == item.pk %}selected{% endif %}>{{ item.parameter.name }}{% if item.parameter.unit %} · {{ item.parameter.unit }}{% endif %}</option>{% empty %}<option value="">No raw-water parameters</option>{% endfor %}
+            </select></div><div id="jt-report-association-chart" class="jt-report-plot" role="img" aria-label="Raw-water parameter and established dosage scatter plot"></div></article>
+            <article class="jt-glass-card jt-report-chart-card"><div><h2>Dose distribution</h2><p>Filtered established-dosage frequency</p></div><div id="jt-report-distribution-chart" class="jt-report-plot" role="img" aria-label="Distribution of established coagulant dosages"></div></article>
+            <article class="jt-glass-card jt-report-chart-card"><div><h2>Coagulant comparison</h2><p>Observed dose distributions by coagulant</p></div><div id="jt-report-groups-chart" class="jt-report-plot" role="img" aria-label="Jar-test dosage comparisons by coagulant"></div></article>
+        </section>
+        <p class="jt-report-stat-note"><i class="fa-solid fa-flask"></i>
+            {% if jar_test_reports.group_test %}{{ jar_test_reports.group_test.name }} across eligible coagulant groups: H={{ jar_test_reports.group_test.statistic }}, p={{ jar_test_reports.group_test.p }}. {% endif %}
+            {% if jar_test_reports.summary.mean != None %}Mean ± SD: {{ jar_test_reports.summary.mean }} ± {{ jar_test_reports.summary.stdev }} mg/L. {% endif %}
+            Theil–Sen fits use up to 500 evenly spaced observations per trend; summary statistics, filters, and exports use every match. Dose limits use the median and median absolute deviation. Spearman associations are shown only when at least four paired observations are available. Statistics are descriptive and do not replace jar-test approval.
+        </p>
+
+        <section class="jt-glass-card jt-report-table-card">
+            <div class="jt-report-table-heading"><div><h2>Filtered jar-test records</h2><span>{{ jar_test_reports.summary.records }} matching records</span></div><span>Exports include all matches using these filters and sort order.</span></div>
+            <div class="jt-report-table-scroll"><table class="jt-report-table">
+                <thead><tr><th>Date</th><th>Coagulant</th><th>Analyst</th><th>Established dose</th><th>Turbidity</th><th>Color</th><th>pH</th>{% if selected_report_parameter %}<th>{{ selected_report_parameter.parameter.name }}{% if selected_report_parameter.parameter.unit %} ({{ selected_report_parameter.parameter.unit }}){% endif %}</th>{% endif %}<th>Jars</th><th>Review</th><th>Source / remarks</th></tr></thead>
+                <tbody>
+                {% for row in jar_test_reports.rows %}
+                <tr><td>{{ row.date }}</td><td>{{ row.coagulant }}</td><td>{{ row.analyst }}</td><td>{% if row.dose != None %}<b>{{ row.dose|floatformat:2 }} mg/L</b>{% else %}—{% endif %}</td><td>{% if row.turbidity != None %}{{ row.turbidity|floatformat:2 }}{% else %}—{% endif %}</td><td>{% if row.color != None %}{{ row.color|floatformat:2 }}{% else %}—{% endif %}</td><td>{% if row.ph != None %}{{ row.ph|floatformat:2 }}{% else %}—{% endif %}</td>{% if selected_report_parameter %}<td>{% if row.selected_parameter_value != None %}{{ row.selected_parameter_value|floatformat:3 }}{% else %}—{% endif %}</td>{% endif %}<td>{{ row.jar_count }}/6</td><td><span class="jt-report-stage stage-{{ row.stage|slugify }}">{{ row.stage }}</span></td><td class="jt-report-remarks" title="{{ row.remarks }}">{{ row.raw_source }}{% if row.remarks %} · {{ row.remarks }}{% endif %}</td></tr>
+                {% empty %}<tr><td colspan="{% if selected_report_parameter %}11{% else %}10{% endif %}" class="jt-report-empty">No jar tests match the selected filters.</td></tr>{% endfor %}
+                </tbody>
+            </table></div>
+            <nav class="jt-report-pagination" aria-label="Jar-test report pages">
+                <span>Showing {{ report_page_obj.start_index }}–{{ report_page_obj.end_index }} of {{ report_page_obj.paginator.count }}</span>
+                <div>
+                    {% if report_page_obj.has_previous %}<a href="?{{ report_page_query }}{% if report_page_query %}&amp;{% endif %}report_page={{ report_page_obj.previous_page_number }}" aria-label="Previous report page"><i class="fa-solid fa-chevron-left"></i> Previous</a>{% endif %}
+                    <b>Page {{ report_page_obj.number }} of {{ report_page_obj.paginator.num_pages }}</b>
+                    {% if report_page_obj.has_next %}<a href="?{{ report_page_query }}{% if report_page_query %}&amp;{% endif %}report_page={{ report_page_obj.next_page_number }}" aria-label="Next report page">Next <i class="fa-solid fa-chevron-right"></i></a>{% endif %}
+                </div>
+            </nav>
+        </section>
+    </div>
+</section>

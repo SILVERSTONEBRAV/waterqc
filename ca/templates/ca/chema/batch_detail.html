@@ -1,502 +1,172 @@
 {% extends "ca/dashboard/layout/app.html" %}
+{% load static %}
 
-{% block title %}Batch {{ batch.sample_id|default:batch.pk }}{% endblock %}
+{% block title %}Batch {{ batch.sample_id|default:batch.pk }} · Chemical Analysis{% endblock %}
+
+{% block extra_css %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'ca/css/pages/batch-workbench.css' %}?v=20261023-workflow-theater">
+{% endblock %}
 
 {% block content %}
-
-<div class="ca-page">
-
-    <div class="page-header">
-        <div>
-            <h1>Batch Details</h1>
-            <p>
-                {% if batch.sample_id %}
-                    {{ batch.sample_id }}
-                {% else %}
-                    Batch #{{ batch.pk }}
-                {% endif %}
-            </p>
-        </div>
-
-        <div class="page-actions">
-            <a href="{% url 'ca:batch-list' %}" class="btn btn-secondary">
-                Back to Batches
+<main class="ca-batch-workbench" aria-labelledby="batch-workbench-title" data-workbench>
+    <header class="ca-batch-workbench__header">
+        <div class="ca-batch-workbench__identity">
+            <a class="ca-workbench-back" href="{% url 'ca:batch-list' %}" aria-label="Back to chemical batches">
+                <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
             </a>
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="card-header">
             <div>
-                <h2>Batch Information</h2>
+                <p class="ca-workbench-eyebrow"><span aria-hidden="true"></span> Chemical analysis · Batch workflow</p>
+                <h1 id="batch-workbench-title">{{ batch.sample_id|default:batch.batch_number|default:batch.pk }}</h1>
+                <p class="ca-workbench-subtitle">{{ batch.chemical|default:"Chemical batch" }} · {{ batch.treatment_plant|default:"Treatment plant" }} · {{ batch.supplier|default:"Supplier not recorded" }}</p>
             </div>
-
-            {% if batch.status %}
-                <span class="badge badge-info">
-                    {{ batch.get_status_display }}
-                </span>
+        </div>
+        <div class="ca-batch-workbench__header-actions">
+            <span class="ca-workbench-status">{{ batch.get_status_display|default:batch.status }}</span>
+            {% if perms.ca.change_chemicalbatch %}
+                <a class="ca-workbench-icon-link" href="{% url 'ca:batch-update' batch.pk %}" title="Edit batch" aria-label="Edit batch">
+                    <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
+                </a>
             {% endif %}
         </div>
+    </header>
 
-        <div class="card-body">
-            <div class="details-grid">
+    {% if batch.has_active_holds %}
+        <aside class="ca-workbench-hold" role="alert">
+            <span class="ca-workbench-hold__icon"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i></span>
+            <div><strong>Workflow paused by an intake hold</strong><p>Resolve the open batch issue before the next laboratory step can proceed.</p></div>
+            {% if perms.ca.resolve_chemical_batch_hold %}
+                {% for hold in holds %}{% if hold.status == "OPEN" %}<a href="{% url 'ca:batch-hold-resolve' batch.pk hold.pk %}">Resolve hold <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>{% endif %}{% endfor %}
+            {% endif %}
+        </aside>
+    {% endif %}
 
-                <div class="detail-item">
-                    <span class="detail-label">Sample ID</span>
-                    <span class="detail-value">
-                        {{ batch.sample_id|default:"—" }}
-                    </span>
-                </div>
-
-                <div class="detail-item">
-                    <span class="detail-label">Batch</span>
-                    <span class="detail-value">
-                        {{ batch|default:"—" }}
-                    </span>
-                </div>
-
-                <div class="detail-item">
-                    <span class="detail-label">Status</span>
-                    <span class="detail-value">
-                        {% if batch.status %}
-                            {{ batch.get_status_display }}
-                        {% else %}
-                            —
-                        {% endif %}
-                    </span>
-                </div>
-
-                <div class="detail-item">
-                    <span class="detail-label">Supplier</span>
-                    <span class="detail-value">
-                        {{ batch.supplier|default:"—" }}
-                    </span>
-                </div>
-
-                <div class="detail-item">
-                    <span class="detail-label">Location</span>
-                    <span class="detail-value">
-                        {{ batch.location|default:"—" }}
-                    </span>
-                </div>
-
-                <div class="detail-item">
-                    <span class="detail-label">Received Date</span>
-                    <span class="detail-value">
-                        {% if batch.received_date %}
-                            {{ batch.received_date|date:"d M Y H:i" }}
-                        {% else %}
-                            —
-                        {% endif %}
-                    </span>
-                </div>
-
-                <div class="detail-item">
-                    <span class="detail-label">Created</span>
-                    <span class="detail-value">
-                        {% if batch.created_at %}
-                            {{ batch.created_at|date:"d M Y H:i" }}
-                        {% else %}
-                            —
-                        {% endif %}
-                    </span>
-                </div>
-
-                <div class="detail-item">
-                    <span class="detail-label">Updated</span>
-                    <span class="detail-value">
-                        {% if batch.updated_at %}
-                            {{ batch.updated_at|date:"d M Y H:i" }}
-                        {% else %}
-                            —
-                        {% endif %}
-                    </span>
-                </div>
-
-            </div>
+    <section class="ca-workbench-progress" aria-label="Workflow progress">
+        <div class="ca-workbench-progress__topline">
+            <div><span class="ca-workbench-eyebrow">BATCH WORKFLOW</span><strong>{{ workflow_progress }}% complete</strong></div>
+            {% if process %}<span>Process #{{ process.pk }}{% if analysis_request %} · Request {{ analysis_request.request_id }}{% endif %}</span>{% else %}<span>Workflow process pending</span>{% endif %}
         </div>
-    </div>
+        <div class="ca-workbench-progress__track" role="progressbar" aria-label="Completed workflow stages" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ workflow_progress }}">
+            <span style="width: {{ workflow_progress }}%"></span>
+        </div>
+    </section>
 
-    {% if batch.chemical %}
+    <nav class="ca-workflow-tabs" role="tablist" aria-label="Chemical batch workflow stages">
+        {% for stage in workflow_stages %}
+            {% if stage.state == "locked" %}
+                <span class="ca-workflow-tab ca-workflow-tab--locked" id="workflow-tab-{{ stage.key }}" role="tab" aria-selected="false" aria-disabled="true" aria-controls="workflow-stage-{{ stage.key }}" tabindex="-1" title="This stage unlocks after the prior stage is complete">
+                    <span class="ca-workflow-tab__number">{{ stage.index|stringformat:"02d" }}</span>
+                    <span class="ca-workflow-tab__copy"><strong>{{ stage.short_title }}</strong><small>Locked</small></span>
+                    <i class="fa-solid fa-lock" aria-hidden="true"></i>
+                </span>
+            {% else %}
+                <a class="ca-workflow-tab ca-workflow-tab--{{ stage.state }}{% if selected_workflow_stage == stage.key %} is-selected{% endif %}"
+                   id="workflow-tab-{{ stage.key }}" role="tab"
+                   aria-selected="{% if selected_workflow_stage == stage.key %}true{% else %}false{% endif %}"
+                   aria-controls="workflow-stage-{{ stage.key }}"
+                   href="{{ request.path }}?stage={{ stage.key }}{% if request.GET.plant %}&amp;plant={{ request.GET.plant }}{% endif %}">
+                    <span class="ca-workflow-tab__number">
+                        {% if stage.state == "complete" %}<i class="fa-solid fa-check" aria-hidden="true"></i>{% elif stage.state == "skipped" %}<i class="fa-solid fa-minus" aria-hidden="true"></i>{% else %}{{ stage.index|stringformat:"02d" }}{% endif %}
+                    </span>
+                    <span class="ca-workflow-tab__copy"><strong>{{ stage.short_title }}</strong><small>{% if stage.state == "current" %}In progress{% elif stage.state == "skipped" %}Not required{% else %}Complete{% endif %}</small></span>
+                </a>
+            {% endif %}
+        {% endfor %}
+    </nav>
 
-        <div class="card">
-            <div class="card-header">
-                <h2>Chemical</h2>
-            </div>
-
-            <div class="card-body">
-                <div class="details-grid">
-
-                    <div class="detail-item">
-                        <span class="detail-label">Chemical</span>
-                        <span class="detail-value">
-                            {{ batch.chemical }}
-                        </span>
+    <div class="ca-workflow-stage-panels">
+        {% for stage in workflow_stages %}
+            <section class="ca-workflow-stage{% if selected_workflow_stage == stage.key %} is-selected{% endif %}" id="workflow-stage-{{ stage.key }}" role="tabpanel" aria-labelledby="workflow-tab-{{ stage.key }}" {% if selected_workflow_stage != stage.key %}hidden{% endif %}>
+                <header class="ca-workflow-stage__heading">
+                    <div>
+                        <p class="ca-workbench-eyebrow">STEP {{ stage.index|stringformat:"02d" }} / {{ workflow_stages|length }} · {{ stage.title }}</p>
+                        <h2>{{ stage.title }}</h2>
+                        <p>{{ stage.summary }}</p>
                     </div>
+                    {% if stage.state == "current" and stage.action_url %}
+                        <a class="ca-workflow-primary-action" href="{{ stage.action_url }}"{% if stage.key == "assignment" %} data-ca-analyst-assignment{% endif %}><span>{{ stage.action_label }}</span><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
+                    {% elif stage.state == "current" %}
+                        <span class="ca-workflow-waiting"><i class="fa-solid fa-user-clock" aria-hidden="true"></i> {{ stage.waiting_message|default:"Waiting for the authorized Analyst" }}</span>
+                    {% elif stage.state == "skipped" %}
+                        <span class="ca-workflow-complete-badge">Not required</span>
+                    {% elif stage.state == "complete" %}
+                        <span class="ca-workflow-complete-badge"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Complete</span>
+                    {% endif %}
+                </header>
 
-                    {% if batch.chemical.code %}
-                        <div class="detail-item">
-                            <span class="detail-label">Code</span>
-                            <span class="detail-value">
-                                {{ batch.chemical.code }}
-                            </span>
+                {% if stage.key == "receipt" %}
+                    <div class="ca-workflow-facts">
+                        <div><span>Received</span><strong>{{ batch.received_date|date:"d M Y"|default:"Pending" }}</strong></div>
+                        <div><span>Batch number</span><strong>{{ batch.batch_number|default:"—" }}</strong></div>
+                        <div><span>Quantity received</span><strong>{{ batch.quantity_received|default:"—" }} {{ batch.unit }}</strong></div>
+                        <div><span>Storage location</span><strong>{{ batch.location|default:"—" }}</strong></div>
+                    </div>
+                {% elif stage.key == "assignment" %}
+                    <div class="ca-workflow-facts">
+                        <div><span>Analysis request</span><strong>{{ analysis_request.request_id|default:"Not created" }}</strong></div>
+                        <div><span>Assignment deadline</span><strong>{{ analysis_request.analysis_deadline|date:"d M Y H:i"|default:"—" }}</strong></div>
+                    </div>
+                    <div class="ca-workflow-assignees"><span>Assigned analysts</span><div>{% if analysis_request %}{% for analyst in analysis_request.assigned_analysts.all %}<span>{{ analyst.get_full_name|default:analyst.get_username }}</span>{% empty %}<em>No analysts assigned</em>{% endfor %}{% else %}<em>Analysis request not available</em>{% endif %}</div></div>
+                {% elif stage.key == "checklist" %}
+                    <div class="ca-workflow-checklist-state{% if checklist and checklist.completed %} is-complete{% endif %}">
+                        <span class="ca-workflow-checklist-state__icon"><i class="fa-solid {% if checklist and checklist.completed %}fa-clipboard-check{% else %}fa-clipboard-list{% endif %}" aria-hidden="true"></i></span>
+                        <div><strong>{% if checklist and checklist.completed %}Receiving checklist confirmed{% else %}Receiving checklist required{% endif %}</strong><p>{% if checklist and checklist.completed %}Completed {{ checklist.completed_at|date:"d M Y H:i" }}{% if checklist.completed_by %} by {{ checklist.completed_by.get_full_name|default:checklist.completed_by.get_username }}{% endif %}{% else %}Verify product identity, batch condition and safety information before starting the assay.{% endif %}</p></div>
+                    </div>
+                {% elif stage.key == "analysis" %}
+                    <div class="ca-analysis-progress">
+                        <div class="ca-analysis-progress__head"><span>Required parameters</span><strong>{{ process.completed_test_count|default:0 }} / {{ process.required_test_count|default:0 }}</strong></div>
+                        <div class="ca-analysis-progress__track"><span style="width: {{ process.analysis_progress|default:0 }}%"></span></div>
+                        <div class="ca-analysis-progress__foot"><span>{{ process.passed_test_count|default:0 }} passed</span><span>{{ process.failed_tests.count|default:0 }} failed</span><span>{{ process.analysis_progress|default:0 }}%</span></div>
+                    </div>
+                    {% if test_results %}
+                        <div class="ca-workbench-results">
+                            <div class="ca-workbench-results__heading"><strong>Recorded assay results</strong><span>{{ test_results|length }} parameter{{ test_results|length|pluralize }}</span></div>
+                            <div class="table-responsive"><table class="table"><thead><tr><th>Parameter</th><th>Result</th><th>Evaluation</th><th>Analyst</th></tr></thead><tbody>
+                                {% for result in test_results %}<tr><td>{{ result.parameter|default:"—" }}</td><td>{% if result.value is not None %}{{ result.value }}{% else %}{{ result.textual_result|default:"—" }}{% endif %} {{ result.parameter.unit|default:"" }}</td><td><span class="ca-result-state ca-result-state--{{ result.status|lower|default:'pending' }}">{{ result.get_status_display|default:result.status|default:"Pending" }}</span></td><td>{{ result.analyst|default:"—" }}</td></tr>{% endfor %}
+                            </tbody></table></div>
                         </div>
                     {% endif %}
-
-                </div>
-            </div>
-        </div>
-
-    {% endif %}
-
-    {% if analysis_request %}
-
-        <div class="card">
-            <div class="card-header">
-                <h2>Analysis Request</h2>
-
-                {% if analysis_request.status %}
-                    <span class="badge badge-info">
-                        {{ analysis_request.get_status_display }}
-                    </span>
+                {% elif stage.key == "quality" %}
+                    <div class="ca-workflow-facts">
+                        <div><span>QA officer</span><strong>{{ process.qa_officer|default:"Not assigned" }}</strong></div>
+                        <div><span>Review recorded</span><strong>{{ process.qa_reviewed_at|date:"d M Y H:i"|default:"Pending" }}</strong></div>
+                        <div><span>Retest cycles</span><strong>{{ process.rework_count|default:0 }}</strong></div>
+                        <div><span>Failed results</span><strong>{{ process.failed_tests.count|default:0 }}</strong></div>
+                    </div>
+                    {% if corrective_actions %}<div class="ca-workbench-results__heading"><strong>Corrective actions</strong><span>{{ corrective_actions|length }} record{{ corrective_actions|length|pluralize }}</span></div>{% endif %}
+                {% elif stage.key == "approval" %}
+                    <div class="ca-workflow-checklist-state{% if process.approved_at %} is-complete{% endif %}"><span class="ca-workflow-checklist-state__icon"><i class="fa-solid fa-stamp" aria-hidden="true"></i></span><div><strong>{% if process.approved_at %}Batch approved{% else %}Independent batch approval{% endif %}</strong><p>{% if process.approved_at %}Approved {{ process.approved_at|date:"d M Y H:i" }}{% if process.approver %} by {{ process.approver }}{% endif %}{% else %}A reviewer independent of the analysis and QA review must approve the finalized batch.{% endif %}</p></div></div>
+                {% elif stage.key == "certificate" %}
+                    <div class="ca-workflow-facts">
+                        <div><span>Sample reference</span><strong>{{ coa.sample_id|default:"Not generated" }}</strong></div>
+                        <div><span>Certificate status</span><strong>{{ coa.generation_status|default:"Pending" }}</strong></div>
+                        <div><span>Generated</span><strong>{{ coa.date_of_report|date:"d M Y H:i"|default:"—" }}</strong></div>
+                        <div><span>Approved</span><strong>{{ coa.approved_on|date:"d M Y H:i"|default:"Pending" }}</strong></div>
+                    </div>
+                    {% if coa and coa.pdf_file %}<a class="ca-workbench-document-link" href="{% url 'ca:coa-download' coa.pk %}"><i class="fa-solid fa-file-pdf" aria-hidden="true"></i> Download Certificate of Analysis</a>{% endif %}
+                {% elif stage.key == "disposition" %}
+                    <div class="ca-workflow-facts">
+                        <div><span>Available stock</span><strong>{{ batch.available_quantity }} {{ batch.unit }}</strong></div>
+                        <div><span>Utilized</span><strong>{{ batch.quantity_utilized|default:"0" }} {{ batch.unit }}</strong></div>
+                        <div><span>Returned</span><strong>{{ batch.quantity_returned|default:"0" }} {{ batch.unit }}</strong></div>
+                        <div><span>Disposition state</span><strong>{{ batch.get_status_display }}</strong></div>
+                    </div>
+                {% elif stage.key == "complete" %}
+                    <div class="ca-workflow-checklist-state is-complete"><span class="ca-workflow-checklist-state__icon"><i class="fa-solid fa-circle-check" aria-hidden="true"></i></span><div><strong>Batch workflow closed</strong><p>{% if process.completed_at %}Closed {{ process.completed_at|date:"d M Y H:i" }}{% else %}{{ batch.get_status_display }}{% endif %}. The batch record and audit trail remain available below.</p></div></div>
                 {% endif %}
-            </div>
-
-            <div class="card-body">
-
-                <div class="details-grid">
-
-                    <div class="detail-item">
-                        <span class="detail-label">Request ID</span>
-                        <span class="detail-value">
-                            {{ analysis_request.request_id|default:"—" }}
-                        </span>
-                    </div>
-
-                    <div class="detail-item">
-                        <span class="detail-label">Status</span>
-                        <span class="detail-value">
-                            {% if analysis_request.status %}
-                                {{ analysis_request.get_status_display }}
-                            {% else %}
-                                —
-                            {% endif %}
-                        </span>
-                    </div>
-
-                    <div class="detail-item">
-                        <span class="detail-label">Location</span>
-                        <span class="detail-value">
-                            {{ analysis_request.location|default:"—" }}
-                        </span>
-                    </div>
-
-                    <div class="detail-item">
-                        <span class="detail-label">Created</span>
-                        <span class="detail-value">
-                            {% if analysis_request.created_at %}
-                                {{ analysis_request.created_at|date:"d M Y H:i" }}
-                            {% else %}
-                                —
-                            {% endif %}
-                        </span>
-                    </div>
-
-                </div>
-
-                {% if analysis_request.assigned_analysts.all %}
-
-                    <div class="section">
-                        <h3>Assigned Analysts</h3>
-
-                        <div class="tag-list">
-                            {% for analyst in analysis_request.assigned_analysts.all %}
-                                <span class="badge badge-secondary">
-                                    {{ analyst }}
-                                </span>
-                            {% empty %}
-                                <span>None assigned</span>
-                            {% endfor %}
-                        </div>
-                    </div>
-
-                {% endif %}
-
-            </div>
-        </div>
-
-    {% endif %}
-
-    {% if process %}
-
-        <div class="card">
-            <div class="card-header">
-                <h2>Analysis Process</h2>
-
-                {% if process.workflow_status %}
-                    <span class="badge badge-warning">
-                        {{ process.get_workflow_status_display }}
-                    </span>
-                {% endif %}
-            </div>
-
-            <div class="card-body">
-
-                <div class="details-grid">
-
-                    <div class="detail-item">
-                        <span class="detail-label">Process Status</span>
-                        <span class="detail-value">
-                            {% if process.workflow_status %}
-                                {{ process.get_workflow_status_display }}
-                            {% else %}
-                                —
-                            {% endif %}
-                        </span>
-                    </div>
-
-                    <div class="detail-item">
-                        <span class="detail-label">Assigned Analyst</span>
-                        <span class="detail-value">
-                            {{ process.assigned_analyst|default:"Unassigned" }}
-                        </span>
-                    </div>
-
-                    <div class="detail-item">
-                        <span class="detail-label">QA Officer</span>
-                        <span class="detail-value">
-                            {{ process.qa_officer|default:"Unassigned" }}
-                        </span>
-                    </div>
-
-                    <div class="detail-item">
-                        <span class="detail-label">Started</span>
-                        <span class="detail-value">
-                            {% if process.started_at %}
-                                {{ process.started_at|date:"d M Y H:i" }}
-                            {% else %}
-                                —
-                            {% endif %}
-                        </span>
-                    </div>
-
-                    <div class="detail-item">
-                        <span class="detail-label">Completed</span>
-                        <span class="detail-value">
-                            {% if process.completed_at %}
-                                {{ process.completed_at|date:"d M Y H:i" }}
-                            {% else %}
-                                —
-                            {% endif %}
-                        </span>
-                    </div>
-
-                    <div class="detail-item">
-                        <span class="detail-label">Progress</span>
-                        <span class="detail-value">
-                            {{ process.analysis_progress|default:0 }}%
-                        </span>
-                    </div>
-
-                </div>
-
-            </div>
-        </div>
-
-    {% endif %}
-
-    {% if test_results %}
-
-        <div class="card">
-            <div class="card-header">
-                <div>
-                    <h2>Test Results</h2>
-                    <span>
-                        {{ test_results|length }}
-                        result{{ test_results|length|pluralize }}
-                    </span>
-                </div>
-            </div>
-
-            <div class="table-responsive">
-
-                <table class="table">
-
-                    <thead>
-                        <tr>
-                            <th>Parameter</th>
-                            <th>Value</th>
-                            <th>Textual Result</th>
-                            <th>Status</th>
-                            <th>Analyst</th>
-                            <th>Tested</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-
-                        {% for result in test_results %}
-
-                            <tr>
-
-                                <td>
-                                    {% if result.parameter %}
-                                        {{ result.parameter }}
-                                    {% else %}
-                                        —
-                                    {% endif %}
-                                </td>
-
-                                <td>
-                                    {% if result.value is not None %}
-                                        {{ result.value }}
-                                    {% else %}
-                                        —
-                                    {% endif %}
-                                </td>
-
-                                <td>
-                                    {{ result.textual_result|default:"—" }}
-                                </td>
-
-                                <td>
-
-                                    {% if result.status == "PASS" %}
-
-                                        <span class="badge badge-success">
-                                            PASS
-                                        </span>
-
-                                    {% elif result.status == "FAIL" %}
-
-                                        <span class="badge badge-danger">
-                                            FAIL
-                                        </span>
-
-                                    {% elif result.status == "NA" %}
-
-                                        <span class="badge badge-secondary">
-                                            N/A
-                                        </span>
-
-                                    {% else %}
-
-                                        <span class="badge badge-warning">
-                                            {{ result.status|default:"Pending" }}
-                                        </span>
-
-                                    {% endif %}
-
-                                </td>
-
-                                <td>
-                                    {{ result.analyst|default:"—" }}
-                                </td>
-
-                                <td>
-                                    {% if result.tested_at %}
-                                        {{ result.tested_at|date:"d M Y H:i" }}
-                                    {% else %}
-                                        —
-                                    {% endif %}
-                                </td>
-
-                                <td>
-                                    <a
-                                        href="{% url 'ca:result-detail' result.pk %}"
-                                        class="btn btn-secondary"
-                                    >
-                                        View
-                                    </a>
-                                </td>
-
-                            </tr>
-
-                        {% endfor %}
-
-                    </tbody>
-
-                </table>
-
-            </div>
-        </div>
-
-    {% endif %}
-
-    {% if coa %}
-
-        <div class="card">
-            <div class="card-header">
-                <h2>Certificate of Analysis</h2>
-
-                {% if coa.status %}
-                    <span class="badge badge-info">
-                        {{ coa.get_status_display }}
-                    </span>
-                {% endif %}
-            </div>
-
-            <div class="card-body">
-
-                <div class="details-grid">
-
-                    <div class="detail-item">
-                        <span class="detail-label">COA Number</span>
-                        <span class="detail-value">
-                            {{ coa.coa_number|default:"—" }}
-                        </span>
-                    </div>
-
-                    <div class="detail-item">
-                        <span class="detail-label">Status</span>
-                        <span class="detail-value">
-                            {% if coa.status %}
-                                {{ coa.get_status_display }}
-                            {% else %}
-                                —
-                            {% endif %}
-                        </span>
-                    </div>
-
-                    <div class="detail-item">
-                        <span class="detail-label">Generated</span>
-                        <span class="detail-value">
-                            {% if coa.generated_at %}
-                                {{ coa.generated_at|date:"d M Y H:i" }}
-                            {% else %}
-                                —
-                            {% endif %}
-                        </span>
-                    </div>
-
-                </div>
-
-            </div>
-        </div>
-
-    {% endif %}
-
-    <div class="page-actions">
-
-        <a
-            href="{% url 'ca:batch-list' %}"
-            class="btn btn-secondary"
-        >
-            Back to Batches
-        </a>
-
-        {% if process %}
-            <a
-                href="{% url 'ca:process-detail' process.pk %}"
-                class="btn btn-primary"
-            >
-                View Analysis Process
-            </a>
-        {% endif %}
-
+            </section>
+        {% endfor %}
     </div>
 
-</div>
+    <details class="ca-workbench-record">
+        <summary><span><i class="fa-solid fa-box-archive" aria-hidden="true"></i> Batch record, stock and audit trail</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></summary>
+        <div class="ca-workbench-record__body">{% include "ca/chema/partials/batch_record_detail.html" %}</div>
+    </details>
 
+</main>
+{% endblock %}
+
+{% block extra_js %}
+    {{ block.super }}
+    <script src="{% static 'ca/js/batch-workbench.js' %}?v=20261023-workflow-theater" defer></script>
 {% endblock %}

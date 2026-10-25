@@ -149,10 +149,10 @@ def logout(request):
 class TreatmentPlantViewSet(viewsets.ModelViewSet):
     queryset = TreatmentPlant.objects.all()
     serializer_class = TreatmentPlantSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAdminUser]
 
-    @action(detail=False, methods=['post'])
-    def check_permissions(self, request):
+    @action(detail=False, methods=['post'], url_path='check-permissions')
+    def check_access(self, request):
         if not request.user.has_perm('accounts.view_treatmentplant'):
             return Response({'detail': 'Permission denied. Please reauthenticate.'},
                             status=status.HTTP_403_FORBIDDEN)
@@ -162,25 +162,32 @@ class TreatmentPlantViewSet(viewsets.ModelViewSet):
 class GroupViewSet(viewsets.ModelViewSet):
     queryset = Group.objects.all()
     serializer_class = GroupSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAdminUser]
 
 
 class PermissionViewSet(viewsets.ModelViewSet):
     queryset = Permission.objects.all()
     serializer_class = PermissionSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAdminUser]
 
 
 class CustomUserViewSet(viewsets.ModelViewSet):
     queryset = CustomUser.objects.all()
     serializer_class = CustomUserSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAdminUser]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['username', 'email']
     ordering_fields = ['username', 'email', 'assigned_treatment_plant__name']
 
+    def get_permissions(self):
+        if getattr(self, "action", None) == "me":
+            return [permissions.IsAuthenticated()]
+        return [permissions.IsAdminUser()]
+
     def get_queryset(self):
         queryset = super().get_queryset()
+        if not (self.request.user.is_staff or self.request.user.is_superuser):
+            return queryset.none()
         treatment_plant = self.request.query_params.get('treatment_plant')
         if treatment_plant:
             queryset = queryset.filter(assigned_treatment_plant__name=treatment_plant)
@@ -203,7 +210,7 @@ class CustomUserViewSet(viewsets.ModelViewSet):
 class AccountConfigurationViewSet(viewsets.ModelViewSet):
     queryset = AccountConfiguration.objects.all()
     serializer_class = AccountConfigurationSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    permission_classes = [permissions.IsAdminUser]
 
     @action(detail=False, methods=['post'])
     def reauthenticate(self, request):

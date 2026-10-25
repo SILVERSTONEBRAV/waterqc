@@ -1,4 +1,5 @@
 from rest_framework import viewsets, status
+from core.permissions import ViewModelPermissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -18,7 +19,7 @@ from .serializers import (
 class SamplingPlanViewSet(viewsets.ModelViewSet):
     queryset = SamplingPlan.objects.all()
     serializer_class = SamplingPlanSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
     @action(detail=True, methods=['post'], url_path='refresh-actuals')
     def refresh_actual_sampled_points(self, request, pk=None):
@@ -30,7 +31,7 @@ class SamplingPlanViewSet(viewsets.ModelViewSet):
 class DynamicSamplingPointViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = DynamicSamplingPoint.objects.select_related('content_type')
     serializer_class = DynamicSamplingPointSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -56,13 +57,13 @@ class DynamicSamplingPointViewSet(viewsets.ReadOnlyModelViewSet):
 class SampleCategoryViewSet(viewsets.ModelViewSet):
     queryset = SampleCategory.objects.all()
     serializer_class = SampleCategorySerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
 # --- Itinerary ViewSet ---
 class ItineraryViewSet(viewsets.ModelViewSet):
     queryset = Itinerary.objects.select_related('content_type').prefetch_related('sampling_points')
     serializer_class = ItinerarySerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
     def get_queryset(self):
         qs = super().get_queryset()

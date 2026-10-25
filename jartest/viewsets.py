@@ -1,4 +1,5 @@
 from rest_framework import viewsets, status, filters, permissions, throttling
+from core.permissions import ViewModelPermissions
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError, PermissionDenied
@@ -38,7 +39,7 @@ class IsAnalystOrReadOnly(permissions.BasePermission):
 class RawWaterViewSet(viewsets.ModelViewSet):
     queryset = RawWater.objects.select_related("treatment_plant").prefetch_related("analyses")
     serializer_class = RawWaterSerializer
-    permission_classes = [permissions.IsAuthenticated, IsAnalystOrReadOnly]
+    permission_classes = [ViewModelPermissions, IsAnalystOrReadOnly]
     throttle_classes = [BurstRateThrottle]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['treatment_plant', 'sampled_at']
@@ -58,7 +59,7 @@ class RawWaterViewSet(viewsets.ModelViewSet):
 class RawWaterAnalysisViewSet(viewsets.ModelViewSet):
     queryset = RawWaterAnalysis.objects.select_related("parameter", "raw_water")
     serializer_class = RawWaterAnalysisSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
     throttle_classes = [BurstRateThrottle]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['raw_water', 'parameter']
@@ -72,7 +73,7 @@ class JarTestViewSet(viewsets.ModelViewSet):
         "jar_results__measurements"
     )
     serializer_class = JarTestSerializer
-    permission_classes = [permissions.IsAuthenticated, IsAnalystOrReadOnly]
+    permission_classes = [ViewModelPermissions, IsAnalystOrReadOnly]
     throttle_classes = [BurstRateThrottle]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['treatment_plant', 'test_date', 'verified_by', 'confirmed_by', 'approved_by']
@@ -201,7 +202,7 @@ class JarTestViewSet(viewsets.ModelViewSet):
 class JarResultViewSet(viewsets.ModelViewSet):
     queryset = JarResult.objects.select_related("jar_test").prefetch_related("measurements")
     serializer_class = JarResultSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
     throttle_classes = [BurstRateThrottle]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['jar_test', 'jar_number', 'is_optimal']
@@ -213,7 +214,7 @@ class JarResultViewSet(viewsets.ModelViewSet):
 class JarMeasurementViewSet(viewsets.ModelViewSet):
     queryset = JarMeasurement.objects.select_related("jar_result", "parameter")
     serializer_class = JarMeasurementSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
     throttle_classes = [BurstRateThrottle]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['jar_result', 'parameter']

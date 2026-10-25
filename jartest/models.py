@@ -189,11 +189,15 @@ class JarTest(ReviewMixin):
             jar.save(update_fields=['performance_rank', 'is_optimal'])
 
         self.established_dosage_mg_per_l = scored[0].dosage_mg_per_l
-        self.save(update_fields=['established_dosage_mg_per_l'])
+        if self.pk:
+            JarTest.objects.filter(pk=self.pk).update(established_dosage_mg_per_l=self.established_dosage_mg_per_l)
 
     def save(self, *args, **kwargs):
+        update_fields = kwargs.get('update_fields')
         super().save(*args, **kwargs)
-        if self.jar_results.count() == 6:
+        if update_fields and 'established_dosage_mg_per_l' in update_fields:
+            return
+        if self.pk and self.jar_results.count() == 6:
             self.rank_jar_results()
 
 
@@ -239,8 +243,9 @@ class JarResult(models.Model):
             relevant_params = {turbidity, color}
 
         score = Decimal('0')
-        for m in self.measurements.all():
-            if m.parameter in relevant_params:
+        for m in self.measurements.select_related('parameter__parameter').all():
+            param_obj = getattr(m.parameter, 'parameter', m.parameter)
+            if param_obj in relevant_params or m.parameter in relevant_params:
                 score += Decimal(m.value)
         return score
 

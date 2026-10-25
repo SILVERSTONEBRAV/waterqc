@@ -24,6 +24,21 @@
                 </a>
             </li>
 
+            <li class="sidebar-item {% if request.resolver_match.url_name == 'telemetry' or request.resolver_match.url_name == 'results_cards' %}active{% endif %}">
+                <a
+                    href="{% url 'instruments:telemetry' %}"
+                    class="nav-link"
+                    title="Sensor Telemetry Matrix"
+                    aria-label="Sensor Telemetry Matrix"
+                >
+                    <i class="fas fa-satellite-dish sidebar-icon"></i>
+
+                    <span class="label">
+                        Telemetry Matrix
+                    </span>
+                </a>
+            </li>
+
 
             {# ====================================================== #}
             {# REGISTRY MODELS #}

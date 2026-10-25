@@ -1,0 +1,59 @@
+<nav class="qcr-water-tabs" aria-label="Filter by water type">
+    {% for key, label, url in water_type_urls %}
+    <a href="{{ url }}"
+       class="qcr-water-tab{% if water_type == key %} is-active{% endif %}"
+       data-qcr-water-type="{{ key }}"{% if water_type == key %} aria-current="page"{% endif %}>{{ label }}</a>
+    {% endfor %}
+</nav>
+
+<form id="qcrFilters" class="qcr-filter-panel" method="get" action="{{ filter_action }}">
+    <input type="hidden" name="water_type" value="{{ water_type }}">
+    <input type="hidden" name="page" value="1">
+    <input type="hidden" name="daily_page" value="1">
+    {% if request.user.is_superuser and plant %}<input type="hidden" name="plant" value="{{ plant.pk }}">{% endif %}
+    <div class="qcr-filter-heading">
+        <div><span class="qcr-section-kicker">{{ controls_kicker|default:"REPORT CONTROLS" }}</span><h2>{{ controls_title|default:"Refine the evidence" }}</h2></div>
+        <button type="button" class="qcr-filter-toggle" aria-expanded="true" aria-controls="qcrFilterGrid"><i class="fa-solid fa-sliders" aria-hidden="true"></i><span>Filters</span></button>
+    </div>
+    <div id="qcrFilterGrid" class="qcr-filter-grid">
+        <label class="qcr-field qcr-field-period"><span>Reporting window</span>
+            <select name="period" id="qcrPeriod">
+                {% for key, label in period_choices %}<option value="{{ key }}"{% if period == key %} selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select>
+        </label>
+        <label class="qcr-field"><span>From</span><input type="date" name="start" value="{{ start_date|date:'Y-m-d' }}"></label>
+        <label class="qcr-field"><span>Through</span><input type="date" name="end" value="{{ end_date|date:'Y-m-d' }}"></label>
+        <label class="qcr-field"><span>Trend interval</span>
+            <select name="group_by">{% for key, label in group_choices %}<option value="{{ key }}"{% if group_by == key %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+        </label>
+        <label class="qcr-field"><span>Parameter</span>
+            <select name="parameter"><option value="">All parameters</option>{% for item in parameters %}<option value="{{ item.name }}"{% if parameter == item.name %} selected{% endif %}>{{ item.name }} · {{ item.unit }}</option>{% endfor %}</select>
+        </label>
+        <label class="qcr-field"><span>Treatment phase</span>
+            <select name="phase"><option value="">All phases</option>{% for item in phases %}<option value="{{ item.id }}"{% if phase == item.id|stringformat:'s' %} selected{% endif %}>{{ item.name }}</option>{% endfor %}</select>
+        </label>
+        {% if is_analytics_page or is_visualizations_page %}
+        <label class="qcr-field"><span>Analytics focus</span>
+            <select name="focus"><option value="">Auto-select strongest dataset</option>{% for item in parameters %}<option value="{{ item.name }}"{% if focus_parameter == item.name %} selected{% endif %}>{{ item.name }} · {{ item.unit }}</option>{% endfor %}</select>
+        </label>
+        {% endif %}
+        <label class="qcr-field qcr-field-search"><span>Search results</span>
+            <span class="qcr-search-wrap"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input type="search" name="search" value="{{ search }}" placeholder="Parameter, sample, phase, result…"></span>
+        </label>
+        <label class="qcr-field"><span>Sort records by</span>
+            <select name="sort">
+                <option value="date"{% if sort == 'date' %} selected{% endif %}>Sample date &amp; time</option>
+                <option value="parameter"{% if sort == 'parameter' %} selected{% endif %}>Parameter</option>
+                <option value="value"{% if sort == 'value' %} selected{% endif %}>Result value</option>
+                <option value="status"{% if sort == 'status' %} selected{% endif %}>Compliance status</option>
+                <option value="phase"{% if sort == 'phase' %} selected{% endif %}>Treatment phase</option>
+                <option value="reference"{% if sort == 'reference' %} selected{% endif %}>Sample reference</option>
+            </select>
+        </label>
+        <label class="qcr-field"><span>Direction</span><select name="direction"><option value="desc"{% if direction == 'desc' %} selected{% endif %}>Newest / highest</option><option value="asc"{% if direction == 'asc' %} selected{% endif %}>Oldest / lowest</option></select></label>
+        <div class="qcr-filter-actions">
+            <button class="qcr-button qcr-button-primary" type="submit"><i class="fa-solid fa-filter" aria-hidden="true"></i> Apply filters</button>
+            <a class="qcr-button qcr-button-quiet" href="{{ dashboard_url }}{% if request.user.is_superuser and plant %}?plant={{ plant.pk }}{% endif %}">Reset</a>
+        </div>
+    </div>
+</form>

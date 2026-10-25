@@ -1,0 +1,95 @@
+{% extends "qc/results/base.html" %}
+{% load static humanize %}
+
+{% block title %}{{ water_type_label }} report · QCA{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'qc/reports/reports.css' %}?v=20261021-advanced">
+<script src="{% static 'qc/reports/reports.js' %}?v=20261021-advanced" defer></script>
+{% endblock %}
+
+{% block content %}
+<section class="qcr-page" aria-labelledby="qcrTitle">
+    <div class="qcr-hero">
+        <div>
+            <div class="qcr-eyebrow"><i class="fa-solid fa-file-lines" aria-hidden="true"></i> WATER QUALITY EVIDENCE</div>
+            <h1 id="qcrTitle">{{ water_type_label }} report</h1>
+            <p>Sample-level results, limit compliance and daily descriptive statistics for this water type.</p>
+        </div>
+        <div class="qcr-hero-meta"><i class="fa-solid fa-industry" aria-hidden="true"></i><span>{{ plant.name|default:"No treatment plant assigned" }}</span><span class="qcr-meta-divider"></span><span>{{ start_date|date:"d M Y" }} – {{ end_date|date:"d M Y" }}</span></div>
+    </div>
+
+    {% include "qc/reports/_controls.html" with controls_kicker="REPORT SCOPE" controls_title="Choose the evidence to include" %}
+
+    {% if plant %}
+    <div class="qcr-kpi-grid" aria-label="Sample and result summary">
+        <article class="qcr-kpi qcr-kpi-blue"><span class="qcr-kpi-icon"><i class="fa-solid fa-vials" aria-hidden="true"></i></span><span class="qcr-kpi-label">Samples collected</span><strong>{{ sample_summary.samples_collected|intcomma }}</strong><small>{{ sample_summary.samples_with_results|intcomma }} with result rows · {{ total_results|intcomma }} parameter results</small></article>
+        <article class="qcr-kpi qcr-kpi-green"><span class="qcr-kpi-icon"><i class="fa-solid fa-circle-check" aria-hidden="true"></i></span><span class="qcr-kpi-label">Samples complying</span><strong>{{ sample_summary.samples_complying|intcomma }}</strong><small>{% if sample_summary.sample_compliance_rate != None %}{{ sample_summary.sample_compliance_rate }}% of fully evaluated samples{% else %}No fully evaluated samples{% endif %}</small></article>
+        <article class="qcr-kpi qcr-kpi-red"><span class="qcr-kpi-icon"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i></span><span class="qcr-kpi-label">Samples out of range</span><strong>{{ sample_summary.samples_out_of_range|intcomma }}</strong><small>At least one measured result outside its configured limit</small></article>
+        <article class="qcr-kpi qcr-kpi-violet"><span class="qcr-kpi-icon"><i class="fa-solid fa-list-check" aria-hidden="true"></i></span><span class="qcr-kpi-label">Evaluated / incomplete</span><strong>{{ sample_summary.samples_evaluated|intcomma }} / {{ sample_summary.samples_not_fully_evaluated|intcomma }}</strong><small>{{ within_limits|intcomma }} results in range · {{ out_of_range|intcomma }} out of range</small></article>
+    </div>
+
+    <div class="qcr-export-toolbar" aria-label="Export this water-type report">
+        <span><i class="fa-solid fa-download" aria-hidden="true"></i> Export {{ water_type_label }}</span>
+        {% for fmt, label, icon in export_formats %}<button class="qcr-export-button" type="submit" form="qcrFilters" name="export" value="{{ fmt }}" formaction="{% url 'qc:reports' %}" title="Download {{ label }} report"><i class="{{ icon }}" aria-hidden="true"></i>{{ label }}</button>{% endfor %}
+    </div>
+
+    <section class="qcr-section" aria-labelledby="qcrDailyHeading">
+        <div class="qcr-section-heading"><div><span class="qcr-section-kicker">DAILY DESCRIPTIVE ANALYTICS</span><h2 id="qcrDailyHeading">Daily sample and parameter profile</h2><p>Each row is one parameter on one sampling date. Compliance counts use sample-level pass rules as well as result-level limits.</p></div><span class="qcr-record-count">{{ daily_summaries|length|intcomma }} daily parameter profiles</span></div>
+        <div class="qcr-table-scroll">
+            <table class="qcr-results-table qcr-summary-table">
+                <thead><tr><th>Sample date</th><th>Parameter</th><th>Samples</th><th>Complying samples</th><th>Results n</th><th>Min – max</th><th>Mean · median</th><th>SD</th><th>Within / out</th><th>Missing / no limits</th><th>Result compliance</th></tr></thead>
+                <tbody>
+                {% for item in daily_rows %}
+                <tr><td><strong>{{ item.date }}</strong></td><td><strong>{{ item.parameter }}</strong><small>{{ item.unit }}</small></td><td>{{ item.samples_collected|intcomma }}</td><td>{{ item.samples_complying|intcomma }} / {{ item.samples_evaluated|intcomma }} evaluated<small>{% if item.sample_compliance_rate != None %}{{ item.sample_compliance_rate }}%{% else %}Not fully evaluated{% endif %}</small></td><td>{{ item.measured_count|intcomma }} / {{ item.result_count|intcomma }} measured<small>{{ item.missing|intcomma }} missing · {{ item.pending|intcomma }} pending</small></td><td>{{ item.minimum|default_if_none:"—"|floatformat:4 }} – {{ item.maximum|default_if_none:"—"|floatformat:4 }}</td><td>{{ item.mean|default_if_none:"—"|floatformat:4 }} · {{ item.median|default_if_none:"—"|floatformat:4 }}</td><td>{{ item.std|default_if_none:"—"|floatformat:4 }}</td><td>{{ item.within_limits|intcomma }} / {{ item.out_of_range|intcomma }}<small>within / out of range</small></td><td>{{ item.missing|intcomma }} / {{ item.pending|intcomma }} / {{ item.no_limits|intcomma }}<small>missing / pending / no limits</small></td><td>{% if item.result_compliance_rate != None %}<span class="qcr-compliance qcr-compliance-rate">{{ item.result_compliance_rate }}%</span>{% else %}—{% endif %}</td></tr>
+                {% empty %}<tr><td colspan="11" class="qcr-empty-row"><i class="fa-solid fa-calendar-xmark" aria-hidden="true"></i><strong>No daily profiles for this selection</strong><span>Adjust the reporting window or filters to include results.</span></td></tr>{% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if daily_page_obj.paginator.num_pages > 1 %}
+        <nav class="qcr-pagination" aria-label="Daily analytics pages">
+            {% if daily_page_obj.has_previous %}<button type="button" data-qcr-daily-page="{{ daily_page_obj.previous_page_number }}"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i> Previous</button>{% else %}<button type="button" disabled>Previous</button>{% endif %}
+            <span>Page <strong>{{ daily_page_obj.number }}</strong> of {{ daily_page_obj.paginator.num_pages }}</span>
+            {% if daily_page_obj.has_next %}<button type="button" data-qcr-daily-page="{{ daily_page_obj.next_page_number }}">Next <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>{% else %}<button type="button" disabled>Next</button>{% endif %}
+        </nav>
+        {% endif %}
+    </section>
+
+    <section class="qcr-section" aria-labelledby="qcrParametersHeading">
+        <div class="qcr-section-heading"><div><span class="qcr-section-kicker">PARAMETER PERFORMANCE</span><h2 id="qcrParametersHeading">Descriptive statistics and configured limits</h2><p>Includes confidence intervals, distribution shape, observed minimum and maximum, and sample-level compliance. CV is SD ÷ |mean|.</p></div></div>
+        <div class="qcr-table-scroll"><table class="qcr-results-table qcr-summary-table">
+            <thead><tr><th>Parameter</th><th>Results / samples</th><th>Mean · 95% CI</th><th>Median · IQR</th><th>SD · CV</th><th>P05 – P95</th><th>Min – max</th><th>Limits</th><th>Complying samples</th><th>Result out of range</th><th>Compliance</th></tr></thead>
+            <tbody>{% for item in summaries %}<tr>
+                <td><strong>{{ item.parameter }}</strong><small>{{ item.unit }}</small></td><td>{{ item.n|intcomma }} measured / {{ item.samples_collected|intcomma }} samples<small>{{ item.missing|intcomma }} missing · {{ item.pending|intcomma }} pending · {{ item.not_evaluated|intcomma }} without limits</small></td>
+                <td>{{ item.mean|default_if_none:"—"|floatformat:4 }}<small>{% if item.ci_low != None %}95% CI {{ item.ci_low|floatformat:4 }} – {{ item.ci_high|floatformat:4 }}{% else %}95% CI unavailable (n &lt; 2){% endif %}</small></td>
+                <td>{{ item.median|default_if_none:"—"|floatformat:4 }}<small>IQR {{ item.q1|default_if_none:"—"|floatformat:4 }} – {{ item.q3|default_if_none:"—"|floatformat:4 }}</small></td>
+                <td>{{ item.std|default_if_none:"—"|floatformat:4 }}<small>CV {{ item.cv|default_if_none:"—"|floatformat:2 }}%</small></td><td>{{ item.p05|default_if_none:"—"|floatformat:4 }} – {{ item.p95|default_if_none:"—"|floatformat:4 }}</td>
+                <td>{{ item.min|default_if_none:"—"|floatformat:4 }} – {{ item.max|default_if_none:"—"|floatformat:4 }}</td><td>{{ item.lower_limit|default_if_none:"—" }} – {{ item.upper_limit|default_if_none:"—" }}</td>
+                <td>{{ item.samples_complying|intcomma }} / {{ item.samples_collected|intcomma }}<small>{% if item.sample_compliance_rate != None %}{{ item.sample_compliance_rate }}% of evaluated samples{% else %}Not evaluated{% endif %}</small></td><td>{{ item.out_of_range|intcomma }}</td>
+                <td>{% if item.compliance_rate != None %}<span class="qcr-compliance qcr-compliance-rate">{{ item.compliance_rate }}%</span>{% else %}—{% endif %}</td>
+            </tr>{% empty %}<tr><td colspan="11" class="qcr-empty-row">No parameter statistics are available for this water type and period.</td></tr>{% endfor %}</tbody>
+        </table></div>
+    </section>
+
+    <section class="qcr-section" aria-labelledby="qcrDetailHeading">
+        <div class="qcr-section-heading"><div><span class="qcr-section-kicker">SAMPLE EVIDENCE</span><h2 id="qcrDetailHeading">Detailed {{ water_type_label }} results</h2><p>Results are scoped to this water type; filters, searches and sorting apply to this evidence table.</p></div><span class="qcr-record-count">{{ total_results|intcomma }} results</span></div>
+        <div class="qcr-table-scroll"><table class="qcr-results-table">
+            <thead><tr><th>Sample</th><th>Sample time</th><th>Phase / filter</th><th>Analysis state</th><th>Parameter</th><th>Result</th><th>Configured limits</th><th>Compliance</th></tr></thead>
+            <tbody>{% for row in page_rows %}<tr>
+                <td><strong>{{ row.reference|default:"—" }}</strong><small>{{ row.date }}</small></td><td>{{ row.time }}{% if row.shift %}<small>{{ row.shift }}</small>{% endif %}</td>
+                <td>{{ row.phase }}{% if row.filter_name %}<small>{{ row.filter_name }}</small>{% endif %}</td><td>{{ row.state|default:"—" }}</td>
+                <td><strong>{{ row.parameter }}</strong><small>{{ row.unit }}</small></td><td class="qcr-value-cell">{% if row.value_text %}{{ row.value_text }} <small>{{ row.unit }}</small>{% else %}<span class="qcr-muted">{{ row.status }}</span>{% endif %}</td>
+                <td>{{ row.minimum_text|default:"—" }} – {{ row.maximum_text|default:"—" }} <small>{{ row.unit }}</small></td><td><span class="qcr-compliance qcr-compliance-{{ row.status|slugify }}">{{ row.status }}</span></td>
+            </tr>{% empty %}<tr><td colspan="8" class="qcr-empty-row"><i class="fa-solid fa-magnifying-glass-chart" aria-hidden="true"></i><strong>No matching results</strong><span>Change the date range or filters to broaden this report.</span></td></tr>{% endfor %}</tbody>
+        </table></div>
+        {% if page_obj.paginator.num_pages > 1 %}<nav class="qcr-pagination" aria-label="Report pages">
+            {% if page_obj.has_previous %}<button type="button" data-qcr-page="{{ page_obj.previous_page_number }}">Previous</button>{% else %}<button type="button" disabled>Previous</button>{% endif %}
+            <span>Page <strong>{{ page_obj.number }}</strong> of {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}<button type="button" data-qcr-page="{{ page_obj.next_page_number }}">Next</button>{% else %}<button type="button" disabled>Next</button>{% endif %}
+        </nav>{% endif %}
+    </section>
+    {% else %}<div class="qcr-empty-analytics"><i class="fa-solid fa-industry" aria-hidden="true"></i><h2>No treatment plant is assigned</h2><p>Reports are limited to the treatment plant attached to your account.</p></div>{% endif %}
+
+    <footer class="qcr-footnote"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>Sample compliance requires every result for a sample to pass an applicable limit. Samples without complete limit coverage are reported separately.</span><span>Generated {{ analyzed_at|date:"d M Y, H:i" }}</span></footer>
+</section>
+{% endblock %}

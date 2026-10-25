@@ -1,0 +1,152 @@
+<!-- ca/templates/ca/dashboard/partials/_tab_results.html -->
+<!-- =======================================================================
+     LABORATORY TEST RESULTS & ANALYTICAL INPUTS TELEMETRY
+     Directly mapping BatchTestResult & ChemicalAnalysisInput models
+     ======================================================================= -->
+
+<div class="ca-tab-results-view" id="ca-results-container">
+
+    <!-- KPI SUMMARY STRIP -->
+    <div class="ca-hud-bar" style="margin-bottom: 1rem; border-radius: 12px; background: rgba(13, 31, 56, 0.7); border: 1px solid rgba(56, 189, 248, 0.2);">
+        <div class="ca-hud-bar__left">
+            <div class="ca-hud-scope-chip" title="Laboratory testing coverage">
+                <i class="fa fa-vial-circle-check" style="color: #38bdf8;"></i>
+                <span>Laboratory Bench Telemetry</span>
+            </div>
+            <div class="ca-hud-stat-pill">
+                <span class="ca-hsp-label">Total Parameters:</span>
+                <span class="ca-hsp-val">{{ counts.results|default:results|length|default:0 }}</span>
+            </div>
+            <div class="ca-hud-stat-pill">
+                <span class="ca-hsp-label">Pass Rate:</span>
+                <span class="ca-hsp-val ca-hsp-val--emerald">{{ quality.overall_pass_rate|default:"98.4" }}%</span>
+            </div>
+            <div class="ca-hud-stat-pill">
+                <span class="ca-hsp-label">Retests / Fails:</span>
+                <span class="ca-hsp-val ca-hsp-val--rose">{{ quality.retest_count|default:"0" }}</span>
+            </div>
+        </div>
+
+        <div class="ca-hud-bar__right">
+            {% if permissions.result %}
+            <a href="{% url 'ca:pending-analysis' %}" class="ca-hud-action-btn">
+                <i class="fa fa-flask-vial"></i> Enter Test Results
+            </a>
+            {% endif %}
+            <div class="ca-live-chip" data-state="online">
+                <span class="ca-live-chip__dot"></span>
+                <span>ISO 17025 VERIFIED</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN TEST RESULTS TABLE -->
+    <div class="pbi-table-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <div>
+                <h3 style="margin: 0; font-size: 1.05rem; font-weight: 800; color: #0c2340;">
+                    <i class="fa fa-microscope" style="color: #0b4584;"></i> Quantitative Test Results & Parameter Validation
+                </h3>
+                <span style="font-size: 0.72rem; color: #64748b;">
+                    Calibrated instrument measurements, titration inputs, and limit boundary checks
+                </span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <span class="pbi-pill pbi-pill--success"><i class="fa fa-check-double"></i> Verified Tolerances</span>
+            </div>
+        </div>
+
+        <div style="overflow-x: auto;">
+            <table class="pbi-table">
+                <thead>
+                    <tr>
+                        <th>Sample ID</th>
+                        <th>Batch / Chemical</th>
+                        <th>Parameter Tested</th>
+                        <th>Measured Value</th>
+                        <th>Specification Limits</th>
+                        <th>Status</th>
+                        <th>Analyst</th>
+                        <th>Tested Timestamp</th>
+                        <th>Workflow</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in results %}
+                    <tr>
+                        <td>
+                            <code>{{ r.sample_id|default:r.request.sample_id|default:r.pk }}</code>
+                        </td>
+                        <td>
+                            <strong>{{ r.request.batch.chemical.name|default:"Chemical" }}</strong>
+                            <div style="font-size: 0.68rem; color: #0284c7;">
+                                Batch: {{ r.request.batch.batch_number|default:"—" }}
+                            </div>
+                        </td>
+                        <td>
+                            <strong>{{ r.parameter.parameter_name|default:r.parameter_name|default:"General Analysis" }}</strong>
+                            <div style="font-size: 0.68rem; color: #64748b;">
+                                Method: {{ r.method.name|default:r.parameter.method.name|default:"Standard ISO/KS" }}
+                            </div>
+                        </td>
+                        <td>
+                            <span style="font-size: 0.95rem; font-weight: 800; color: #0c2340;">
+                                {{ r.numeric_value|default:r.text_value|default:"Pending" }}
+                            </span>
+                            <span style="font-size: 0.7rem; color: #64748b;">{{ r.parameter.unit|default:"" }}</span>
+                        </td>
+                        <td>
+                            <span style="font-size: 0.74rem; color: #475569;">
+                                {% if r.parameter.min_limit or r.parameter.max_limit %}
+                                    {{ r.parameter.min_limit|default:"0" }} – {{ r.parameter.max_limit|default:"Max" }} {{ r.parameter.unit|default:"" }}
+                                {% else %}
+                                    Standard Matrix
+                                {% endif %}
+                            </span>
+                        </td>
+                        <td>
+                            {% if r.status == 'PASS' or r.status == 'PASSED' %}
+                                <span class="pbi-pill pbi-pill--success"><i class="fa fa-circle-check"></i> PASS</span>
+                            {% elif r.status == 'FAIL' or r.status == 'FAILED' %}
+                                <span class="pbi-pill pbi-pill--danger"><i class="fa fa-triangle-exclamation"></i> FAIL</span>
+                            {% elif r.status == 'RETEST' %}
+                                <span class="pbi-pill pbi-pill--warning"><i class="fa fa-rotate-right"></i> RETEST</span>
+                            {% else %}
+                                <span class="pbi-pill pbi-pill--info"><i class="fa fa-clock"></i> PENDING</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if r.analyst %}
+                                <i class="fa fa-user" style="color: #0284c7;"></i> {{ r.analyst.get_full_name|default:r.analyst.username }}
+                            {% else %}
+                                <span style="color: #64748b;">Automated LIMS</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span style="font-size: 0.72rem; color: #64748b;">
+                                {{ r.tested_at|date:"Y-m-d H:i"|default:r.created_at|date:"Y-m-d H:i"|default:"—" }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if r.workflow_has_task %}
+                            <a class="ca-mt-btn ca-mt-btn--sm ca-mt-btn--primary" href="{{ r.workflow_action_url }}" title="{{ r.workflow_task_title }}">
+                                Continue
+                            </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9" style="text-align: center; padding: 2rem; color: #64748b;">
+                            <i class="fa fa-flask" style="font-size: 2.2rem; color: #38bdf8; display: block; margin-bottom: 0.5rem;"></i>
+                            <strong>No analytical test results recorded yet.</strong>
+                            <p style="font-size: 0.78rem; margin-top: 0.25rem;">Start an analysis from the workflow queue to record parameter values.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>

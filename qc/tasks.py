@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
+from datetime import timedelta
 
 from celery import shared_task
 from django.utils import timezone
@@ -110,3 +111,30 @@ def qc_health_check(self):
         "worker": self.request.hostname,
         "timestamp": timezone.now().isoformat(),
     }
+
+
+@shared_task(name="qc.publish_qc_outbox_events", ignore_result=True)
+def publish_qc_outbox_events(batch_size=200):
+    """Retry durable QC events if a web process stopped after database commit."""
+    from qc.services.realtime_outbox import publish_pending_qc_events
+
+    return publish_pending_qc_events(batch_size=batch_size)
+
+
+@shared_task(name="qc.prune_qc_outbox_events", ignore_result=True)
+def prune_qc_outbox_events(retention_days=30, batch_size=5000):
+    """Bound delivered-event storage while retaining pending events indefinitely."""
+    from qc.models import QCRealtimeOutboxEvent
+
+    cutoff = timezone.now() - timedelta(days=max(1, int(retention_days)))
+    event_ids = list(
+        QCRealtimeOutboxEvent.objects.filter(delivered_at__lt=cutoff)
+        .order_by("delivered_at")
+        .values_list("event_id", flat=True)[: max(1, min(int(batch_size), 10000))]
+    )
+    deleted, _ = QCRealtimeOutboxEvent.objects.filter(
+        event_id__in=event_ids,
+        delivered_at__lt=cutoff,
+    ).delete()
+    logger.info("Pruned %s delivered QC outbox events older than %s days", deleted, retention_days)
+    return {"deleted": deleted}

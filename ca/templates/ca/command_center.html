@@ -1,0 +1,183 @@
+{% extends "ca/dashboard/layout/app.html" %}
+{% load static %}
+
+{% block title %}Chemical Batch Command · {{ block.super }}{% endblock %}
+
+{% block breadcrumbs %}
+<span class="ca-crumb-sep">/</span>
+<span class="ca-crumb-active">Batch command</span>
+{% endblock %}
+
+{% block page_css %}
+<link rel="stylesheet" href="{% static 'ca/css/pages/batch-command-center.css' %}?v=20261022-v2">
+{% endblock %}
+
+{% block content %}
+<main class="ca-batch-command" data-register-user="{{ request.user.pk }}" data-export-base="{% url 'ca:batch-register-export' %}">
+    {% if can_view_batches %}
+    <section class="batch-console" aria-label="Chemical batch register">
+
+        <form class="batch-filters" method="get" data-register-filter-form>
+            {% if request.GET.plant %}<input type="hidden" name="plant" value="{{ request.GET.plant }}">{% endif %}
+            <div class="batch-filters__primary">
+                <label class="batch-search">
+                    <span class="sr-only">Search batches</span>
+                    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                    <input type="search" name="q" value="{{ register_filters.q|default:'' }}" placeholder="Search sample, batch, chemical, supplier, location…" autocomplete="off">
+                    {% if register_filters.q %}<button type="button" class="batch-clear-search" data-clear-search aria-label="Clear search"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>{% endif %}
+                </label>
+                <label class="batch-compact-filter"><span class="sr-only">Batch state</span>
+                    <select name="status" aria-label="Batch state">
+                        <option value="">All states</option>
+                        {% for value,label in chemical_batch_statuses %}<option value="{{ value }}" {% if register_filters.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                    </select>
+                </label>
+                <label class="batch-compact-filter"><span class="sr-only">Sort batches</span>
+                    <select name="sort" aria-label="Sort batches">
+                        {% for value,label in register_sorts.items %}<option value="{{ value }}" {% if register_filters.sort == value or not register_filters.sort and value == '-received_date' %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                    </select>
+                </label>
+                <button class="batch-filter-submit" type="submit"><i class="fa-solid fa-sliders" aria-hidden="true"></i> Apply</button>
+                <a class="batch-filter-reset" href="{% url 'ca:dashboard' %}{% if request.GET.plant %}?plant={{ request.GET.plant }}{% endif %}" title="Clear all filters"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i><span>Reset</span></a>
+            </div>
+
+            <details class="batch-filters__advanced" {% if register_filters.chemical or register_filters.supplier or register_filters.location or register_filters.received_from or register_filters.received_to or register_filters.qty_min or register_filters.qty_max or register_filters.age or register_filters.coa or register_filters.hold or register_filters.stage or register_filters.analyst %}open{% endif %}>
+                <summary><i class="fa-solid fa-microchip" aria-hidden="true"></i> Advanced filters <span>+</span></summary>
+                <div class="batch-filters__grid">
+                    <label><span>Chemical</span><select name="chemical"><option value="">Any chemical</option>{% for item in register_filter_options.chemicals %}<option value="{{ item.pk }}" {% if register_filters.chemical == item.pk|stringformat:'s' %}selected{% endif %}>{{ item.name }}</option>{% endfor %}</select></label>
+                    <label><span>Supplier</span><select name="supplier"><option value="">Any supplier</option>{% for item in register_filter_options.suppliers %}<option value="{{ item.pk }}" {% if register_filters.supplier == item.pk|stringformat:'s' %}selected{% endif %}>{{ item.name }}</option>{% endfor %}</select></label>
+                    <label><span>Storage location</span><select name="location"><option value="">Any location</option>{% for item in register_filter_options.locations %}<option value="{{ item.pk }}" {% if register_filters.location == item.pk|stringformat:'s' %}selected{% endif %}>{{ item.name }}{% if item.treatment_plant %} · {{ item.treatment_plant.name }}{% endif %}</option>{% endfor %}</select></label>
+                    <label><span>Received from</span><input type="date" name="received_from" value="{{ register_filters.received_from|default:'' }}"></label>
+                    <label><span>Received to</span><input type="date" name="received_to" value="{{ register_filters.received_to|default:'' }}"></label>
+                    <label><span>Quantity minimum</span><input type="number" name="qty_min" min="0" step="any" value="{{ register_filters.qty_min|default:'' }}" placeholder="0"></label>
+                    <label><span>Quantity maximum</span><input type="number" name="qty_max" min="0" step="any" value="{{ register_filters.qty_max|default:'' }}" placeholder="No limit"></label>
+                    <label><span>Time in store</span><select name="age"><option value="">Any age</option>{% for value,label in age_buckets %}<option value="{{ value }}" {% if register_filters.age == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+                    {% if can_view_coa %}<label><span>Certificate</span><select name="coa"><option value="">Any CoA state</option><option value="ready" {% if register_filters.coa == 'ready' %}selected{% endif %}>Generated</option><option value="pending" {% if register_filters.coa == 'pending' %}selected{% endif %}>Pending</option></select></label>{% endif %}
+                    <label><span>Intake hold</span><select name="hold"><option value="">Any hold state</option><option value="open" {% if register_filters.hold == 'open' %}selected{% endif %}>Open hold</option><option value="clear" {% if register_filters.hold == 'clear' %}selected{% endif %}>Clear</option></select></label>
+                    {% if can_view_processes %}<label><span>Workflow stage</span><select name="stage"><option value="">Any stage</option><option value="NO_PROCESS" {% if register_filters.stage == 'NO_PROCESS' %}selected{% endif %}>No workflow</option>{% for value,label in workflow_statuses %}<option value="{{ value }}" {% if register_filters.stage == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>{% endif %}
+                    {% if can_view_requests %}<label><span>Assigned analyst</span><select name="analyst"><option value="">Any analyst</option>{% for item in register_filter_options.analysts %}<option value="{{ item.pk }}" {% if register_filters.analyst == item.pk|stringformat:'s' %}selected{% endif %}>{{ item.get_full_name|default:item.username }}</option>{% endfor %}</select></label>{% endif %}
+                    {% if can_view_requests %}<label><span>Analysis SLA</span><select name="sla"><option value="">Any SLA state</option>{% for value,label in sla_filters %}<option value="{{ value }}" {% if register_filters.sla == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>{% endif %}
+                    <label><span>Rows per page</span><select name="page_size"><option value="25" {% if register_page_size == 25 %}selected{% endif %}>25 rows</option><option value="50" {% if register_page_size == 50 %}selected{% endif %}>50 rows</option><option value="100" {% if register_page_size == 100 %}selected{% endif %}>100 rows</option><option value="200" {% if register_page_size == 200 %}selected{% endif %}>200 rows</option></select></label>
+                </div>
+            </details>
+        </form>
+
+        <div class="batch-register__toolbar">
+            <div class="batch-register__result-count">
+                <strong>{{ register_total }}</strong> batch{{ register_total|pluralize }}
+                {% if plant_context.is_superuser and plant_context.available_plants %}
+                <label class="batch-register__scope">Plant scope
+                    <select aria-label="Treatment plant scope" data-register-plant-scope>
+                        <option value="all" {% if not plant_context.plant_id %}selected{% endif %}>All treatment plants</option>
+                        {% for plant in plant_context.available_plants %}<option value="{{ plant.id }}" {% if plant_context.plant_id == plant.id %}selected{% endif %}>{{ plant.name }}</option>{% endfor %}
+                    </select>
+                </label>
+                {% else %}<span>·</span> {{ plant_context.plant_name }}{% endif %}
+            </div>
+            <div class="batch-register__tools">
+                {% if can_receive_batch %}<a class="batch-register__receive" href="{% url 'ca:batch-create' %}" data-open-modal="receive-batch-modal"><i class="fa-solid fa-plus" aria-hidden="true"></i> Receive batch</a>{% endif %}
+                <details class="batch-columns">
+                    <summary><i class="fa-solid fa-table-columns" aria-hidden="true"></i> Columns</summary>
+                    <div class="batch-columns__menu">
+                        {% for key,column in register_columns.items %}
+                        <label><input type="checkbox" value="{{ key }}" data-column-toggle {% if key in register_selected_columns %}checked{% endif %}><span>{{ column.0 }}</span></label>
+                        {% endfor %}
+                    </div>
+                </details>
+                {% if can_export_batches %}
+                <details class="batch-export">
+                    <summary><i class="fa-solid fa-arrow-up-from-bracket" aria-hidden="true"></i> Export</summary>
+                    <div class="batch-export__menu">
+                        <a href="#" data-register-export="csv">CSV · filtered rows</a>
+                        <a href="#" data-register-export="xlsx">Excel workbook</a>
+                        <a href="#" data-register-export="pdf">PDF report</a>
+                        <a href="#" data-register-export="docx">Word document</a>
+                    </div>
+                </details>
+                {% endif %}
+                <span class="batch-live"><i aria-hidden="true"></i> LIVE</span>
+            </div>
+        </div>
+
+        <div class="batch-table-scroll" role="region" aria-label="Chemical batch register" tabindex="0">
+            <table class="batch-table" data-batch-register-table>
+                <thead><tr>
+                    {% for key,column in register_columns.items %}{% if key in register_selected_columns %}<th data-column="{{ key }}" scope="col">{{ column.0 }}</th>{% endif %}{% endfor %}
+                    <th data-column="actions" scope="col" class="batch-actions-head">Actions</th>
+                </tr></thead>
+                <tbody>
+                    {% for batch in register_batches %}
+                    <tr data-batch-id="{{ batch.pk }}" {% if request.GET.highlight == batch.pk|stringformat:'s' %}class="is-highlighted"{% endif %}>
+                        {% for key,column in register_columns.items %}{% if key in register_selected_columns %}
+                        <td data-column="{{ key }}">
+                            {% if key == 'sample' %}<a class="batch-id" href="{{ batch.detail_url }}">{{ batch.sample_id }}</a>
+                            {% elif key == 'batch' %}<span class="batch-mono">{{ batch.batch_number }}</span>
+                            {% elif key == 'chemical' %}<span class="batch-primary-value">{{ batch.chemical.name }}</span><small class="batch-sub-value">{{ batch.chemical.code|default:'Chemical' }}</small>
+                            {% elif key == 'supplier' %}{{ batch.supplier.name|default:'—' }}
+                            {% elif key == 'plant' %}{{ batch.treatment_plant.name|default:'—' }}
+                            {% elif key == 'location' %}{{ batch.location.name|default:'—' }}
+                            {% elif key == 'received' %}{{ batch.received_date|date:'Y-m-d'|default:'—' }}
+                            {% elif key == 'age' %}<span class="batch-age {% if batch.days_in_store > 90 %}is-aged{% elif batch.days_in_store > 30 %}is-warm{% endif %}">{{ batch.days_in_store|default:'—' }}{% if batch.days_in_store != None %} d{% endif %}</span>
+                            {% elif key == 'quantity' %}{{ batch.quantity_received|floatformat:2 }} {{ batch.unit }}
+                            {% elif key == 'available' %}<strong>{{ batch.register_available_quantity|floatformat:2 }}</strong> {{ batch.unit }}
+                            {% elif key == 'status' %}<span class="batch-state batch-state--{{ batch.status|lower }}"><i></i>{{ batch.get_status_display }}</span>
+                            {% elif key == 'stage' %}<span class="batch-stage batch-stage--{{ batch.analysis_stage_key }}">{{ batch.analysis_stage_label }}</span>
+                            {% elif key == 'analysts' %}<span class="batch-wrap-cell">{{ batch.assigned_analysts_label }}</span>
+                            {% elif key == 'checklist' %}{{ batch.checklist_state }}
+                            {% elif key == 'deadline' %}{{ batch.analysis_deadline|date:'Y-m-d H:i'|default:'—' }}
+                            {% elif key == 'sla' %}<span class="batch-sla batch-sla--{{ batch.sla_state_key }}">{{ batch.sla_state }}</span>
+                            {% elif key == 'test_count' %}<span class="batch-test-count">{{ batch.test_count }}</span>
+                            {% elif key == 'result' %}<span class="batch-result batch-result--{{ batch.latest_result|lower }}">{{ batch.latest_result }}</span>
+                            {% elif key == 'result_date' %}{{ batch.latest_tested_at|date:'Y-m-d H:i'|default:'—' }}
+                            {% elif key == 'coa' %}<span class="batch-signal {% if batch.coa_generated %}is-good{% else %}is-pending{% endif %}">{{ batch.coa_state }}</span>
+                            {% elif key == 'hold' %}<span class="batch-signal {% if batch.has_open_hold %}is-alert{% else %}is-good{% endif %}">{{ batch.hold_state }}</span>
+                            {% elif key == 'received_by' %}{{ batch.received_by.get_full_name|default:batch.received_by.username|default:'—' }}
+                            {% elif key == 'updated' %}<span title="{{ batch.updated_at|date:'Y-m-d H:i:s' }}">{{ batch.updated_at|timesince }} ago</span>
+                            {% endif %}
+                        </td>
+                        {% endif %}{% endfor %}
+                        <td data-column="actions" class="batch-row-actions">
+                            {% if batch.workflow_action_url %}<a class="batch-row-actions__primary" href="{{ batch.workflow_action_url }}"><i class="fa-solid fa-play" aria-hidden="true"></i>{{ batch.workflow_action_label }}</a>{% endif %}
+                            <a class="batch-icon-action" href="{{ batch.detail_url }}" title="Open batch" aria-label="Open {{ batch.sample_id }}"><i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+                            {% if batch.edit_url %}<a class="batch-icon-action" href="{{ batch.edit_url }}" title="Edit batch" aria-label="Edit {{ batch.sample_id }}"><i class="fa-solid fa-pen" aria-hidden="true"></i></a>{% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td class="batch-empty" colspan="{{ register_selected_columns|length|add:1 }}"><span><i class="fa-solid fa-box-open" aria-hidden="true"></i></span><strong>No batches match this register view</strong><small>Change the search or filter set, or receive a new batch.</small></td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if register_page %}
+        <footer class="batch-pagination">
+            <span>Showing <strong>{{ register_page.start_index|default:0 }}–{{ register_page.end_index|default:0 }}</strong> of <strong>{{ register_total }}</strong></span>
+            <nav aria-label="Batch register pages">
+                {% if register_page.has_previous %}<a href="?{{ register_query_without_page }}&page={{ register_page.previous_page_number }}" aria-label="Previous page"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></a>{% else %}<span class="is-disabled"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></span>{% endif %}
+                {% for number in register_page_numbers %}{% if number == '…' %}<span class="is-ellipsis" aria-hidden="true">…</span>{% elif number == register_page.number %}<span class="is-current" aria-current="page">{{ number }}</span>{% else %}<a href="?{{ register_query_without_page }}&page={{ number }}">{{ number }}</a>{% endif %}{% endfor %}
+                {% if register_page.has_next %}<a href="?{{ register_query_without_page }}&page={{ register_page.next_page_number }}" aria-label="Next page"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a>{% else %}<span class="is-disabled"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span>{% endif %}
+            </nav>
+        </footer>
+        {% endif %}
+    </section>
+    {% else %}
+    <section class="batch-console batch-no-access"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i><h1>Batch register unavailable</h1><p>Your account does not have permission to view chemical batches in this treatment-plant scope.</p></section>
+    {% endif %}
+</main>
+{% endblock %}
+
+{% block page_js %}
+<script>
+    document.body.dataset.plantId = "{{ selected_plant_id|default_if_none:''|escapejs }}";
+    document.addEventListener("DOMContentLoaded", function() {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get("open_receive_batch") === "1") {
+            if (typeof caOpenReceiveBatchModal === "function") caOpenReceiveBatchModal();
+            url.searchParams.delete("open_receive_batch");
+            window.history.replaceState({}, "", url);
+        }
+    });
+</script>
+<script src="{% static 'ca/js/batch-command-center.js' %}?v=20261022-v2" defer></script>
+<script src="{% static 'core/js/live_updates.js' %}?v=20261022-ca-batch-register" defer></script>
+{% endblock %}

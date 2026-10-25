@@ -18,6 +18,7 @@ from django.http import (
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.views import View
+from django.contrib.auth.mixins import LoginRequiredMixin
 
 from .autodiscovery import (
     discovery_export,
@@ -29,7 +30,7 @@ from .registry import registry
 logger = logging.getLogger(__name__)
 
 
-class DashboardView(View):
+class DashboardView(LoginRequiredMixin, View):
     template_name = "dashboards/dashboard.html"
 
     dashboard_key: str | None = None
@@ -67,10 +68,13 @@ class DashboardView(View):
     ):
         self.started_at = time.perf_counter()
 
-        registry.autodiscover()
-
         self.request = request
         self.user = request.user
+
+        if not self.user.is_authenticated:
+            return self.handle_no_permission()
+
+        registry.autodiscover()
 
         self.dashboard = self.get_dashboard()
 
@@ -161,6 +165,7 @@ class DashboardView(View):
             )
 
             if item:
+                self._check_dashboard_access(item)
                 return item.obj
 
             raise Http404(
@@ -189,12 +194,36 @@ class DashboardView(View):
                 )
                 == slug
             ):
+                self._check_dashboard_access(item)
                 return dashboard
 
         raise Http404(
             f"Dashboard '{slug}' "
             f"does not exist."
         )
+
+    def _check_dashboard_access(self, item):
+        permissions = self._permissions_for(item)
+        if permissions and not (
+            self.user.is_superuser
+            or self.user.has_perms(list(permissions))
+        ):
+            # Hide dashboards the user cannot access, as Django admin does in its app list.
+            raise Http404
+
+    @staticmethod
+    def _permissions_for(item):
+        permissions = set()
+        for source in (
+            getattr(item, "permissions", ()),
+            getattr(item, "metadata", {}).get("permissions", ()),
+            getattr(getattr(item, "obj", None), "permissions", ()),
+        ):
+            if isinstance(source, str):
+                permissions.add(source)
+            elif source:
+                permissions.update(source)
+        return permissions
 
     ##################################################################
     # TEMPLATE
@@ -354,6 +383,13 @@ class DashboardView(View):
         ) as executor:
 
             for key in keys:
+                item = component_registry.get(key)
+                permissions = self._permissions_for(item) if item else set()
+                if permissions and not (
+                    self.user.is_superuser
+                    or self.user.has_perms(list(permissions))
+                ):
+                    continue
                 futures[
                     executor.submit(
                         self.resolve_component,

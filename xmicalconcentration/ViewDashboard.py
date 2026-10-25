@@ -1,130 +1,134 @@
+"""
+xmicalconcentration/ViewDashboard.py — Chemical Concentration Cockpit
+Tracks hydrometer readings, concentration calculations, and trend analytics.
+"""
+import json
 import logging
+from collections import defaultdict
+from datetime import timedelta
 
-from django.views import View
-from django.http import HttpResponse, Http404
+from django.core.serializers.json import DjangoJSONEncoder
+from django.db.models import Avg, Count, Max, Min, Sum
+from django.http import HttpResponse, JsonResponse
 from django.template.loader import render_to_string
-from django.core.exceptions import ImproperlyConfigured
+from django.utils import timezone
+from django.views import View
 
 from core.mixins import WanjalaMixin
 from core.registry import registry
+
+from .models import XmicalConcentration
 
 logger = logging.getLogger(__name__)
 
 
 class DashboardView(WanjalaMixin, View):
-    """
-    Registry-driven dashboard (NO TEMPLATE LOGIC, NO FUNCTION CALLS IN HTML)
-    """
-
     template_name = "xmicalconcentration/dashboard.html"
     app_label = "xmicalconcentration"
+
     def get(self, request):
         if (r := self.process_request(request)):
             return r
-
         self.check_idle_timeout()
 
+        wants_json = (
+            "application/json" in request.headers.get("Accept", "")
+            or request.GET.get("format") == "json"
+        )
         context = self.get_context(request)
+        if wants_json:
+            return JsonResponse(context.get("dashboard_json_payload", {}), safe=False)
+        return HttpResponse(render_to_string(self.template_name, context, request=request))
 
-        return HttpResponse(
-            render_to_string(self.template_name, context, request=request)
-        )
-
-    # =====================================================
-    # CONTEXT PIPELINE
-    # =====================================================
     def get_context(self, request):
-        entries = self.get_entries()
+        now = timezone.now()
+        today = now.date()
+        period_days = int(request.GET.get("days", 30))
+        start_date = today - timedelta(days=period_days)
 
-        return {
-            "app_groups": registry.sidebar(self.app_label),
-            "app": {
-                "name": self.app_label,
-                "label": "Dashboard",
-            },
-            "models": self.serialize_models(entries),
-            "stats": self.build_stats(entries),
-        }
+        qs = XmicalConcentration.objects.filter(measurement_date__date__gte=start_date)
+        qs_today = qs.filter(measurement_date__date=today)
 
-    # =====================================================
-    # REGISTRY ACCESS
-    # =====================================================
-    def get_entries(self):
-        entries = registry.for_app(self.app_label)
-
-        if entries is None:
-            raise ImproperlyConfigured(f"Registry returned None for '{self.app_label}'")
-
-        if not entries:
-            raise Http404(f"No models registered for app '{self.app_label}'")
-
-        return entries
-
-    # =====================================================
-    # SAFE URL BUILDER (SERVER SIDE ONLY)
-    # =====================================================
-    def build_url(self, model: str, action: str, pk: str | None = None):
-        """
-        NEVER expose registry.url() to templates.
-        """
-        return registry.url(
-            model=model,
-            action=action,
-            app_label=self.app_label,
-            pk=pk
+        agg = qs.aggregate(
+            avg_conc=Avg("concentration_mg_per_l"),
+            min_conc=Min("concentration_mg_per_l"),
+            max_conc=Max("concentration_mg_per_l"),
+            avg_reading=Avg("hydrometer_reading"),
         )
 
-    # =====================================================
-    # SERIALIZER (TEMPLATE SAFE CONTRACT)
-    # =====================================================
-    def serialize_models(self, entries):
-        out = []
+        kpis = [
+            {"label": "Measurements", "value": qs.count(), "icon": "fa-vial-circle-check", "color": "cyan"},
+            {"label": "Today", "value": qs_today.count(), "icon": "fa-calendar-day", "color": "emerald"},
+            {"label": "Avg Conc (mg/L)", "value": f"{float(agg['avg_conc'] or 0):.1f}", "icon": "fa-gauge-high", "color": "blue"},
+            {"label": "Min Conc", "value": f"{float(agg['min_conc'] or 0):.1f}", "icon": "fa-arrow-down", "color": "amber"},
+            {"label": "Max Conc", "value": f"{float(agg['max_conc'] or 0):.1f}", "icon": "fa-arrow-up", "color": "rose"},
+            {"label": "Avg Reading", "value": f"{float(agg['avg_reading'] or 0):.3f}", "icon": "fa-ruler-vertical", "color": "purple"},
+            {"label": "Chemicals", "value": qs.values("chemical_name").distinct().count(), "icon": "fa-flask", "color": "cyan"},
+            {"label": "Tanks", "value": qs.values("tank").distinct().count(), "icon": "fa-oil-can", "color": "slate"},
+        ]
 
-        for entry in entries:
-            meta = entry.meta
-            model = meta.get("model_name")
+        # Concentration trend
+        conc_trend = list(
+            qs.values("measurement_date__date")
+            .annotate(avg=Avg("concentration_mg_per_l"), count=Count("id"))
+            .order_by("measurement_date__date")
+        )
 
-            if not model:
-                continue
+        # By chemical
+        by_chemical = list(
+            qs.values("chemical_name")
+            .annotate(avg=Avg("concentration_mg_per_l"), count=Count("id"))
+            .order_by("-count")[:10]
+        )
 
-            app = meta.get("app_label")
+        # By tank
+        by_tank = list(
+            qs.values("tank__name")
+            .annotate(avg=Avg("concentration_mg_per_l"), count=Count("id"))
+            .order_by("-count")[:10]
+        )
 
-            out.append({
-                "key": meta.get("key"),
-                "model_name": model,
-                "app_label": app,
-
-                # safe display
-                "label": meta.get("label_plural") or meta.get("label") or model,
-
-                # IMPORTANT: precomputed URLs only
-                "urls": {
-                    "list": self.build_url(model, "list"),
-                    "create": self.build_url(model, "create"),
-                    "export": self.build_url(model, "export"),
-                },
-
-                "capabilities": {
-                    "create": bool(meta.get("has_create")),
-                    "export": bool(meta.get("has_export")),
-                    "inline": bool(meta.get("has_inline")),
-                },
-
-                "custom_actions": list(entry.custom_actions.keys()),
-                "tags": list(entry.tags),
-                "icon": meta.get("icon", "cube"),
+        # Recent measurements
+        recent = []
+        for m in qs.select_related("tank", "measured_by")[:15]:
+            recent.append({
+                "chemical": m.chemical_name,
+                "concentration": float(m.concentration_mg_per_l),
+                "reading": float(m.hydrometer_reading),
+                "tank": str(m.tank) if m.tank else "—",
+                "by": str(m.measured_by) if m.measured_by else "—",
+                "date": m.measurement_date.strftime("%Y-%m-%d %H:%M"),
             })
 
-        return out
+        charts_payload = {
+            "conc_trend": {
+                "labels": [str(d["measurement_date__date"]) for d in conc_trend],
+                "data": [float(d["avg"] or 0) for d in conc_trend],
+                "counts": [d["count"] for d in conc_trend],
+            },
+            "by_chemical": {
+                "labels": [d["chemical_name"] for d in by_chemical],
+                "data": [float(d["avg"] or 0) for d in by_chemical],
+            },
+            "by_tank": {
+                "labels": [d["tank__name"] or "—" for d in by_tank],
+                "data": [float(d["avg"] or 0) for d in by_tank],
+            },
+        }
 
-    # =====================================================
-    # STATS ENGINE
-    # =====================================================
-    def build_stats(self, entries):
+        try:
+            entries = registry.for_app(self.app_label) or []
+        except Exception:
+            entries = []
+
         return {
-            "total_models": len(entries),
-            "with_create": sum(bool(e.meta.get("has_create")) for e in entries),
-            "with_export": sum(bool(e.meta.get("has_export")) for e in entries),
-            "with_inline": sum(bool(e.meta.get("has_inline")) for e in entries),
-            "tags_count": sum(len(e.tags) for e in entries),
+            "dashboard_title": "Chemical Concentration",
+            "dashboard_subtitle": f"Hydrometer Analytics · {period_days}d",
+            "dashboard_icon": "vial-circle-check",
+            "app_groups": registry.sidebar(self.app_label) if entries else [],
+            "kpis": kpis,
+            "recent": recent,
+            "charts_json": json.dumps(charts_payload, cls=DjangoJSONEncoder, default=str),
+            "dashboard_json_payload": charts_payload,
+            "period_days": period_days,
         }

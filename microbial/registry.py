@@ -249,6 +249,7 @@ safe_register(
     ordering=["analysis"],
     queryset_factory=microbial_result_qs,
     select_related=["analysis", "parameter"],
+    inline_edit_fields=["value", "entry_status"],
 )
 
 safe_register(

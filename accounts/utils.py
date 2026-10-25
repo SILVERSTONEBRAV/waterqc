@@ -99,12 +99,30 @@ def get_user_landing_url(user):
 
     # -------------------------
     # GROUP MAPPING
+    # DB-managed map takes precedence over settings map.
     # -------------------------
-    group_map = getattr(
+    # 1. Try DB-managed GroupDashboardRedirect table
+    db_map = {}
+    try:
+        from core.models import GroupDashboardRedirect
+        db_map = GroupDashboardRedirect.get_redirect_map()
+    except Exception:
+        pass
+
+    # 2. Settings-level fallback map
+    settings_map = getattr(
         settings,
         "LOGIN_GROUP_REDIRECT_MAP",
         {},
     ) or {}
+
+    # Merge: DB entries shadow matching settings entries
+    merged_map = {
+        str(k).strip().upper(): v
+        for k, v in settings_map.items()
+        if v
+    }
+    merged_map.update(db_map)  # DB wins on collision
 
     groups = get_user_groups(user)
 
@@ -128,7 +146,7 @@ def get_user_landing_url(user):
 
     for group in groups:
 
-        target = group_map.get(group)
+        target = merged_map.get(group)
 
         if not target:
             continue

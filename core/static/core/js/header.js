@@ -22,13 +22,10 @@ class HeaderController {
         ========================================================= */
         this.activeDropdown = null;
         this.outsideHandlerActive = false;
-        this.isAnimating = false;
-
-        this.themes = [
-            "daylight", "dawn", "ocean", "emerald",
-            "celestial", "aurora", "inferno", "gold", "oled"
-        ];
-
+        /* Use the shared palette registry; standalone behavior remains a safe fallback. */
+        this.themes = window.ThemeEngine && typeof window.ThemeEngine.list === "function"
+            ? window.ThemeEngine.list()
+            : ["auto", "day", "dawn", "ocean", "emerald", "autumn", "winter", "dusk", "night", "aurora", "emerald-dark", "high-contrast"];
         this.currentThemeIndex = 0;
 
         /* =========================================================
@@ -88,8 +85,47 @@ class HeaderController {
     ========================================================= */
     bindDropdowns() {
 
-        this.bindDropdown(this.userMenuBtn, this.userDropdown);
+        this.bindUserMenuDialog();
         this.bindDropdown(this.notificationBtn, this.notificationDropdown);
+    }
+
+    bindUserMenuDialog() {
+        if (!this.userMenuBtn || !this.userDropdown || typeof this.userDropdown.showModal !== "function") return;
+
+        this.userDropdown.addEventListener("close", () => {
+            this.userMenuBtn.setAttribute("aria-expanded", "false");
+        });
+        this.userDropdown.addEventListener("click", (event) => {
+            if (event.target === this.userDropdown || event.target.closest("[data-close-user-menu]")) {
+                this.closeUserMenu();
+            }
+        });
+        this.userMenuBtn.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (this.userDropdown.open) {
+                this.closeUserMenu();
+            } else {
+                this.openUserMenu();
+            }
+        });
+    }
+
+    openUserMenu() {
+        if (!this.userDropdown || this.userDropdown.open) return;
+        this.closeAllDropdowns();
+        this.userDropdown.showModal();
+        this.userMenuBtn.setAttribute("aria-expanded", "true");
+        const firstAction = this.userDropdown.querySelector("[data-close-user-menu], [role='menuitem']");
+        if (firstAction) firstAction.focus({ preventScroll: true });
+    }
+
+    closeUserMenu(restoreFocus = true) {
+        if (this.userDropdown && this.userDropdown.open) this.userDropdown.close();
+        if (this.userMenuBtn) {
+            this.userMenuBtn.setAttribute("aria-expanded", "false");
+            if (restoreFocus) this.userMenuBtn.focus({ preventScroll: true });
+        }
     }
 
     bindDropdown(button, dropdown) {
@@ -99,6 +135,9 @@ class HeaderController {
         // enforce class consistency
         dropdown.classList.add("dropdown-menu");
         dropdown.classList.remove("show");
+        dropdown.hidden = true;
+        dropdown.setAttribute("aria-hidden", "true");
+        button.setAttribute("aria-expanded", "false");
 
         button.addEventListener("click", (e) => {
             e.preventDefault();
@@ -110,13 +149,15 @@ class HeaderController {
 
     toggleDropdown(button, dropdown) {
 
-        const isOpen = dropdown.classList.contains("show");
+        const isOpen = dropdown.classList.contains("show") && !dropdown.hidden;
 
         this.closeAllDropdowns();
 
         if (isOpen) return;
 
         dropdown.classList.add("show");
+        dropdown.hidden = false;
+        dropdown.setAttribute("aria-hidden", "false");
         button.setAttribute("aria-expanded", "true");
 
         this.activeDropdown = dropdown;
@@ -129,8 +170,14 @@ class HeaderController {
 
     closeAllDropdowns() {
 
+        this.closeUserMenu(false);
+
         document.querySelectorAll(".dropdown-menu.show")
             .forEach(el => el.classList.remove("show"));
+        if (this.notificationDropdown) {
+            this.notificationDropdown.hidden = true;
+            this.notificationDropdown.setAttribute("aria-hidden", "true");
+        }
 
         document.querySelectorAll("[aria-expanded='true']")
             .forEach(btn => btn.setAttribute("aria-expanded", "false"));
@@ -209,63 +256,45 @@ class HeaderController {
        THEME ENGINE (SAFE + FIXED)
     ========================================================= */
     initializeTheme() {
-
-        const stored = localStorage.getItem("theme");
-
-        if (stored && this.themes.includes(stored)) {
-            this.currentThemeIndex = this.themes.indexOf(stored);
-            this.applyTheme(stored, false);
-        } else {
-            this.applyTheme(this.themes[0], false);
+        /* Defer to the shared ThemeEngine so every app uses the same palette. */
+        if (window.ThemeEngine && typeof window.ThemeEngine.get === "function") {
+            const current = window.ThemeEngine.get();
+            const mode = typeof window.ThemeEngine.getMode === "function" ? window.ThemeEngine.getMode() : "manual";
+            this.currentThemeIndex = Math.max(0, this.themes.indexOf(mode === "auto" ? "auto" : current));
+            this.updateToggleIcon(current, mode);
+            return;
         }
     }
 
     bindThemeToggle() {
-
+        /* ThemeEngine owns the click handler; header only syncs icon + flash */
         if (!this.themeToggle) return;
-
-        this.themeToggle.addEventListener("click", () => {
-
-            const rect = this.themeToggle.getBoundingClientRect();
-
-            const x = (rect.left + rect.width / 2) / window.innerWidth;
-            const y = (rect.top + rect.height / 2) / window.innerHeight;
-
-            this.nextTheme(x, y);
+        window.addEventListener("themeChanged", (e) => {
+            const theme = (e.detail && e.detail.theme) || "day";
+            const mode = (e.detail && e.detail.mode) || "manual";
+            this.currentThemeIndex = Math.max(0, this.themes.indexOf(mode === "auto" ? "auto" : theme));
+            this.updateToggleIcon(theme, mode);
         });
     }
 
     nextTheme(x = 0.5, y = 0.5) {
-
-        this.currentThemeIndex =
-            (this.currentThemeIndex + 1) % this.themes.length;
-
-        const theme = this.themes[this.currentThemeIndex];
-
-        this.applyTheme(theme, true, x, y);
+        if (window.ThemeEngine && typeof window.ThemeEngine.cycle === "function") {
+            const flash = this.createFlash();
+            this.triggerPortalEffect(flash, x, y);
+            window.ThemeEngine.cycle();
+            return;
+        }
     }
 
     applyTheme(theme, animate = true, x = 0.5, y = 0.5) {
-
-        if (this.isAnimating) return;
-        this.isAnimating = true;
-
-        const flash = this.createFlash();
-
-        if (animate) this.triggerPortalEffect(flash, x, y);
-
-        requestAnimationFrame(() => {
-
-            document.documentElement.setAttribute("data-theme", theme);
-
-            localStorage.setItem("theme", theme);
-
-            this.updateToggleIcon(theme);
-
-            setTimeout(() => {
-                this.isAnimating = false;
-            }, animate ? 500 : 0);
-        });
+        if (window.ThemeEngine && typeof window.ThemeEngine.set === "function") {
+            if (animate) {
+                const flash = this.createFlash();
+                this.triggerPortalEffect(flash, x, y);
+            }
+            window.ThemeEngine.set(theme);
+            return;
+        }
     }
 
     /* =========================================================
@@ -299,7 +328,7 @@ class HeaderController {
     /* =========================================================
        ICON UPDATE
     ========================================================= */
-    updateToggleIcon(theme) {
+    updateToggleIcon(theme, mode = "manual") {
 
         if (!this.themeToggle) return;
 
@@ -308,18 +337,30 @@ class HeaderController {
         if (!icon) return;
 
         const ICON_MAP = {
+            "auto": "fas fa-adjust",
+            "day": "fas fa-sun",
             "daylight": "fas fa-sun",
             "dawn": "fas fa-sun",
+            "light": "fas fa-sun",
+            "default": "fas fa-sun",
             "ocean": "fas fa-water",
             "emerald": "fas fa-leaf",
-            "celestial": "fas fa-star",
-            "aurora": "fas fa-wand-magic-sparkles",
-            "inferno": "fas fa-fire",
-            "gold": "fas fa-gem",
-            "oled": "fas fa-moon"
+            "autumn": "fas fa-leaf",
+            "winter": "fas fa-snowflake",
+            "emerald-dark": "fas fa-leaf",
+            "night": "fas fa-moon",
+            "dark": "fas fa-moon",
+            "celestial": "fas fa-moon",
+            "aurora": "fas fa-moon",
+            "inferno": "fas fa-moon",
+            "gold": "fas fa-moon",
+            "dusk": "fas fa-moon",
+            "oled": "fas fa-moon",
+            "amoled": "fas fa-moon",
+            "high-contrast": "fas fa-adjust"
         };
 
-        icon.className = ICON_MAP[theme] || "fas fa-sun";
+        icon.className = mode === "auto" ? ICON_MAP.auto : (ICON_MAP[theme] || "fas fa-sun");
     }
 
     /* =========================================================
@@ -329,6 +370,11 @@ class HeaderController {
 
         document.addEventListener("keydown", this.boundKeyHandler);
         window.addEventListener("storage", this.boundStorageHandler);
+        // BFCache can restore a page with a menu visibly open. Keep drawers
+        // transient across page navigation and PWA resume.
+        window.addEventListener("pageshow", () => this.closeAllDropdowns());
+        window.addEventListener("popstate", () => this.closeAllDropdowns());
+        document.addEventListener("htmx:beforeRequest", () => this.closeAllDropdowns());
 
         document.addEventListener("mousemove", (e) => {
             document.documentElement.style.setProperty("--x", `${e.clientX}px`);
@@ -338,16 +384,11 @@ class HeaderController {
 
     handleStorage(event) {
 
-        if (
-            event.key === "theme" &&
-            event.newValue &&
-            this.themes.includes(event.newValue)
-        ) {
-            this.currentThemeIndex =
-                this.themes.indexOf(event.newValue);
-
-            this.applyTheme(event.newValue, false);
-        }
+        if (!window.ThemeEngine || typeof window.ThemeEngine.get !== "function") return;
+        const theme = window.ThemeEngine.get();
+        const mode = typeof window.ThemeEngine.getMode === "function" ? window.ThemeEngine.getMode() : "manual";
+        this.currentThemeIndex = Math.max(0, this.themes.indexOf(mode === "auto" ? "auto" : theme));
+        this.updateToggleIcon(theme, mode);
     }
 
     /* =========================================================

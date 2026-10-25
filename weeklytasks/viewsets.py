@@ -1,6 +1,7 @@
 # weekly_duty_allocations/viewsets.py
 
 from rest_framework import viewsets, permissions
+from core.permissions import ViewModelPermissions
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.utils import timezone
@@ -33,7 +34,7 @@ User = get_user_model()
 class StandardWeeklyTaskViewSet(viewsets.ModelViewSet):
     queryset = StandardWeeklyTask.objects.all()
     serializer_class = StandardWeeklyTaskSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
 
 # ============
@@ -42,7 +43,7 @@ class StandardWeeklyTaskViewSet(viewsets.ModelViewSet):
 class MonthlyDutyScheduleViewSet(viewsets.ModelViewSet):
     queryset = MonthlyDutySchedule.objects.prefetch_related('weeks__weekly_tasks__daily_assignments').all()
     serializer_class = MonthlyDutyScheduleSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
@@ -66,7 +67,7 @@ class MonthlyDutyScheduleViewSet(viewsets.ModelViewSet):
 class DutyWeekViewSet(viewsets.ModelViewSet):
     queryset = DutyWeek.objects.select_related('schedule').prefetch_related('weekly_tasks__daily_assignments').all()
     serializer_class = DutyWeekSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
 
 # ============
@@ -75,7 +76,7 @@ class DutyWeekViewSet(viewsets.ModelViewSet):
 class WeeklyDutyTaskViewSet(viewsets.ModelViewSet):
     queryset = WeeklyDutyTask.objects.select_related('week', 'task_template', 'treatment_plant').prefetch_related('daily_assignments__user').all()
     serializer_class = WeeklyDutyTaskSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
     @action(detail=True, methods=['get'])
     def assigned_users(self, request, pk=None):
@@ -102,7 +103,7 @@ class WeeklyDutyTaskViewSet(viewsets.ModelViewSet):
 class DailyTaskAssignmentViewSet(viewsets.ModelViewSet):
     queryset = DailyTaskAssignment.objects.select_related('task', 'user', 'shift').all()
     serializer_class = DailyTaskAssignmentSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
@@ -122,7 +123,7 @@ class DailyTaskAssignmentViewSet(viewsets.ModelViewSet):
 class DutyConfirmationViewSet(viewsets.ModelViewSet):
     queryset = DutyConfirmation.objects.select_related('assignment', 'confirmed_by').all()
     serializer_class = DutyConfirmationSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ViewModelPermissions]
 
     def perform_create(self, serializer):
         serializer.save(confirmed_by=self.request.user, confirmed_at=timezone.now())

@@ -1,20 +1,28 @@
 from __future__ import annotations
 
+import datetime
+from decimal import Decimal
 import json
+from types import SimpleNamespace
 from typing import Any
+from uuid import UUID
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib import messages
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied, ValidationError
 from django.db import transaction
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils import timezone
+from django.views import View as DjangoView
 
 from viewflow import this
 from viewflow.workflow import flow, lock
 from viewflow.workflow.flow import views
 from viewflow.workflow.flow.views import mixins
 
+from .signals import _generate_coa_assets
 from .forms import (
     AnalystAssignmentForm,
     AnalystAutoAssignmentForm,
@@ -31,6 +39,7 @@ from .forms import (
     CompleteChecklistForm,
     ConfirmActionForm,
     DynamicChemicalAnalysisInputForm,
+    FormulaDrivenChemicalAnalysisForm,
     QAReviewForm,
     ReceiveChemicalBatchForm,
     RejectAnalysisForm,
@@ -46,8 +55,10 @@ from .models import (
     ChemicalAnalysisRequest,
     ChemicalBatch,
     ChemicalCoA,
+    ChemicalCorrectiveAction,
     ChecklistForWaterTreatmentChemicalAnalysis,
 )
+from .workflow_ui import next_stage_key
 
 
 User = get_user_model()
@@ -56,6 +67,7 @@ User = get_user_model()
 class ChemicalWorkflowTaskView(
     LoginRequiredMixin,
     mixins.TaskSuccessUrlMixin,
+    DjangoView,
 ):
     form_class = None
     template_name = "ca/workflow/task.html"
@@ -95,10 +107,25 @@ class ChemicalWorkflowTaskView(
         data = self.get_activation().task.data
         return data if isinstance(data, dict) else {}
 
+    @staticmethod
+    def _json_safe(val: Any) -> Any:
+        if isinstance(val, Decimal):
+            return str(val)
+        if isinstance(val, (datetime.date, datetime.datetime)):
+            return val.isoformat()
+        if isinstance(val, UUID):
+            return str(val)
+        if isinstance(val, dict):
+            return {k: ChemicalWorkflowTaskView._json_safe(v) for k, v in val.items()}
+        if isinstance(val, (list, tuple)):
+            return [ChemicalWorkflowTaskView._json_safe(v) for v in val]
+        return val
+
     def set_task_data(self, **values: Any):
         task = self.get_activation().task
         data = task.data if isinstance(task.data, dict) else {}
-        data.update(values)
+        for k, v in values.items():
+            data[k] = self._json_safe(v)
         task.data = data
         task.save(update_fields=["data"])
         return data
@@ -114,16 +141,61 @@ class ChemicalWorkflowTaskView(
     def get_form(self):
         if self.form_class is None:
             raise ImproperlyConfigured("form_class must be defined.")
-        return self.form_class(
-            user=self.request.user,
-            process=self.get_process(),
-            batch=self.get_batch(),
-            **self.get_form_kwargs(),
-        )
+        kwargs = {
+            "user": self.request.user,
+            "process": self.get_process(),
+            "batch": self.get_batch(),
+        }
+        kwargs.update(self.get_form_kwargs())
+        while True:
+            try:
+                return self.form_class(**kwargs)
+            except TypeError as exc:
+                msg = str(exc)
+                popped = False
+                for key in ("batch", "process", "user"):
+                    if key in kwargs and f"unexpected keyword argument '{key}'" in msg:
+                        kwargs.pop(key, None)
+                        popped = True
+                        break
+                if not popped:
+                    raise
 
     def get_context_data(self, *, form, **extra):
         activation = self.get_activation()
         process = self.get_process()
+        flow_task = activation.flow_task
+        task_name = getattr(flow_task, "name", "")
+        task_prompts = {
+            "receive": "Check the delivery note, batch identity, quantity, packaging and physical condition before confirming receipt.",
+            "create_request": "Confirm the analysis request details. The request will be linked to this batch and routed for analyst assignment.",
+            "assign_analysts": "Select every permitted analyst who will carry out this chemical analysis. At least one analyst is required.",
+            "checklist": "Complete each receiving checklist item using the physical batch and its supporting documents.",
+            "complete_checklist": "Review the saved checklist and confirm it is complete before laboratory work begins.",
+            "start_analysis": "Only an assigned analyst can start. The system will present each required specification in turn.",
+            "record_result": "Enter the measured analytical values. The system calculates the result, checks the specification and records the appropriate pass/fail remark.",
+            "record_input": "Enter the method-specific measurements and instrument inputs requested for this result.",
+            "complete_analysis": "Finalize analysis after every required parameter has a result and all method inputs are recorded.",
+            "qa_review": "Review all results against the approved specifications, then choose approval, retest, CAPA or rejection.",
+            "retest": "Choose the parameter to repeat and explain why the original result needs retesting.",
+            "retest_result": "Record the requested retest result and any method inputs, then submit it for another QA review.",
+            "complete_retest": "Confirm the retest is complete. The process will return to QA for a fresh decision.",
+            "capa": "Record corrective and preventive actions and evidence before resubmitting the process to QA.",
+            "approval": "Confirm the final batch decision. Failed or unfinished results cannot be approved.",
+            "generate_coa": "Generate the Certificate of Analysis from the approved batch and its finalized results.",
+            "approve_coa": "Verify the certificate details and approve its release before recording batch disposition.",
+            "batch_disposition": "Choose whether the approved batch will be utilized or returned to the supplier.",
+            "utilize": "Record the quantity put into use and any utilization remarks to close this batch disposition.",
+            "return_to_supplier": "Record the quantity returned and the reason. A rejected batch must be returned to close the process.",
+            "reject": "Record the rejection reason. The workflow will then require a supplier return.",
+        }
+        annotation = getattr(flow_task, "annotation", None)
+        task_title = (
+            getattr(annotation, "title", None)
+            or getattr(flow_task, "title", None)
+            or task_name.replace("_", " ").capitalize()
+            or "Chemical batch workflow"
+        )
         context = {
             "form": form,
             "process": process,
@@ -134,7 +206,64 @@ class ChemicalWorkflowTaskView(
             "flow_task": activation.flow_task,
             "workflow_status": process.status,
             "task_data": self.get_task_data(),
+            "task_title": task_title,
+            "task_prompt": task_prompts.get(
+                task_name,
+                "Complete the requested workflow step. The next eligible task will open automatically after submission.",
+            ),
         }
+        if task_name == "checklist":
+            context["form_groups"] = [
+                {
+                    "title": "Product identity",
+                    "description": "Confirm the chemical and supplier label details.",
+                    "icon": "fa-flask",
+                    "fields": [
+                        form[name]
+                        for name in (
+                            "chemical",
+                            "chemical_name_on_label",
+                            "manufacturer_name_indicated",
+                            "grade",
+                            "country_of_origin",
+                        )
+                    ],
+                },
+                {
+                    "title": "Batch condition",
+                    "description": "Verify quantity, dates, storage and handling information.",
+                    "icon": "fa-box-open",
+                    "fields": [
+                        form[name]
+                        for name in (
+                            "min_mass_indicated",
+                            "net_weight",
+                            "manufacture_date",
+                            "expiry_date",
+                            "storage_conditions",
+                            "handling_instructions",
+                        )
+                    ],
+                },
+                {
+                    "title": "Safety verification",
+                    "description": "Record the hazards shown on the package and required response guidance.",
+                    "icon": "fa-shield-halved",
+                    "fields": [
+                        form[name]
+                        for name in (
+                            "is_oxidizing",
+                            "is_corrosive",
+                            "may_cause_fire",
+                            "contact_with_acids_liberates_toxic_gas",
+                            "causes_burns",
+                            "keep_out_of_reach_of_children",
+                            "contact_with_eyes_action",
+                            "fire_action_requires_respiratory_equipment",
+                        )
+                    ],
+                },
+            ]
         context.update(extra)
         return context
 
@@ -146,19 +275,62 @@ class ChemicalWorkflowTaskView(
         if not form.is_valid():
             return render(request, self.template_name, self.get_context_data(form=form))
 
-        with transaction.atomic():
-            process = (
-                ChemicalAnalysisProcess.objects
-                .select_for_update()
-                .select_related("batch", "analysis_request")
-                .get(pk=self.get_process().pk)
-            )
-            self.assert_process_scope(process)
-            result = self.save_form(form)
-            self.after_save(form=form, result=result)
-            self.get_activation().execute()
+        try:
+            with transaction.atomic():
+                process = (
+                    ChemicalAnalysisProcess.objects
+                    .select_for_update(of=("self",))
+                    .select_related("batch", "analysis_request")
+                    .get(pk=self.get_process().pk)
+                )
+                self.assert_process_scope(process)
+                status_before = process.status
+                task_name = getattr(self.get_activation().flow_task, "name", "workflow_task")
+                result = self.save_form(form)
+                self.after_save(form=form, result=result)
+                self.get_activation().execute()
+                from .services.workflow_enhancements import record_workflow_event
+
+                process.refresh_from_db()
+                record_workflow_event(
+                    process,
+                    event_type="task_completed",
+                    action=task_name,
+                    actor=request.user,
+                    from_status=status_before,
+                    to_status=process.status,
+                    details={
+                        "task_name": task_name,
+                        "result_type": result.__class__.__name__ if result is not None else "",
+                        "result_id": getattr(result, "pk", None),
+                    },
+                )
+        except ValidationError as exc:
+            # Business-rule failures are expected workflow feedback. Return
+            # them on the task form instead of crashing the task page with a
+            # 500; atomic() has already rolled back any partial changes.
+            #
+            # Model-level ValidationErrors may carry field-keyed messages
+            # (e.g. "analyst") that don't exist on the current form class.
+            # Django's add_error() would raise ValueError in that case, so
+            # we flatten any unknown-field messages into non-field errors.
+            if hasattr(exc, "message_dict"):
+                for field, msgs in exc.message_dict.items():
+                    target = None if field not in form.fields else field
+                    for msg in msgs:
+                        form.add_error(target, msg)
+            else:
+                form.add_error(None, exc)
+            return render(request, self.template_name, self.get_context_data(form=form))
 
         return redirect(self.get_success_url())
+
+    def get_success_url(self):
+        """Return to the batch workbench focused on the next active stage."""
+        process = self.get_process()
+        process.refresh_from_db()
+        stage = next_stage_key(process)
+        return f"{reverse('ca:batch-detail', kwargs={'pk': process.batch_id})}?stage={stage}"
 
     def assert_process_scope(self, process):
         user = self.request.user
@@ -206,17 +378,9 @@ class StartChemicalBatchView(LoginRequiredMixin, views.CreateArtifactView):
             raise PermissionDenied("This view must be executed by Viewflow.")
 
         with transaction.atomic():
-            response = super().form_valid(form)
-            process = (
-                ChemicalAnalysisProcess.objects
-                .select_for_update()
-                .get(pk=activation.process.pk)
-            )
-            batch = (
-                ChemicalBatch.objects
-                .select_for_update()
-                .get(pk=self.object.pk)
-            )
+            self.object = form.save()
+            process = activation.process
+            batch = self.object
 
             if batch.treatment_plant_id is None:
                 raise ValidationError("A treatment plant is required for a chemical batch.")
@@ -231,8 +395,263 @@ class StartChemicalBatchView(LoginRequiredMixin, views.CreateArtifactView):
             process.batch = batch
             process.initiated_by = self.request.user
             process.status = ChemicalAnalysisProcess.WorkflowStatus.CREATED
-            process.save(update_fields=["batch", "initiated_by", "status", "updated_at"])
-            return response
+            process.artifact = batch
+            activation.execute()
+
+        return redirect(self.get_success_url())
+
+    def get_success_url(self):
+        if getattr(self, "object", None) is not None:
+            return f"{reverse('ca:batch-detail', kwargs={'pk': self.object.pk})}?stage=receipt"
+        return super().get_success_url()
+
+
+@transaction.atomic
+def start_chemical_analysis_for_batch(batch, analysis_request, user, http_request):
+    """Create the Viewflow process for a batch received through the CA dashboard.
+
+    Dashboard intake already confirms receipt and records its custody and
+    inventory events. Mark that receive step complete in Viewflow as part of
+    process bootstrap, then route through analyst assignment before checklist.
+    """
+    existing = (
+        ChemicalAnalysisProcess.objects.select_for_update()
+        .filter(batch=batch)
+        .first()
+    )
+    if existing is not None:
+        if analysis_request is not None and existing.analysis_request_id != analysis_request.pk:
+            if existing.analysis_request_id:
+                raise ValidationError(
+                    "The chemical batch workflow is linked to a different analysis request."
+                )
+            existing.analysis_request = analysis_request
+            existing.save(update_fields=["analysis_request"])
+            _complete_unclaimed_view_task(existing, "create_request")
+        return existing
+    if batch.status != ChemicalBatch.Status.RECEIVED:
+        raise ValidationError("The chemical batch must be received before its workflow can start.")
+
+    start_task = ChemicalAnalysisFlow.start
+    activation = start_task.activation_class.create(start_task, None, None)
+    # Viewflow's start activation reads ``request.user`` even for a process
+    # created by Celery or the inbox reconciler. Give background starts an
+    # anonymous request context so the initial workflow task remains unowned.
+    activation.start(
+        http_request if http_request is not None else SimpleNamespace(user=None)
+    )
+    activation.process.batch = batch
+    activation.process.analysis_request = analysis_request
+    activation.process.initiated_by = user
+    activation.process.status = ChemicalAnalysisProcess.WorkflowStatus.CREATED
+    activation.process.artifact = batch
+    activation.execute()
+    process = activation.process
+    process.transition_to(
+        ChemicalAnalysisProcess.WorkflowStatus.RECEIVED,
+        performed_by=user,
+    )
+
+    # Receipt is already persisted on the batch, so acknowledge this gate as
+    # a system action even when a background reconciler created the process.
+    _complete_unclaimed_view_task(process, "receive")
+
+    return process
+
+
+def _complete_unclaimed_view_task(process, node_name):
+    """Advance a Viewflow node already completed in the CA domain records."""
+    for task in process.task_set.select_for_update().all():
+        node = task.flow_task
+        if not node or node.name != node_name or task.status not in {"NEW", "ASSIGNED"}:
+            continue
+        # A claimed task belongs to its current owner. Only reconcile unclaimed
+        # tasks whose domain work has already been saved and verified.
+        if task.owner_id is not None:
+            return False
+        activation = node.activation_class(task)
+        if task.status == "NEW":
+            task.status = "ASSIGNED"
+            task.save(update_fields=["status"])
+        activation.start(None)
+        activation.execute()
+        return True
+    return False
+
+
+def _complete_persisted_receive_task(process):
+    """Close a receive node when the batch already records confirmed receipt.
+
+    Older processes can retain an assigned receive node after the batch was
+    marked received through the dashboard. The persisted batch state is the
+    source of truth for that gate, so it is safe to reconcile the stale node
+    even when Viewflow had assigned it to a user.
+    """
+    for task in process.task_set.select_for_update().all():
+        node = task.flow_task
+        if (
+            not node
+            or node.name != "receive"
+            or task.status not in {"NEW", "ASSIGNED", "STARTED"}
+        ):
+            continue
+
+        activation = node.activation_class(task)
+        if task.status in {"NEW", "ASSIGNED"}:
+            if task.status == "NEW":
+                task.status = "ASSIGNED"
+                task.save(update_fields=["status"])
+            activation.start(None)
+        activation.execute()
+        return True
+    return False
+
+
+@transaction.atomic
+def advance_analyst_assignment_workflow(
+    process,
+    *,
+    assigned_by=None,
+    http_request=None,
+    automatic=False,
+):
+    """Sync a direct assignment with an already waiting Viewflow assignment task.
+
+    Analyst assignment can also be submitted from the request page or an
+    assignment notification. When the flow is waiting at its assignment node,
+    complete that node here so the assigned analyst immediately receives the
+    receiving checklist. Automatic assignment can complete an unclaimed
+    assignment node as a system action. Intake and checklist nodes are never
+    skipped by this helper.
+    """
+    if process is None or not process.pk:
+        return False
+
+    process = (
+        ChemicalAnalysisProcess.objects.select_for_update(of=("self",))
+        .select_related("analysis_request", "batch")
+        .get(pk=process.pk)
+    )
+    if not process.analysis_request_id or not process.has_assigned_analysts:
+        return False
+
+    # Reconcile processes created before dashboard intake began auto-closing
+    # its Viewflow receive node. Receipt itself is already persisted on the
+    # batch; this only aligns the process and its task graph with that fact.
+    if (
+        process.batch_id
+        and process.batch.status == ChemicalBatch.Status.RECEIVED
+    ):
+        if process.status == ChemicalAnalysisProcess.WorkflowStatus.CREATED:
+            process.transition_to(
+                ChemicalAnalysisProcess.WorkflowStatus.RECEIVED,
+                auto=True,
+            )
+        completed_receive_task = _complete_persisted_receive_task(process)
+        if not completed_receive_task and any(
+            task.flow_task
+            and task.flow_task.name == "receive"
+            and task.status in {"NEW", "ASSIGNED", "STARTED"}
+            for task in process.task_set.all()
+        ):
+            return False
+
+    has_completed_checklist = process.analysis_request.checklists.filter(completed=True).exists()
+    if (
+        has_completed_checklist
+        and process.status in {
+            ChemicalAnalysisProcess.WorkflowStatus.RECEIVED,
+            ChemicalAnalysisProcess.WorkflowStatus.REQUESTED,
+            ChemicalAnalysisProcess.WorkflowStatus.ASSIGNED,
+        }
+        and not (process.batch_id and process.batch.has_active_holds)
+    ):
+        checklist = (
+            process.analysis_request.checklists.filter(completed=True)
+            .order_by("-completed_at", "-pk")
+            .first()
+        )
+        process.transition_to(
+            ChemicalAnalysisProcess.WorkflowStatus.CHECKLIST,
+            performed_by=None,
+            extra_fields={
+                "checklist_completed_at": process.checklist_completed_at
+                or (checklist.completed_at if checklist else None)
+                or timezone.now(),
+            },
+            auto=True,
+        )
+        _complete_unclaimed_view_task(process, "checklist")
+        _complete_unclaimed_view_task(process, "complete_checklist")
+
+    if process.status in {
+        ChemicalAnalysisProcess.WorkflowStatus.RECEIVED,
+        ChemicalAnalysisProcess.WorkflowStatus.REQUESTED,
+        ChemicalAnalysisProcess.WorkflowStatus.CHECKLIST,
+    }:
+        process.transition_to(
+            ChemicalAnalysisProcess.WorkflowStatus.ASSIGNED,
+            performed_by=assigned_by,
+            auto=automatic,
+        )
+
+    active_statuses = {"NEW", "ASSIGNED"}
+    pending_assignment = None
+    for task in process.task_set.select_for_update().all():
+        node = task.flow_task
+        if (
+            node
+            and node.name == "assign_analysts"
+            and task.status in active_statuses
+        ):
+            pending_assignment = (task, node)
+            break
+
+    if pending_assignment is None:
+        return False
+
+    task, node = pending_assignment
+    activation = node.activation_class(task)
+    if automatic:
+        if task.status == "NEW":
+            # The system has already validated and recorded the eligible
+            # analyst assignment. Move only this unclaimed assignment node
+            # into Viewflow's executable state before completing it.
+            task.status = "ASSIGNED"
+            task.save(update_fields=["status"])
+        elif task.owner_id is not None:
+            # Respect a manager who has already claimed the assignment task.
+            return False
+        activation.start(None)
+        assignment_mode = "AUTOMATIC"
+    else:
+        if assigned_by is None:
+            return False
+        if task.status == "NEW":
+            if not node.can_assign(assigned_by, task):
+                return False
+            activation.assign(assigned_by)
+        elif task.status == "ASSIGNED" and task.owner_id != assigned_by.pk:
+            # Do not take over a task another staff member has already claimed.
+            return False
+        if not node.can_execute(assigned_by, task):
+            return False
+        activation.start(http_request)
+        assignment_mode = "MANUAL"
+
+    data = task.data if isinstance(task.data, dict) else {}
+    data.update(
+        assignment_mode=assignment_mode,
+        assigned_analyst_ids=list(
+            process.assigned_analysts.values_list("pk", flat=True)
+        ),
+        assigned_at=timezone.now().isoformat(),
+        assignment_completed_by_id=assigned_by.pk if assigned_by else None,
+    )
+    task.data = data
+    task.save(update_fields=["data"])
+    activation.execute()
+    return True
 
 
 class ReceiveChemicalBatchTaskView(ChemicalWorkflowTaskView):
@@ -257,8 +676,10 @@ class ReceiveChemicalBatchTaskView(ChemicalWorkflowTaskView):
             batch.remarks = remarks
             batch.save(update_fields=["remarks", "updated_at"])
         process = self.get_process()
-        process.status = ChemicalAnalysisProcess.WorkflowStatus.RECEIVED
-        process.save(update_fields=["status", "updated_at"])
+        process.transition_to(
+            ChemicalAnalysisProcess.WorkflowStatus.RECEIVED,
+            performed_by=self.request.user,
+        )
         return batch
 
 
@@ -289,9 +710,11 @@ class CreateChemicalAnalysisRequestTaskView(ChemicalWorkflowTaskView):
         form.instance.requested_by = self.request.user
         request = form.save()
 
-        process.analysis_request = request
-        process.status = ChemicalAnalysisProcess.WorkflowStatus.REQUESTED
-        process.save(update_fields=["analysis_request", "status", "updated_at"])
+        process.transition_to(
+            ChemicalAnalysisProcess.WorkflowStatus.REQUESTED,
+            performed_by=self.request.user,
+            extra_fields={"analysis_request": request},
+        )
 
         request.auto_assign_analysts_if_due()
         return request
@@ -312,9 +735,20 @@ class AnalystAssignmentTaskView(ChemicalWorkflowTaskView):
         analysts = form.cleaned_data.get("analysts")
         if request.status != ChemicalAnalysisRequest.Status.PENDING:
             raise ValidationError("Manual analyst assignment is only available while the analysis request is pending.")
-        request.assign_analysts(analysts, assigned_by=self.request.user, manual=True)
+        if request.has_assigned_analysts:
+            # A due automatic assignment can happen while this Viewflow task
+            # is waiting. Confirm it without converting it into a manual one.
+            assignment_mode = "AUTOMATIC" if request.auto_assigned_at else "MANUAL"
+        else:
+            request.assign_analysts(analysts, assigned_by=self.request.user, manual=True)
+            assignment_mode = "MANUAL"
+        if process.status != ChemicalAnalysisProcess.WorkflowStatus.ASSIGNED:
+            process.transition_to(
+                ChemicalAnalysisProcess.WorkflowStatus.ASSIGNED,
+                performed_by=self.request.user,
+            )
         self.set_task_data(
-            assignment_mode="MANUAL",
+            assignment_mode=assignment_mode,
             assigned_analyst_ids=list(request.assigned_analysts.values_list("pk", flat=True)),
             assigned_at=timezone.now().isoformat(),
         )
@@ -332,11 +766,17 @@ class AnalystAutoAssignmentTaskView(ChemicalWorkflowTaskView):
     def save_form(self, form):
         self.require_permission("ca.create_analysis_request")
         request = self.get_analysis_request()
-        if not request.assignment_overdue:
+        if not request.assignment_overdue and not request.has_assigned_analysts:
             raise ValidationError("Automatic analyst assignment is not yet due.")
         assigned = request.auto_assign_analysts_if_due()
         if not assigned.exists():
             raise ValidationError("No scheduled chemical-analysis analyst is currently available for automatic assignment.")
+        process = self.get_process()
+        if process.status != ChemicalAnalysisProcess.WorkflowStatus.ASSIGNED:
+            process.transition_to(
+                ChemicalAnalysisProcess.WorkflowStatus.ASSIGNED,
+                performed_by=self.request.user,
+            )
         self.set_task_data(
             assignment_mode="AUTOMATIC",
             assigned_analyst_ids=list(assigned.values_list("pk", flat=True)),
@@ -350,21 +790,110 @@ class ChecklistTaskView(ChemicalWorkflowTaskView):
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
+        analysis_request = self.get_analysis_request()
         kwargs.update(
-            request=self.get_analysis_request(),
+            request=analysis_request,
             user=self.request.user,
             process=self.get_process(),
             batch=self.get_batch(),
+            instance=(
+                analysis_request.checklists
+                .filter(completed=False)
+                .order_by("-pk")
+                .first()
+            ),
         )
         return kwargs
 
     def save_form(self, form):
         self.require_permission("ca.complete_receiving_checklist")
+        self.require_active_user()
+        process = self.get_process()
+        if not self.request.user.is_superuser and not process.is_authorized_analyst(self.request.user):
+            raise PermissionDenied("Only an analyst assigned to this batch may complete its receiving checklist.")
+        if self.get_batch().has_active_holds:
+            raise ValidationError("Resolve the open intake holds before completing the receiving checklist.")
+        if self.get_analysis_request().checklists.filter(completed=True).exists():
+            raise ValidationError("The receiving checklist is already complete.")
         self.require_status(
+            ChemicalAnalysisProcess.WorkflowStatus.RECEIVED,
             ChemicalAnalysisProcess.WorkflowStatus.REQUESTED,
+            ChemicalAnalysisProcess.WorkflowStatus.ASSIGNED,
             ChemicalAnalysisProcess.WorkflowStatus.CHECKLIST,
         )
-        return form.save()
+        action = self.request.POST.get("checklist_action", "save_close")
+        if action not in {"start_analysis", "save_close"}:
+            raise ValidationError("Choose whether to start analysis now or save the completed checklist for later.")
+
+        checklist = form.save()
+        checklist.mark_completed(performed_by=self.request.user)
+        if process.status != ChemicalAnalysisProcess.WorkflowStatus.CHECKLIST:
+            process.transition_to(
+                ChemicalAnalysisProcess.WorkflowStatus.CHECKLIST,
+                performed_by=self.request.user,
+                extra_fields={
+                    "checklist_completed_at": checklist.completed_at or timezone.now(),
+                },
+            )
+        elif not process.checklist_completed_at:
+            process.checklist_completed_at = checklist.completed_at or timezone.now()
+            process.save(update_fields=["checklist_completed_at", "updated_at"])
+
+        from .services.workflow_enhancements import record_custody_event
+
+        batch = self.get_batch()
+        record_custody_event(
+            batch,
+            event_type="SAMPLED",
+            actor=self.request.user,
+            from_location=str(batch.location),
+            to_location="Chemical analysis sample",
+            remarks=f"Receiving checklist {checklist.pk} completed.",
+        )
+        self.set_task_data(
+            checklist_id=checklist.pk,
+            completed_by_id=self.request.user.pk,
+            completed_at=checklist.completed_at.isoformat() if checklist.completed_at else timezone.now().isoformat(),
+            next_action=action,
+        )
+
+        if action == "start_analysis":
+            # Keep checklist completion durable even when a later analysis
+            # prerequisite (for example, the batch storage location) prevents
+            # analysis from starting in this same submission. Roll back only
+            # the attempted analysis transition, then let Viewflow route the
+            # analyst to its explicit Start Analysis task.
+            try:
+                with transaction.atomic():
+                    process.move_to_analysis(performed_by=self.request.user)
+                    process.mark_analysis_started(performed_by=self.request.user)
+                    process.refresh_from_db()
+                    record_custody_event(
+                        batch,
+                        event_type="ANALYSIS_STARTED",
+                        actor=self.request.user,
+                        from_location=str(batch.location),
+                        to_location="Chemical analysis laboratory",
+                        remarks="Assigned analyst completed the receiving checklist and started analysis.",
+                    )
+            except ValidationError as exc:
+                process.refresh_from_db()
+                messages.warning(
+                    self.request,
+                    f"The receiving checklist was completed and saved. Analysis could not start yet: {exc}",
+                )
+                self.set_task_data(
+                    next_action="start_analysis_pending",
+                    analysis_start_blocked_reason=str(exc),
+                )
+
+        return checklist
+
+    def get_success_url(self):
+        process = self.get_process()
+        process.refresh_from_db()
+        stage = next_stage_key(process)
+        return f"{reverse('ca:batch-detail', kwargs={'pk': process.batch_id})}?stage={stage}"
 
 
 class CompleteChecklistTaskView(ChemicalWorkflowTaskView):
@@ -376,13 +905,14 @@ class CompleteChecklistTaskView(ChemicalWorkflowTaskView):
             user=self.request.user,
             process=self.get_process(),
             batch=self.get_batch(),
-            request=self.get_analysis_request(),
         )
         return kwargs
 
     def save_form(self, form):
         self.require_permission("ca.complete_receiving_checklist")
         process = self.get_process()
+        if self.get_batch().has_active_holds:
+            raise ValidationError("Resolve the open intake holds before completing the receiving checklist.")
         request = self.get_analysis_request()
         checklist = (
             ChecklistForWaterTreatmentChemicalAnalysis.objects
@@ -398,9 +928,23 @@ class CompleteChecklistTaskView(ChemicalWorkflowTaskView):
             checklist.completed_at = timezone.now()
             checklist.completed_by = self.request.user
             checklist.save(update_fields=["completed", "completed_at", "completed_by", "updated_at"])
-        process.checklist_completed_at = process.checklist_completed_at or checklist.completed_at or timezone.now()
-        process.status = ChemicalAnalysisProcess.WorkflowStatus.CHECKLIST
-        process.save(update_fields=["checklist_completed_at", "status", "updated_at"])
+        process.transition_to(
+            ChemicalAnalysisProcess.WorkflowStatus.CHECKLIST,
+            performed_by=self.request.user,
+            extra_fields={
+                "checklist_completed_at": process.checklist_completed_at or checklist.completed_at or timezone.now(),
+            },
+        )
+        from .services.workflow_enhancements import record_custody_event
+
+        record_custody_event(
+            self.get_batch(),
+            event_type="SAMPLED",
+            actor=self.request.user,
+            from_location=str(self.get_batch().location),
+            to_location="Chemical analysis sample",
+            remarks=f"Receiving checklist {checklist.pk} completed.",
+        )
         return process
 
 
@@ -415,9 +959,14 @@ class StartAnalysisTaskView(ChemicalWorkflowTaskView):
     def save_form(self, form):
         self.require_permission("ca.start_chemical_analysis")
         process = self.get_process()
-        if process.status != ChemicalAnalysisProcess.WorkflowStatus.CHECKLIST:
+        if process.status not in {
+            ChemicalAnalysisProcess.WorkflowStatus.CHECKLIST,
+            ChemicalAnalysisProcess.WorkflowStatus.ASSIGNED,
+        }:
             raise ValidationError("Chemical analysis can only start after the receiving checklist is complete.")
         if not process.analysis_ready:
+            if self.get_batch().has_active_holds:
+                raise ValidationError("Resolve the intake hold before starting chemical analysis.")
             raise ValidationError("A completed receiving checklist is required before analysis.")
         request = self.get_analysis_request()
         if not request.has_assigned_analysts:
@@ -427,13 +976,55 @@ class StartAnalysisTaskView(ChemicalWorkflowTaskView):
             raise ValidationError("No analyst is assigned to this analysis. Manual assignment may be made before the 30-minute automatic assignment deadline; after the deadline the system assigns the scheduled analyst automatically.")
         if not process.is_authorized_analyst(self.request.user):
             raise PermissionDenied("You are not assigned to perform this chemical analysis.")
+        process.move_to_analysis(performed_by=self.request.user)
         process.mark_analysis_started(performed_by=self.request.user)
         process.refresh_from_db()
+        from .services.workflow_enhancements import record_custody_event
+
+        record_custody_event(
+            self.get_batch(),
+            event_type="ANALYSIS_STARTED",
+            actor=self.request.user,
+            from_location=str(self.get_batch().location),
+            to_location="Chemical analysis laboratory",
+            remarks="Assigned analyst started the analysis.",
+        )
         return process
 
 
 class RecordTestResultTaskView(ChemicalWorkflowTaskView):
     form_class = BatchTestResultForm
+
+    @staticmethod
+    def _validate_formula_specification(parameter):
+        method = getattr(parameter, "method", None)
+        if method is None:
+            raise ValidationError(
+                "No analytical method is assigned to this specification. "
+                "Configure its method before recording results."
+            )
+        if not (method.formula or "").strip():
+            raise ValidationError(
+                "This analysis method has input measurements but no calculation formula. "
+                "Configure the approved formula before recording results."
+            )
+        if not method.get_input_fields():
+            raise ValidationError(
+                "This analysis method has a formula but no input measurements. "
+                "Configure its input fields before continuing."
+            )
+        if parameter.min_limit is None and parameter.max_limit is None:
+            raise ValidationError(
+                "Automated pass/fail needs a minimum or maximum specification limit. "
+                "Configure the parameter limits before continuing."
+            )
+        method_unit = (method.unit or "").strip().casefold()
+        specification_unit = (parameter.unit or "").strip().casefold()
+        if method_unit and specification_unit and method_unit != specification_unit:
+            raise ValidationError(
+                "The method output unit does not match the chemical specification unit. "
+                "Correct the method or specification setup before recording results."
+            )
 
     def get_retest_parameter_id(self):
         value = self.get_task_data().get("retest_parameter_id")
@@ -484,16 +1075,14 @@ class RecordTestResultTaskView(ChemicalWorkflowTaskView):
         if parameter is None:
             raise ValidationError("All required analytical parameters have been completed.")
         kwargs = self.get_form_kwargs()
-        existing = (
-            BatchTestResult.objects
-            .filter(batch=self.get_batch(), parameter=parameter)
-            .first()
+        kwargs.pop("user", None)
+        kwargs.update(
+            parameter=parameter,
+            batch=self.get_batch(),
+            process=self.get_process(),
+            analyst=self.request.user,
         )
-        form = self.form_class(instance=existing, **kwargs)
-        if "parameter" in form.fields:
-            form.fields["parameter"].queryset = form.fields["parameter"].queryset.filter(pk=parameter.pk)
-            form.initial["parameter"] = parameter.pk
-        return form
+        return FormulaDrivenChemicalAnalysisForm(**kwargs)
 
     def save_form(self, form):
         self.require_permission("ca.record_chemical_result")
@@ -502,6 +1091,10 @@ class RecordTestResultTaskView(ChemicalWorkflowTaskView):
         if not process.is_authorized_analyst(self.request.user):
             raise PermissionDenied("You are not assigned to perform this chemical analysis.")
         expected = self.get_next_parameter()
+        if isinstance(form, FormulaDrivenChemicalAnalysisForm):
+            if expected is None or form.parameter.pk != expected.pk:
+                raise ValidationError("The calculated result does not match the required parameter.")
+            return self._save_formula_result(form, process, expected)
         parameter = form.cleaned_data.get("parameter")
         if parameter is None or expected is None or parameter.pk != expected.pk:
             raise ValidationError("The selected parameter is not currently required.")
@@ -515,6 +1108,117 @@ class RecordTestResultTaskView(ChemicalWorkflowTaskView):
             result_recorded_at=timezone.now().isoformat(),
         )
         return result
+
+    def _save_formula_result(self, form, process, parameter):
+        self._validate_formula_specification(parameter)
+        if process.status not in {
+            ChemicalAnalysisProcess.WorkflowStatus.ANALYSIS,
+            ChemicalAnalysisProcess.WorkflowStatus.RETEST,
+        }:
+            raise ValidationError("Formula results can only be recorded during analysis or an assigned retest.")
+
+        is_retest = process.status == ChemicalAnalysisProcess.WorkflowStatus.RETEST
+        if is_retest and process.retest_parameter_id != parameter.pk:
+            raise ValidationError("The result does not match the parameter selected for retest.")
+
+        existing = (
+            BatchTestResult.objects
+            .filter(batch=process.batch, parameter=parameter)
+            .first()
+        )
+        if existing and existing.status and not is_retest:
+            raise ValidationError("This parameter already has a finalized result. Use the QA retest workflow to change it.")
+
+        inputs = form.as_input_dictionary()
+        result = existing or BatchTestResult(batch=process.batch, parameter=parameter)
+        result.batch = process.batch
+        result.parameter = parameter
+        result.analyst = self.request.user
+        result.instrument = form.cleaned_data.get("instrument")
+        result.tested_at = timezone.now()
+        result.textual_result = ""
+        if is_retest:
+            reason = (process.retest_reason or "").strip()
+            if not reason:
+                raise ValidationError("A documented retest reason is required before recording this result.")
+            result.revision_reason = reason[:500]
+        elif existing:
+            result.revision_reason = "Finalized pending formula result from method measurements."
+
+        calculated_input = ChemicalAnalysisInput(test_result=result, inputs=inputs)
+        value = calculated_input.calculate()
+        minimum = parameter.min_limit
+        maximum = parameter.max_limit
+        passed = (minimum is None or value >= minimum) and (maximum is None or value <= maximum)
+        result.value = value
+        result.status = BatchTestResult.Status.PASS if passed else BatchTestResult.Status.FAIL
+        result.save()
+
+        previous_input = ChemicalAnalysisInput.objects.filter(test_result=result).first()
+        if previous_input is not None:
+            calculated_input.pk = previous_input.pk
+            calculated_input.method_snapshot = previous_input.method_snapshot
+            calculated_input._allow_retest_update = is_retest
+        calculated_input.test_result = result
+        calculated_input.save()
+        if calculated_input.calculated_value != result.value:
+            raise ValidationError(
+                "The saved method inputs do not reproduce the recorded analytical value."
+            )
+        transaction.on_commit(
+            lambda: messages.success(
+                self.request,
+                f"{parameter.parameter_name}: {result.value:g} {parameter.unit} — "
+                f"{result.get_status_display()}. {result.auto_remark}",
+            )
+        )
+
+        self.set_task_data(
+            result_id=result.pk,
+            parameter_id=result.parameter_id,
+            result_status=result.status,
+            result_recorded_at=timezone.now().isoformat(),
+            input_record_id=calculated_input.pk,
+            input_recorded=True,
+            calculated_value=str(result.value) if result.value is not None else None,
+        )
+        return result
+
+    def get_context_data(self, *, form, **extra):
+        context = super().get_context_data(form=form, **extra)
+        parameter = self.get_next_parameter()
+        if parameter is not None and isinstance(form, FormulaDrivenChemicalAnalysisForm):
+            method = parameter.method
+            setup_error = ""
+            try:
+                self._validate_formula_specification(parameter)
+            except ValidationError as exc:
+                setup_error = " ".join(str(message) for message in exc.messages)
+            except Exception:
+                setup_error = "The configured analysis method inputs are invalid. Ask an administrator to review the formula setup."
+            field_setup_errors = getattr(form, "setup_errors", [])
+            if field_setup_errors:
+                setup_error = " ".join(field_setup_errors)
+            context.update(
+                formula_result=True,
+                task_title=f"Enter measurements · {parameter.parameter_name}",
+                task_prompt=(
+                    "Enter the measured volumes and reagent values below. The system will calculate "
+                    "the analytical result, compare it with the approved limits, set pass or fail, "
+                    "and apply the configured remark."
+                ),
+                result_parameter=parameter,
+                result_method=method,
+                result_unit=parameter.unit,
+                result_minimum=parameter.min_limit,
+                result_maximum=parameter.max_limit,
+                result_has_minimum=parameter.min_limit is not None,
+                result_has_maximum=parameter.max_limit is not None,
+                formula_setup_error=setup_error,
+            )
+        else:
+            context["formula_result"] = False
+        return context
 
 
 class RecordDynamicAnalysisInputTaskView(ChemicalWorkflowTaskView):
@@ -583,6 +1287,15 @@ class RecordDynamicAnalysisInputTaskView(ChemicalWorkflowTaskView):
 class CompleteAnalysisTaskView(ChemicalWorkflowTaskView):
     form_class = CompleteAnalysisForm
 
+    def get(self, request, *args, **kwargs):
+        process = self.get_process()
+        process.refresh_from_db()
+        stage = next_stage_key(process)
+        return redirect(f"{reverse('ca:batch-detail', kwargs={'pk': process.batch_id})}?stage={stage}")
+
+    def post(self, request, *args, **kwargs):
+        return self.get(request, *args, **kwargs)
+
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs.update(user=self.request.user, process=self.get_process(), batch=self.get_batch())
@@ -600,6 +1313,16 @@ class CompleteAnalysisTaskView(ChemicalWorkflowTaskView):
         process.refresh_from_db()
         if process.status != ChemicalAnalysisProcess.WorkflowStatus.QA:
             raise ValidationError("Chemical analysis did not advance to QA.")
+        from .services.workflow_enhancements import record_custody_event
+
+        record_custody_event(
+            self.get_batch(),
+            event_type="ANALYSIS_COMPLETED",
+            actor=self.request.user,
+            from_location="Chemical analysis laboratory",
+            to_location=str(self.get_batch().location),
+            remarks="Analysis completed and sent for QA review.",
+        )
         return process
 
 
@@ -625,9 +1348,11 @@ class RetestTaskView(ChemicalWorkflowTaskView):
             raise ValidationError("A retest parameter and reason are required.")
         if not process.required_specifications().filter(pk=parameter.pk).exists():
             raise ValidationError("The selected parameter is not required for this analysis.")
-        process.rework_count += 1
-        process.status = ChemicalAnalysisProcess.WorkflowStatus.RETEST
-        process.save(update_fields=["rework_count", "status", "updated_at"])
+        process.request_retest(
+            parameter=parameter,
+            reason=reason,
+            performed_by=self.request.user,
+        )
         self.set_task_data(
             retest_parameter_id=parameter.pk,
             retest_reason=reason,
@@ -657,6 +1382,8 @@ class CompleteRetestTaskView(ChemicalWorkflowTaskView):
             parameter_id = int(parameter_id)
         except (TypeError, ValueError) as exc:
             raise ValidationError("The retest parameter reference is invalid.") from exc
+        if process.retest_parameter_id != parameter_id:
+            raise ValidationError("The workflow retest parameter does not match the saved process record.")
         result = (
             BatchTestResult.objects
             .filter(batch=process.batch, parameter_id=parameter_id)
@@ -664,8 +1391,7 @@ class CompleteRetestTaskView(ChemicalWorkflowTaskView):
         )
         if result is None or not result.status:
             raise ValidationError("The required retest result has not been finalized.")
-        process.status = ChemicalAnalysisProcess.WorkflowStatus.QA
-        process.save(update_fields=["status", "updated_at"])
+        process.mark_retest_completed(performed_by=self.request.user, result=result)
         self.set_task_data(retest_completed=True, retest_result_id=result.pk, retest_completed_at=timezone.now().isoformat())
         return process
 
@@ -685,20 +1411,63 @@ class QAReviewTaskView(ChemicalWorkflowTaskView):
             raise ValidationError("The analysis must be in QA before review.")
         if process.has_pending_tests or not process.is_analysis_complete:
             raise ValidationError("All required analytical results must be finalized before QA review.")
+        if not self.request.user.is_superuser and process.assigned_analysts.filter(pk=self.request.user.pk).exists():
+            raise PermissionDenied("The analyst who performed this analysis cannot independently review it.")
         decision = str(form.cleaned_data.get("decision", "")).upper()
         remarks = (form.cleaned_data.get("remarks") or "").strip()
         if decision not in {"PASS", "REWORK", "CAPA", "REJECT"}:
             raise ValidationError("Invalid QA decision.")
         if decision == "PASS" and process.failed_tests.exists():
             raise ValidationError("A failed analysis cannot pass QA.")
+
+        open_capa = list(
+            ChemicalCorrectiveAction.objects.select_for_update()
+            .filter(process=process, status=ChemicalCorrectiveAction.Status.OPEN)
+        )
+        if not self.request.user.is_superuser and any(item.submitted_by_id == self.request.user.pk for item in open_capa):
+            raise PermissionDenied("The CAPA submitter cannot independently verify their own corrective action.")
+        if open_capa and decision in {"PASS", "REJECT"} and not remarks:
+            raise ValidationError("QA remarks are required to verify or reject the submitted corrective actions.")
+
         process.qa_officer = self.request.user
         process.qa_reviewed_at = timezone.now()
         process.save(update_fields=["qa_officer", "qa_reviewed_at", "updated_at"])
+
+        if decision in {"PASS", "REJECT"}:
+            for action in open_capa:
+                action.review(
+                    actor=self.request.user,
+                    accepted=(decision == "PASS"),
+                    notes=remarks,
+                )
+                from .models import ChemicalWorkflowAlert
+
+                ChemicalWorkflowAlert.objects.filter(
+                    alert_type="ca_capa_review",
+                    dedupe_key=f"capa-review:{action.pk}",
+                    acknowledged_at__isnull=True,
+                ).update(acknowledged_at=timezone.now(), acknowledged_by=self.request.user)
+
         self.set_task_data(
             decision=decision,
             remarks=remarks,
             reviewed_by_id=self.request.user.pk,
             reviewed_at=timezone.now().isoformat(),
+        )
+        from .services.workflow_enhancements import record_workflow_event
+
+        record_workflow_event(
+            process,
+            event_type="qa_review_recorded",
+            action=f"QA decision: {decision.lower()}",
+            actor=self.request.user,
+            from_status=process.status,
+            to_status=process.status,
+            details={
+                "decision": decision,
+                "remarks": remarks,
+                "reviewed_capa_ids": [item.pk for item in open_capa] if decision in {"PASS", "REJECT"} else [],
+            },
         )
         return process
 
@@ -716,12 +1485,49 @@ class CAPATaskView(ChemicalWorkflowTaskView):
         process = self.get_process()
         if process.status != ChemicalAnalysisProcess.WorkflowStatus.QA:
             raise ValidationError("CAPA can only be initiated during QA.")
+        decision_data = self.get_task_data()
+        action = ChemicalCorrectiveAction.submit(
+            process=process,
+            actor=self.request.user,
+            qa_observation=decision_data.get("remarks"),
+            corrective_action=form.cleaned_data.get("corrective_action"),
+            preventive_action=form.cleaned_data.get("preventive_action"),
+        )
+        from .services.workflow_notifications import create_workflow_alert
+
+        create_workflow_alert(
+            batch=process.batch,
+            request=process.analysis_request if process.analysis_request_id else None,
+            alert_type="ca_capa_review",
+            title="Corrective action awaits independent QA verification",
+            message=f"CAPA for batch {process.batch.sample_id} was submitted and requires an independent QA review.",
+            url="/ca/tasks/",
+            severity="high",
+            dedupe_key=f"capa-review:{action.pk}",
+            permissions=("ca.review_chemical_analysis",),
+            exclude_user_ids=[
+                *process.assigned_analysts.values_list("pk", flat=True),
+                self.request.user.pk,
+            ],
+        )
         self.set_task_data(
             capa_submitted=True,
             corrective_action=(form.cleaned_data.get("corrective_action") or "").strip(),
             preventive_action=(form.cleaned_data.get("preventive_action") or "").strip(),
+            corrective_action_id=action.pk,
             capa_submitted_by_id=self.request.user.pk,
             capa_submitted_at=timezone.now().isoformat(),
+        )
+        from .services.workflow_enhancements import record_workflow_event
+
+        record_workflow_event(
+            process,
+            event_type="capa_submitted",
+            action="corrective and preventive actions submitted",
+            actor=self.request.user,
+            from_status=process.status,
+            to_status=process.status,
+            details={"capa_id": action.pk, "qa_observation": action.qa_observation},
         )
         return process
 
@@ -741,6 +1547,8 @@ class ApprovalTaskView(ChemicalWorkflowTaskView):
             raise ValidationError("Chemical analysis approval is only available after QA review.")
         if process.has_pending_tests or process.failed_tests.exists() or not process.is_analysis_complete:
             raise ValidationError("The analysis must be complete with no failed results before approval.")
+        if not process.is_independent_approver(self.request.user):
+            raise PermissionDenied("Batch approval must be performed by someone independent of analysis and QA review.")
         if str(form.cleaned_data.get("decision", "APPROVE")).upper() != "APPROVE":
             raise ValidationError("Only APPROVE is valid at this stage.")
         process.mark_approved(approved_by=self.request.user)
@@ -768,6 +1576,11 @@ class GenerateChemicalCoATaskView(ChemicalWorkflowTaskView):
         if not (coa.pdf_file and coa.qr_code):
             coa.prepare_for_generation()
             coa.save(generate_assets=True, regenerate_watermark=True)
+            # Generate QR code and PDF synchronously within the transaction.
+            # The signal uses transaction.on_commit() which would fire AFTER this
+            # method checks for asset existence — causing a false "not generated"
+            # error. Calling directly here ensures assets exist before the check.
+            _generate_coa_assets(coa, force=False)
             coa.refresh_from_db()
         if not coa.pdf_file or not coa.qr_code:
             raise ValidationError("The CoA assets could not be generated completely.")
@@ -797,6 +1610,13 @@ class ApproveChemicalCoATaskView(ChemicalWorkflowTaskView):
         if not coa.pdf_file or not coa.qr_code:
             raise ValidationError("The Certificate of Analysis is incomplete.")
         if not coa.is_approved:
+            performing_ids = process.performing_analyst_ids
+            if (
+                self.request.user.pk in performing_ids
+                or process.qa_officer_id == self.request.user.pk
+                or process.approver_id == self.request.user.pk
+            ):
+                raise PermissionDenied("CoA approval must be independent of analysis, QA review, and batch approval.")
             coa.approve(approved_by=self.request.user)
             coa.refresh_from_db()
         if not coa.is_approved:
@@ -825,8 +1645,20 @@ class RejectAnalysisTaskView(ChemicalWorkflowTaskView):
         reason = (form.cleaned_data.get("reason") or form.cleaned_data.get("remarks") or "").strip()
         if not reason:
             raise ValidationError("A rejection reason is required.")
-        process.mark_rejected()
+        prior_status = process.status
+        process.mark_rejected(performed_by=self.request.user, reason=reason)
         self.set_task_data(decision="REJECT", rejection_reason=reason, rejected_by_id=self.request.user.pk, rejected_at=timezone.now().isoformat())
+        from .services.workflow_enhancements import record_workflow_event
+
+        record_workflow_event(
+            process,
+            event_type="batch_rejected",
+            action="chemical batch rejected",
+            actor=self.request.user,
+            from_status=prior_status,
+            to_status=ChemicalAnalysisProcess.WorkflowStatus.REJECTED,
+            details={"reason": reason},
+        )
         return process
 
 
@@ -871,12 +1703,39 @@ class UtilizeChemicalBatchTaskView(ChemicalWorkflowTaskView):
         coa = ChemicalCoA.objects.filter(batch=batch).first()
         if coa is None or not coa.is_approved:
             raise ValidationError("An approved Certificate of Analysis is required.")
-        result = form.save()
+        quantity = form.cleaned_data.get("quantity_used")
+        batch.quantity_utilized = quantity if quantity is not None else batch.quantity_received
+        batch.utilization_remarks = (form.cleaned_data.get("remarks") or "").strip()
+        batch.utilized_by = self.request.user
+        batch.utilized_at = timezone.now()
+        from .services.workflow_enhancements import record_custody_event, record_inventory_movement
+
+        quantity = batch.quantity_utilized
+        record_inventory_movement(
+            batch,
+            movement_type="UTILIZATION",
+            quantity=quantity,
+            actor=self.request.user,
+            idempotency_key=f"batch:{batch.pk}:utilization",
+            notes=batch.utilization_remarks,
+        )
         batch.transition_to(ChemicalBatch.Status.UTILIZED, performed_by=self.request.user)
-        process.mark_disposition_completed(ChemicalAnalysisProcess.WorkflowStatus.UTILIZED)
-        process.mark_completed()
+        batch.save(update_fields=[
+            "quantity_utilized", "utilization_remarks", "utilized_by",
+            "utilized_at", "updated_at",
+        ])
+        process.mark_disposition_completed(ChemicalAnalysisProcess.WorkflowStatus.UTILIZED, performed_by=self.request.user)
+        process.mark_completed(performed_by=self.request.user)
+        record_custody_event(
+            batch,
+            event_type="UTILIZED",
+            actor=self.request.user,
+            from_location=str(batch.location),
+            to_location="Treatment process",
+            remarks=batch.utilization_remarks,
+        )
         self.set_task_data(disposition="UTILIZED", completed_by_id=self.request.user.pk, completed_at=timezone.now().isoformat())
-        return result
+        return batch
 
 
 class ReturnChemicalBatchTaskView(ChemicalWorkflowTaskView):
@@ -893,16 +1752,39 @@ class ReturnChemicalBatchTaskView(ChemicalWorkflowTaskView):
         batch = self.get_batch()
         if batch.status not in {ChemicalBatch.Status.APPROVED, ChemicalBatch.Status.REJECTED}:
             raise ValidationError("The chemical batch cannot currently be returned.")
-        result = form.save()
-        if batch.status == ChemicalBatch.Status.APPROVED:
-            batch.transition_to(ChemicalBatch.Status.RETURNED, performed_by=self.request.user)
-        else:
-            batch.status = ChemicalBatch.Status.RETURNED
-            batch.save(update_fields=["status", "updated_at"])
-        process.mark_disposition_completed(ChemicalAnalysisProcess.WorkflowStatus.RETURNED)
-        process.mark_completed()
+        quantity = form.cleaned_data.get("quantity_returned")
+        batch.quantity_returned = quantity if quantity is not None else batch.quantity_received
+        batch.return_reason = (form.cleaned_data.get("reason") or "").strip()
+        batch.returned_by = self.request.user
+        batch.returned_at = timezone.now()
+        from .services.workflow_enhancements import record_custody_event, record_inventory_movement
+
+        quantity = batch.quantity_returned
+        record_inventory_movement(
+            batch,
+            movement_type="RETURN",
+            quantity=quantity,
+            actor=self.request.user,
+            idempotency_key=f"batch:{batch.pk}:return",
+            notes=batch.return_reason,
+        )
+        batch.transition_to(ChemicalBatch.Status.RETURNED, performed_by=self.request.user)
+        batch.save(update_fields=[
+            "quantity_returned", "return_reason", "returned_by",
+            "returned_at", "updated_at",
+        ])
+        process.mark_disposition_completed(ChemicalAnalysisProcess.WorkflowStatus.RETURNED, performed_by=self.request.user)
+        process.mark_completed(performed_by=self.request.user)
+        record_custody_event(
+            batch,
+            event_type="RETURNED",
+            actor=self.request.user,
+            from_location=str(batch.location),
+            to_location=str(batch.supplier),
+            remarks=batch.return_reason,
+        )
         self.set_task_data(disposition="RETURNED", completed_by_id=self.request.user.pk, completed_at=timezone.now().isoformat())
-        return result
+        return batch
 
 
 class ChemicalAnalysisFlow(flow.Flow):
@@ -910,49 +1792,74 @@ class ChemicalAnalysisFlow(flow.Flow):
     lock_impl = lock.select_for_update_lock
 
     start = (
-        flow.Start(StartChemicalBatchView)
+        flow.Start(StartChemicalBatchView.as_view())
         .Annotation(title="Register Chemical Batch")
         .Permission("ca.receive_chemical_batch")
         .Next(this.receive)
     )
 
     receive = (
-        flow.View(ReceiveChemicalBatchTaskView)
+        flow.View(ReceiveChemicalBatchTaskView.as_view())
         .Annotation(title="Confirm Chemical Receipt")
         .Permission("ca.receive_chemical_batch")
-        .Next(this.create_request)
+        .Next(this.request_check)
+    )
+
+    request_check = (
+        flow.If(lambda activation: ChemicalAnalysisFlow.has_analysis_request(activation))
+        .Then(this.assign_analysts)
+        .Else(this.create_request)
     )
 
     create_request = (
-        flow.View(CreateChemicalAnalysisRequestTaskView)
+        flow.View(CreateChemicalAnalysisRequestTaskView.as_view())
         .Annotation(title="Create Chemical Analysis Request")
+        .Permission("ca.create_analysis_request")
+        .Next(this.assign_analysts)
+    )
+
+    assign_analysts = (
+        flow.View(AnalystAssignmentTaskView.as_view())
+        .Annotation(title="Assign Chemical Analysis Analysts")
         .Permission("ca.create_analysis_request")
         .Next(this.checklist)
     )
 
     checklist = (
-        flow.View(ChecklistTaskView)
+        flow.View(ChecklistTaskView.as_view())
         .Annotation(title="Receiving Checklist")
         .Permission("ca.complete_receiving_checklist")
-        .Next(this.complete_checklist)
+        .Next(this.checklist_decision)
+    )
+
+    checklist_decision = (
+        flow.If(lambda activation: ChemicalAnalysisFlow.checklist_starts_analysis(activation))
+        .Then(this.record_result)
+        .Else(this.start_analysis)
     )
 
     complete_checklist = (
-        flow.View(CompleteChecklistTaskView)
+        flow.View(CompleteChecklistTaskView.as_view())
         .Annotation(title="Complete Receiving Checklist")
         .Permission("ca.complete_receiving_checklist")
-        .Next(this.start_analysis)
+        .Next(this.assignment_check)
+    )
+
+    assignment_check = (
+        flow.If(lambda activation: ChemicalAnalysisFlow.has_assigned_analysts(activation))
+        .Then(this.start_analysis)
+        .Else(this.assign_analysts)
     )
 
     start_analysis = (
-        flow.View(StartAnalysisTaskView)
+        flow.View(StartAnalysisTaskView.as_view())
         .Annotation(title="Start Chemical Analysis")
         .Permission("ca.start_chemical_analysis")
         .Next(this.record_result)
     )
 
     record_result = (
-        flow.View(RecordTestResultTaskView)
+        flow.View(RecordTestResultTaskView.as_view())
         .Annotation(title="Record Chemical Test Result")
         .Permission("ca.record_chemical_result")
         .Next(this.check_result_input, task_data=lambda activation: ChemicalAnalysisFlow.result_task_data(activation))
@@ -965,7 +1872,7 @@ class ChemicalAnalysisFlow(flow.Flow):
     )
 
     record_input = (
-        flow.View(RecordDynamicAnalysisInputTaskView)
+        flow.View(RecordDynamicAnalysisInputTaskView.as_view())
         .Annotation(title="Record Analytical Method Inputs")
         .Permission("ca.record_chemical_result")
         .Next(this.check_analysis_progress)
@@ -978,14 +1885,15 @@ class ChemicalAnalysisFlow(flow.Flow):
     )
 
     complete_analysis = (
-        flow.View(CompleteAnalysisTaskView)
+        flow.Function(
+            this._auto_complete_analysis
+        )
         .Annotation(title="Complete Chemical Analysis")
-        .Permission("ca.complete_chemical_analysis")
         .Next(this.qa_review)
     )
 
     qa_review = (
-        flow.View(QAReviewTaskView)
+        flow.View(QAReviewTaskView.as_view())
         .Annotation(title="QA Review")
         .Permission("ca.review_chemical_analysis")
         .Next(this.qa_decision, task_data=lambda activation: ChemicalAnalysisFlow.qa_task_data(activation))
@@ -993,27 +1901,34 @@ class ChemicalAnalysisFlow(flow.Flow):
 
     qa_decision = (
         flow.If(lambda activation: ChemicalAnalysisFlow.qa_is_retest(activation))
+        .Annotation(title="QA routing: retest")
         .Then(this.retest)
-        .Else(
-            flow.If(lambda activation: ChemicalAnalysisFlow.qa_is_capa(activation))
-            .Then(this.capa)
-            .Else(
-                flow.If(lambda activation: ChemicalAnalysisFlow.qa_is_rejected(activation))
-                .Then(this.reject)
-                .Else(this.approval)
-            )
-        )
+        .Else(this.qa_capa_decision)
+    )
+
+    qa_capa_decision = (
+        flow.If(lambda activation: ChemicalAnalysisFlow.qa_is_capa(activation))
+        .Annotation(title="QA routing: corrective action")
+        .Then(this.capa)
+        .Else(this.qa_reject_decision)
+    )
+
+    qa_reject_decision = (
+        flow.If(lambda activation: ChemicalAnalysisFlow.qa_is_rejected(activation))
+        .Annotation(title="QA routing: rejection")
+        .Then(this.reject)
+        .Else(this.approval)
     )
 
     retest = (
-        flow.View(RetestTaskView)
+        flow.View(RetestTaskView.as_view())
         .Annotation(title="Request Chemical Retest")
         .Permission("ca.perform_chemical_retest")
         .Next(this.retest_result)
     )
 
     retest_result = (
-        flow.View(RecordTestResultTaskView)
+        flow.View(RecordTestResultTaskView.as_view())
         .Annotation(title="Record Retest Result")
         .Permission("ca.record_chemical_result")
         .Next(this.check_retest_input, task_data=lambda activation: ChemicalAnalysisFlow.result_task_data(activation))
@@ -1026,49 +1941,49 @@ class ChemicalAnalysisFlow(flow.Flow):
     )
 
     retest_input = (
-        flow.View(RecordDynamicAnalysisInputTaskView)
+        flow.View(RecordDynamicAnalysisInputTaskView.as_view())
         .Annotation(title="Record Retest Method Inputs")
         .Permission("ca.record_chemical_result")
         .Next(this.complete_retest)
     )
 
     complete_retest = (
-        flow.View(CompleteRetestTaskView)
+        flow.View(CompleteRetestTaskView.as_view())
         .Annotation(title="Complete Chemical Retest")
         .Permission("ca.perform_chemical_retest")
         .Next(this.qa_review)
     )
 
     capa = (
-        flow.View(CAPATaskView)
+        flow.View(CAPATaskView.as_view())
         .Annotation(title="Corrective and Preventive Action")
         .Permission("ca.review_chemical_analysis")
         .Next(this.qa_review)
     )
 
     approval = (
-        flow.View(ApprovalTaskView)
+        flow.View(ApprovalTaskView.as_view())
         .Annotation(title="Approve Chemical Analysis")
         .Permission("ca.approve_chemical_batch")
         .Next(this.generate_coa)
     )
 
     generate_coa = (
-        flow.View(GenerateChemicalCoATaskView)
+        flow.View(GenerateChemicalCoATaskView.as_view())
         .Annotation(title="Generate Chemical CoA")
         .Permission("ca.approve_chemical_coa")
         .Next(this.approve_coa)
     )
 
     approve_coa = (
-        flow.View(ApproveChemicalCoATaskView)
+        flow.View(ApproveChemicalCoATaskView.as_view())
         .Annotation(title="Approve Chemical CoA")
         .Permission("ca.approve_chemical_coa")
         .Next(this.batch_disposition)
     )
 
     batch_disposition = (
-        flow.View(ConfirmWorkflowActionTaskView)
+        flow.View(ConfirmWorkflowActionTaskView.as_view())
         .Annotation(title="Select Chemical Batch Disposition")
         .Next(this.disposition_decision, task_data=lambda activation: {"action": ChemicalAnalysisFlow.task_value(activation, "action")})
     )
@@ -1080,33 +1995,58 @@ class ChemicalAnalysisFlow(flow.Flow):
     )
 
     utilize = (
-        flow.View(UtilizeChemicalBatchTaskView)
+        flow.View(UtilizeChemicalBatchTaskView.as_view())
         .Annotation(title="Utilize Chemical Batch")
         .Permission("ca.utilize_chemical_batch")
         .Next(this.completed)
     )
 
     return_to_supplier = (
-        flow.View(ReturnChemicalBatchTaskView)
+        flow.View(ReturnChemicalBatchTaskView.as_view())
         .Annotation(title="Return Chemical Batch")
         .Permission("ca.return_chemical_batch")
         .Next(this.completed)
     )
 
     reject = (
-        flow.View(RejectAnalysisTaskView)
+        flow.View(RejectAnalysisTaskView.as_view())
         .Annotation(title="Reject Chemical Batch")
         .Permission("ca.reject_chemical_batch")
-        .Next(this.rejected)
+        .Next(this.return_rejected)
     )
 
-    rejected = flow.End().Annotation(title="Chemical Analysis Rejected")
+    return_rejected = (
+        flow.View(ReturnChemicalBatchTaskView.as_view())
+        .Annotation(title="Return Rejected Chemical Batch")
+        .Permission("ca.return_chemical_batch")
+        .Next(this.completed)
+    )
+
     completed = flow.End().Annotation(title="Chemical Analysis Completed")
 
     @staticmethod
     def task_value(activation, key, default=None):
         data = activation.task.data
         return data.get(key, default) if isinstance(data, dict) else default
+
+    @staticmethod
+    def has_assigned_analysts(activation):
+        process = activation.process
+        process.refresh_from_db()
+        return process.has_assigned_analysts
+
+    @staticmethod
+    def has_analysis_request(activation):
+        process = activation.process
+        process.refresh_from_db()
+        return bool(process.analysis_request_id)
+
+    @staticmethod
+    def checklist_starts_analysis(activation):
+        return ChemicalAnalysisProcess.objects.filter(
+            pk=activation.process.pk,
+            status=ChemicalAnalysisProcess.WorkflowStatus.ANALYSIS,
+        ).exists()
 
     @staticmethod
     def result_task_data(activation):
@@ -1117,6 +2057,7 @@ class ChemicalAnalysisFlow(flow.Flow):
             "result_id": data.get("result_id"),
             "parameter_id": data.get("parameter_id"),
             "result_status": data.get("result_status"),
+            "input_recorded": data.get("input_recorded", False),
             "retest_parameter_id": data.get("retest_parameter_id"),
         }
 
@@ -1134,6 +2075,8 @@ class ChemicalAnalysisFlow(flow.Flow):
 
     @staticmethod
     def result_requires_input(activation):
+        if ChemicalAnalysisFlow.task_value(activation, "input_recorded"):
+            return False
         result_id = ChemicalAnalysisFlow.task_value(activation, "result_id")
         if result_id in (None, ""):
             return False
@@ -1159,6 +2102,46 @@ class ChemicalAnalysisFlow(flow.Flow):
         process = activation.process
         process.refresh_from_db()
         return bool(process.is_analysis_complete and not process.has_pending_tests)
+
+    @staticmethod
+    def _auto_complete_analysis(activation):
+        process = activation.process
+        process.refresh_from_db()
+        batch = process.batch
+        analyst = process.assigned_analyst
+        if analyst is None and process.analysis_request_id:
+            analyst = process.analysis_request.assigned_analysts.first()
+        if analyst is None and batch is not None:
+            last_res = batch.test_results.filter(analyst__isnull=False).order_by("-tested_at").first()
+            if last_res is not None:
+                analyst = last_res.analyst
+        if analyst is None and getattr(activation, "user", None):
+            analyst = activation.user
+
+        if process.status == ChemicalAnalysisProcess.WorkflowStatus.ANALYSIS:
+            process.mark_analysis_completed(performed_by=analyst)
+
+        process.refresh_from_db()
+
+        if batch is not None:
+            from .services.workflow_enhancements import record_custody_event, record_workflow_event
+            record_custody_event(
+                batch,
+                event_type="ANALYSIS_COMPLETED",
+                actor=analyst,
+                from_location="Chemical analysis laboratory",
+                to_location=str(batch.location),
+                remarks="Analysis automatically completed and forwarded to QA review.",
+            )
+            record_workflow_event(
+                process,
+                event_type="analysis_completed",
+                action="complete_analysis",
+                actor=analyst,
+                from_status=ChemicalAnalysisProcess.WorkflowStatus.ANALYSIS,
+                to_status=process.status,
+                details={"automated": True},
+            )
 
     @staticmethod
     def qa_is_retest(activation):
