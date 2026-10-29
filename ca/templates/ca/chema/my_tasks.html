@@ -4,83 +4,171 @@
 {% block title %}My Assigned Tasks | Chemical Analysis{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'ca/css/pages/my-tasks.css' %}?v=20261020-1">
+<link rel="stylesheet" href="{% static 'ca/css/pages/my-tasks.css' %}?v=20261026-no-hero">
 {% endblock %}
 
 {% block content %}
 <div class="ca-my-work" id="ca-my-tasks" data-page="my-tasks">
-    <section class="my-work-hero" aria-labelledby="my-work-title">
-        <div class="my-work-hero__copy">
-            <div class="my-work-eyebrow"><span class="my-work-pulse"></span> CHEMICAL ANALYSIS · WORKFLOW INBOX</div>
-            <h1 id="my-work-title">My assigned tasks</h1>
-            <p>Only active workflow tasks assigned to you and permitted for you to execute appear here.</p>
-            <div class="my-work-hero__meta">
-                <span><i class="fa fa-user-check" aria-hidden="true"></i> {{ request.user.get_full_name|default:request.user.get_username }}</span>
-                <span><i class="fa fa-location-dot" aria-hidden="true"></i> {% if request.user.assigned_treatment_plant %}{{ request.user.assigned_treatment_plant }}{% else %}All authorised plants{% endif %}</span>
-                <span><i class="fa fa-rotate" aria-hidden="true"></i> Updated {{ now|date:"H:i"|default:"just now" }}</span>
+    <section class="my-work-metrics" aria-label="Filter tasks by status and stage">
+        <article class="my-work-metric my-work-metric--total is-active" role="button" tabindex="0" data-filter-trigger="all" title="Show all executable tasks">
+            <span class="my-work-metric__icon"><i class="fa fa-layer-group"></i></span>
+            <div>
+                <span class="my-work-metric__label">All assigned</span>
+                <strong>{{ task_count }}</strong>
+                <small>executable</small>
             </div>
-        </div>
-        <div class="my-work-orbit" aria-hidden="true">
-            <div class="my-work-orbit__ring my-work-orbit__ring--outer"></div>
-            <div class="my-work-orbit__ring my-work-orbit__ring--inner"></div>
-            <div class="my-work-orbit__core"><i class="fa fa-diagram-project"></i><strong>{{ task_count }}</strong><small>IN QUEUE</small></div>
-            <span class="my-work-orbit__node my-work-orbit__node--one"><i class="fa fa-flask"></i></span>
-            <span class="my-work-orbit__node my-work-orbit__node--two"><i class="fa fa-shield-halved"></i></span>
-            <span class="my-work-orbit__node my-work-orbit__node--three"><i class="fa fa-file-circle-check"></i></span>
-        </div>
-        <div class="my-work-hero__actions">
-            <a class="my-work-button my-work-button--light" href="{% url 'ca:dashboard' %}"><i class="fa fa-grid-2"></i> Command center</a>
-            <a class="my-work-button my-work-button--glass" href="{% url 'ca:my-tasks' %}"><i class="fa fa-arrows-rotate"></i> Refresh queue</a>
-        </div>
-    </section>
-
-    <section class="my-work-metrics" aria-label="Assigned task summary">
-        <article class="my-work-metric my-work-metric--total"><span class="my-work-metric__icon"><i class="fa fa-layer-group"></i></span><div><span class="my-work-metric__label">Assigned to you</span><strong>{{ task_count }}</strong><small>executable tasks</small></div><span class="my-work-metric__accent">QUEUE</span></article>
-        <article class="my-work-metric my-work-metric--analysis"><span class="my-work-metric__icon"><i class="fa fa-flask-vial"></i></span><div><span class="my-work-metric__label">Analysis</span><strong>{{ pending_analysis }}</strong><small>laboratory work</small></div><span class="my-work-metric__accent">01</span></article>
-        <article class="my-work-metric my-work-metric--quality"><span class="my-work-metric__icon"><i class="fa fa-shield-halved"></i></span><div><span class="my-work-metric__label">Quality review</span><strong>{{ pending_qa }}</strong><small>QA and retest steps</small></div><span class="my-work-metric__accent">02</span></article>
-        <article class="my-work-metric my-work-metric--release"><span class="my-work-metric__icon"><i class="fa fa-certificate"></i></span><div><span class="my-work-metric__label">Release &amp; disposition</span><strong>{{ pending_release }}</strong><small>approval through closeout</small></div><span class="my-work-metric__accent">03</span></article>
-        <article class="my-work-metric my-work-metric--risk"><span class="my-work-metric__icon"><i class="fa fa-hourglass-half"></i></span><div><span class="my-work-metric__label">Needs attention</span><strong>{{ overdue_count }}</strong><small>{% if due_soon_count %}{{ due_soon_count }} due in 24 hours{% else %}past deadline{% endif %}</small></div><span class="my-work-metric__accent">SLA</span></article>
+            <span class="my-work-metric__accent">ALL</span>
+        </article>
+        <article class="my-work-metric my-work-metric--analysis" role="button" tabindex="0" data-filter-trigger="analysis" title="Filter by Analysis tasks">
+            <span class="my-work-metric__icon"><i class="fa fa-flask-vial"></i></span>
+            <div>
+                <span class="my-work-metric__label">Analysis</span>
+                <strong>{{ pending_analysis }}</strong>
+                <small>lab steps</small>
+            </div>
+            <span class="my-work-metric__accent">01</span>
+        </article>
+        <article class="my-work-metric my-work-metric--quality" role="button" tabindex="0" data-filter-trigger="quality" title="Filter by Quality review tasks">
+            <span class="my-work-metric__icon"><i class="fa fa-shield-halved"></i></span>
+            <div>
+                <span class="my-work-metric__label">QA Review</span>
+                <strong>{{ pending_qa }}</strong>
+                <small>review &amp; retest</small>
+            </div>
+            <span class="my-work-metric__accent">02</span>
+        </article>
+        <article class="my-work-metric my-work-metric--release" role="button" tabindex="0" data-filter-trigger="release" title="Filter by Release & Disposition tasks">
+            <span class="my-work-metric__icon"><i class="fa fa-certificate"></i></span>
+            <div>
+                <span class="my-work-metric__label">Release</span>
+                <strong>{{ pending_release }}</strong>
+                <small>disposition</small>
+            </div>
+            <span class="my-work-metric__accent">03</span>
+        </article>
+        <article class="my-work-metric my-work-metric--risk" role="button" tabindex="0" data-filter-trigger="attention" title="Filter by Overdue & Due Soon tasks">
+            <span class="my-work-metric__icon"><i class="fa fa-hourglass-half"></i></span>
+            <div>
+                <span class="my-work-metric__label">Attention</span>
+                <strong>{{ overdue_count }}</strong>
+                <small>{% if due_soon_count %}{{ due_soon_count }} due in 24h{% else %}urgent{% endif %}</small>
+            </div>
+            <span class="my-work-metric__accent">SLA</span>
+        </article>
     </section>
 
     <section class="my-work-board" aria-labelledby="assigned-work-heading">
         <header class="my-work-board__header">
             <div>
-                <div class="my-work-section-label"><span></span> LIVE WORKFLOW QUEUE</div>
-                <h2 id="assigned-work-heading">Your next actions</h2>
-                <p>Tasks are ordered by deadline and workflow urgency.</p>
+                <div class="my-work-section-label"><span></span> QUEUE CONTROLS</div>
+                <h2 id="assigned-work-heading">Task stream</h2>
             </div>
             <div class="my-work-controls">
-                <label class="my-work-search"><i class="fa fa-magnifying-glass" aria-hidden="true"></i><span class="sr-only">Search assigned tasks</span><input type="search" placeholder="Search batch, chemical, stage…" data-my-work-search></label>
+                <label class="my-work-search">
+                    <i class="fa fa-magnifying-glass" aria-hidden="true"></i>
+                    <span class="sr-only">Search assigned tasks</span>
+                    <input type="search" placeholder="Search batch, chemical, stage…" data-my-work-search>
+                </label>
                 <label class="sr-only" for="my-work-stage">Filter by workflow stage</label>
                 <select id="my-work-stage" data-my-work-filter>
-                    <option value="all">All workflow stages</option>
+                    <option value="all">All stages</option>
                     <option value="intake">Intake</option>
                     <option value="analysis">Analysis</option>
-                    <option value="quality">Quality review</option>
-                    <option value="release">Release &amp; disposition</option>
+                    <option value="quality">QA review</option>
+                    <option value="release">Release</option>
+                    <option value="attention">Needs attention</option>
                 </select>
+                <button type="button" class="my-work-density-btn" id="myWorkDensityToggle" title="Toggle compact density view" aria-label="Toggle compact view">
+                    <i class="fa fa-table-cells" aria-hidden="true"></i>
+                    <span data-density-label>Compact</span>
+                </button>
             </div>
         </header>
 
-            <div class="my-work-board__meta"><span><i class="fa fa-circle-check"></i> <strong data-my-work-count>{{ task_count }}</strong> active work item{{ task_count|pluralize }}</span><span><i class="fa fa-lock"></i> Only tasks assigned to you and executable by you are shown</span></div>
+        <div class="my-work-board__meta">
+            <span><i class="fa fa-circle-check"></i> Showing <strong data-my-work-count>{{ task_count }}</strong> of {{ task_count }} active item{{ task_count|pluralize }}</span>
+            <span class="my-work-filter-tag" data-my-work-active-filter hidden>Filtered by: <b>All</b> <button type="button" data-my-work-clear-filter title="Clear filter">&times;</button></span>
+            <span><i class="fa fa-lock"></i> Strict execution permissions applied</span>
+        </div>
 
         {% if tasks %}
         <div class="my-work-list" data-my-work-list>
             {% for item in tasks %}
-            <article class="my-work-card{% if item.overdue %} is-overdue{% elif item.due_soon %} is-due-soon{% endif %}" data-my-work-card data-stage="{{ item.stage }}" data-search="{{ item.batch_label }} {{ item.chemical }} {{ item.title }} {{ item.stage_label }} {{ item.plant }} {{ item.sample_id }}">
-                <div class="my-work-card__rail"><span class="my-work-card__step">{% if forloop.counter < 10 %}0{% endif %}{{ forloop.counter }}</span><span class="my-work-card__line"></span><span class="my-work-card__stage-icon"><i class="fa {% if item.stage == 'analysis' %}fa-flask-vial{% elif item.stage == 'quality' %}fa-shield-halved{% elif item.stage == 'release' %}fa-certificate{% else %}fa-boxes-stacked{% endif %}"></i></span></div>
-                <div class="my-work-card__main">
-                    <div class="my-work-card__topline"><span class="my-work-stage my-work-stage--{{ item.stage }}">{{ item.stage_label }}</span><span class="my-work-task-status"><span></span>{{ item.status_label }}</span>{% if item.overdue %}<span class="my-work-sla my-work-sla--overdue"><i class="fa fa-triangle-exclamation"></i> Overdue</span>{% elif item.due_soon %}<span class="my-work-sla my-work-sla--soon"><i class="fa fa-clock"></i> Due soon</span>{% endif %}</div>
-                    <h3>{{ item.title }}</h3>
-                    <div class="my-work-card__identity"><span class="my-work-batch-id"><i class="fa fa-barcode"></i> {{ item.batch_label }}</span><span>{{ item.chemical }}</span></div>
-                    <div class="my-work-card__details"><span><i class="fa fa-location-dot"></i> {{ item.plant }}</span><span><i class="fa fa-vial"></i> Sample {{ item.sample_id }}</span><span><i class="fa fa-user"></i> {{ item.assignee }}</span></div>
-                    <div class="my-work-progress"><div class="my-work-progress__label"><span>Analysis progress</span><strong>{{ item.progress|default:0 }}%</strong></div><div class="my-work-progress__track"><span style="width:{{ item.progress|default:0 }}%"></span></div></div>
+            <article class="my-work-card{% if item.overdue %} is-overdue{% elif item.due_soon %} is-due-soon{% endif %}" data-my-work-card data-stage="{{ item.stage }}" data-is-attention="{% if item.overdue or item.due_soon %}true{% else %}false{% endif %}" data-search="{{ item.batch_label }} {{ item.chemical }} {{ item.title }} {{ item.stage_label }} {{ item.plant }} {{ item.sample_id }}">
+                <div class="my-work-card__rail">
+                    <span class="my-work-card__step">{% if forloop.counter < 10 %}0{% endif %}{{ forloop.counter }}</span>
+                    <span class="my-work-card__line"></span>
+                    <span class="my-work-card__stage-icon"><i class="fa {% if item.stage == 'analysis' %}fa-flask-vial{% elif item.stage == 'quality' %}fa-shield-halved{% elif item.stage == 'release' %}fa-certificate{% else %}fa-boxes-stacked{% endif %}"></i></span>
                 </div>
-                <aside class="my-work-card__side"><div class="my-work-deadline"><span>DEADLINE</span>{% if item.deadline %}<strong class="{% if item.overdue %}is-danger{% endif %}">{{ item.deadline|date:"d M Y" }}</strong><small>{{ item.deadline|date:"H:i" }}</small>{% else %}<strong>No deadline</strong><small>Not scheduled</small>{% endif %}</div>{% if item.action_url %}<a class="my-work-execute" href="{{ item.action_url }}"><span class="my-work-execute__icon"><i class="fa fa-play"></i></span><span><strong>{{ item.action_label }}</strong><small>Open workflow step</small></span><i class="fa fa-arrow-up-right-from-square my-work-execute__arrow"></i></a>{% else %}<div class="my-work-execute my-work-execute--disabled" aria-disabled="true" title="{{ item.action_hint }}"><span class="my-work-execute__icon"><i class="fa fa-hourglass-half"></i></span><span><strong>{{ item.action_label }}</strong><small>{{ item.action_hint }}</small></span></div>{% endif %}</aside>
+                <div class="my-work-card__main">
+                    <div class="my-work-card__topline">
+                        <span class="my-work-stage my-work-stage--{{ item.stage }}">{{ item.stage_label }}</span>
+                        <span class="my-work-task-status"><span></span>{{ item.status_label }}</span>
+                        {% if item.overdue %}
+                        <span class="my-work-sla my-work-sla--overdue"><i class="fa fa-triangle-exclamation"></i> Overdue</span>
+                        {% elif item.due_soon %}
+                        <span class="my-work-sla my-work-sla--soon"><i class="fa fa-clock"></i> Due soon</span>
+                        {% endif %}
+                    </div>
+                    <h3>{{ item.title }}</h3>
+                    <div class="my-work-card__identity">
+                        <span class="my-work-batch-id"><i class="fa fa-barcode"></i> {{ item.batch_label }}</span>
+                        <span class="my-work-chem-name">{{ item.chemical }}</span>
+                    </div>
+                    <div class="my-work-card__details">
+                        <span><i class="fa fa-location-dot"></i> {{ item.plant }}</span>
+                        <span><i class="fa fa-vial"></i> Sample {{ item.sample_id }}</span>
+                        <span><i class="fa fa-user"></i> {{ item.assignee }}</span>
+                    </div>
+                    <div class="my-work-progress">
+                        <div class="my-work-progress__label">
+                            <span>Analysis progress</span>
+                            <strong>{{ item.progress|default:0 }}%</strong>
+                        </div>
+                        <div class="my-work-progress__track">
+                            <span style="width:{{ item.progress|default:0 }}%"></span>
+                        </div>
+                    </div>
+                </div>
+                <aside class="my-work-card__side">
+                    <div class="my-work-deadline">
+                        <span>DEADLINE</span>
+                        {% if item.deadline %}
+                        <strong class="{% if item.overdue %}is-danger{% endif %}">{{ item.deadline|date:"d M Y" }}</strong>
+                        <small>{{ item.deadline|date:"H:i" }}</small>
+                        {% else %}
+                        <strong>No deadline</strong>
+                        <small>Not scheduled</small>
+                        {% endif %}
+                    </div>
+                    {% if item.action_url %}
+                    <a class="my-work-execute" href="{{ item.action_url }}">
+                        <span class="my-work-execute__icon"><i class="fa fa-play"></i></span>
+                        <span>
+                            <strong>{{ item.action_label }}</strong>
+                            <small>Execute step</small>
+                        </span>
+                        <i class="fa fa-arrow-up-right-from-square my-work-execute__arrow"></i>
+                    </a>
+                    {% else %}
+                    <div class="my-work-execute my-work-execute--disabled" aria-disabled="true" title="{{ item.action_hint }}">
+                        <span class="my-work-execute__icon"><i class="fa fa-hourglass-half"></i></span>
+                        <span>
+                            <strong>{{ item.action_label }}</strong>
+                            <small>{{ item.action_hint }}</small>
+                        </span>
+                    </div>
+                    {% endif %}
+                </aside>
             </article>
             {% endfor %}
         </div>
-        <div class="my-work-no-results" data-my-work-no-results hidden><i class="fa fa-filter-circle-xmark"></i><strong>No matching tasks</strong><span>Change the search or stage filter to see more of your queue.</span></div>
+        <div class="my-work-no-results" data-my-work-no-results hidden>
+            <i class="fa fa-filter-circle-xmark"></i>
+            <strong>No matching tasks</strong>
+            <span>Change your search or click another stage tile to see more tasks.</span>
+            <button type="button" class="my-work-button my-work-button--glass" style="margin-top:10px" data-my-work-reset-all>Show all tasks</button>
+        </div>
         {% else %}
         <div class="my-work-empty">
             <div class="my-work-empty__icon"><i class="fa fa-check-double"></i></div>
@@ -92,7 +180,10 @@
         {% endif %}
     </section>
 
-    <footer class="my-work-footer"><span><i class="fa fa-shield-halved"></i> Permission-aware workflow inbox</span><span>CA WORKFLOW <b>·</b> {{ task_count }} ACTIVE</span></footer>
+    <footer class="my-work-footer">
+        <span><i class="fa fa-shield-halved"></i> Permission-aware workflow stream</span>
+        <span>CA WORKFLOW <b>·</b> {{ task_count }} ACTIVE</span>
+    </footer>
 </div>
 {% endblock %}
 
@@ -106,21 +197,135 @@
     const cards = [...root.querySelectorAll('[data-my-work-card]')];
     const count = root.querySelector('[data-my-work-count]');
     const noResults = root.querySelector('[data-my-work-no-results]');
+    const metricTiles = [...root.querySelectorAll('[data-filter-trigger]')];
+    const activeFilterTag = root.querySelector('[data-my-work-active-filter]');
+    const clearFilterBtn = root.querySelector('[data-my-work-clear-filter]');
+    const resetAllBtn = root.querySelector('[data-my-work-reset-all]');
+    const densityBtn = root.getElementById('myWorkDensityToggle');
+    const taskList = root.querySelector('[data-my-work-list]');
+    const densityLabel = densityBtn ? densityBtn.querySelector('[data-density-label]') : null;
+
+    // Density toggle with localStorage persistence
+    const savedDensity = localStorage.getItem('ca_my_tasks_density') || 'standard';
+    if (taskList && savedDensity === 'compact') {
+        taskList.classList.add('is-compact');
+        if (densityLabel) densityLabel.textContent = 'Expanded';
+        if (densityBtn) densityBtn.classList.add('is-active');
+    }
+
+    if (densityBtn && taskList) {
+        densityBtn.addEventListener('click', () => {
+            const isCompact = taskList.classList.toggle('is-compact');
+            densityBtn.classList.toggle('is-active', isCompact);
+            if (densityLabel) densityLabel.textContent = isCompact ? 'Expanded' : 'Compact';
+            localStorage.setItem('ca_my_tasks_density', isCompact ? 'compact' : 'standard');
+        });
+    }
+
+    let currentStage = 'all';
+
+    const syncMetricTiles = (stage) => {
+        metricTiles.forEach(tile => {
+            const match = tile.dataset.filterTrigger === stage;
+            tile.classList.toggle('is-active', match);
+            tile.setAttribute('aria-pressed', match ? 'true' : 'false');
+        });
+        if (activeFilterTag) {
+            if (stage === 'all') {
+                activeFilterTag.hidden = true;
+            } else {
+                activeFilterTag.hidden = false;
+                const b = activeFilterTag.querySelector('b');
+                if (b) {
+                    const labelMap = {
+                        analysis: 'Analysis',
+                        quality: 'QA Review',
+                        release: 'Release',
+                        attention: 'Needs Attention',
+                        intake: 'Intake'
+                    };
+                    b.textContent = labelMap[stage] || stage;
+                }
+            }
+        }
+    };
+
     const apply = () => {
         const query = (search?.value || '').trim().toLocaleLowerCase();
-        const stage = filter?.value || 'all';
+        const stage = currentStage;
         let visible = 0;
+
         cards.forEach(card => {
-            const matches = (stage === 'all' || card.dataset.stage === stage)
-                && (!query || card.dataset.search.toLocaleLowerCase().includes(query));
+            let stageMatch = false;
+            if (stage === 'all') {
+                stageMatch = true;
+            } else if (stage === 'attention') {
+                stageMatch = card.dataset.isAttention === 'true';
+            } else {
+                stageMatch = card.dataset.stage === stage;
+            }
+
+            const searchMatch = !query || (card.dataset.search || '').toLocaleLowerCase().includes(query);
+            const matches = stageMatch && searchMatch;
             card.hidden = !matches;
             if (matches) visible += 1;
         });
+
         if (count) count.textContent = visible;
         if (noResults) noResults.hidden = visible !== 0;
     };
-    search?.addEventListener('input', apply);
-    filter?.addEventListener('change', apply);
+
+    // Metric tiles click handler
+    metricTiles.forEach(tile => {
+        const trigger = tile.dataset.filterTrigger;
+        tile.addEventListener('click', () => {
+            if (currentStage === trigger && trigger !== 'all') {
+                currentStage = 'all';
+            } else {
+                currentStage = trigger;
+            }
+            if (filter) filter.value = currentStage;
+            syncMetricTiles(currentStage);
+            apply();
+        });
+        tile.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                tile.click();
+            }
+        });
+    });
+
+    if (filter) {
+        filter.addEventListener('change', () => {
+            currentStage = filter.value;
+            syncMetricTiles(currentStage);
+            apply();
+        });
+    }
+
+    if (search) {
+        search.addEventListener('input', apply);
+    }
+
+    if (clearFilterBtn) {
+        clearFilterBtn.addEventListener('click', () => {
+            currentStage = 'all';
+            if (filter) filter.value = 'all';
+            syncMetricTiles('all');
+            apply();
+        });
+    }
+
+    if (resetAllBtn) {
+        resetAllBtn.addEventListener('click', () => {
+            currentStage = 'all';
+            if (filter) filter.value = 'all';
+            if (search) search.value = '';
+            syncMetricTiles('all');
+            apply();
+        });
+    }
 })();
 </script>
 {% endblock %}

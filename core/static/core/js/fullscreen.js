@@ -8,46 +8,79 @@
     const root = document.documentElement;
     root.classList.add("app-fullscreen");
 
+    const FS_KEY = "qad_fullscreen_active";
+    const FS_EXIT_KEY = "qad_fullscreen_user_exited";
+
+    function isPwa() {
+        return window.matchMedia &&
+            (window.matchMedia("(display-mode: fullscreen)").matches ||
+             window.matchMedia("(display-mode: standalone)").matches);
+    }
+
+    function syncFullscreenState() {
+        if (document.fullscreenElement) {
+            sessionStorage.setItem(FS_KEY, "1");
+            sessionStorage.removeItem(FS_EXIT_KEY);
+        }
+    }
+
+    document.addEventListener("fullscreenchange", () => {
+        if (document.fullscreenElement) {
+            sessionStorage.setItem(FS_KEY, "1");
+            sessionStorage.removeItem(FS_EXIT_KEY);
+        } else {
+            // If user explicitly pressed Esc or exited, remember so we don't annoy them
+            sessionStorage.setItem(FS_EXIT_KEY, "1");
+            sessionStorage.removeItem(FS_KEY);
+        }
+    });
+
     function requestFullscreenAfterInteraction(event) {
         if (!event.isTrusted || document.fullscreenElement ||
             typeof root.requestFullscreen !== "function") {
             return;
         }
 
-        const isFullscreenPwa = window.matchMedia &&
-            window.matchMedia("(display-mode: fullscreen)").matches;
-        if (isFullscreenPwa) return;
+        if (isPwa()) return;
 
-        root.requestFullscreen().catch((error) => {
-            // Keep retrying on later trusted interactions if the browser rejects it.
-            console.info("[QAD] Fullscreen was not available:", error);
+        // If user explicitly exited during this session, don't re-force unless they clicked an internal navigation
+        if (sessionStorage.getItem(FS_EXIT_KEY) === "1" && sessionStorage.getItem(FS_KEY) !== "1") {
+            return;
+        }
+
+        root.requestFullscreen().then(() => {
+            sessionStorage.setItem(FS_KEY, "1");
+            sessionStorage.removeItem(FS_EXIT_KEY);
+        }).catch((error) => {
+            console.info("[QAD] Fullscreen request handled:", error);
         });
     }
 
+    // Save intent before navigating internally
+    document.addEventListener("click", (event) => {
+        const link = event.target.closest("a");
+        if (link && link.href && link.origin === window.location.origin) {
+            if (document.fullscreenElement || sessionStorage.getItem(FS_KEY) === "1") {
+                sessionStorage.setItem(FS_KEY, "1");
+                sessionStorage.removeItem(FS_EXIT_KEY);
+            }
+        }
+    }, true);
+
     document.addEventListener("pointerdown", requestFullscreenAfterInteraction, true);
     document.addEventListener("keydown", requestFullscreenAfterInteraction, true);
+    document.addEventListener("touchstart", requestFullscreenAfterInteraction, true);
 
-    document.addEventListener("click", (event) => {
-        const closeControl = event.target.closest("[data-close-app-window]");
-        if (closeControl) {
-            event.preventDefault();
-            event.stopPropagation();
-            if (navigator.sendBeacon) {
-                try {
-                    navigator.sendBeacon("/accounts/logout/", new Blob(["action=window_close"], { type: "application/x-www-form-urlencoded" }));
-                } catch (e) {}
+    // ESC key handles exiting fullscreen / closing overlays
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" || event.keyCode === 27) {
+            if (document.fullscreenElement) {
+                document.exitFullscreen().catch(() => {});
             }
-            try {
-                localStorage.setItem("qad_auth_logout_event", JSON.stringify({ action: "logout", reason: "window_closed", timestamp: Date.now() }));
-            } catch (e) {}
-            window.close();
-            setTimeout(() => {
-                window.location.href = "/accounts/logout/?reason=window_closed";
-            }, 200);
         }
     });
 
-    const toggleSelector = "#fullscreenToggle, [data-fullscreen-toggle], .fullscreen-toggle, .fullscreen-control";
+    const toggleSelector = "#fullscreenToggle, [data-fullscreen-toggle], .fullscreen-toggle, .fullscreen-control, [data-close-app-window], #pwa-global-close-control, .btn-launcher-close";
 
     function applyAppViewport() {
         root.classList.add("app-fullscreen");

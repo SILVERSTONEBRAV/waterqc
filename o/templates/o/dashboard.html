@@ -1,164 +1,348 @@
-{% extends "core/cockpit/base_cockpit.html" %}
+{% extends "o/base.html" %}
 {% load static %}
 
-{% block kpi_strip %}
-<div class="kpi-strip">
-    {% for kpi in kpis %}
-    <div class="kpi-card">
-        <div class="kpi-card__icon kpi-card__icon--{{ kpi.color }}">
-            <i class="fa-solid {{ kpi.icon }}"></i>
-        </div>
-        <div class="kpi-card__body">
-            <div class="kpi-card__value">{{ kpi.value }}</div>
-            <div class="kpi-card__label">{{ kpi.label }}</div>
-        </div>
-    </div>
-    {% endfor %}
-</div>
+{% block title %}Water Treatment Operations | SCADA{% endblock %}
+
+{% block extra_styles %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'o/css/scada_dashboard.css' %}?v=20261029-no-hero">
 {% endblock %}
 
-{% block cockpit_grid %}
-<div class="cockpit-grid cockpit-grid--3col" style="flex:1;min-height:0;">
+{% block page_content %}
+<div class="water-scada" id="waterScadaDashboard">
+    <form method="get" class="scada-global-filters scada-filters" aria-label="Global dashboard filters">
+        <strong class="scada-global-filters__title"><i class="fa-solid fa-sliders"></i> GLOBAL SCOPE</strong>
+        {% if is_superuser %}
+        <label class="scada-global-filters__field" for="plantFilter"><span>Treatment plant</span><select id="plantFilter" name="plant" onchange="this.form.submit()"><option value="">All treatment plants</option>{% for option in plant_options %}<option value="{{ option.pk }}" {% if plant.pk == option.pk %}selected{% endif %}>{{ option.code }} · {{ option.name }}</option>{% endfor %}</select></label>
+        {% else %}
+        <span class="scada-global-filters__scope"><small>TREATMENT PLANT</small><b>{{ plant_name }}</b></span>
+        {% endif %}
+        <label class="scada-global-filters__field" for="periodFilter"><span>Analysis period</span><select id="periodFilter" name="days" onchange="this.form.submit()">{% for option in allowed_periods %}<option value="{{ option }}" {% if period_days == option %}selected{% endif %}>{{ option }} days</option>{% endfor %}</select></label>
+        <input type="hidden" name="tab" id="dashboardActiveTab" value="{{ active_tab }}">
+        <button type="submit" title="Apply filters to every dashboard panel"><i class="fa-solid fa-check"></i><span>Apply to all panels</span></button>
+        <a class="scada-refresh" href="?{% if plant %}plant={{ plant.pk }}&amp;{% endif %}days={{ period_days }}&amp;tab={{ active_tab }}" title="Refresh all panel data"><i class="fa-solid fa-arrows-rotate"></i></a>
+        <output class="scada-global-filters__note">Plant scope and analysis period are shared across every tab.</output>
+    </form>
 
-    <!-- ═══ USAGE TREND ═══ -->
-    <div class="panel panel--span-2">
-        <div class="panel__header">
-            <span class="panel__title"><i class="fa-solid fa-chart-line"></i> Chemical Usage Trend (kg/day)</span>
-            <span class="pill pill--cyan">{{ period_days }}d</span>
-        </div>
-        <div class="panel__body">
-            <div class="chart-wrap"><canvas id="usageTrendChart"></canvas></div>
-        </div>
-    </div>
+    <nav class="scada-tabs" role="tablist" aria-label="Water operations workspaces">
+        <button class="scada-tab{% if active_tab == 'overview' %} is-active{% endif %}" id="scada-tab-overview" role="tab" aria-selected="{% if active_tab == 'overview' %}true{% else %}false{% endif %}" aria-controls="scada-panel-overview" data-tab-target="overview"><i class="fa-solid fa-gauge-high"></i><span>Overview</span><b>{{ alerts|length }}</b></button>
+        <button class="scada-tab{% if active_tab == 'process' %} is-active{% endif %}" id="scada-tab-process" role="tab" aria-selected="{% if active_tab == 'process' %}true{% else %}false{% endif %}" aria-controls="scada-panel-process" data-tab-target="process"><i class="fa-solid fa-water"></i><span>Process & filtration</span><b>{{ phase_rows|length }}P · {{ filter_rows|length }}F</b></button>
+        <button class="scada-tab{% if active_tab == 'dosing' %} is-active{% endif %}" id="scada-tab-dosing" role="tab" aria-selected="{% if active_tab == 'dosing' %}true{% else %}false{% endif %}" aria-controls="scada-panel-dosing" data-tab-target="dosing"><i class="fa-solid fa-vials"></i><span>Dosing analytics</span><b>{{ dosing_total }}</b></button>
+        <button class="scada-tab{% if active_tab == 'assets' %} is-active{% endif %}" id="scada-tab-assets" role="tab" aria-selected="{% if active_tab == 'assets' %}true{% else %}false{% endif %}" aria-controls="scada-panel-assets" data-tab-target="assets"><i class="fa-solid fa-industry"></i><span>Assets & inventory</span><b>{{ pump_rows|length }}</b></button>
+        <button class="scada-tab{% if active_tab == 'storage' %} is-active{% endif %}" id="scada-tab-storage" role="tab" aria-selected="{% if active_tab == 'storage' %}true{% else %}false{% endif %}" aria-controls="scada-panel-storage" data-tab-target="storage"><i class="fa-solid fa-water-ladder"></i><span>Water storage</span><b>{{ reservoir_rows|length }}</b></button>
+        <button class="scada-tab{% if active_tab == 'reference' %} is-active{% endif %}" id="scada-tab-reference" role="tab" aria-selected="{% if active_tab == 'reference' %}true{% else %}false{% endif %}" aria-controls="scada-panel-reference" data-tab-target="reference"><i class="fa-solid fa-sliders"></i><span>Reference data</span><b>{{ monitoring_rows|length }}</b></button>
+        <button class="scada-tab{% if active_tab == 'reports' %} is-active{% endif %}" id="scada-tab-reports" role="tab" aria-selected="{% if active_tab == 'reports' %}true{% else %}false{% endif %}" aria-controls="scada-panel-reports" data-tab-target="reports"><i class="fa-solid fa-file-chart-column"></i><span>Analytics & reports</span><b>{{ period_days }}d</b></button>
+    </nav>
 
-    <!-- ═══ CATEGORY BREAKDOWN ═══ -->
-    <div class="panel">
-        <div class="panel__header">
-            <span class="panel__title"><i class="fa-solid fa-chart-pie"></i> Category Mix</span>
-        </div>
-        <div class="panel__body" style="display:flex;align-items:center;justify-content:center;">
-            <div class="chart-wrap" style="max-width:200px;max-height:200px;"><canvas id="categoryChart"></canvas></div>
-        </div>
-    </div>
+    <section class="scada-tab-panel{% if active_tab == 'overview' %} is-active{% endif %}" id="scada-panel-overview" role="tabpanel" aria-labelledby="scada-tab-overview" data-tab-panel="overview"{% if active_tab != 'overview' %} hidden{% endif %}>
 
-    <!-- ═══ STOCK LEVELS ═══ -->
-    <div class="panel panel--span-2">
-        <div class="panel__header">
-            <span class="panel__title"><i class="fa-solid fa-warehouse"></i> Chemical Stock Levels (kg)</span>
+    <section class="scada-command-overview" id="overview" aria-labelledby="commandOverviewTitle">
+        <div class="scada-command-overview__head">
+            <div><span class="scada-overline">SCADA COMMAND DECK · MODEL-BACKED TELEMETRY</span><h2 id="commandOverviewTitle">Plant signal field</h2><p>High-resolution view across treatment flow, chemical control, storage and equipment readiness.</p></div>
+            <div class="scada-operating-state scada-operating-state--{{ operational_tone }}"><span class="scada-operating-state__glyph"><i class="fa-solid {% if operational_tone == 'green' %}fa-check{% elif operational_tone == 'red' %}fa-triangle-exclamation{% elif operational_tone == 'amber' %}fa-exclamation{% else %}fa-wave-square{% endif %}"></i></span><span><small>LATEST RECORD STATE</small><b>{{ operational_state }}</b><em>{% if latest_activity %}Last activity {{ latest_activity|date:"d M Y · H:i" }}{% else %}No operational records in this scope{% endif %}</em></span><span class="scada-state-orbit" aria-hidden="true"></span></div>
         </div>
-        <div class="panel__body">
-            <div class="chart-wrap"><canvas id="stockChart"></canvas></div>
-        </div>
-    </div>
 
-    <!-- ═══ PUMP STATUS ═══ -->
-    <div class="panel">
-        <div class="panel__header">
-            <span class="panel__title"><i class="fa-solid fa-pump-medical"></i> Pump Status</span>
-            <span class="live-tag">LIVE</span>
+        <div class="scada-synoptic">
+            <div class="scada-synoptic__heading"><span><i class="fa-solid fa-diagram-project"></i> Treatment train · configured phases</span><small>SCHEMATIC VIEW · RECORDED VALUES</small></div>
+            <div class="scada-synoptic__track">
+                <a href="#water-quality-telemetry" class="scada-synoptic__terminal"><span class="scada-synoptic__icon"><i class="fa-solid fa-water"></i></span><span><small>RAW WATER INFLOW · {{ flow_metric_source }}</small><b>{% if flow_display != None %}{{ flow_display|floatformat:1 }} m³/h{% else %}—{% endif %}</b><em>{{ flow_observation_count }} feed readings · QC raw-water telemetry</em></span></a>
+                <span class="scada-synoptic__connector" aria-hidden="true"><i></i></span>
+                <div class="scada-synoptic__phases">
+                    {% for phase in phase_rows %}<a href="#process-dynamics" class="scada-synoptic__phase"><span class="scada-synoptic__phase-index">{{ forloop.counter|stringformat:"02d" }}</span><span><small>{{ phase.plant }}</small><b>{{ phase.name }}</b><em>{% if phase.recorded_flow != None %}{{ phase.recorded_flow|floatformat:1 }} m³/h · {{ phase.flow_load|floatformat:0 }}% of op cap{% else %}No flow entry · {{ phase.operational_capacity|floatformat:0 }} m³/h op cap{% endif %}</em></span><span class="scada-synoptic__mini-meter"><i style="width:{{ phase.flow_meter }}%"></i></span></a>{% empty %}<a href="#process-dynamics" class="scada-synoptic__phase scada-synoptic__phase--empty"><span class="scada-synoptic__phase-index">··</span><span><small>PLANT CONFIGURATION</small><b>No phases configured</b><em>Open process dynamics</em></span></a>{% endfor %}
+                </div>
+                <span class="scada-synoptic__connector" aria-hidden="true"><i></i></span>
+                <a href="#t-clarifiers" class="scada-synoptic__terminal scada-synoptic__terminal--treatment"><span class="scada-synoptic__icon"><i class="fa-solid fa-industry"></i></span><span><small>CLARIFICATION · FILTRATION</small><b>{{ clarifier_rows|length }} clarifiers · {{ filter_rows|length }} filters</b><em>{{ valve_rows|length }} disludge valves · {{ filter_flow_total|floatformat:0 }} m³/h filter flow</em></span></a>
+                <span class="scada-synoptic__connector" aria-hidden="true"><i></i></span>
+                <a href="#reservoirs" class="scada-synoptic__terminal scada-synoptic__terminal--storage"><span class="scada-synoptic__icon"><i class="fa-solid fa-water-ladder"></i></span><span><small>STORAGE FIELD</small><b>{% if monitored_reservoir_count %}{{ reservoir_fill|floatformat:1 }}% mean fill{% else %}No readings{% endif %}</b><em>{{ monitored_reservoir_count }} / {{ reservoir_rows|length }} monitored</em></span></a>
+            </div>
+            <div class="scada-synoptic__legend"><span><i class="scada-synoptic__legend-dot"></i> Logged process record</span><span><i class="scada-synoptic__legend-line"></i> Navigation path · not a live PLC connection</span><a href="#process-dynamics">Open phase dynamics <i class="fa-solid fa-arrow-right"></i></a></div>
         </div>
-        <div class="panel__body">
-            <table class="panel-table">
-                <thead><tr><th>Pump</th><th>Status</th><th>Cat</th></tr></thead>
-                <tbody>
-                    {% for ps in pump_statuses %}
-                    <tr>
-                        <td>{{ ps.name }}</td>
-                        <td>
-                            <span class="status-dot status-dot--{% if ps.status == 'working' %}ok{% elif ps.status == 'faulty' %}danger{% elif ps.status == 'maintenance' %}warning{% else %}idle{% endif %} status-dot--pulse"></span>
-                            {{ ps.status|title }}
-                        </td>
-                        <td><span class="pill pill--slate">{{ ps.category }}</span></td>
-                    </tr>
-                    {% empty %}
-                    <tr><td colspan="3" class="empty-state"><i class="fa-solid fa-plug-circle-xmark"></i> No pumps</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
 
-    <!-- ═══ DOSAGE COMPLIANCE ═══ -->
-    <div class="panel">
-        <div class="panel__header">
-            <span class="panel__title"><i class="fa-solid fa-bullseye"></i> Dosage Compliance</span>
+        <div class="scada-telemetry-grid" aria-label="Clickable telemetry micrographs">
+            <a class="scada-telemetry-card scada-telemetry-card--cyan" href="#process-dynamics"><span class="scada-telemetry-card__top"><span>HYDRAULICS · {{ period_days }}D</span><i class="fa-solid fa-arrow-up-right-from-square"></i></span><span class="scada-telemetry-card__metric">{% if flow_display != None %}{{ flow_display|floatformat:1 }}{% else %}—{% endif %}<small>m³/h avg</small></span><span class="scada-telemetry-card__chart"><canvas id="overviewFlowMicro" aria-label="Daily recorded water flow trendline"></canvas></span><span class="scada-telemetry-card__foot">{{ flow_metric_source }} · {{ flow_observation_count }} readings</span></a>
+            <a class="scada-telemetry-card scada-telemetry-card--amber" href="#chemical-usage"><span class="scada-telemetry-card__top"><span>CHEMICAL USE · {{ period_days }}D</span><i class="fa-solid fa-arrow-up-right-from-square"></i></span><span class="scada-telemetry-card__metric">{{ usage_total|floatformat:1 }}<small>kg logged</small></span><span class="scada-telemetry-card__chart"><canvas id="overviewUsageMicro" aria-label="Daily logged chemical consumption trendline"></canvas></span><span class="scada-telemetry-card__foot">Daily chemical usage ledger · kg</span></a>
+            <a class="scada-telemetry-card scada-telemetry-card--blue" href="#reservoirs"><span class="scada-telemetry-card__top"><span>STORAGE FILL · MEAN</span><i class="fa-solid fa-arrow-up-right-from-square"></i></span><span class="scada-telemetry-card__metric">{% if monitored_reservoir_count %}{{ reservoir_fill|floatformat:1 }}{% else %}—{% endif %}<small>% recorded fill</small></span><span class="scada-telemetry-card__chart"><canvas id="overviewReservoirMicro" aria-label="Daily mean recorded reservoir fill trendline"></canvas></span><span class="scada-telemetry-card__foot">{{ monitored_reservoir_count }} reservoirs with level readings</span></a>
+            <a class="scada-telemetry-card scada-telemetry-card--violet" href="#dosing-records"><span class="scada-telemetry-card__top"><span>DOSE ALIGNMENT · ±15%</span><i class="fa-solid fa-arrow-up-right-from-square"></i></span><span class="scada-telemetry-card__metric">{% if compliance_rate != None %}{{ compliance_rate|floatformat:1 }}{% else %}—{% endif %}<small>% within expected</small></span><span class="scada-telemetry-card__chart"><canvas id="overviewComplianceMicro" aria-label="Daily dosing and reading alignment trendline"></canvas></span><span class="scada-telemetry-card__foot">{{ compliance_total }} actual-to-expected comparisons</span></a>
+            <a class="scada-telemetry-card scada-telemetry-card--green" href="#chemical-pumps"><span class="scada-telemetry-card__top"><span>PUMP READINESS · LATEST STATUS</span><i class="fa-solid fa-arrow-up-right-from-square"></i></span><span class="scada-telemetry-card__metric">{{ pump_summary.working }}<small>/ {{ pump_rows|length }} working</small></span><span class="scada-telemetry-card__chart scada-telemetry-card__chart--donut"><canvas id="overviewPumpMicro" aria-label="Current pump status mix"></canvas></span><span class="scada-telemetry-card__foot">{{ pump_summary.faulty }} faulty · {{ pump_summary.maintenance }} maintenance · {{ pump_summary.unknown }} unreported</span></a>
+            <a class="scada-telemetry-card scada-telemetry-card--rose" href="#chemical-stocks"><span class="scada-telemetry-card__top"><span>INVENTORY WATCH · SNAPSHOT</span><i class="fa-solid fa-arrow-up-right-from-square"></i></span><span class="scada-telemetry-card__metric">{{ low_stock_count }}<small>lines &lt; 50 kg</small></span><span class="scada-telemetry-card__chart"><canvas id="overviewStockMicro" aria-label="Current stock level micrograph"></canvas></span><span class="scada-telemetry-card__foot">{{ stock_rows|length }} stock lines · current quantities</span></a>
+            <a class="scada-telemetry-card scada-telemetry-card--cyan" href="#t-filters"><span class="scada-telemetry-card__top"><span>FILTER TRAIN · FLOW / DESIGN</span><i class="fa-solid fa-arrow-up-right-from-square"></i></span><span class="scada-telemetry-card__metric">{{ filter_flow_total|floatformat:1 }}<small>m³/h</small></span><span class="scada-telemetry-card__chart"><canvas id="overviewFilterMicro" aria-label="Filter flow compared with design capacity"></canvas></span><span class="scada-telemetry-card__foot">{% if filter_overall_utilization != None %}{{ filter_overall_utilization|floatformat:1 }}% aggregate design utilization{% else %}{{ filter_rows|length }} configured filters{% endif %}</span></a>
+            <a class="scada-telemetry-card scada-telemetry-card--blue" href="#t-clarifiers"><span class="scada-telemetry-card__top"><span>CLARIFICATION · VALVES</span><i class="fa-solid fa-arrow-up-right-from-square"></i></span><span class="scada-telemetry-card__metric">{{ clarifier_rows|length }}<small>clarifiers</small></span><span class="scada-telemetry-card__chart scada-telemetry-card__chart--donut"><canvas id="overviewValveMicro" aria-label="Disludge valve status distribution"></canvas></span><span class="scada-telemetry-card__foot">{{ valve_rows|length }} valves · {{ clarifier_maintenance_due }} clarifiers due service</span></a>
         </div>
-        <div class="panel__body" id="compliancePanel" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.5rem;">
-            <!-- Filled by JS -->
-        </div>
-    </div>
+        <div class="scada-command-overview__foot"><span><i class="fa-solid fa-circle-info"></i> Raw water and inflow are one feed: flow comes from O dosing records; water-quality measurements and stage samples come from QC.</span><span>SNAPSHOT {{ today|date:"d M Y" }} · {{ period_days }} DAY WINDOW</span></div>
+    </section>
 
-    <!-- ═══ RECENT DOSING ═══ -->
-    <div class="panel panel--span-2">
-        <div class="panel__header">
-            <span class="panel__title"><i class="fa-solid fa-clock-rotate-left"></i> Recent Dosing Records</span>
+    {% if not has_plant_scope %}
+    <div class="scada-empty-scope"><i class="fa-solid fa-location-crosshairs"></i><div><strong>No treatment plant is assigned to this account.</strong><span>Assign a plant to view scoped operations records.</span></div></div>
+    {% endif %}
+
+    {% if alerts %}
+    <section class="scada-alert-ribbon" aria-label="Operational alerts">
+        <div class="scada-alert-ribbon__title"><span class="scada-alert-icon"><i class="fa-solid fa-bell"></i></span><div><b>Attention required</b><small>{{ alerts|length }} operational signal{{ alerts|length|pluralize }}</small></div></div>
+        <div class="scada-alert-ribbon__items">
+            {% for alert in alerts %}<a class="scada-alert-chip scada-alert-chip--{{ alert.level }}" href="{{ alert.target }}"><i class="fa-solid {% if alert.level == 'critical' %}fa-triangle-exclamation{% else %}fa-circle-exclamation{% endif %}"></i><span><b>{{ alert.title }}</b><small>{{ alert.detail }}</small></span><i class="fa-solid fa-arrow-up-right-from-square"></i></a>{% endfor %}
         </div>
-        <div class="panel__body">
-            <table class="panel-table">
-                <thead><tr><th>Type</th><th>Chemical</th><th>Actual</th><th>Expected</th><th>Flow</th><th>Date</th><th>By</th></tr></thead>
-                <tbody>
-                    {% for d in recent_dosing %}
-                    <tr>
-                        <td><span class="pill pill--{% if d.type == 'Coagulant' %}blue{% elif d.type == 'pH Adj' %}purple{% elif d.type == 'Disinfect' %}emerald{% else %}amber{% endif %}">{{ d.type }}</span></td>
-                        <td>{{ d.chemical }}</td>
-                        <td>{{ d.dosage|floatformat:1 }}</td>
-                        <td>{{ d.expected|floatformat:1|default:"—" }}</td>
-                        <td>{{ d.flow|floatformat:0 }}</td>
-                        <td>{{ d.date }}</td>
-                        <td>{{ d.operator }}</td>
-                    </tr>
-                    {% empty %}
-                    <tr><td colspan="7" class="empty-state"><i class="fa-solid fa-vial"></i> No dosing records</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    </section>
+    {% endif %}
+
+    <section class="scada-kpis" aria-label="Water treatment key performance indicators">
+        {% for kpi in kpis %}
+        <a href="{{ kpi.href }}" class="scada-kpi scada-kpi--{{ kpi.tone }}">
+            <span class="scada-kpi__icon"><i class="fa-solid {{ kpi.icon }}"></i></span>
+            <span class="scada-kpi__meta"><span class="scada-kpi__label">{{ kpi.label }}</span><strong>{{ kpi.value }}</strong><span class="scada-kpi__unit">{{ kpi.unit }}</span><small>{{ kpi.target }}</small></span>
+            <i class="fa-solid fa-arrow-up-right-from-square scada-kpi__jump" aria-hidden="true"></i>
+        </a>
+        {% endfor %}
+    </section>
+
+    <section class="scada-section scada-start" aria-labelledby="startTitle">
+        <div class="scada-section__heading">
+            <div><span class="scada-overline">OPERATIONS WORKSPACES</span><h2 id="startTitle">Start with a system</h2><p>Open a model-backed drill-down into the underlying chemical operations records.</p></div>
+            <span class="scada-section__count">13 O MODELS · 5 T TELEMETRY MODELS</span>
         </div>
-    </div>
+        <div class="scada-start-grid">
+            <a href="#process-dynamics" class="scada-start-card scada-start-card--cyan"><span class="scada-start-card__icon"><i class="fa-solid fa-water"></i></span><span><small>CAPACITY · THROUGHPUT</small><b>Plant dynamics</b><em>TreatmentPlantPhase</em></span><i class="fa-solid fa-arrow-right"></i></a>
+            <a href="#dosing-record-table" class="scada-start-card scada-start-card--violet scada-dose-filter" data-dose-filter="coagulant"><span class="scada-start-card__icon"><i class="fa-solid fa-vials"></i></span><span><small>DOSING MODEL</small><b>Coagulant</b><em>CoagulantUsageRecord</em></span><i class="fa-solid fa-arrow-right"></i></a>
+            <a href="#dosing-record-table" class="scada-start-card scada-start-card--violet scada-dose-filter" data-dose-filter="ph-adjuster"><span class="scada-start-card__icon"><i class="fa-solid fa-flask"></i></span><span><small>DOSING MODEL</small><b>pH adjuster</b><em>PHAdjusterUsageRecord</em></span><i class="fa-solid fa-arrow-right"></i></a>
+            <a href="#dosing-record-table" class="scada-start-card scada-start-card--green scada-dose-filter" data-dose-filter="disinfectant"><span class="scada-start-card__icon"><i class="fa-solid fa-shield-virus"></i></span><span><small>DOSING MODEL</small><b>Disinfectant</b><em>DisinfectantUsageRecord</em></span><i class="fa-solid fa-arrow-right"></i></a>
+            <a href="#dosing-record-table" class="scada-start-card scada-start-card--amber scada-dose-filter" data-dose-filter="flocculant"><span class="scada-start-card__icon"><i class="fa-solid fa-atom"></i></span><span><small>DOSING MODEL</small><b>Flocculant</b><em>FlocculantUsageRecord</em></span><i class="fa-solid fa-arrow-right"></i></a>
+            <a href="#chemical-pumps" class="scada-start-card scada-start-card--green"><span class="scada-start-card__icon"><i class="fa-solid fa-pump-soap"></i></span><span><small>READINESS · STATUS</small><b>Pump station</b><em>ChemicalPump · PumpStatus</em></span><i class="fa-solid fa-arrow-right"></i></a>
+            <a href="#chemical-tanks" class="scada-start-card scada-start-card--blue"><span class="scada-start-card__icon"><i class="fa-solid fa-database"></i></span><span><small>PHASE · CAPACITY</small><b>Chemical tanks</b><em>ChemicalTank</em></span><i class="fa-solid fa-arrow-right"></i></a>
+            <a href="#chemical-stocks" class="scada-start-card scada-start-card--amber"><span class="scada-start-card__icon"><i class="fa-solid fa-boxes-stacked"></i></span><span><small>INVENTORY · REORDER</small><b>Stock position</b><em>ChemicalStock</em></span><i class="fa-solid fa-arrow-right"></i></a>
+            <a href="#chemical-usage" class="scada-start-card scada-start-card--rose"><span class="scada-start-card__icon"><i class="fa-solid fa-arrow-trend-down"></i></span><span><small>CONSUMPTION · TRENDS</small><b>Usage ledger</b><em>ChemicalUsageRecord</em></span><i class="fa-solid fa-arrow-right"></i></a>
+            <a href="#reservoirs" class="scada-start-card scada-start-card--cyan"><span class="scada-start-card__icon"><i class="fa-solid fa-water-ladder"></i></span><span><small>STORAGE · CAPACITY</small><b>Reservoirs</b><em>Reservoir</em></span><i class="fa-solid fa-arrow-right"></i></a>
+            <a href="#reservoir-levels" class="scada-start-card scada-start-card--blue"><span class="scada-start-card__icon"><i class="fa-solid fa-chart-area"></i></span><span><small>LEVEL HISTORY</small><b>Storage readings</b><em>ReservoirLevel</em></span><i class="fa-solid fa-arrow-right"></i></a>
+            <a href="#chemical-categories" class="scada-start-card scada-start-card--violet"><span class="scada-start-card__icon"><i class="fa-solid fa-layer-group"></i></span><span><small>PROCESS CLASSIFICATION</small><b>Chemical categories</b><em>ChemicalCategory</em></span><i class="fa-solid fa-arrow-right"></i></a>
+            <a href="#monitoring-times" class="scada-start-card scada-start-card--green"><span class="scada-start-card__icon"><i class="fa-solid fa-clock"></i></span><span><small>DAILY OBSERVATION SLOTS</small><b>Monitoring schedule</b><em>MonitoringTime</em></span><i class="fa-solid fa-arrow-right"></i></a>
+            <a href="#t-filters" class="scada-start-card scada-start-card--cyan"><span class="scada-start-card__icon"><i class="fa-solid fa-filter"></i></span><span><small>FILTER TRAIN · FLOW & STATUS</small><b>Water filters</b><em>WaterFilter · FilterType</em></span><i class="fa-solid fa-arrow-right"></i></a>
+            <a href="#t-clarifiers" class="scada-start-card scada-start-card--blue"><span class="scada-start-card__icon"><i class="fa-solid fa-industry"></i></span><span><small>SETTLING · VALVE HEALTH</small><b>Clarifiers</b><em>Clarifier · DisludgeValve · Status</em></span><i class="fa-solid fa-arrow-right"></i></a>
+        </div>
+    </section>
+
+    <section class="scada-grid scada-grid--overview">
+        <article class="scada-panel scada-panel--wide">
+            <div class="scada-panel__head"><div><span class="scada-overline">PROCESS INTELLIGENCE</span><h2>Flow & chemical consumption</h2></div><span class="scada-badge"><i class="fa-solid fa-chart-line"></i> {{ period_days }} DAYS</span></div>
+            <p class="scada-panel__hint">Raw-water inflow is the average entered in dosing records for each day. This is the same raw-water feed represented in QC raw-water samples.</p>
+            <div class="scada-chart"><canvas id="processChart" aria-label="Recorded flow and chemical usage chart"></canvas>{% if not dosing_total and not usage_total %}<div class="scada-chart-empty"><i class="fa-solid fa-chart-line"></i><span>No process or chemical usage records in this period.</span></div>{% endif %}</div>
+            <div class="scada-legend"><span><i class="scada-legend__dot scada-legend__dot--cyan"></i> Recorded flow · m³/h</span><span><i class="scada-legend__dot scada-legend__dot--amber"></i> Chemical usage · kg/day</span></div>
+        </article>
+        <article class="scada-panel">
+            <div class="scada-panel__head"><div><span class="scada-overline">ASSET HEALTH</span><h2>Pump readiness</h2></div><a href="#chemical-pumps" class="scada-icon-link" aria-label="Open pump details"><i class="fa-solid fa-arrow-up-right-from-square"></i></a></div>
+            <div class="scada-donut-wrap"><canvas id="pumpChart" aria-label="Pump status distribution"></canvas><div class="scada-donut-center"><b>{{ pump_rows|length }}</b><small>PUMPS</small></div></div>
+            <div class="scada-status-list">
+                <span><i class="scada-status-dot scada-status-dot--working"></i> Working <b>{{ pump_summary.working }}</b></span>
+                <span><i class="scada-status-dot scada-status-dot--faulty"></i> Faulty <b>{{ pump_summary.faulty }}</b></span>
+                <span><i class="scada-status-dot scada-status-dot--maint"></i> Maintenance <b>{{ pump_summary.maintenance }}</b></span>
+                <span><i class="scada-status-dot scada-status-dot--unknown"></i> Unreported <b>{{ pump_summary.unknown }}</b></span>
+            </div>
+        </article>
+    </section>
+
+    <section class="scada-section scada-water-quality" id="water-quality-telemetry" aria-labelledby="waterQualityTitle">
+        <div class="scada-section__heading">
+            <div><span class="scada-overline">QC LAB · RAW WATER THROUGH TREATMENT</span><h2 id="waterQualityTitle">Water quality telemetry &amp; stage performance</h2><p>QC measurements are grouped by raw, coagulated, clarified and treated samples for the shared plant and date window. Raw-water inflow uses the O flow observations above.</p></div>
+            <a class="scada-section__count" href="{% url 'qc:analytics' %}{% if plant %}?plant={{ plant.pk }}{% endif %}">OPEN QC ANALYTICS <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+        </div>
+        <div class="scada-water-stage-strip" aria-label="QC sample and quality status by stage">
+            {% for stage in water_quality_stages %}
+            <a class="scada-water-stage" href="{% url 'qc:analytics' %}?water_type={{ stage.key }}{% if plant %}&amp;plant={{ plant.pk }}{% endif %}">
+                <span class="scada-water-stage__top"><i style="--stage-color:{{ stage.color }}"></i>{{ stage.label }}</span>
+                <strong>{{ stage.samples }}</strong><small>QC samples · {{ stage.measurements }} measurements</small>
+                <span class="scada-water-stage__foot">{% if stage.compliance != None %}{{ stage.compliance|floatformat:1 }}% within configured limits{% else %}{{ stage.parameter_count }} parameters · no limits to score{% endif %}</span>
+                <span class="scada-water-stage__stamp">{% if stage.latest_date %}Latest {{ stage.latest_date|date:"d M Y" }} · {{ stage.latest_time }}{% else %}No QC result in window{% endif %}</span>
+            </a>
+            {% endfor %}
+        </div>
+        <div class="scada-grid scada-grid--water-quality">
+            <article class="scada-panel scada-panel--wide">
+                <div class="scada-panel__head"><div><span class="scada-overline">STAGE TREND · DAILY MEAN</span><h2>Parameter profile through the treatment train</h2></div>
+                    <label class="scada-quality-select" for="waterQualityParameter"><span>Parameter</span><select id="waterQualityParameter"{% if not water_quality_parameters %} disabled{% endif %}>{% for parameter in water_quality_parameters %}<option value="{{ parameter.id }}"{% if selected_quality_parameter.id == parameter.id %} selected{% endif %}>{{ parameter.name }} · {{ parameter.unit }}</option>{% endfor %}</select></label>
+                </div>
+                <p class="scada-panel__hint">Daily mean of entered QC result values. Gaps remain empty when the selected stage or parameter has no reading.</p>
+                <div class="scada-chart"><canvas id="waterQualityTrendChart" aria-label="Daily quality measurement trend by treatment stage"></canvas>{% if not water_quality_parameters %}<div class="scada-chart-empty"><i class="fa-solid fa-flask-vial"></i><span>No QC result values in this plant and period.</span></div>{% endif %}</div>
+            </article>
+            <article class="scada-panel">
+                <div class="scada-panel__head"><div><span class="scada-overline">SAMPLE COMPLETENESS · QC</span><h2>Stage coverage &amp; compliance</h2></div></div>
+                <div class="scada-chart scada-chart--compact"><canvas id="waterQualityStageChart" aria-label="QC sample counts and configured-limit compliance by stage"></canvas>{% if not qc_sample_count %}<div class="scada-chart-empty"><span>No QC samples in this date window.</span></div>{% endif %}</div>
+                <div class="scada-quality-note"><i class="fa-solid fa-circle-info"></i><span>Compliance uses only result parameters with configured minimum or maximum limits. Missing limits are left unscored.</span></div>
+            </article>
+        </div>
+        <div class="scada-panel scada-dose-panel" id="established-dosages">
+            <div class="scada-panel__head"><div><span class="scada-overline">LATEST APPROVED RECOMMENDATIONS</span><h2>Established chemical dosages</h2></div><span class="scada-badge">APPROVED SOURCE RECORDS</span></div>
+            <div class="scada-dose-grid">
+                {% for dose in established_dosages %}
+                <a class="scada-dose-card" href="{% if dose.label == 'Coagulant' %}{% url 'jartest:dashboard' %}{% elif dose.label == 'pH adjustment' %}{% url 'PHadjustment:dashboard' %}{% else %}{% url 'chlorinedemand:dashboard' %}{% endif %}{% if plant %}?plant={{ plant.pk }}{% endif %}">
+                    <span class="scada-dose-card__label">{{ dose.label }} · ESTABLISHED</span>
+                    <strong>{% if dose.value != None %}{{ dose.value|floatformat:2 }}{% else %}—{% endif %}<small>{{ dose.unit }}</small></strong>
+                    <span class="scada-dose-card__chemical">{{ dose.detail }}</span>
+                    <span class="scada-dose-card__stamp">{% if dose.date %}Approved test · {{ dose.date|date:"d M Y" }}{% else %}No approved established value{% endif %}{% if is_superuser and not plant %} · {{ dose.plant }}{% endif %}</span>
+                    <span class="scada-dose-card__trend"><canvas id="establishedDoseTrend{{ forloop.counter }}" aria-label="{{ dose.label }} established dosage trend"></canvas></span>
+                </a>
+                {% endfor %}
+            </div>
+            <div class="scada-quality-note"><i class="fa-solid fa-shield-halved"></i><span>Values come from the latest approved Jar Test, pH Adjustment and Chlorine Demand records. Trendlines show approved records inside the selected period; units remain separate by card.</span></div>
+        </div>
+        <div class="scada-panel scada-table-panel scada-quality-table">
+            <div class="scada-panel__head"><div><span class="scada-overline">QC RESULT DETAIL · ALL PARAMETERS</span><h2>Stage parameter telemetry</h2></div><span class="scada-badge">{{ water_quality_rows|length }} STAGE / PARAMETER LINES</span></div>
+            <div class="scada-table-scroll"><table class="scada-table"><thead><tr><th>Stage · phase</th><th>Parameter</th><th>Window mean</th><th>Observed range</th><th>Latest result</th><th>Limit compliance</th><th>Readings</th></tr></thead><tbody>
+                {% for row in water_quality_rows %}<tr><td><span class="scada-tag scada-tag--blue">{{ row.stage }}</span><small>{{ row.phase }}{% if row.latest_reference %} · {{ row.latest_reference }}{% endif %}</small></td><td><b>{{ row.parameter }}</b><small>{{ row.unit }}</small></td><td>{% if row.mean != None %}<strong>{{ row.mean|floatformat:3 }}</strong> {{ row.unit }}{% else %}—{% endif %}</td><td>{% if row.minimum != None and row.maximum != None %}{{ row.minimum|floatformat:3 }} – {{ row.maximum|floatformat:3 }}{% else %}—{% endif %}<small>{{ row.unit }}</small></td><td>{% if row.latest != None %}<strong>{{ row.latest|floatformat:3 }}</strong> {{ row.unit }}<small>{{ row.latest_date|date:"d M Y" }} · {{ row.latest_time }}</small>{% else %}—{% endif %}</td><td>{% if row.compliance != None %}<span class="scada-state-pill scada-state-pill--{% if row.compliance >= 95 %}working{% elif row.compliance >= 80 %}maintenance{% else %}faulty{% endif %}"><i></i>{{ row.compliance|floatformat:1 }}% · {{ row.within }}/{{ row.compared }}</span>{% else %}<span class="scada-state-pill scada-state-pill--unknown"><i></i>Not scored</span>{% endif %}</td><td>{{ row.samples }}</td></tr>
+                {% empty %}<tr><td colspan="7"><div class="scada-empty scada-empty--row"><i class="fa-solid fa-flask-vial"></i><b>No QC parameter measurements for this plant and period</b><span>QC result measurements will appear here when recorded.</span></div></td></tr>{% endfor %}
+            </tbody></table></div>
+        </div>
+    </section>
+
+    </section>
+
+    <section class="scada-tab-panel{% if active_tab == 'process' %} is-active{% endif %}" id="scada-panel-process" role="tabpanel" aria-labelledby="scada-tab-process" data-tab-panel="process"{% if active_tab != 'process' %} hidden{% endif %}>
+
+    <section class="scada-grid scada-grid--dynamics" id="process-dynamics">
+        <article class="scada-panel scada-panel--wide">
+            <div class="scada-panel__head"><div><span class="scada-overline">PLANT HYDRAULICS</span><h2>Phase throughput vs capacity</h2></div><span class="scada-badge">RECORDED FLOW / OPERATIONAL</span></div>
+            <div class="scada-process-flow">
+                {% for phase in phase_rows %}
+                <div class="scada-phase-node"><span class="scada-phase-node__index">{{ forloop.counter|stringformat:"02d" }}</span><div><small>{{ phase.plant }}</small><b>{{ phase.name }}</b><span>{% if phase.recorded_flow != None %}{{ phase.recorded_flow|floatformat:1 }} m³/h avg · {{ phase.flow_source }}{% else %}No recent flow entry{% endif %}</span><small>Operational / design: {{ phase.operational_capacity|floatformat:1 }} / {{ phase.design_capacity|floatformat:1 }} m³/h</small></div><div class="scada-phase-meter"><i style="width:{{ phase.flow_meter }}%"></i></div><strong>{% if phase.flow_load != None %}{{ phase.flow_load|floatformat:0 }}%{% else %}—{% endif %}</strong></div>
+                {% empty %}<div class="scada-empty"><i class="fa-solid fa-water"></i><b>No treatment phases in scope</b><span>Phase design and operational capacities appear here when configured.</span></div>{% endfor %}
+            </div>
+            <div class="scada-footnote"><i class="fa-solid fa-circle-info"></i> Flow loading uses entered dosing-record averages compared with configured operational capacity; no sensor feed is implied.</div>
+        </article>
+        <article class="scada-panel">
+            <div class="scada-panel__head"><div><span class="scada-overline">STORAGE DYNAMICS</span><h2>Reservoir fill profile</h2></div><a href="#reservoirs" class="scada-icon-link" aria-label="Open reservoir details"><i class="fa-solid fa-arrow-up-right-from-square"></i></a></div>
+            <div class="scada-chart scada-chart--compact"><canvas id="reservoirChart" aria-label="Reservoir fill percentages"></canvas>{% if not monitored_reservoir_count %}<div class="scada-chart-empty"><i class="fa-solid fa-water-ladder"></i><span>No reservoir levels recorded.</span></div>{% endif %}</div>
+            <div class="scada-storage-total"><span>Latest measured storage</span><b>{{ reservoir_storage|floatformat:0 }} <small>m³</small></b><em>of {{ reservoir_measured_capacity|floatformat:0 }} m³ monitored capacity · {{ reservoir_capacity|floatformat:0 }} m³ total rated</em></div>
+        </article>
+    </section>
+
+    <section class="scada-section scada-detail-section" id="t-filters">
+        <div class="scada-section__heading"><div><span class="scada-overline">TREATMENT APP · FILTER TRAIN</span><h2>Water filter telemetry</h2><p>Configured flow, design throughput, operating state, geometry and maintenance age from T app filter records.</p></div><span class="scada-section__count">{{ filter_rows|length }} FILTERS</span></div>
+        <div class="scada-mini-stats">
+            <div class="scada-mini-stat scada-mini-stat--metric"><span>Aggregate flow / design</span><b>{{ filter_flow_total|floatformat:1 }} / {{ filter_design_total|floatformat:1 }}</b><small>m³/h · {% if filter_overall_utilization != None %}{{ filter_overall_utilization }}% utilization{% else %}capacity not configured{% endif %}</small></div>
+            <div class="scada-mini-stat scada-mini-stat--metric"><span>Working</span><b>{{ filter_status_counts.working|default:0 }} / {{ filter_rows|length }}</b><small>Configured filter assets</small></div>
+            <div class="scada-mini-stat scada-mini-stat--metric"><span>Backwashing</span><b>{{ filter_status_counts.backwashing|default:0 }}</b><small>Current model status</small></div>
+            <div class="scada-mini-stat scada-mini-stat--metric"><span>Isolated / maintenance</span><b>{{ filter_status_counts.isolated|default:0 }} / {{ filter_status_counts.maintenance|default:0 }}</b><small>{{ filter_maintenance_due }} maintenance intervals ≥ 180 days</small></div>
+        </div>
+        <div class="scada-grid scada-grid--t-telemetry">
+            <article class="scada-panel scada-panel--wide"><div class="scada-panel__head"><div><span class="scada-overline">THROUGHPUT ENVELOPE</span><h2>Filter flow vs design capacity</h2></div><span class="scada-badge">MODEL CONFIGURATION</span></div><div class="scada-chart"><canvas id="filterTrainChart" aria-label="Filter flow compared with design capacity"></canvas>{% if not filter_rows %}<div class="scada-chart-empty"><i class="fa-solid fa-filter"></i><span>No filter assets in this plant scope.</span></div>{% endif %}</div></article>
+            <article class="scada-panel"><div class="scada-panel__head"><div><span class="scada-overline">OPERATING STATE</span><h2>Filter status mix</h2></div></div><div class="scada-donut-wrap"><canvas id="filterStatusChart" aria-label="Filter status distribution"></canvas><div class="scada-donut-center"><b>{{ filter_rows|length }}</b><small>FILTERS</small></div></div><div class="scada-status-list">{% for row in filter_status_rows %}<span><i class="scada-status-dot scada-status-dot--{{ row.key }}"></i>{{ row.label }} <b>{{ row.count }}</b></span>{% endfor %}</div></article>
+        </div>
+        <div class="scada-panel scada-table-panel"><div class="scada-panel__head"><div><span class="scada-overline">WATERFILTER · FILTERTYPE</span><h2>Filter asset register</h2></div><span class="scada-badge">{{ filter_type_rows|length }} FILTER TYPES</span></div><div class="scada-table-scroll"><table class="scada-table"><thead><tr><th>Filter · type</th><th>Plant · phase</th><th>Status</th><th>Flow / capacity</th><th>Utilization</th><th>Volume · geometry</th><th>Location · maintenance</th></tr></thead><tbody>
+            {% for row in filter_rows %}<tr><td><b>{{ row.name }}</b><small>{{ row.type }}</small></td><td>{{ row.plant }}<small>{{ row.phase }}</small></td><td><span class="scada-state-pill scada-state-pill--{{ row.status }}"><i></i>{{ row.status_label }}</span></td><td>{{ row.flow_rate|floatformat:2 }} / {{ row.design_capacity|floatformat:2 }}<small>m³/h</small></td><td>{% if row.utilization != None %}<strong>{{ row.utilization|floatformat:1 }}%</strong>{% else %}—{% endif %}</td><td>{{ row.volume|floatformat:2 }} m³<small>{{ row.dimensions }}</small></td><td>{{ row.location }}<small>Last service {{ row.last_maintenance|date:"d M Y" }} · {{ row.days_since_maintenance }} days ago{% if row.maintenance_due %} · DUE{% endif %}</small></td></tr>
+            {% empty %}<tr><td colspan="7"><div class="scada-empty scada-empty--row"><i class="fa-solid fa-filter"></i><b>No water filters configured</b></div></td></tr>{% endfor %}
+            </tbody></table></div></div>
+        <div class="scada-panel scada-table-panel"><div class="scada-panel__head"><div><span class="scada-overline">FILTERTYPE CATALOG</span><h2>Filter design families</h2></div></div><div class="scada-filter-types">{% for row in filter_type_rows %}<article><i class="fa-solid fa-water"></i><span><b>{{ row.name }}</b><small>{{ row.description }}</small></span><strong>{{ row.units }} units</strong></article>{% empty %}<div class="scada-empty"><b>No in-scope filter types</b></div>{% endfor %}</div></div>
+    </section>
+
+    <section class="scada-section scada-detail-section" id="t-clarifiers">
+        <div class="scada-section__heading"><div><span class="scada-overline">TREATMENT APP · CLARIFICATION</span><h2>Clarifier & disludge telemetry</h2><p>Hydraulic design envelope, basin geometry, maintenance interval and linked valve status counts.</p></div><span class="scada-section__count">{{ clarifier_rows|length }} CLARIFIERS · {{ valve_rows|length }} VALVES</span></div>
+        <div class="scada-mini-stats"><div class="scada-mini-stat scada-mini-stat--metric"><span>Design throughput</span><b>{{ clarifier_design_total|floatformat:1 }} m³/h</b><small>Across scoped clarifiers</small></div><div class="scada-mini-stat scada-mini-stat--metric"><span>Basin volume</span><b>{{ clarifier_volume_total|floatformat:1 }} m³</b><small>Configured clarifier capacity</small></div><div class="scada-mini-stat scada-mini-stat--metric"><span>Maintenance due</span><b>{{ clarifier_maintenance_due }}</b><small>Last service ≥ 180 days ago</small></div><div class="scada-mini-stat scada-mini-stat--metric"><span>Valve states</span><b>{{ valve_status_rows|length }}</b><small>{{ valve_rows|length }} linked disludge valves</small></div></div>
+        <div class="scada-grid scada-grid--t-telemetry"><article class="scada-panel scada-panel--wide"><div class="scada-panel__head"><div><span class="scada-overline">DESIGN ENVELOPE</span><h2>Clarifier capacity & basin volume</h2></div></div><div class="scada-chart"><canvas id="clarifierCapacityChart" aria-label="Clarifier design flow and basin volume"></canvas>{% if not clarifier_rows %}<div class="scada-chart-empty"><span>No clarifiers configured in this plant scope.</span></div>{% endif %}</div></article><article class="scada-panel"><div class="scada-panel__head"><div><span class="scada-overline">DISLUDGE ACTUATION</span><h2>Valve status mix</h2></div><a href="#t-valves" class="scada-icon-link" aria-label="Open disludge valve status"><i class="fa-solid fa-arrow-up-right-from-square"></i></a></div><div class="scada-donut-wrap"><canvas id="valveStatusChart" aria-label="Disludge valve status distribution"></canvas><div class="scada-donut-center"><b>{{ valve_rows|length }}</b><small>VALVES</small></div></div><div class="scada-status-list">{% for row in valve_status_rows %}<span><i class="scada-status-dot"></i>{{ row.name }} <b>{{ row.count }}</b></span>{% empty %}<span>No statuses recorded</span>{% endfor %}</div></article></div>
+        <div class="scada-panel scada-table-panel"><div class="scada-panel__head"><div><span class="scada-overline">CLARIFIER ASSET REGISTER</span><h2>Settling basins</h2></div></div><div class="scada-table-scroll"><table class="scada-table"><thead><tr><th>Clarifier</th><th>Phase · plant</th><th>Design · flow</th><th>Capacity · area</th><th>Surface loading</th><th>Geometry · flow path</th><th>Service · valves</th></tr></thead><tbody>{% for row in clarifier_rows %}<tr><td><b>{{ row.name }}</b></td><td>{{ row.phase }}<small>{{ row.plant }}</small></td><td>{{ row.design }}<small>{{ row.design_capacity|floatformat:2 }} m³/h</small></td><td>{{ row.volume_capacity|floatformat:2 }} m³<small>{{ row.surface_area|floatformat:2 }} m²</small></td><td>{{ row.surface_loading|floatformat:3 }} m³/m²/h</td><td>{{ row.dimensions }}<small>{{ row.flow_type }}</small></td><td>{{ row.last_maintenance|date:"d M Y" }}<small>{{ row.days_since_maintenance }} days · {{ row.valve_count }} valves{% if row.maintenance_due %} · DUE{% endif %}</small></td></tr>{% empty %}<tr><td colspan="7"><div class="scada-empty scada-empty--row"><b>No clarifiers configured</b></div></td></tr>{% endfor %}</tbody></table></div></div>
+    </section>
+
+    <section class="scada-section scada-detail-section" id="t-valves"><div class="scada-section__heading"><div><span class="scada-overline">STATUS · DISLUDGEVALVE</span><h2>Valve state register</h2><p>Valve status is joined to the plant-scoped clarifier register.</p></div><span class="scada-section__count">{{ valve_rows|length }} VALVES</span></div><div class="scada-panel scada-table-panel"><div class="scada-table-scroll"><table class="scada-table"><thead><tr><th>Valve</th><th>Clarifier</th><th>Plant</th><th>Configured status</th></tr></thead><tbody>{% for row in valve_rows %}<tr><td><b>{{ row.name }}</b></td><td>{{ row.clarifier }}</td><td>{{ row.plant }}</td><td><span class="scada-state-pill"><i></i>{{ row.status }}</span></td></tr>{% empty %}<tr><td colspan="4"><div class="scada-empty scada-empty--row"><b>No disludge valves are configured</b></div></td></tr>{% endfor %}</tbody></table></div></div></section>
+
+    </section>
+
+    <section class="scada-tab-panel{% if active_tab == 'dosing' %} is-active{% endif %}" id="scada-panel-dosing" role="tabpanel" aria-labelledby="scada-tab-dosing" data-tab-panel="dosing"{% if active_tab != 'dosing' %} hidden{% endif %}>
+
+    <section class="scada-section scada-detail-section" id="dosing-records">
+        <div class="scada-section__heading"><div><span class="scada-overline">MODEL DRILL-DOWN · BASE USAGE FIELDS</span><h2>Chemical dosing runs</h2><p>Operator, phase, flow, selected pump and tank, dosage, concentration, shift and monitoring slot.</p></div><span class="scada-section__count">{{ dosing_total }} RECORDS</span></div>
+        <div class="scada-mini-stats"><a href="#dosing-record-table" class="scada-mini-stat scada-dose-filter" data-dose-filter="all"><span>All dosing types</span><b>{{ dosing_total }}</b><i class="fa-solid fa-arrow-right"></i></a>{% for label, count in dosing_counts.items %}<a href="#dosing-record-table" class="scada-mini-stat scada-dose-filter" data-dose-filter="{{ label|slugify }}"><span>{{ label }}</span><b>{{ count }}</b><i class="fa-solid fa-arrow-right"></i></a>{% endfor %}<div class="scada-mini-stat scada-mini-stat--metric"><span>Comparable readings</span><b>{% if compliance_rate != None %}{{ compliance_rate }}%{% else %}—{% endif %}</b><small>{{ compliance_total }} records have an expected value</small></div></div>
+        <div class="scada-panel scada-table-panel" id="dosing-record-table">
+            <div class="scada-panel__head"><div><span class="scada-overline">COAGULANT · pH · DISINFECTANT · FLOCCULANT</span><h2>Recent dosing activity</h2></div><span class="scada-badge">UP TO 40 ROWS</span></div>
+            <div class="scada-table-scroll"><table class="scada-table"><thead><tr><th>Type / chemical</th><th>Phase · date · slot</th><th>Flow</th><th>Actual</th><th>Expected</th><th>Concentration</th><th>Pump · tank</th><th>Operator · shift</th><th>Additional fields</th></tr></thead><tbody>
+                {% for row in dosing_records %}<tr data-dosing-type="{{ row.type|slugify }}"><td><span class="scada-tag scada-tag--{{ row.color }}">{{ row.type }}</span><b>{{ row.chemical }}</b></td><td>{{ row.phase }}<small>{{ row.plant }}</small><small>{{ row.date|date:"d M Y" }} · {{ row.time }}</small></td><td>{{ row.flow|floatformat:1 }}<small>m³/h</small></td><td>{{ row.actual|floatformat:2 }}<small>actual dosage</small></td><td>{% if row.expected != None %}{{ row.expected|floatformat:2 }}{% else %}—{% endif %}<small>expected dosage</small></td><td>{% if row.concentration != None %}{{ row.concentration|floatformat:2 }} ppm{% else %}—{% endif %}</td><td>{{ row.pump }}<small>{{ row.tank }}</small></td><td>{{ row.operator }}<small>{{ row.shift }}</small></td><td>{% if row.specific_reading != None %}Reading {{ row.specific_reading|floatformat:2 }}{% if row.expected_reading != None %} / {{ row.expected_reading|floatformat:2 }} expected{% endif %}{% endif %}{% if row.batch %}Batch {{ row.batch }}{% endif %}{% if row.flocculant_type %}<small>{{ row.flocculant_type }}</small>{% endif %}{% if row.quantity != None %}<small>{{ row.quantity|floatformat:2 }} kg used</small>{% endif %}{% if row.remarks %}<small>{{ row.remarks }}</small>{% endif %}</td></tr>
+                {% empty %}<tr><td colspan="9"><div class="scada-empty scada-empty--row"><i class="fa-solid fa-vials"></i><b>No dosing records in this analysis window</b><span>Try a longer period or check the selected plant.</span></div></td></tr>{% endfor %}
+            </tbody></table></div>
+        </div>
+    </section>
+
+    </section>
+
+    <section class="scada-tab-panel{% if active_tab == 'assets' %} is-active{% endif %}" id="scada-panel-assets" role="tabpanel" aria-labelledby="scada-tab-assets" data-tab-panel="assets"{% if active_tab != 'assets' %} hidden{% endif %}>
+
+    <section class="scada-grid scada-grid--assets" id="chemical-pumps">
+        <article class="scada-panel scada-panel--wide">
+            <div class="scada-panel__head"><div><span class="scada-overline">CHEMICAL PUMP · PUMP STATUS</span><h2>Pump station readiness</h2></div><span class="scada-badge">{{ pump_rows|length }} PUMPS</span></div>
+            <div class="scada-table-scroll"><table class="scada-table"><thead><tr><th>Pump</th><th>Phase · plant</th><th>Category</th><th>Latest status</th><th>Updated by · timestamp</th><th>Remarks</th></tr></thead><tbody>
+                {% for pump in pump_rows %}<tr><td><b>{{ pump.name }}</b></td><td>{{ pump.phase }}<small>{{ pump.plant }}</small></td><td>{{ pump.category }}</td><td><span class="scada-state-pill scada-state-pill--{{ pump.status }}"><i></i>{{ pump.status_label }}</span></td><td>{{ pump.updated_by }}<small>{% if pump.updated_at %}{{ pump.updated_at|date:"d M Y · H:i" }}{% else %}No status event{% endif %}</small></td><td>{{ pump.remarks|default:"—" }}</td></tr>
+                {% empty %}<tr><td colspan="6"><div class="scada-empty scada-empty--row"><i class="fa-solid fa-pump-soap"></i><b>No chemical pumps configured</b></div></td></tr>{% endfor %}
+            </tbody></table></div>
+            <details class="scada-history" id="pump-status-history"><summary><i class="fa-solid fa-clock-rotate-left"></i> Recent PumpStatus events <span>{{ pump_status_history|length }} events</span></summary><div class="scada-table-scroll"><table class="scada-table"><thead><tr><th>Pump</th><th>Plant · phase</th><th>Status</th><th>Updated by</th><th>Timestamp</th><th>Remarks</th></tr></thead><tbody>{% for event in pump_status_history %}<tr><td><b>{{ event.pump }}</b></td><td>{{ event.plant }}<small>{{ event.phase }}</small></td><td><span class="scada-state-pill scada-state-pill--{{ event.status_key }}"><i></i>{{ event.status }}</span></td><td>{{ event.updated_by }}</td><td>{{ event.updated_at|date:"d M Y · H:i" }}</td><td>{{ event.remarks }}</td></tr>{% empty %}<tr><td colspan="6">No pump status events available.</td></tr>{% endfor %}</tbody></table></div></details>
+        </article>
+        <article class="scada-panel" id="chemical-tanks">
+            <div class="scada-panel__head"><div><span class="scada-overline">CHEMICAL TANK</span><h2>Tank capacity map</h2></div><span class="scada-badge">{{ tank_rows|length }} TANKS</span></div>
+            <div class="scada-tank-total"><b>{{ tank_capacity|floatformat:0 }} <small>L</small></b><span>Configured capacity</span></div>
+            <div class="scada-asset-list">{% for tank in tank_rows %}<div class="scada-asset-row"><span class="scada-asset-icon"><i class="fa-solid fa-database"></i></span><span><b>{{ tank.name }}</b><small>{{ tank.plant }} · {{ tank.phase }} · {{ tank.category }}</small></span><strong>{{ tank.capacity|floatformat:0 }} L</strong></div>{% empty %}<div class="scada-empty"><i class="fa-solid fa-database"></i><b>No chemical tanks configured</b></div>{% endfor %}</div>
+        </article>
+    </section>
+
+    <section class="scada-grid scada-grid--inventory" id="chemical-stocks">
+        <article class="scada-panel scada-panel--wide">
+            <div class="scada-panel__head"><div><span class="scada-overline">CHEMICAL STOCK</span><h2>Inventory position</h2></div><span class="scada-badge">{{ stock_rows|length }} STOCK LINES</span></div>
+            <div class="scada-chart scada-chart--stock"><canvas id="stockChart" aria-label="Chemical stock quantity chart"></canvas>{% if not stock_rows %}<div class="scada-chart-empty"><i class="fa-solid fa-boxes-stacked"></i><span>No stock entries are available.</span></div>{% endif %}</div>
+            <div class="scada-table-scroll"><table class="scada-table"><thead><tr><th>Chemical</th><th>Treatment plant</th><th>Available on record</th><th>Updated</th><th>Stock signal</th></tr></thead><tbody>
+                {% for stock in stock_rows %}<tr><td><b>{{ stock.chemical }}</b></td><td>{{ stock.plant }}</td><td><strong>{{ stock.quantity|floatformat:2 }} kg</strong></td><td>{{ stock.updated_at|date:"d M Y · H:i" }}</td><td>{% if stock.quantity < 50 %}<span class="scada-state-pill scada-state-pill--maintenance"><i></i>Below 50 kg</span>{% else %}<span class="scada-state-pill scada-state-pill--working"><i></i>Above threshold</span>{% endif %}</td></tr>
+                {% empty %}<tr><td colspan="5"><div class="scada-empty scada-empty--row"><i class="fa-solid fa-boxes-stacked"></i><b>No stock entries available</b></div></td></tr>{% endfor %}
+            </tbody></table></div>
+        </article>
+        <article class="scada-panel" id="chemical-usage">
+            <div class="scada-panel__head"><div><span class="scada-overline">CHEMICAL USAGE RECORD</span><h2>Consumption ledger</h2></div><span class="scada-badge">{{ usage_total|floatformat:1 }} KG</span></div>
+            <div class="scada-usage-list">{% for row in usage_records %}<div class="scada-usage-row"><span class="scada-usage-date">{{ row.date|date:"d M" }}</span><span><b>{{ row.chemical }}</b><small>{{ row.plant }} · {{ row.operator }}</small>{% if row.remarks %}<small>{{ row.remarks }}</small>{% endif %}</span><strong>{{ row.quantity|floatformat:2 }} <small>kg</small></strong></div>{% empty %}<div class="scada-empty"><i class="fa-solid fa-arrow-trend-down"></i><b>No chemical usage logged in this period</b></div>{% endfor %}</div>
+        </article>
+    </section>
+
+    </section>
+
+    <section class="scada-tab-panel{% if active_tab == 'storage' %} is-active{% endif %}" id="scada-panel-storage" role="tabpanel" aria-labelledby="scada-tab-storage" data-tab-panel="storage"{% if active_tab != 'storage' %} hidden{% endif %}>
+
+    <section class="scada-section scada-detail-section" id="reservoirs">
+        <div class="scada-section__heading"><div><span class="scada-overline">RESERVOIR GEOMETRY · LATEST LEVEL</span><h2>Water storage network</h2><p>Capacity is computed from reservoir dimensions; stored volume uses the latest recorded level.</p></div><span class="scada-section__count">{{ reservoir_rows|length }} RESERVOIRS</span></div>
+        <div class="scada-reservoir-grid">
+            {% for reservoir in reservoir_rows %}<a href="#reservoir-levels" class="scada-reservoir-card scada-reservoir-card--{{ reservoir.state }}"><div class="scada-reservoir-card__top"><span><i class="fa-solid fa-water-ladder"></i> {{ reservoir.plant }} · {{ reservoir.phase }}</span><b>{% if reservoir.fill != None %}{{ reservoir.fill }}%{% else %}NO READING{% endif %}</b></div><h3>{{ reservoir.name }}</h3><span class="scada-reservoir-dims">{{ reservoir.dimensions }}</span><div class="scada-reservoir-meter"><i style="height:{% if reservoir.fill != None %}{{ reservoir.fill }}{% else %}0{% endif %}%"></i></div><div class="scada-reservoir-card__metrics"><span>Latest level <b>{% if reservoir.level != None %}{{ reservoir.level }} m{% else %}—{% endif %}</b></span><span>Stored volume <b>{% if reservoir.volume != None %}{{ reservoir.volume|floatformat:1 }} m³{% else %}—{% endif %}</b></span><span>Capacity <b>{{ reservoir.capacity|floatformat:1 }} m³</b></span></div><small class="scada-reservoir-card__stamp">{% if reservoir.date %}{{ reservoir.date|date:"d M Y" }} · {{ reservoir.time }}{% else %}No level entered{% endif %}</small></a>
+            {% empty %}<div class="scada-empty"><i class="fa-solid fa-water-ladder"></i><b>No reservoirs configured</b></div>{% endfor %}
+        </div>
+    </section>
+
+    <section class="scada-section scada-detail-section" id="reservoir-levels">
+        <div class="scada-section__heading"><div><span class="scada-overline">RESERVOIR LEVEL</span><h2>Level observation history</h2><p>Most recent 60 recorded levels across reservoirs in scope.</p></div><span class="scada-section__count">{{ reservoir_level_rows|length }} READINGS</span></div>
+        <div class="scada-panel scada-table-panel"><div class="scada-table-scroll"><table class="scada-table"><thead><tr><th>Reservoir</th><th>Phase</th><th>Level</th><th>Calculated volume</th><th>Monitoring date · time</th><th>Record created</th></tr></thead><tbody>
+            {% for row in reservoir_level_rows %}<tr><td><b>{{ row.reservoir }}</b></td><td>{{ row.plant }}<small>{{ row.phase }}</small></td><td><strong>{{ row.level|floatformat:2 }} m</strong></td><td>{{ row.volume|floatformat:2 }} m³</td><td>{{ row.date|date:"d M Y" }} · {{ row.time }}</td><td>{{ row.recorded_at|date:"d M Y · H:i" }}</td></tr>{% empty %}<tr><td colspan="6"><div class="scada-empty scada-empty--row"><i class="fa-solid fa-chart-area"></i><b>No reservoir levels have been recorded</b></div></td></tr>{% endfor %}
+        </tbody></table></div></div>
+    </section>
+
+    </section>
+
+    <section class="scada-tab-panel{% if active_tab == 'reference' %} is-active{% endif %}" id="scada-panel-reference" role="tabpanel" aria-labelledby="scada-tab-reference" data-tab-panel="reference"{% if active_tab != 'reference' %} hidden{% endif %}>
+
+    <section class="scada-grid scada-grid--reference">
+        <article class="scada-panel" id="chemical-categories">
+            <div class="scada-panel__head"><div><span class="scada-overline">CHEMICAL CATEGORY</span><h2>Dosing taxonomy</h2></div><span class="scada-badge">{{ category_rows|length }} LINKS</span></div>
+            <div class="scada-asset-list">{% for row in category_rows %}<div class="scada-asset-row"><span class="scada-asset-icon scada-asset-icon--violet"><i class="fa-solid fa-flask"></i></span><span><b>{{ row.chemical }}</b><small>{{ row.category }}</small></span><i class="fa-solid fa-arrow-right scada-subtle-arrow"></i></div>{% empty %}<div class="scada-empty"><i class="fa-solid fa-layer-group"></i><b>No chemical categories configured</b></div>{% endfor %}</div>
+        </article>
+        <article class="scada-panel" id="monitoring-times">
+            <div class="scada-panel__head"><div><span class="scada-overline">MONITORING TIME</span><h2>Daily observation schedule</h2></div><span class="scada-badge">{{ monitoring_rows|length }} SLOTS</span></div>
+            <div class="scada-time-grid">{% for row in monitoring_rows %}<span><i class="fa-regular fa-clock"></i>{{ row.time_value }}</span>{% empty %}<div class="scada-empty"><i class="fa-solid fa-clock"></i><b>No monitoring slots configured</b></div>{% endfor %}</div>
+        </article>
+    </section>
+
+    </section>
+
+    <section class="scada-tab-panel{% if active_tab == 'reports' %} is-active{% endif %}" id="scada-panel-reports" role="tabpanel" aria-labelledby="scada-tab-reports" data-tab-panel="reports"{% if active_tab != 'reports' %} hidden{% endif %}>
+        <section class="scada-section scada-detail-section" id="analytics-reports">
+            <div class="scada-section__heading"><div><span class="scada-overline">OPERATIONS INTELLIGENCE · EXPORTABLE SNAPSHOT</span><h2>Analytics & reporting center</h2><p>Plant-scoped model rollups for {{ start_date|date:"d M Y" }} through {{ today|date:"d M Y" }}. Telemetry shown here is recorded model data, not a live PLC feed.</p></div><div class="scada-report-actions"><button type="button" data-report-action="download"><i class="fa-solid fa-download"></i> Export JSON</button><button type="button" data-report-action="print"><i class="fa-solid fa-print"></i> Print report</button></div></div>
+            <div class="scada-report-summary"><article><small>PROCESS FLOW</small><b>{% if flow_display != None %}{{ flow_display|floatformat:1 }}{% else %}—{% endif %} <em>m³/h</em></b><span>{{ flow_observation_count }} observations</span></article><article><small>FLOW VARIATION · CV</small><b>{% if flow_coefficient_variation != None %}{{ flow_coefficient_variation|floatformat:1 }}{% else %}—{% endif %}<em>%</em></b><span>Record-to-record variability</span></article><article><small>DOSING ALIGNMENT</small><b>{% if compliance_rate != None %}{{ compliance_rate|floatformat:1 }}{% else %}—{% endif %}<em>%</em></b><span>{{ compliance_total }} comparable runs</span></article><article><small>FILTER UTILIZATION</small><b>{% if filter_overall_utilization != None %}{{ filter_overall_utilization|floatformat:1 }}{% else %}—{% endif %}<em>%</em></b><span>{{ filter_flow_total|floatformat:1 }} / {{ filter_design_total|floatformat:1 }} m³/h</span></article><article><small>ASSET INTERVENTIONS</small><b>{{ filter_maintenance_due|add:clarifier_maintenance_due }}</b><span>filter + clarifier maintenance due</span></article><article><small>ALERTS IN SCOPE</small><b>{{ alerts|length }}</b><span>{{ operational_state }}</span></article></div>
+            <div class="scada-grid scada-grid--reports"><article class="scada-panel"><div class="scada-panel__head"><div><span class="scada-overline">CHEMICAL MIX</span><h2>Recorded usage by model family</h2></div></div><div class="scada-donut-wrap scada-donut-wrap--report"><canvas id="dosingMixChart" aria-label="Chemical dosing records by type"></canvas></div></article><article class="scada-panel"><div class="scada-panel__head"><div><span class="scada-overline">DOSE QUALITY</span><h2>Runs within ±15% expected</h2></div></div><div class="scada-chart"><canvas id="dosingAlignmentChart" aria-label="Dosing alignment by record type"></canvas></div></article><article class="scada-panel scada-panel--wide"><div class="scada-panel__head"><div><span class="scada-overline">HYDRAULIC ENVELOPE</span><h2>Phase flow vs operational capacity</h2></div></div><div class="scada-chart"><canvas id="phasePerformanceChart" aria-label="Treatment phase flow compared with operational capacity"></canvas></div></article><article class="scada-panel scada-panel--wide"><div class="scada-panel__head"><div><span class="scada-overline">FLOW STABILITY · DAILY DISTRIBUTION</span><h2>Observed range and 7-day moving average</h2></div><span class="scada-badge">MEASURED FLOW · m³/h</span></div><p class="scada-panel__hint">Daily min, max and mean are calculated from dosing records; rolling average skips days with no readings.</p><div class="scada-chart"><canvas id="flowStabilityChart" aria-label="Daily flow minimum maximum mean and seven day rolling average"></canvas>{% if not flow_observation_count %}<div class="scada-chart-empty"><span>No flow observations in this window.</span></div>{% endif %}</div></article><article class="scada-panel scada-panel--wide"><div class="scada-panel__head"><div><span class="scada-overline">WATER ASSET OVERVIEW</span><h2>Clarifier design throughput & filter flow</h2></div></div><div class="scada-chart"><canvas id="treatmentCapacityChart" aria-label="Filter flow and clarifier design capacities"></canvas></div></article><article class="scada-panel"><div class="scada-panel__head"><div><span class="scada-overline">CHEMICAL USAGE RANKING</span><h2>Highest recorded consumption</h2></div></div><div class="scada-chart"><canvas id="chemicalUsageRankingChart" aria-label="Top chemicals by recorded usage for this plant and period"></canvas>{% if not usage_total %}<div class="scada-chart-empty"><span>No usage-ledger records in this period.</span></div>{% endif %}</div></article><article class="scada-panel"><div class="scada-panel__head"><div><span class="scada-overline">RESERVOIR LEVEL TREND</span><h2>Mean fill vs low-level threshold</h2></div></div><div class="scada-chart"><canvas id="reservoirTrendChart" aria-label="Daily reservoir fill trend with a 20 percent low threshold"></canvas>{% if not monitored_reservoir_count %}<div class="scada-chart-empty"><span>No reservoir levels recorded in this window.</span></div>{% endif %}</div></article></div>
+        </section>
+        <section class="scada-section scada-detail-section" id="inventory-coverage"><div class="scada-section__heading"><div><span class="scada-overline">INVENTORY INTELLIGENCE · PERIOD AVERAGE</span><h2>Projected stock coverage</h2><p>Current on-record quantity divided by average daily usage within this selected window. Projection is unavailable when there is no usage history.</p></div><span class="scada-section__count">{{ inventory_coverage_rows|length }} CHEMICALS</span></div><div class="scada-grid scada-grid--t-telemetry"><article class="scada-panel"><div class="scada-panel__head"><div><span class="scada-overline">DAYS OF COVER</span><h2>Forecast by chemical</h2></div></div><div class="scada-chart"><canvas id="inventoryCoverageChart" aria-label="Projected days of stock coverage"></canvas></div></article><article class="scada-panel"><div class="scada-panel__head"><div><span class="scada-overline">INTERPRETATION</span><h2>Projection limits</h2></div></div><div class="scada-report-notes"><p><i class="fa-solid fa-circle-info"></i> Coverage uses the selected date window’s recorded usage and current stock snapshot.</p><p><i class="fa-solid fa-triangle-exclamation"></i> It is a planning estimate, not an inventory reservation or reorder commitment.</p><p><i class="fa-solid fa-database"></i> Rows without usage history are shown as unprojected.</p></div></article></div><div class="scada-panel scada-table-panel"><div class="scada-table-scroll"><table class="scada-table"><thead><tr><th>Chemical · plant</th><th>Current stock</th><th>Period usage</th><th>Average daily use</th><th>Projected coverage</th><th>Signal</th></tr></thead><tbody>{% for row in inventory_coverage_rows %}<tr><td><b>{{ row.chemical }}</b><small>{{ row.plant }}</small></td><td>{% if row.stock != None %}{{ row.stock|floatformat:2 }} kg{% else %}No stock record{% endif %}</td><td>{{ row.usage_total|floatformat:2 }} kg</td><td>{{ row.daily_average|floatformat:3 }} kg/day</td><td>{% if row.coverage_days != None %}<strong>{{ row.coverage_days|floatformat:1 }} days</strong>{% else %}—{% endif %}</td><td><span class="scada-state-pill scada-state-pill--{% if row.coverage_days != None and row.coverage_days < 7 %}maintenance{% else %}working{% endif %}"><i></i>{{ row.state }}</span></td></tr>{% empty %}<tr><td colspan="6">No stock or usage lines to project.</td></tr>{% endfor %}</tbody></table></div></div></section>
+    </section>
+
+    <footer class="scada-footer"><span><i class="fa-solid fa-shield-halved"></i> Scope: {{ plant_name }}</span><span>Operational database view · {{ start_date|date:"d M Y" }} to {{ today|date:"d M Y" }}</span><a href="#overview"><i class="fa-solid fa-arrow-up"></i> Back to command view</a></footer>
 </div>
+{{ chart_json|json_script:"water-scada-data" }}
+{{ report_json|json_script:"water-scada-report" }}
 {% endblock %}
 
-{% block dashboard_scripts %}
-{{ charts_json|json_script:"ops-charts-data" }}
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-    var raw = JSON.parse(document.getElementById("ops-charts-data").textContent);
-
-    // Usage Trend
-    if (raw.usage_trend && raw.usage_trend.labels.length) {
-        QADCockpit.line("usageTrendChart", raw.usage_trend.labels, [
-            QADCockpit.dataset("Usage (kg)", raw.usage_trend.data, "cyan", true)
-        ]);
-    }
-
-    // Category Doughnut
-    if (raw.category_breakdown) {
-        QADCockpit.doughnut("categoryChart", raw.category_breakdown.labels, raw.category_breakdown.data,
-            ["blue","purple","emerald","amber"]);
-    }
-
-    // Stock Bar
-    if (raw.stock_levels && raw.stock_levels.labels.length) {
-        QADCockpit.bar("stockChart", raw.stock_levels.labels, [
-            QADCockpit.dataset("Stock (kg)", raw.stock_levels.data, "emerald")
-        ]);
-    }
-
-    // Compliance
-    var cp = document.getElementById("compliancePanel");
-    if (cp && raw.compliance) {
-        var c = raw.compliance;
-        var color = c.rate >= 85 ? "emerald" : c.rate >= 60 ? "amber" : "rose";
-        cp.innerHTML =
-            '<div class="kpi-card__value" style="font-size:2rem;">' + c.rate + '%</div>' +
-            '<div class="kpi-card__label">Compliance Rate</div>' +
-            '<div style="margin-top:0.5rem;">' +
-            '<span class="pill pill--emerald">' + c.compliant + ' OK</span> ' +
-            '<span class="pill pill--slate">' + c.total + ' Total</span>' +
-            '</div>' +
-            '<div class="progress-micro" style="width:80%;margin-top:0.5rem;">' +
-            '<div class="progress-micro__fill progress-micro__fill--' + color + '" style="width:' + c.rate + '%"></div>' +
-            '</div>';
-    }
-});
-</script>
+{% block extra_scripts %}
+{{ block.super }}
+<script src="{% static 'js/Chart.min.js' %}"></script>
+<script src="{% static 'o/js/scada_dashboard.js' %}?v=20261028-qc-integration"></script>
 {% endblock %}

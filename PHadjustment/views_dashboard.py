@@ -7,6 +7,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Dict, Any, List, Optional
 
 from django.contrib import messages
+from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Case, F, IntegerField, OuterRef, Q, Subquery, Value, When
@@ -395,6 +396,21 @@ class PHAdjustmentDashboardView(WanjalaMixin, View):
             .order_by("-jar_test__test_date", "performance_rank")[:10]
         ) if plant else []
 
+        # Available pH Adjuster chemicals for plant conditioning feed
+        from ca.models import Chemical
+        available_ph_adjusters = list(
+            Chemical.objects.filter(
+                Q(categories__category="PH Adjuster")
+                | Q(name__icontains="lime")
+                | Q(name__icontains="soda")
+                | Q(name__icontains="caustic")
+                | Q(name__icontains="acid")
+                | Q(code__icontains="LIME")
+                | Q(code__icontains="SODA")
+                | Q(code__icontains="NAOH")
+            ).distinct().order_by("name")
+        )
+
         return {
             "plant": plant,
             "test_date": test_date,
@@ -406,6 +422,7 @@ class PHAdjustmentDashboardView(WanjalaMixin, View):
             "telemetry": telemetry,
             "available_plants": self.get_available_plants(request),
             "available_source_jars": available_source_jars,
+            "available_ph_adjusters": available_ph_adjusters,
             "current_user": request.user,
             "show_ph_workspace_tabs": bool(plant),
         }
@@ -426,7 +443,18 @@ class PHAdjustmentDashboardView(WanjalaMixin, View):
             return render(request, self.partial_curve_template, context)
 
         if context["plant"] and request.GET.get("tab") == "reports":
-            reports, page, page_query = self._reports_context(request)
+            has_report_filters = any(k.startswith("report_") for k in request.GET)
+            cache_key = f"ph_reports_{context['plant'].pk}"
+            if not has_report_filters:
+                cached = cache.get(cache_key)
+                if cached:
+                    reports, page, page_query = cached
+                else:
+                    reports, page, page_query = self._reports_context(request)
+                    cache.set(cache_key, (reports, page, page_query), 180)
+            else:
+                reports, page, page_query = self._reports_context(request)
+
             from ca.models import Chemical
             coagulant_ids = JarTest.objects.filter(treatment_plant=context["plant"]).values_list("coagulant_id", flat=True).distinct()
             report_coagulants = Chemical.objects.filter(pk__in=coagulant_ids).order_by("name")

@@ -5,6 +5,7 @@ import logging
 from typing import Any
 from datetime import date, datetime, time, timedelta
 from django.utils import timezone
+from django.db import transaction
 from django.db.models import Q
 from django.apps import apps
 from django.contrib.contenttypes.models import ContentType
@@ -50,10 +51,12 @@ class ChemicalAlertsService:
         try:
             AlertState = apps.get_model("alerts", "AlertState")
             AlertConfig = apps.get_model("alerts", "AlertConfig")
+            AlertNotification = apps.get_model("alerts", "AlertNotification")
             AlarmAcknowledgment = apps.get_model("alerts", "AlarmAcknowledgment")
         except LookupError:
             AlertState = None
             AlertConfig = None
+            AlertNotification = None
             AlarmAcknowledgment = None
 
         # 1. Fetch channelled AlertStates from alerts app
@@ -72,14 +75,39 @@ class ChemicalAlertsService:
                     .order_by("-updated_at")
                 )
 
+                recipient_state_ids = []
+                if AlertNotification:
+                    recipient_state_ids = AlertNotification.objects.filter(
+                        recipient=user,
+                        acknowledged_at__isnull=True,
+                    ).values_list("alert_state_id", flat=True)
+                    states_with_inbox_rows = AlertNotification.objects.values_list(
+                        "alert_state_id", flat=True
+                    )
+                    # New events are private per persisted recipient. Legacy
+                    # AlertState rows without inbox records retain config scope.
+                    state_qs = state_qs.filter(
+                        Q(pk__in=recipient_state_ids)
+                        | ~Q(pk__in=states_with_inbox_rows)
+                    )
+
                 if plant is None:
                     state_qs = state_qs.none()
                 else:
                     plant_scope = (
-                        Q(alert_config__target_treatment_plants=plant)
-                        | Q(alert_config__target_treatment_plants__isnull=True)
-                        | Q(geo_context__plant_id=str(plant.pk))
-                        | Q(alert_config__geo_context__plant_id=str(plant.pk))
+                        Q(geo_context__plant_id=str(plant.pk))
+                        | (
+                            Q(geo_context__plant_id__isnull=True)
+                            & Q(alert_config__target_treatment_plants=plant)
+                        )
+                        | (
+                            Q(geo_context__plant_id__isnull=True)
+                            & Q(alert_config__target_treatment_plants__isnull=True)
+                            & (
+                                Q(alert_config__geo_context__plant_id=str(plant.pk))
+                                | Q(alert_config__geo_context__plant_id__isnull=True)
+                            )
+                        )
                     )
                     state_qs = state_qs.filter(plant_scope)
                 if plant is not None and not is_superuser:
@@ -89,7 +117,7 @@ class ChemicalAlertsService:
                     )
                     if getattr(user, "section_id", None):
                         audience_without_plant |= Q(alert_config__target_sections__pk=user.section_id)
-                    audience = Q(alert_config__target_treatment_plants=plant) | (
+                    audience = Q(pk__in=recipient_state_ids) | Q(alert_config__target_treatment_plants=plant) | (
                         Q(alert_config__target_treatment_plants__isnull=True)
                         & audience_without_plant
                     )
@@ -108,18 +136,35 @@ class ChemicalAlertsService:
                     config = item.alert_config
                     if not ChemicalAlertsService._can_view_alert_type(user, config.alert_type if config else "", is_superuser):
                         continue
-                    subject = config.template.subject_template if config and config.template else (config.alert_type or "System Alert")
+                    notification = None
+                    if AlertNotification:
+                        notification = AlertNotification.objects.filter(
+                            alert_state=item,
+                            recipient=user,
+                            acknowledged_at__isnull=True,
+                        ).order_by("-sequence", "-created_at").first()
+                    subject = (
+                        notification.title if notification else
+                        item.title or (config.template.subject_template if config and config.template else (config.alert_type or "System Alert"))
+                    )
+                    message = (
+                        notification.message if notification else
+                        item.message or f"Alert ref {item.instance_ref} · State: {item.state}"
+                    )
+                    priority = notification.priority if notification else (item.priority or (config.priority if config else "medium"))
                     alerts_list.append({
                         "id": f"state_{item.pk}",
                         "db_id": item.pk,
                         "type": "alert_state",
                         "title": subject,
-                        "message": f"Alert ref {item.instance_ref} · State: {item.state}",
-                        "priority": config.priority if config else "medium",
-                        "severity": (config.priority or "medium").lower(),
-                        "timestamp": item.updated_at,
-                        "time_ago": ChemicalAlertsService._time_ago(item.updated_at, now),
+                        "message": message,
+                        "priority": priority,
+                        "severity": (priority or "medium").lower(),
+                        "timestamp": item.created_at,
+                        "time_ago": ChemicalAlertsService._time_ago(item.created_at, now),
                         "acknowledged": item.state == AlertState.StateChoices.ACKNOWLEDGED,
+                        "can_acknowledge": True,
+                        "escalated": bool(notification.is_escalation) if notification else item.state == AlertState.StateChoices.ESCALATED,
                         "source": "alerts_app",
                         "url": f"/alerts/",
                     })
@@ -204,6 +249,14 @@ class ChemicalAlertsService:
                 )
             )
             if can_assign_analysts:
+                from ca.models import ChemicalWorkflowAlert
+
+                persistent_assignment_requests = ChemicalWorkflowAlert.objects.filter(
+                    recipient=user,
+                    alert_type="ca_assignment_pending",
+                    acknowledged_at__isnull=True,
+                    analysis_request__isnull=False,
+                ).values_list("analysis_request_id", flat=True)
                 received_batches = (
                     ChemicalBatch.objects
                     .filter(
@@ -212,6 +265,7 @@ class ChemicalAlertsService:
                         analysis_request__status=ChemicalAnalysisRequest.Status.PENDING,
                         analysis_request__assigned_analysts__isnull=True,
                     )
+                    .exclude(analysis_request_id__in=persistent_assignment_requests)
                     .select_related("chemical", "analysis_request")
                     .order_by("-created_at")
                 )
@@ -384,6 +438,15 @@ class ChemicalAlertsService:
             workflow_qs = ChemicalWorkflowAlert.objects.filter(
                 recipient=user,
                 acknowledged_at__isnull=True,
+            ).exclude(
+                Q(
+                    alert_type__in=(
+                        "ca_analysis_assignment",
+                        "ca_assignment_pending",
+                        "ca_assignment_escalation",
+                    ),
+                    analysis_request__assigned_analysts__isnull=False,
+                )
             ).select_related("batch", "analysis_request")
             if not is_superuser:
                 if plant is None:
@@ -496,30 +559,18 @@ class ChemicalAlertsService:
         now = timezone.now()
         try:
             AlertState = apps.get_model("alerts", "AlertState")
+            AlertNotification = apps.get_model("alerts", "AlertNotification")
             AlarmAcknowledgment = apps.get_model("alerts", "AlarmAcknowledgment")
         except LookupError:
             AlertState = None
+            AlertNotification = None
             AlarmAcknowledgment = None
 
-        if alert_id.startswith("state_") and AlertState:
+        if alert_id.startswith("state_"):
             pk = alert_id.replace("state_", "")
             try:
-                state = AlertState.objects.select_related("alert_config").get(pk=pk)
-                if not ChemicalAlertsService._can_ack_alert_state(user, state, is_superuser):
-                    return {"success": False, "error": "Notification not found."}
-
-                if AlarmAcknowledgment:
-                    content_type = ContentType.objects.get_for_model(state)
-                    AlarmAcknowledgment.objects.update_or_create(
-                        user=user,
-                        content_type=content_type,
-                        object_id=state.pk,
-                        defaults={
-                            "acknowledged": True,
-                            "acknowledged_at": now,
-                        }
-                    )
-                return {"success": True, "message": "Alert state acknowledged."}
+                from alerts.engine import AlertEngine
+                return AlertEngine.acknowledge_alert(user, pk)
             except Exception as e:
                 return {"success": False, "error": str(e)}
 
@@ -677,7 +728,13 @@ class ChemicalAlertsService:
         context_plant = (state.geo_context or {}).get("plant_id")
         if context_plant and str(context_plant) != str(plant.pk):
             return False
+        try:
+            is_notification_recipient = state.notifications.filter(recipient=user).exists()
+        except Exception:
+            is_notification_recipient = False
         return bool(
+            is_notification_recipient
+            or
             config.recipients.filter(pk=user.pk).exists()
             or config.target_groups.filter(pk__in=user.groups.values("pk")).exists()
             or (getattr(user, "section_id", None) and config.target_sections.filter(pk=user.section_id).exists())

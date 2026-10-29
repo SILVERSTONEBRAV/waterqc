@@ -89,7 +89,7 @@ def _sync_result_nonconformity(sender, instance, **kwargs):
 
 
 def _broadcast_nonconformity(nc):
-    """Push a new QC nonconformity directly into the live alerts stream."""
+    """Publish a plant-scoped QC data event; AlertEngine owns user alerts."""
     try:
         from asgiref.sync import async_to_sync
         from channels.layers import get_channel_layer
@@ -97,20 +97,6 @@ def _broadcast_nonconformity(nc):
         channel_layer = get_channel_layer()
         if channel_layer is None:
             return
-        message = (
-            f"Water quality nonconformity: {nc.parameter_name} measured "
-            f"{nc.observed_value} (allowed {nc.min_limit}–{nc.max_limit})."
-        )
-        async_to_sync(channel_layer.group_send)(
-            "alerts_stream",
-            {
-                "type": "alert.message",
-                "message": message,
-                "priority": "high",
-                "alert_type": "nonconformity",
-                "instance_ref": f"NC-{nc.pk}",
-            },
-        )
         async_to_sync(channel_layer.group_send)(
             f"qc-plant-{nc.analysis.treatment_plant_id}",
             {
@@ -178,44 +164,48 @@ def bootstrap_sampling_system(sender, **kwargs):
             "start_time": datetime.strptime("00:00", "%H:%M").time(),
             "interval_minutes": 30,
             "adaptive": False,
+            "adaptive_confidence": 0.0,
         },
         {
             "water_type": "treated",
             "start_time": datetime.strptime("00:00", "%H:%M").time(),
             "interval_minutes": 30,
             "adaptive": False,
+            "adaptive_confidence": 0.0,
         },
         {
             "water_type": "coagulated",
             "start_time": datetime.strptime("02:00", "%H:%M").time(),
             "interval_minutes": 120,
             "adaptive": False,
+            "adaptive_confidence": 0.0,
         },
         {
             "water_type": "clarified",
             "start_time": datetime.strptime("00:30", "%H:%M").time(),
             "interval_minutes": 120,
             "adaptive": False,
+            "adaptive_confidence": 0.0,
         },
     ]
 
     plants = TreatmentPlant.objects.all()
     for plant in plants:
         for item in defaults:
-            data = dict(item)
-            data["treatment_plant"] = plant
-            schedule, created = Schedule.objects.get_or_create(
-                treatment_plant=plant,
-                water_type=item["water_type"],
-                defaults=data,
-            )
-
-            if created:
-                logger.info(
-                    "Created default schedule for %s plant=%s",
-                    schedule.water_type,
-                    plant.name,
-                )
+            try:
+                schedule = Schedule.objects.filter(water_type=item["water_type"]).first()
+                if not schedule:
+                    data = dict(item)
+                    data["treatment_plant"] = plant
+                    schedule = Schedule.objects.create(**data)
+                    logger.info(
+                        "Created default schedule for %s plant=%s",
+                        schedule.water_type,
+                        plant.name,
+                    )
+            except Exception as sched_err:
+                logger.debug(f"[SamplingSchedule] Schedule bootstrap notice: {sched_err}")
+                continue
 
             if schedule.enabled and schedule.sampling_times.count() == 0:
                 try:

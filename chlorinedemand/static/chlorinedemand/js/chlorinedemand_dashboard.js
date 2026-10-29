@@ -389,29 +389,23 @@ function initChlorineReportAnalytics() {
         const [traces, chartLayout] = control(timeline || [], field, color, unit);
         window.Plotly.react(node, traces, chartLayout, config);
     };
-    drawControl("cd-report-dose-timeline", data.dose_timeline, "Established dose", "#34d399", "mg/L");
-    const responseNode = document.getElementById("cd-report-response");
-    if (responseNode) {
-        const response = data.dose_residual || {};
-        const traces = [{ x: (response.points || []).map((point) => point.x), y: (response.points || []).map((point) => point.y), customdata: (response.points || []).map((point) => point.date), type: "scatter", mode: "markers", name: "Optimal jar", marker: { size: 8, color: "#22d3ee", line: { color: "#cffafe", width: 1 }, opacity: .82 }, hovertemplate: "Dose %{x:.2f} mg/L<br>Residual %{y:.3f} mg/L<br>%{customdata}<extra></extra>" }];
-        if (response.fit?.length) traces.push({ x: response.fit.map((point) => point.x), y: response.fit.map((point) => point.y), type: "scatter", mode: "lines", name: "Theil–Sen fit", line: { color: "#a78bfa", width: 2, dash: "dot" } });
-        if (response.points?.length) {
-            const extent = response.points.reduce((range, point) => [Math.min(range[0], point.x), Math.max(range[1], point.x)], [Infinity, -Infinity]);
-            traces.push({ x: extent, y: [.2, .2], type: "scatter", mode: "lines", name: "0.20 mg/L target", line: { color: "#34d399", width: 1, dash: "dash" } });
+    requestAnimationFrame(() => {
+        drawControl("cd-report-dose-timeline", data.dose_timeline, "Established dose", "#34d399", "mg/L");
+        const responseNode = document.getElementById("cd-report-response");
+        if (responseNode) {
+            const response = data.dose_residual || {};
+            const traces = [{ x: (response.points || []).map((point) => point.x), y: (response.points || []).map((point) => point.y), customdata: (response.points || []).map((point) => point.date), type: "scatter", mode: "markers", name: "Optimal jar", marker: { size: 8, color: "#22d3ee", line: { color: "#cffafe", width: 1 }, opacity: .82 }, hovertemplate: "Dose %{x:.2f} mg/L<br>Residual %{y:.3f} mg/L<br>%{customdata}<extra></extra>" }];
+            if (response.fit?.length) traces.push({ x: response.fit.map((point) => point.x), y: response.fit.map((point) => point.y), type: "scatter", mode: "lines", name: "Theil–Sen fit", line: { color: "#a78bfa", width: 2, dash: "dot" } });
+            if (response.points?.length) {
+                const extent = response.points.reduce((range, point) => [Math.min(range[0], point.x), Math.max(range[1], point.x)], [Infinity, -Infinity]);
+                traces.push({ x: extent, y: [.2, .2], type: "scatter", mode: "lines", name: "0.20 mg/L target", line: { color: "#34d399", width: 1, dash: "dash" } });
+            }
+            const chartLayout = { ...layout, xaxis: { ...layout.xaxis, title: "Established dose (mg/L)" }, yaxis: { ...layout.yaxis, title: "Residual (mg/L)" } };
+            if (!response.points?.length) chartLayout.annotations = [{ text: "No dose / residual pairs match these filters", x: .5, y: .5, xref: "paper", yref: "paper", showarrow: false, font: { color: "#8193ae", size: 10 } }];
+            if (response.correlation) chartLayout.annotations = [{ text: `Spearman ρ ${response.correlation.rho} · p ${response.correlation.p ?? "—"}`, x: .99, y: .98, xref: "paper", yref: "paper", xanchor: "right", yanchor: "top", showarrow: false, font: { color: "#c4b5fd", size: 9 } }];
+            window.Plotly.react(responseNode, traces, chartLayout, config);
         }
-        const chartLayout = { ...layout, xaxis: { ...layout.xaxis, title: "Established dose (mg/L)" }, yaxis: { ...layout.yaxis, title: "Residual (mg/L)" } };
-        if (!response.points?.length) chartLayout.annotations = [{ text: "No dose / residual pairs match these filters", x: .5, y: .5, xref: "paper", yref: "paper", showarrow: false, font: { color: "#8193ae", size: 10 } }];
-        if (response.correlation) chartLayout.annotations = [{ text: `Spearman ρ ${response.correlation.rho} · p ${response.correlation.p ?? "—"}`, x: .99, y: .98, xref: "paper", yref: "paper", xanchor: "right", yanchor: "top", showarrow: false, font: { color: "#c4b5fd", size: 9 } }];
-        window.Plotly.react(responseNode, traces, chartLayout, config);
-    }
-    const drawHistogram = (id, values, label, color, unit) => {
-        const node = document.getElementById(id);
-        if (!node) return;
-        const chartLayout = { ...layout, showlegend: false, xaxis: { ...layout.xaxis, title: unit }, yaxis: { ...layout.yaxis, title: "Tests", dtick: 1 } };
-        const traces = [{ x: values?.centers || [], y: values?.counts || [], type: "bar", name: label, marker: { color, line: { color: "rgba(255,255,255,.2)", width: 1 } }, hovertemplate: `${label}<br>%{x:.3f} ${unit}<br>%{y} tests<extra></extra>` }];
-        if (!values?.counts?.length) chartLayout.annotations = [{ text: "No matching values", x: .5, y: .5, xref: "paper", yref: "paper", showarrow: false, font: { color: "#8193ae", size: 10 } }];
-        window.Plotly.react(node, traces, chartLayout, config);
-    };
-    drawHistogram("cd-report-dose-hist", data.dose_histogram, "Established dose", "#10b981", "mg/L");
-    drawHistogram("cd-report-residual-hist", data.residual_histogram, "Residual chlorine", "#06b6d4", "mg/L");
+        drawHistogram("cd-report-dose-hist", data.dose_histogram, "Established dose", "#10b981", "mg/L");
+        drawHistogram("cd-report-residual-hist", data.residual_histogram, "Residual chlorine", "#06b6d4", "mg/L");
+    });
 }

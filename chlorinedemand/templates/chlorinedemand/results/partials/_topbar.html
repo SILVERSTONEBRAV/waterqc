@@ -11,10 +11,6 @@
 
         <div class="cl-telemetry-ticker">
             <div class="cl-ticker-chip">
-                <span class="chip-label">Plant:</span>
-                <span class="chip-val">{{ plant.name|default:"Main Plant" }}</span>
-            </div>
-            <div class="cl-ticker-chip">
                 <span class="chip-label">Raw pH:</span>
                 <span class="chip-val" style="color:#a78bfa;">{{ telemetry.ph }}</span>
             </div>
@@ -60,16 +56,6 @@
     <div class="cl-control-bar">
         <!-- Left: Plant & Date Selector -->
         <div class="cl-session-meta">
-            <div class="cl-meta-pill">
-                <i class="fa-solid fa-industry text-emerald"></i>
-                <select name="plant" id="plant-select" class="cl-select" onchange="const u = new URL(window.location); u.searchParams.set('plant', this.value); window.location = u;">
-                    {% for p in available_plants %}
-                    <option value="{{ p.pk }}" {% if plant.pk == p.pk %}selected{% endif %}>
-                        {{ p.name }}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
 
             <div class="cl-meta-pill">
                 <i class="fa-regular fa-calendar-days text-cyan"></i>

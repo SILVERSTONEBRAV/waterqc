@@ -85,7 +85,7 @@
                     </div>
 
                     <!-- CHEMICAL SELECTION -->
-                    <div class="ca-field-wrap">
+                    <div class="ca-field-wrap ca-col-half">
                         <label for="id_chemical" class="ca-field-label">
                             <span><i class="fa fa-flask"></i> Chemical <span class="required-star">*</span></span>
                         </label>
@@ -99,7 +99,7 @@
                     </div>
 
                     <!-- SUPPLIER SELECTION -->
-                    <div class="ca-field-wrap">
+                    <div class="ca-field-wrap ca-col-half">
                         <label for="id_supplier" class="ca-field-label">
                             <span><i class="fa fa-truck-ramp-box"></i> Supplier <span class="required-star">*</span></span>
                         </label>
@@ -113,66 +113,66 @@
                     </div>
 
                     <!-- STORAGE LOCATION -->
-                    <div class="ca-field-wrap">
+                    <div class="ca-field-wrap ca-col-half">
                         <label for="id_location" class="ca-field-label">
-                            <span><i class="fa fa-location-dot"></i> Chemical Storage Location <span class="required-star">*</span></span>
+                            <span><i class="fa fa-location-dot"></i> Storage Location <span class="required-star">*</span></span>
                         </label>
                         <select name="location" id="id_location" class="ca-compact-select" required>
                             <option value="">Select Storage Location...</option>
                             {% for location in chemical_locations %}
-                                <option value="{{ location.pk }}" data-plant-id="{{ location.treatment_plant_id }}">{{ location.name }}{% if location.treatment_plant %} — {{ location.treatment_plant.name }}{% endif %}</option>
+                                <option value="{{ location.pk }}" data-plant-id="{{ location.treatment_plant_id }}">{{ location.name }}{% if location.treatment_plant %} ({{ location.treatment_plant.name }}){% endif %}</option>
                             {% empty %}
-                                <option value="" disabled>No chemical storage locations are configured.</option>
+                                <option value="" disabled>No chemical storage locations configured.</option>
                             {% endfor %}
                         </select>
                         <div class="ca-field-error" id="err-location" style="display: none;"></div>
-                        <div id="ca-location-empty-hint" class="ca-field-hint" hidden>No storage locations are configured for the selected treatment plant.</div>
+                        <div id="ca-location-empty-hint" class="ca-field-hint" hidden style="font-size:0.65rem;color:#94a3b8;margin-top:2px;">Showing all facility storage bays.</div>
                     </div>
 
                     <!-- DELIVERY / RECEIPT DATE WITH DATE PICKER -->
-                    <div class="ca-field-wrap">
+                    <div class="ca-field-wrap ca-col-half">
                         <label for="id_delivery_date" class="ca-field-label">
                             <span><i class="fa fa-calendar-day"></i> Date Received <span class="required-star">*</span></span>
+                            <span class="ca-date-quick-chips" style="margin: 0;">
+                                <span class="ca-date-chip" onclick="caSetBatchDate('today')">Today</span>
+                                <span class="ca-date-chip" onclick="caSetBatchDate('yesterday')">Yesterday</span>
+                            </span>
                         </label>
                         <input type="date" name="delivery_date" id="id_delivery_date" class="ca-compact-input ca-date-picker" value="{% now 'Y-m-d' %}" required>
-                        <div class="ca-date-quick-chips">
-                            <span class="ca-date-chip" onclick="caSetBatchDate('today')">Today</span>
-                            <span class="ca-date-chip" onclick="caSetBatchDate('yesterday')">Yesterday</span>
-                        </div>
                         <div class="ca-field-error" id="err-delivery_date" style="display: none;"></div>
                     </div>
 
                     <!-- DELIVERY NOTE NUMBER -->
-                    <div class="ca-field-wrap">
+                    <div class="ca-field-wrap ca-col-quarter">
                         <label for="id_delivery_note_number" class="ca-field-label">
-                            <span><i class="fa fa-file-invoice"></i> Delivery Note No. <span class="required-star">*</span></span>
-                            <span class="ca-field-label__badge" style="cursor: pointer; color: #38bdf8;" onclick="caAutoFillDN()" title="Generate temporary format">Auto-Fill</span>
+                            <span><i class="fa fa-file-invoice"></i> Delivery Note <span class="required-star">*</span></span>
+                            <span class="ca-field-label__badge" style="cursor: pointer; color: #38bdf8;" onclick="caAutoFillDN()" title="Generate temporary format">Auto</span>
                         </label>
                         <input type="text" name="delivery_note_number" id="id_delivery_note_number" class="ca-compact-input" placeholder="e.g. DN-2026-9842" required autocomplete="off">
                         <div class="ca-field-error" id="err-delivery_note_number" style="display: none;"></div>
                     </div>
 
                     <!-- BATCH NUMBER -->
-                    <div class="ca-field-wrap">
+                    <div class="ca-field-wrap ca-col-quarter">
                         <label for="id_batch_number" class="ca-field-label">
-                            <span><i class="fa fa-barcode"></i> Batch Number <span class="required-star">*</span></span>
-                            <span class="ca-field-label__badge" style="cursor: pointer; color: #38bdf8;" onclick="caAutoFillBatchNo()" title="Format standard code">Auto-Format</span>
+                            <span><i class="fa fa-barcode"></i> Batch No. <span class="required-star">*</span></span>
+                            <span class="ca-field-label__badge" style="cursor: pointer; color: #38bdf8;" onclick="caAutoFillBatchNo()" title="Format standard code">Auto</span>
                         </label>
-                        <input type="text" name="batch_number" id="id_batch_number" class="ca-compact-input" placeholder="e.g. BATCH-ALUM-2026-04" required autocomplete="off">
+                        <input type="text" name="batch_number" id="id_batch_number" class="ca-compact-input" placeholder="e.g. BATCH-ALUM-26" required autocomplete="off">
                         <div class="ca-field-error" id="err-batch_number" style="display: none;"></div>
                     </div>
 
                     <!-- QUANTITY RECEIVED -->
-                    <div class="ca-field-wrap">
+                    <div class="ca-field-wrap ca-col-quarter">
                         <label for="id_quantity_received" class="ca-field-label">
-                            <span><i class="fa fa-scale-unbalanced"></i> Quantity Received <span class="required-star">*</span></span>
+                            <span><i class="fa fa-scale-unbalanced"></i> Quantity <span class="required-star">*</span></span>
                         </label>
-                        <div style="display: flex; gap: 8px;">
-                            <input type="number" step="any" min="0.0001" name="quantity_received" id="id_quantity_received" class="ca-compact-input" placeholder="e.g. 5000" style="flex: 1;" required>
-                            <select name="unit" id="id_unit" class="ca-compact-select" style="width: 85px;">
+                        <div style="display: flex; gap: 6px;">
+                            <input type="number" step="any" min="0.0001" name="quantity_received" id="id_quantity_received" class="ca-compact-input" placeholder="e.g. 5000" style="flex: 1; min-width: 0;" required>
+                            <select name="unit" id="id_unit" class="ca-compact-select" style="width: 70px; padding: 0 18px 0 6px;">
                                 <option value="kg" selected>kg</option>
                                 <option value="L">L</option>
-                                <option value="tonnes">tonnes</option>
+                                <option value="tonnes">t</option>
                                 <option value="m3">m³</option>
                                 <option value="bags">bags</option>
                                 <option value="drums">drums</option>
@@ -182,10 +182,9 @@
                     </div>
 
                     <!-- PACKAGE COUNT -->
-                    <div class="ca-field-wrap">
+                    <div class="ca-field-wrap ca-col-quarter">
                         <label for="id_package_count" class="ca-field-label">
                             <span><i class="fa fa-cubes-stacked"></i> Package Count <span class="required-star">*</span></span>
-                            <span class="ca-field-label__badge">Containers / Bags</span>
                         </label>
                         <input type="number" min="1" step="1" name="package_count" id="id_package_count" class="ca-compact-input" placeholder="e.g. 100 bags" required>
                         <div class="ca-field-error" id="err-package_count" style="display: none;"></div>
@@ -194,27 +193,51 @@
                     <!-- REMARKS & INTEL (Full width) -->
                     <div class="ca-field-wrap ca-col-full">
                         <label for="id_remarks" class="ca-field-label">
-                            <span><i class="fa fa-comment-dots"></i> Intake Remarks & Physical Inspection</span>
+                            <span><i class="fa fa-comment-dots"></i> Physical Inspection &amp; Intake Remarks</span>
                             <span class="ca-field-label__badge">Truck Reg / Seals / Packaging</span>
                         </label>
-                        <textarea name="remarks" id="id_remarks" class="ca-compact-textarea" rows="2" placeholder="e.g. Truck KBZ 982T, seals intact, dry bags, no spillage detected. Received into main store."></textarea>
+                        <textarea name="remarks" id="id_remarks" class="ca-compact-textarea" rows="1" placeholder="e.g. Truck KBZ 982T, seals intact, dry bags, no spillage detected. Received into main store."></textarea>
                         <div class="ca-field-error" id="err-remarks" style="display: none;"></div>
                     </div>
 
-                    <fieldset class="ca-field-wrap ca-col-full" style="border:1px solid rgba(251,146,60,.35);border-radius:10px;padding:10px 12px;">
-                        <legend class="ca-field-label" style="padding:0 6px;color:#fdba74;">
+                    <!-- DISCREPANCIES / HOLD FIELDSET -->
+                    <fieldset class="ca-field-wrap ca-col-full ca-discrepancy-fieldset" id="ca-discrepancy-box">
+                        <legend class="ca-field-label" style="padding:0 6px;color:#fdba74;margin-bottom:2px;">
                             <i class="fa fa-triangle-exclamation" aria-hidden="true"></i> Intake discrepancies / hold
                         </legend>
-                        <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:.78rem;color:#cbd5e1;">
-                            <label><input type="checkbox" name="intake_discrepancies" value="DAMAGED_PACKAGING"> Damaged packaging</label>
-                            <label><input type="checkbox" name="intake_discrepancies" value="QUANTITY_MISMATCH"> Quantity mismatch</label>
-                            <label><input type="checkbox" name="intake_discrepancies" value="MISSING_DOCUMENTS"> Missing documents</label>
-                            <label><input type="checkbox" name="intake_discrepancies" value="LABEL_MISMATCH"> Label mismatch</label>
-                            <label><input type="checkbox" name="intake_discrepancies" value="EXPIRED"> Expired chemical</label>
-                            <label><input type="checkbox" name="intake_discrepancies" value="OTHER"> Other</label>
+                        <div class="ca-discrepancy-chips">
+                            <label class="ca-discrepancy-chip">
+                                <input type="checkbox" name="intake_discrepancies" value="DAMAGED_PACKAGING">
+                                <span><i class="fa fa-box-open"></i> Damaged packaging</span>
+                            </label>
+                            <label class="ca-discrepancy-chip">
+                                <input type="checkbox" name="intake_discrepancies" value="QUANTITY_MISMATCH">
+                                <span><i class="fa fa-scale-unbalanced"></i> Quantity mismatch</span>
+                            </label>
+                            <label class="ca-discrepancy-chip">
+                                <input type="checkbox" name="intake_discrepancies" value="MISSING_DOCUMENTS">
+                                <span><i class="fa fa-file-circle-xmark"></i> Missing docs</span>
+                            </label>
+                            <label class="ca-discrepancy-chip">
+                                <input type="checkbox" name="intake_discrepancies" value="LABEL_MISMATCH">
+                                <span><i class="fa fa-tag"></i> Label mismatch</span>
+                            </label>
+                            <label class="ca-discrepancy-chip">
+                                <input type="checkbox" name="intake_discrepancies" value="EXPIRED">
+                                <span><i class="fa fa-calendar-xmark"></i> Expired</span>
+                            </label>
+                            <label class="ca-discrepancy-chip">
+                                <input type="checkbox" name="intake_discrepancies" value="OTHER">
+                                <span><i class="fa fa-ellipsis"></i> Other</span>
+                            </label>
                         </div>
-                        <textarea name="hold_reason" id="id_hold_reason" class="ca-compact-textarea" rows="2" placeholder="Describe the discrepancy. A held batch cannot proceed to analysis until an authorized reviewer resolves it."></textarea>
-                        <div class="ca-field-error" id="err-hold_reason" style="display:none;"></div>
+                        <div id="ca-hold-reason-wrapper" class="ca-hold-reason-wrap" style="display: none; margin-top: 6px;">
+                            <label for="id_hold_reason" class="ca-field-label" style="color: #fdba74; font-size: 0.63rem;">
+                                <span><i class="fa fa-circle-exclamation"></i> Discrepancy details &amp; hold reason <span class="required-star">*</span></span>
+                            </label>
+                            <textarea name="hold_reason" id="id_hold_reason" class="ca-compact-textarea" rows="2" style="min-height: 48px;" placeholder="Describe the discrepancy. A held batch cannot proceed to analysis until an authorized reviewer resolves it."></textarea>
+                            <div class="ca-field-error" id="err-hold_reason" style="display:none;"></div>
+                        </div>
                     </fieldset>
 
                 </div>
@@ -363,22 +386,63 @@ document.addEventListener("DOMContentLoaded", function() {
     // Populate chemical and supplier options if empty
     caLoadBatchPrerequisites();
 
+    // Discrepancy Chips & Hold Reason Toggle
+    const discrepancyCheckboxes = modal.querySelectorAll('input[name="intake_discrepancies"]');
+    const discrepancyBox = document.getElementById("ca-discrepancy-box");
+    const holdReasonWrapper = document.getElementById("ca-hold-reason-wrapper");
+    const holdReasonTextarea = document.getElementById("id_hold_reason");
+
+    function updateDiscrepanciesState() {
+        let anyChecked = false;
+        discrepancyCheckboxes.forEach(cb => {
+            const chip = cb.closest(".ca-discrepancy-chip");
+            if (chip) chip.classList.toggle("is-checked", cb.checked);
+            if (cb.checked) anyChecked = true;
+        });
+        if (discrepancyBox) discrepancyBox.classList.toggle("has-discrepancy", anyChecked);
+        if (holdReasonWrapper) {
+            holdReasonWrapper.style.display = anyChecked ? "block" : "none";
+        }
+    }
+    discrepancyCheckboxes.forEach(cb => {
+        cb.addEventListener("change", updateDiscrepanciesState);
+    });
+    updateDiscrepanciesState();
+
     const plantSelect = modal.querySelector('select[name="treatment_plant"]');
     const plantInput = modal.querySelector('input[name="treatment_plant"]');
     const locationSelect = modal.querySelector('select[name="location"]');
     function filterBatchLocations() {
         if (!locationSelect) return;
         const selectedPlant = (plantSelect && plantSelect.value) || (plantInput && plantInput.value) || "";
+        const plantOption = plantSelect && plantSelect.selectedOptions && plantSelect.selectedOptions[0];
+        const plantName = (plantOption ? plantOption.text : "").trim().toLowerCase();
+
         let visibleLocations = 0;
         Array.from(locationSelect.options).forEach(function(option) {
             if (!option.value) return;
-            option.hidden = !selectedPlant || option.dataset.plantId !== selectedPlant;
+            const matchesId = selectedPlant && String(option.dataset.plantId) === String(selectedPlant);
+            const matchesName = plantName && option.text.toLowerCase().includes(plantName);
+            option.hidden = !(matchesId || matchesName);
             if (!option.hidden) visibleLocations += 1;
         });
+
+        // Resilient fallback: If no location is explicitly bound to this specific plant id/name,
+        // unhide all locations so the user is never blocked or left with an empty select!
+        const emptyHint = modal.querySelector("#ca-location-empty-hint");
+        if (visibleLocations === 0) {
+            Array.from(locationSelect.options).forEach(function(option) {
+                if (!option.value) return;
+                option.hidden = false;
+                visibleLocations += 1;
+            });
+            if (emptyHint) emptyHint.hidden = false;
+        } else {
+            if (emptyHint) emptyHint.hidden = true;
+        }
+
         const selected = locationSelect.selectedOptions[0];
         if (selected && selected.value && selected.hidden) locationSelect.value = "";
-        const emptyHint = modal.querySelector("#ca-location-empty-hint");
-        if (emptyHint) emptyHint.hidden = visibleLocations > 0;
     }
     if (plantSelect) plantSelect.addEventListener("change", filterBatchLocations);
     filterBatchLocations();

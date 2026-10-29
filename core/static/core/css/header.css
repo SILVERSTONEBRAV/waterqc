@@ -18,21 +18,25 @@
    painting priority as the user-menu dialog.
 =========================================================================== */
 .notification-wrapper {
-    /* Inherit dropdown-wrapper's isolation/z-index; add explicit stacking */
     position: relative;
-    z-index: calc(var(--header-z, 2000) + 60);
+    isolation: auto !important;
+    z-index: 10050 !important;
 }
 
 /* When the panel is open, paint it as a fixed overlay anchored to the header
-   so it clears all dashboard stacking contexts (charts, canvas, etc). */
-.notification-wrapper #notificationDropdown.show {
+   so it clears all dashboard stacking contexts (charts, canvas, worksheet headers, etc). */
+.notification-wrapper #notificationDropdown,
+.notification-wrapper #notificationDropdown.show,
+#notificationDropdown.dropdown-menu.show {
     /* Override absolute positioning from .dropdown-menu */
-    position: fixed;
-    top: calc(var(--header-height, 62px) + .45rem);
-    right: 1rem;
-    left: auto;
-    /* Remove the transform that would fight fixed positioning */
-    transform: translateY(0) scale(1);
+    position: fixed !important;
+    top: calc(var(--header-height, 62px) + .45rem) !important;
+    right: 1rem !important;
+    left: auto !important;
+    z-index: 999999 !important;
+    /* Remove any transform that fights fixed positioning */
+    transform: translateY(0) scale(1) !important;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--theme-border) !important;
 }
 
 

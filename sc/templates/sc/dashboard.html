@@ -1,138 +1,137 @@
 {% extends "sc/base.html" %}
 {% load static %}
 
-{% block content %}
+{% block title %}Shift Control | Operations{% endblock %}
+{% block extra_styles %}<link rel="stylesheet" href="{% static 'core/css/operations_dashboard.css' %}?v=20261028-operations">{% endblock %}
 
-<div class="container-fluid mt-3">
-
-    <!-- ================= HEADER ================= -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h3 class="mb-0">
-                📊 {{ app.label }}
-            </h3>
-            <small class="text-muted">
-                Registry-driven overview for "{{ app.name }}"
-            </small>
-        </div>
-
-        <div class="text-muted small">
-            Total: {{ stats.total_models }} models
-        </div>
+{% block page_content %}
+<div class="ops-dashboard sc-dashboard">
+  <section class="ops-hero" id="overview">
+    <div class="ops-hero__copy">
+      <span class="ops-eyebrow"><i class="fas fa-tower-broadcast"></i> SHIFT CONTROL · LIVE OPERATIONS</span>
+      <h1>Shift operations</h1>
+      <p>Staffing, attendance, handovers and apparatus readiness in one operational view.</p>
+      <div class="ops-hero__meta">
+        <span><i class="far fa-calendar"></i> {{ today|date:"l, d F Y" }}</span>
+        <span><i class="fas fa-location-dot"></i> {% if selected_plant %}{{ selected_plant.name }}{% else %}All treatment plants{% endif %}</span>
+        <span><i class="fas fa-clock"></i> {% if current_shifts %}{{ current_shifts|length }} shift{{ current_shifts|length|pluralize }} active now{% else %}No active shift window{% endif %}</span>
+      </div>
     </div>
-
-
-    <!-- ================= STATS ================= -->
-    <div class="row g-3 mb-4">
-
-        {% for key, value in stats.items %}
-        <div class="col-md-3">
-            <div class="card shadow-sm border-0">
-                <div class="card-body">
-                    <small class="text-muted">{{ key|title }}</small>
-                    <h3 class="mb-0">{{ value }}</h3>
-                </div>
-            </div>
-        </div>
-        {% endfor %}
-
+    <div class="ops-hero__actions">
+      {% if show_plant_selector %}
+      <form method="get" class="ops-plant-filter">
+        <input type="hidden" name="section" value="overview">
+        <label for="sc-plant">Treatment plant</label>
+        <select name="plant" id="sc-plant" onchange="this.form.submit()">
+          <option value="">All plants</option>
+          {% for plant in plant_options %}<option value="{{ plant.pk }}" {% if selected_plant.pk == plant.pk %}selected{% endif %}>{{ plant.code }} · {{ plant.name }}</option>{% endfor %}
+        </select>
+      </form>
+      {% endif %}
+      <a class="ops-refresh" href="{% url 'sc:dashboard' %}{% if selected_plant %}?plant={{ selected_plant.pk }}{% endif %}"><i class="fas fa-rotate-right"></i> Refresh view</a>
     </div>
+    <div class="ops-hero__signal"><span class="ops-live-dot"></span><span>SHIFT DESK</span><strong>Operational</strong></div>
+  </section>
 
+  <section class="ops-kpi-grid" aria-label="Shift Control key performance indicators">
+    {% for item in kpis %}
+      <a class="ops-kpi ops-kpi--{{ item.tone }}" href="{% url 'sc:dashboard' %}?{% if selected_plant %}plant={{ selected_plant.pk }}&amp;{% endif %}section={{ item.target }}#{{ item.target }}">
+        <div class="ops-kpi__top"><span>{{ item.label }}</span><i class="fas fa-{{ item.icon }}"></i></div>
+        <strong>{{ item.value }}</strong>
+        <small>{{ item.detail }}</small>
+      </a>
+    {% endfor %}
+  </section>
 
-    <!-- ================= MODELS ================= -->
-    <div class="card shadow-sm border-0">
-
-        <div class="card-header bg-light">
-            <strong>Registered Models</strong>
-        </div>
-
-        <div class="card-body p-0">
-
-            {% for m in models %}
-
-                <div class="d-flex justify-content-between align-items-center px-3 py-3 border-bottom">
-
-                    <!-- LEFT -->
-                    <div class="d-flex align-items-center">
-
-                        <div class="me-3">
-                            <i class="fas fa-{{ m.icon|default:'cube' }} fa-lg text-primary"></i>
-                        </div>
-
-                        <div>
-                            <div class="fw-semibold">
-                                {{ m.label }}
-                            </div>
-
-                            <small class="text-muted">
-                                {{ m.key }}
-                            </small>
-
-                            <!-- TAGS (pure registry-driven) -->
-                            <div class="mt-1">
-                                {% for tag in m.tags %}
-                                    <span class="badge bg-secondary">{{ tag }}</span>
-                                {% empty %}
-                                    <span class="text-muted small">No tags</span>
-                                {% endfor %}
-                            </div>
-                        </div>
-                    </div>
-
-
-                    <!-- RIGHT ACTIONS (registry-driven ONLY) -->
-                    <div class="d-flex align-items-center gap-2">
-
-                        {% with r=m.routes c=m.capabilities %}
-
-                            <a href="{{ r.list }}"
-                               class="btn btn-sm btn-outline-primary">
-                                <i class="fas fa-list"></i>
-                                List
-                            </a>
-
-                            {% if c.create %}
-                                <a href="{{ r.create }}"
-                                   class="btn btn-sm btn-outline-success">
-                                    <i class="fas fa-plus"></i>
-                                    Create
-                                </a>
-                            {% endif %}
-
-                            {% if c.export %}
-                                <a href="{{ r.export }}"
-                                   class="btn btn-sm btn-outline-warning">
-                                    <i class="fas fa-file-export"></i>
-                                    Export
-                                </a>
-                            {% endif %}
-
-                            {% if c.inline %}
-                                <a href="{{ r.update }}"
-                                   class="btn btn-sm btn-outline-info">
-                                    <i class="fas fa-edit"></i>
-                                    Inline
-                                </a>
-                            {% endif %}
-
-                        {% endwith %}
-
-                    </div>
-
-                </div>
-
-            {% empty %}
-
-                <div class="text-center text-muted py-5">
-                    <i class="fas fa-database fa-2x mb-2"></i>
-                    <div>No models registered for this app</div>
-                </div>
-
-            {% endfor %}
-
-        </div>
+  <section class="ops-panel" aria-labelledby="sc-now-title">
+    <div class="ops-panel__heading"><div><span class="ops-eyebrow">CURRENT ROSTER</span><h2 id="sc-now-title">Shifts active now</h2></div><a href="#staffing">View coverage <i class="fas fa-arrow-right"></i></a></div>
+    <div class="ops-shift-strip">
+      {% for shift in current_shifts %}
+        <article class="ops-shift-tile"><span class="ops-live-dot"></span><div><strong>{{ shift.name }}</strong><small>{{ shift.start_time|time:"H:i" }} – {{ shift.end_time|time:"H:i" }}</small></div><span class="ops-chip ops-chip--green">LIVE</span></article>
+      {% empty %}
+        <div class="ops-empty-inline"><i class="fas fa-moon"></i><span>No shift is active at the current local time.</span></div>
+      {% endfor %}
     </div>
+  </section>
 
+  <section class="ops-section" id="shift-catalog">
+    <div class="ops-section-heading"><div><span class="ops-eyebrow">SHIFT CONFIGURATION</span><h2>Shift catalogue</h2><p>Active shift definitions and transition times at the selected plant.</p></div><span class="ops-count-pill">{{ shift_count }} active</span></div>
+    <article class="ops-panel"><div class="ops-table-wrap"><table class="ops-table"><thead><tr><th>Shift</th><th>Plant</th><th>Operating hours</th><th>Handover</th><th>Takeover</th><th>Current state</th></tr></thead><tbody>
+      {% for shift in shift_rows %}<tr><td class="ops-strong">{{ shift.name }}</td><td>{{ shift.treatment_plant.name }}</td><td>{{ shift.start_time|time:"H:i" }} – {{ shift.end_time|time:"H:i" }}{% if shift.is_overnight %}<small> · overnight</small>{% endif %}</td><td>{{ shift.handover_time|time:"H:i"|default:"—" }}</td><td>{{ shift.takeover_time|time:"H:i"|default:"—" }}</td><td>{% if shift.is_active_now %}<span class="ops-chip ops-chip--green">Active now</span>{% else %}<span class="ops-chip ops-chip--slate">Off shift</span>{% endif %}</td></tr>
+      {% empty %}<tr><td colspan="6"><div class="ops-empty"><i class="fas fa-arrows-rotate"></i><strong>No active shift definitions</strong><span>Active shifts will appear when configured for this plant.</span></div></td></tr>{% endfor %}
+    </tbody></table></div></article>
+  </section>
+
+  <section class="ops-section" id="staffing">
+    <div class="ops-section-heading"><div><span class="ops-eyebrow">CAPACITY & COVERAGE</span><h2>Staffing coverage</h2><p>Today's scheduled headcount compared with each shift and section requirement.</p></div><div class="ops-score"><strong>{{ coverage_rate }}%</strong><span>staffing coverage</span></div></div>
+    <div class="ops-two-col">
+      <article class="ops-panel">
+        <div class="ops-panel__heading"><div><h3>Coverage by shift and section</h3><span class="ops-muted">{{ understaffed_count }} requirement{{ understaffed_count|pluralize }} below target</span></div></div>
+        <div class="ops-table-wrap"><table class="ops-table"><thead><tr><th>Shift</th><th>Section</th><th>Scheduled / required</th><th>Coverage</th><th>Gap</th></tr></thead><tbody>
+          {% for row in coverage_rows %}<tr><td class="ops-strong">{{ row.shift }}</td><td>{{ row.section }}</td><td>{{ row.assigned }} / {{ row.required }}</td><td><div class="ops-progress"><span style="width:{{ row.fill }}%"></span></div><small>{{ row.fill }}%</small></td><td>{% if row.gap %}<span class="ops-chip ops-chip--rose">−{{ row.gap }}</span>{% else %}<span class="ops-chip ops-chip--green">Covered</span>{% endif %}</td></tr>
+          {% empty %}<tr><td colspan="5"><div class="ops-empty"><i class="fas fa-people-group"></i><strong>No shift requirements configured</strong><span>Coverage will appear after shift and section requirements are recorded.</span></div></td></tr>{% endfor %}
+        </tbody></table></div>
+      </article>
+      <article class="ops-panel ops-chart-panel"><div class="ops-panel__heading"><div><h3>Rostered staff this week</h3><span class="ops-muted">Assignment volume by day</span></div></div><div class="ops-chart-box"><canvas id="scAttendanceTrend" aria-label="Shift assignment trend over the current week"></canvas></div></article>
+    </div>
+  </section>
+
+  <section class="ops-section" id="attendance">
+    <div class="ops-section-heading"><div><span class="ops-eyebrow">ATTENDANCE INTELLIGENCE</span><h2>Attendance</h2><p>Recorded attendance status from shift assignments, with monthly attendance rate.</p></div><div class="ops-score"><strong>{{ attendance_month.present|default:0 }}/{{ attendance_month.absent|default:0 }}</strong><span>present / absent this month</span></div></div>
+    <div class="ops-two-col">
+      <article class="ops-panel"><div class="ops-panel__heading"><div><h3>Attendance status · {{ month_label }}</h3><span class="ops-muted">{{ attendance_month.present|default:0 }} present · {{ attendance_month.late|default:0 }} late · {{ attendance_month.absent|default:0 }} absent · {{ attendance_month.excused|default:0 }} excused</span></div></div><div class="ops-status-stack">
+        <div><span class="ops-status-label"><i class="ops-dot ops-dot--green"></i>Present</span><strong>{{ attendance_month.present|default:0 }}</strong><div class="ops-progress"><span class="ops-fill--green" style="width:{{ attendance_rate }}%"></span></div></div>
+        <div><span class="ops-status-label"><i class="ops-dot ops-dot--amber"></i>Late</span><strong>{{ attendance_month.late|default:0 }}</strong></div>
+        <div><span class="ops-status-label"><i class="ops-dot ops-dot--rose"></i>Absent</span><strong>{{ attendance_month.absent|default:0 }}</strong></div>
+        <div><span class="ops-status-label"><i class="ops-dot ops-dot--blue"></i>Excused</span><strong>{{ attendance_month.excused|default:0 }}</strong></div>
+      </div></article>
+      <article class="ops-panel"><div class="ops-panel__heading"><div><h3>Today's attendance</h3><span class="ops-muted">{{ today|date:"D, d M" }}</span></div></div><div class="ops-attendance-today"><div class="ops-attendance-total"><strong>{{ attendance_today.present|default:0 }}</strong><span>present</span></div><div><span>Late</span><strong>{{ attendance_today.late|default:0 }}</strong></div><div><span>Absent</span><strong>{{ attendance_today.absent|default:0 }}</strong></div><div><span>Excused</span><strong>{{ attendance_today.excused|default:0 }}</strong></div></div></article>
+    </div>
+    <article class="ops-panel" style="margin-top:13px"><div class="ops-panel__heading"><div><h3>Today's shift assignments</h3><span class="ops-muted">Attendance register · up to 30 records</span></div></div><div class="ops-table-wrap"><table class="ops-table"><thead><tr><th>Staff member</th><th>Section</th><th>Shift</th><th>Attendance</th><th>Remarks</th></tr></thead><tbody>
+      {% for assignment in today_assignment_rows %}<tr><td class="ops-strong">{{ assignment.staff.get_full_name|default:assignment.staff.username }}</td><td>{{ assignment.staff.section.name|default:"—" }}</td><td>{{ assignment.shift.name }}</td><td><span class="ops-chip {% if assignment.attendance_status == 'present' %}ops-chip--green{% elif assignment.attendance_status == 'absent' %}ops-chip--rose{% elif assignment.attendance_status == 'late' %}ops-chip--amber{% else %}ops-chip--blue{% endif %}">{{ assignment.get_attendance_status_display }}</span></td><td>{{ assignment.remarks|default:"—"|truncatechars:90 }}</td></tr>
+      {% empty %}<tr><td colspan="5"><div class="ops-empty"><i class="fas fa-user-check"></i><strong>No shift assignments recorded today</strong><span>Today's attendance register will appear here when assignments are created.</span></div></td></tr>{% endfor %}
+    </tbody></table></div></article>
+  </section>
+
+  <section class="ops-section" id="rosters">
+    <div class="ops-section-heading"><div><span class="ops-eyebrow">MONTHLY PLANNING</span><h2>Duty rosters</h2><p>Roster plans created for {{ month_label }}.</p></div><span class="ops-count-pill">{{ roster_count }} roster plans</span></div>
+    <article class="ops-panel"><div class="ops-table-wrap"><table class="ops-table"><thead><tr><th>Plant</th><th>Month</th><th>Assignments</th><th>Created by</th><th>Created</th><th>Notes</th></tr></thead><tbody>
+      {% for roster in roster_rows %}<tr><td class="ops-strong">{{ roster.treatment_plant.name }}</td><td>{{ roster.month }}/{{ roster.year }}</td><td>{{ roster.assignment_count }}</td><td>{{ roster.created_by.get_full_name|default:roster.created_by.username|default:"—" }}</td><td>{{ roster.created_at|date:"d M Y" }}</td><td>{{ roster.notes|default:"—"|truncatechars:90 }}</td></tr>
+      {% empty %}<tr><td colspan="6"><div class="ops-empty"><i class="fas fa-calendar-xmark"></i><strong>No monthly roster records</strong><span>There are no roster plans for the selected plant and month.</span></div></td></tr>{% endfor %}
+    </tbody></table></div></article>
+  </section>
+
+  <section class="ops-section" id="supervisors">
+    <div class="ops-section-heading"><div><span class="ops-eyebrow">LEADERSHIP COVERAGE</span><h2>Shift supervisors</h2><p>Active supervisory appointments at the selected plant.</p></div><span class="ops-count-pill">{{ supervisors|length }} shown</span></div>
+    <div class="ops-people-grid">{% for assignment in supervisors %}<article class="ops-person-card"><div class="ops-avatar">{{ assignment.user.first_name|default:assignment.user.username|slice:":1"|upper }}{{ assignment.user.last_name|slice:":1"|upper }}</div><div><strong>{{ assignment.user.get_full_name|default:assignment.user.username }}</strong><span>{{ assignment.section.name|default:"Plant-wide" }}</span><small>{{ assignment.treatment_plant.name }}</small></div><span class="ops-chip ops-chip--green">ACTIVE</span></article>{% empty %}<div class="ops-empty"><i class="fas fa-user-shield"></i><strong>No active supervisor records</strong><span>Supervisor coverage will appear here when assigned.</span></div>{% endfor %}</div>
+  </section>
+
+  <section class="ops-section" id="handovers">
+    <div class="ops-section-heading"><div><span class="ops-eyebrow">SHIFT CONTINUITY</span><h2>Recent handovers</h2><p>Takeover status and pending work from recent shift transitions.</p></div><span class="ops-count-pill">{{ latest_handovers|length }} recent</span></div>
+    <article class="ops-panel"><div class="ops-table-wrap"><table class="ops-table"><thead><tr><th>Date</th><th>Shift</th><th>Outgoing supervisor</th><th>Incoming supervisor</th><th>Takeover</th><th>Pending work</th></tr></thead><tbody>
+      {% for handover in latest_handovers %}<tr><td>{{ handover.date|date:"d M Y" }}</td><td class="ops-strong">{{ handover.shift.name }}</td><td>{{ handover.outgoing_supervisor.get_full_name|default:handover.outgoing_supervisor.username|default:"—" }}</td><td>{{ handover.incoming_supervisor.get_full_name|default:handover.incoming_supervisor.username|default:"—" }}</td><td>{% if handover.is_taken_over %}<span class="ops-chip ops-chip--green">Taken over</span>{% else %}<span class="ops-chip ops-chip--amber">Waiting</span>{% endif %}</td><td>{{ handover.pending_work|default:"No pending work recorded"|truncatechars:100 }}</td></tr>
+      {% empty %}<tr><td colspan="6"><div class="ops-empty"><i class="fas fa-right-left"></i><strong>No shift handovers recorded</strong><span>Handover activity will show here once a shift transition is logged.</span></div></td></tr>{% endfor %}
+    </tbody></table></div></article>
+  </section>
+
+  <section class="ops-section" id="apparatus">
+    <div class="ops-section-heading"><div><span class="ops-eyebrow">ASSET READINESS</span><h2>Apparatus condition</h2><p>Latest condition recorded through shift handover inspections.</p></div><span class="ops-count-pill">{{ apparatus_attention }} need attention or reporting</span></div>
+    <article class="ops-panel"><div class="ops-table-wrap"><table class="ops-table"><thead><tr><th>Apparatus</th><th>Linked equipment</th><th>Latest condition</th><th>Inspection date</th><th>Remarks</th></tr></thead><tbody>
+      {% for row in apparatus_rows %}<tr><td class="ops-strong">{{ row.name }}</td><td>{{ row.equipment }}</td><td><span class="ops-chip {% if row.status == 'working' %}ops-chip--green{% elif row.status == 'unreported' %}ops-chip--slate{% else %}ops-chip--rose{% endif %}">{{ row.status|title }}</span></td><td>{{ row.date|date:"d M Y"|default:"—" }}</td><td>{{ row.remarks|default:"—"|truncatechars:90 }}</td></tr>
+      {% empty %}<tr><td colspan="5"><div class="ops-empty"><i class="fas fa-screwdriver-wrench"></i><strong>No apparatus linked</strong><span>Apparatus linked to plant equipment will appear here.</span></div></td></tr>{% endfor %}
+    </tbody></table></div></article>
+  </section>
+
+  <section class="ops-section" id="activity">
+    <div class="ops-section-heading"><div><span class="ops-eyebrow">TRACEABILITY</span><h2>Recent audit activity</h2><p>{% if show_plant_selector %}Latest Shift Control changes{% else %}Your latest Shift Control changes{% endif %}.</p></div></div>
+    <article class="ops-panel"><div class="ops-timeline">{% for entry in audit_logs %}<div class="ops-timeline__row"><span class="ops-timeline__icon"><i class="fas fa-{% if entry.action == 'create' %}plus{% elif entry.action == 'delete' %}trash{% else %}pen{% endif %}"></i></span><div><strong>{{ entry.action|title }} · {{ entry.content_type.name|title }}</strong><p>{{ entry.object_repr }}</p><small>{{ entry.user.get_full_name|default:entry.user.username|default:"System" }} · {{ entry.timestamp|date:"d M Y, H:i" }}</small></div></div>{% empty %}<div class="ops-empty"><i class="fas fa-clock-rotate-left"></i><strong>No audit events to show</strong><span>Recent changes will be listed here as they happen.</span></div>{% endfor %}</div></article>
+  </section>
 </div>
+{{ attendance_trend|json_script:"sc-trend-data" }}
+{% endblock %}
 
+{% block extra_scripts %}
+{{ block.super }}
+<script src="{% static 'js/Chart.min.js' %}"></script>
+<script src="{% static 'sc/js/dashboard.js' %}?v=20261028-operations"></script>
 {% endblock %}

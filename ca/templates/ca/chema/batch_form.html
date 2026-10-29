@@ -105,7 +105,7 @@
                     </div>
 
                     <!-- CHEMICAL -->
-                    <div class="ca-field-wrap">
+                    <div class="ca-field-wrap ca-col-half">
                         <label class="ca-field-label" for="{{ form.chemical.id_for_label }}">
                             <span><i class="fa fa-flask"></i> Chemical <span class="required-star">*</span></span>
                         </label>
@@ -116,7 +116,7 @@
                     </div>
 
                     <!-- SUPPLIER -->
-                    <div class="ca-field-wrap">
+                    <div class="ca-field-wrap ca-col-half">
                         <label class="ca-field-label" for="{{ form.supplier.id_for_label }}">
                             <span><i class="fa fa-truck-ramp-box"></i> Supplier <span class="required-star">*</span></span>
                         </label>
@@ -127,7 +127,7 @@
                     </div>
 
                     <!-- STORAGE LOCATION -->
-                    <div class="ca-field-wrap">
+                    <div class="ca-field-wrap ca-col-half">
                         <label class="ca-field-label" for="{{ form.location.id_for_label }}">
                             <span><i class="fa fa-location-dot"></i> Chemical Storage Location <span class="required-star">*</span></span>
                         </label>
@@ -141,25 +141,24 @@
                     </div>
 
                     <!-- DELIVERY DATE WITH COMPACT DATE PICKER -->
-                    <div class="ca-field-wrap">
+                    <div class="ca-field-wrap ca-col-half">
                         <label class="ca-field-label" for="{{ form.delivery_date.id_for_label }}">
                             <span><i class="fa fa-calendar-day"></i> Date Received <span class="required-star">*</span></span>
+                            <span class="ca-date-quick-chips" style="margin:0;">
+                                <span class="ca-date-chip" onclick="caQuickDate('today')">Today</span>
+                                <span class="ca-date-chip" onclick="caQuickDate('yesterday')">Yesterday</span>
+                            </span>
                         </label>
                         {{ form.delivery_date }}
-                        <small class="ca-field-help">{{ form.delivery_date.help_text }}</small>
-                        <div class="ca-date-quick-chips">
-                            <span class="ca-date-chip" onclick="caQuickDate('today')">Today</span>
-                            <span class="ca-date-chip" onclick="caQuickDate('yesterday')">Yesterday</span>
-                        </div>
                         {% if form.delivery_date.errors %}
                             <div class="ca-field-error"><i class="fa fa-circle-exclamation"></i> {{ form.delivery_date.errors.0 }}</div>
                         {% endif %}
                     </div>
 
                     <!-- DELIVERY NOTE NUMBER -->
-                    <div class="ca-field-wrap">
+                    <div class="ca-field-wrap ca-col-quarter">
                         <label class="ca-field-label" for="{{ form.delivery_note_number.id_for_label }}">
-                            <span><i class="fa fa-file-invoice"></i> Delivery Note No. <span class="required-star">*</span></span>
+                            <span><i class="fa fa-file-invoice"></i> Delivery Note <span class="required-star">*</span></span>
                         </label>
                         {{ form.delivery_note_number }}
                         {% if form.delivery_note_number.errors %}
@@ -168,7 +167,7 @@
                     </div>
 
                     <!-- BATCH NUMBER -->
-                    <div class="ca-field-wrap">
+                    <div class="ca-field-wrap ca-col-quarter">
                         <label class="ca-field-label" for="{{ form.batch_number.id_for_label }}">
                             <span><i class="fa fa-barcode"></i> Batch Number <span class="required-star">*</span></span>
                         </label>
@@ -179,15 +178,15 @@
                     </div>
 
                     <!-- QUANTITY RECEIVED & UNIT -->
-                    <div class="ca-field-wrap">
+                    <div class="ca-field-wrap ca-col-quarter">
                         <label class="ca-field-label" for="{{ form.quantity_received.id_for_label }}">
-                            <span><i class="fa fa-scale-unbalanced"></i> Quantity Received <span class="required-star">*</span></span>
+                            <span><i class="fa fa-scale-unbalanced"></i> Quantity <span class="required-star">*</span></span>
                         </label>
-                        <div style="display: flex; gap: 8px;">
-                            <div style="flex: 1;">
+                        <div style="display: flex; gap: 6px;">
+                            <div style="flex: 1; min-width: 0;">
                                 {{ form.quantity_received }}
                             </div>
-                            <div style="width: 85px;">
+                            <div style="width: 72px;">
                                 {{ form.unit }}
                             </div>
                         </div>
@@ -197,7 +196,7 @@
                     </div>
 
                     <!-- PACKAGE COUNT -->
-                    <div class="ca-field-wrap">
+                    <div class="ca-field-wrap ca-col-quarter">
                         <label class="ca-field-label" for="{{ form.package_count.id_for_label }}">
                             <span><i class="fa fa-cubes-stacked"></i> Package Count</span>
                         </label>
@@ -210,7 +209,7 @@
                     <!-- REMARKS -->
                     <div class="ca-field-wrap ca-col-full">
                         <label class="ca-field-label" for="{{ form.remarks.id_for_label }}">
-                            <span><i class="fa fa-comment-dots"></i> Intake Remarks & Physical Inspection</span>
+                            <span><i class="fa fa-comment-dots"></i> Intake Remarks &amp; Physical Inspection</span>
                             <span class="ca-field-label__badge">Vehicle Reg, Seal Integrity, Packaging Condition</span>
                         </label>
                         {{ form.remarks }}
@@ -261,22 +260,33 @@ document.addEventListener("DOMContentLoaded", function() {
 
     function filterLocationsForPlant() {
         const plantId = plantSelect.value || "";
+        const plantOption = plantSelect.selectedOptions && plantSelect.selectedOptions[0];
+        const plantName = (plantOption ? plantOption.text : "").trim().toLowerCase();
+
         let visibleCount = 0;
 
         Array.from(locationSelect.options).forEach(function(option) {
             if (!option.value) return;
-            option.hidden = !plantId || option.dataset.plantId !== plantId;
+            const matchesId = plantId && String(option.dataset.plantId) === String(plantId);
+            const matchesName = plantName && option.text.toLowerCase().includes(plantName);
+            option.hidden = !(matchesId || matchesName);
             if (!option.hidden) visibleCount += 1;
         });
 
+        // Resilient fallback
+        if (visibleCount === 0) {
+            Array.from(locationSelect.options).forEach(function(option) {
+                if (!option.value) return;
+                option.hidden = false;
+                visibleCount += 1;
+            });
+            if (locationHint) locationHint.hidden = true;
+        } else {
+            if (locationHint) locationHint.hidden = true;
+        }
+
         const selected = locationSelect.selectedOptions[0];
         if (selected && selected.value && selected.hidden) locationSelect.value = "";
-        if (locationHint) {
-            locationHint.hidden = Boolean(plantId && visibleCount > 0);
-            locationHint.textContent = !plantId
-                ? "Select a treatment plant to see its configured chemical storage locations."
-                : "No chemical storage locations are configured for the selected treatment plant.";
-        }
     }
 
     plantSelect.addEventListener("change", filterLocationsForPlant);

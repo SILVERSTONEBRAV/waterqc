@@ -315,16 +315,21 @@ window.calculatePhPlantFeed = function() {
 
     const flow = parseFloat(flowInput ? flowInput.value : 1000) || 1000; // m³/hr
     const dose = parseFloat(doseInput ? doseInput.value : 18.0) || 18.0;   // mL/L or g/m³ equivalent
-    const reagent = reagentSelect ? reagentSelect.value : "lime";
+    const selectedOption = reagentSelect ? reagentSelect.options[reagentSelect.selectedIndex] : null;
+    const optPurity = selectedOption?.dataset?.purity ? parseFloat(selectedOption.dataset.purity) : null;
+    const optVal = (reagentSelect ? reagentSelect.value : "lime").toLowerCase();
+    const optText = (selectedOption ? selectedOption.textContent : "").toLowerCase();
 
     // Reagent purity / activity factors
-    let purityFactor = 1.0;
+    let purityFactor = optPurity || 1.0;
     let sackWeightKg = 25.0;
 
-    if (reagent === "lime") purityFactor = 0.90;      // 90% hydrated lime Ca(OH)2
-    else if (reagent === "soda") purityFactor = 0.99; // 99% dense soda ash
-    else if (reagent === "caustic") purityFactor = 0.50; // 50% liquid caustic
-    else if (reagent === "acid") purityFactor = 0.98;
+    if (!optPurity) {
+        if (optVal.includes("lime") || optText.includes("lime")) purityFactor = 0.90;      // 90% hydrated lime Ca(OH)2
+        else if (optVal.includes("soda") || optText.includes("soda")) purityFactor = 0.99; // 99% dense soda ash
+        else if (optVal.includes("caustic") || optText.includes("naoh") || optText.includes("caustic")) purityFactor = 0.50; // 50% liquid caustic
+        else if (optVal.includes("acid") || optText.includes("acid")) purityFactor = 0.98;
+    }
 
     // Feed rate kg/hr = (flow m³/hr * dose g/m³) / (1000 * purity)
     const rateKgHr = (flow * dose) / (1000 * purityFactor);
@@ -444,10 +449,12 @@ function initPhReportAnalytics() {
         if (!traces.length) chartLayout.annotations = [{ text: "No linked coagulant groups match these filters", x: .5, y: .5, xref: "paper", yref: "paper", showarrow: false, font: { color: "#8193ae", size: 10 } }];
         window.Plotly.react(node, traces, chartLayout, config);
     };
-    drawControl();
-    drawDosePh();
-    drawRawAssociation(document.getElementById("ph-report-raw-select")?.value || data.selected_parameter);
-    drawHistogram();
-    drawCoagulantGroups();
+    requestAnimationFrame(() => {
+        drawControl();
+        drawDosePh();
+        drawRawAssociation(document.getElementById("ph-report-raw-select")?.value || data.selected_parameter);
+        drawHistogram();
+        drawCoagulantGroups();
+    });
     document.getElementById("ph-report-raw-select")?.addEventListener("change", (event) => drawRawAssociation(event.target.value));
 }

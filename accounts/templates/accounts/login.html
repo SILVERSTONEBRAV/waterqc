@@ -30,7 +30,7 @@
 
     <link rel="stylesheet" href="{% static 'core/css/theme.css' %}?v=20261020-enterprise-theme">
     <!-- Login-specific layout, using the shared theme tokens. -->
-    <link rel="stylesheet" href="{% static 'accounts/css/login.css' %}?v=20261020-enterprise-theme">
+    <link rel="stylesheet" href="{% static 'accounts/css/login.css' %}?v=20261025-standard-login">
 </head>
 <body>
 
@@ -56,48 +56,36 @@
             {% include 'accounts/components/company_branding.html' %}
         </div>
 
-        <!-- Verified username display (shown after verification) -->
-        <div id="verifiedUsername" class="verified-username" style="display:none;"></div>
-
-        <!-- Username Input -->
-        <div class="form-group" id="usernameGroup">
-            <i class="fas fa-user left-icon" aria-hidden="true"></i>
-            <input type="text"
-                   id="username"
-                   name="username"
-                   placeholder="Username"
-                   value="{{ username|default:'' }}"
-                   autocomplete="off"
-                   spellcheck="false"
-                   aria-label="Username">
-        </div>
-
-        <!-- Verify Username Button -->
-        <button type="button"
-                id="verifyBtn"
-                data-url="{% url 'accounts:check_username' %}"
-                data-csrf="{{ csrf_token }}">
-            Verify Username
-        </button>
-
-        <!-- Password Form (hidden until username verified) -->
+        <!-- Standard Login Form — username + password visible together -->
         <form id="loginForm"
               method="post"
               action="{% url 'accounts:login' %}"
+              autocomplete="off"
               style="width:100%; display:flex; flex-direction:column; gap:8px; margin-top:10px;">
 
             {% csrf_token %}
 
-            <div class="form-group password-container"
-                 id="passwordGroup"
-                 style="display:none;">
+            <!-- Username Input -->
+            <div class="form-group" id="usernameGroup">
+                <i class="fas fa-user left-icon" aria-hidden="true"></i>
+                <input type="text"
+                       id="username"
+                       name="username"
+                       placeholder="Username"
+                       autocomplete="off"
+                       spellcheck="false"
+                       aria-label="Username">
+            </div>
+
+            <!-- Password Input -->
+            <div class="form-group password-container" id="passwordGroup">
                 <i class="fas fa-lock left-icon" aria-hidden="true"></i>
 
                 <input type="password"
                        id="password"
                        name="password"
                        placeholder="Password"
-                       autocomplete="new-password"
+                       autocomplete="off"
                        aria-label="Password">
 
                 <i class="fas fa-eye toggle-password"
@@ -107,22 +95,15 @@
                    tabindex="0"></i>
             </div>
 
-            <!-- Password Strength Meter -->
-            <div id="passwordStrengthContainer" style="display:none;">
-                <div id="passwordStrengthBar"></div>
-            </div>
-
             <button type="submit"
                     id="loginBtn"
-                    class="ripple"
-                    disabled
-                    style="display:none;">
+                    class="ripple">
                 Login
             </button>
         </form>
 
         <!-- Forgot Password (AJAX trigger) -->
-        <div class="forgot-password" id="forgotDiv" style="display:none;">
+        <div class="forgot-password" id="forgotDiv">
             <a href="#" id="forgotPasswordLink"
                data-url="{% url 'accounts:reset_password_request' %}">
                 Forgot your password?
@@ -137,27 +118,7 @@
 <!-- =============================
      Login JS
      ============================= -->
-<script src="{% static 'accounts/js/login.js' %}"></script>
-
-<!-- Optional: Dynamic gradient based on logo colors -->
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    const wrapper = document.getElementById('companyBrandingWrapper');
-    const loginContainer = document.querySelector('.login-container');
-
-    if (wrapper && wrapper.dataset.logo) {
-        // Placeholder for future color extraction from logo
-        // e.g., use Color Thief or Vibrant.js
-        // const img = new Image();
-        // img.src = wrapper.dataset.logo;
-        // img.onload = () => {
-        //     const colors = extractColors(img);
-        //     loginContainer.style.background = `linear-gradient(135deg, ${colors.join(',')})`;
-        //     loginContainer.classList.add('dynamic-gradient');
-        // };
-    }
-});
-</script>
+<script src="{% static 'accounts/js/login.js' %}?v=20261027-clear-login"></script>
 
 {% if error %}
 <script>
@@ -172,6 +133,6 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 {% endif %}
 
-<script src="{% static 'core/js/pwa.js' %}?v=20261020-pwa" defer></script>
+<script src="{% static 'core/js/pwa.js' %}?v=20261027-no-auto-logout" defer></script>
 </body>
 </html>

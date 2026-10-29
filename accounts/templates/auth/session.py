@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.utils import timezone
 
 
@@ -7,11 +8,9 @@ class SessionManagerV2:
         self.remember_seconds = remember_seconds
 
     def initialize(self, request, user, remember: bool):
-
-        request.session.set_expiry(
-            self.remember_seconds if remember else 0
-        )
-
+        # Use the shared long-lived policy; a false remember flag must not turn
+        # the cookie into a browser session.
+        request.session.set_expiry(settings.SESSION_COOKIE_AGE)
         request.session.cycle_key()
 
         request.session.update({

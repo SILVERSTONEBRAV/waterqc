@@ -11,10 +11,6 @@
 
         <div class="jt-telemetry-ticker">
             <div class="jt-ticker-chip">
-                <span class="chip-label">Plant:</span>
-                <span class="chip-val">{{ plant.name|default:"Main Plant" }}</span>
-            </div>
-            <div class="jt-ticker-chip">
                 <span class="chip-label">Raw Turbidity:</span>
                 <span class="chip-val" style="color:#38bdf8;">{{ raw_metrics.turbidity|default:"48.5" }} NTU</span>
             </div>
@@ -69,16 +65,6 @@
     <div class="jt-control-bar">
         <!-- Left: Plant, Date & Coagulant Selector -->
         <div class="jt-session-meta">
-            <div class="jt-meta-pill">
-                <i class="fa-solid fa-industry text-emerald"></i>
-                <select name="plant" id="plant-select" class="jt-select" onchange="const u = new URL(window.location); u.searchParams.set('plant', this.value); window.location = u;">
-                    {% for p in available_plants %}
-                    <option value="{{ p.pk }}" {% if plant.pk == p.pk %}selected{% endif %}>
-                        {{ p.name }}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
 
             <div class="jt-meta-pill">
                 <i class="fa-regular fa-calendar-days text-cyan"></i>

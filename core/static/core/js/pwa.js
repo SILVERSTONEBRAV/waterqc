@@ -1,4 +1,4 @@
-/* NCWSCwaterLAB — High Performance PWA & Secure Multi-Tab / Single-Device Session Manager */
+/* NCWSCwaterLAB — High Performance PWA shell with explicit logout sync */
 (function () {
     "use strict";
 
@@ -35,8 +35,7 @@
         }, { once: true });
     }
 
-    // 3. Multi-Tab Synchronization Channel
-    // Logout on one tab automatically logs out all other open tabs instantly.
+    // 3. Synchronize an explicit logout across tabs in this browser.
     var authChannel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("qad_auth_sync") : null;
 
     function broadcastLogout(reason) {
@@ -56,6 +55,7 @@
     }
 
     function handleRemoteLogout(reason) {
+        if (reason === "window_closed") return;
         sessionStorage.removeItem("qad_active_session");
         var isLoginPage = window.location.pathname.includes("/login/");
         if (!isLoginPage) {
@@ -82,58 +82,13 @@
         }
     });
 
-    // 4. Window Close vs Internal Navigation Tracking
-    // Closing the app window is considered a logout. Internal link clicks must NOT log out.
-    var isInternalNav = false;
-
-    // Track internal links
-    document.addEventListener("click", function (event) {
-        var target = event.target;
-        while (target && target !== document.body) {
-            if (target.tagName === "A" && target.href) {
-                try {
-                    var targetUrl = new URL(target.href, window.location.origin);
-                    if (targetUrl.origin === window.location.origin && !target.target.includes("_blank")) {
-                        isInternalNav = true;
-                    }
-                } catch (e) {}
-                break;
-            }
-            target = target.parentElement;
-        }
-    }, true);
-
-    // Track form submissions
-    document.addEventListener("submit", function () {
-        isInternalNav = true;
-    }, true);
-
-    // Track history navigation (back/forward)
-    window.addEventListener("popstate", function () {
-        isInternalNav = true;
-    });
-
-    // Reset internal navigation flag on page visibility restore
-    window.addEventListener("pageshow", function () {
-        isInternalNav = false;
-    });
-
-    // When the app window / tab is closed or user exits the app:
-    window.addEventListener("pagehide", function (event) {
-        if (!isInternalNav) {
-            sessionStorage.removeItem("qad_active_session");
-            localStorage.setItem("qad_window_closed_at", Date.now().toString());
-
-            // Synchronize logout across any other open tabs
-            broadcastLogout("window_closed");
-
-            // Dispatch logout beacon to server immediately
-            if (navigator.sendBeacon) {
-                try {
-                    var logoutUrl = "/accounts/logout/";
-                    var blob = new Blob(["action=window_close"], { type: "application/x-www-form-urlencoded" });
-                    navigator.sendBeacon(logoutUrl, blob);
-                } catch (e) {}
+    // 4. Safe Session Navigation
+    // We do NOT send logout beacons on pagehide / tab switches because that causes
+    // premature logouts during normal navigation, dropdown changes, or page refreshes.
+    window.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" || e.keyCode === 27) {
+            if (document.fullscreenElement) {
+                document.exitFullscreen().catch(function () {});
             }
         }
     });
@@ -149,58 +104,6 @@
             target = target.parentElement;
         }
     }, true);
-
-    // 6. Real-Time Single-Device Session Heartbeat
-    // If the account is opened on another computer, this session is terminated and redirects immediately.
-    (function initSessionHeartbeat() {
-        var isLoginPage = window.location.pathname.includes("/login/");
-        if (isLoginPage) return;
-
-        var isChecking = false;
-
-        function checkActiveSession() {
-            if (isChecking) return;
-            isChecking = true;
-
-            fetch("/accounts/session-check/", {
-                method: "GET",
-                headers: {
-                    "X-Requested-With": "XMLHttpRequest",
-                    "Cache-Control": "no-cache"
-                },
-                cache: "no-store"
-            }).then(function (res) {
-                if (res.status === 401) {
-                    return res.json().then(function (data) {
-                        var reason = (data && data.reason) || "concurrent_login";
-                        broadcastLogout(reason);
-                        handleRemoteLogout(reason);
-                    }).catch(function () {
-                        broadcastLogout("concurrent_login");
-                        handleRemoteLogout("concurrent_login");
-                    });
-                }
-            }).catch(function () {
-                // Ignore transient network errors
-            }).finally(function () {
-                isChecking = false;
-            });
-        }
-
-        // Heartbeat interval: every 20 seconds when visible, immediately on window focus/tab change
-        setInterval(function () {
-            if (!document.hidden) {
-                checkActiveSession();
-            }
-        }, 20000);
-
-        window.addEventListener("focus", checkActiveSession);
-        document.addEventListener("visibilitychange", function () {
-            if (!document.hidden) {
-                checkActiveSession();
-            }
-        });
-    })();
 
     // 7. Offline / Online Network Indicator
     var networkNotice = null;
@@ -295,133 +198,32 @@
         removeInstallButton();
     });
 
-    // 9. Client-Side Hashed / Shortened URL Engine
-    // Transforms browser address bars into clean, short, hashed URLs without displaying long raw paths.
-    var ROUTE_SLUG_MAP = {
-        "/": "#/portal",
-        "/qc/scada/": "#/scada",
-        "/qc/cards/": "#/qc-cards",
-        "/qc/dashboard/": "#/qc-dashboard",
-        "/ca/": "#/chemlab",
-        "/accounts/login/": "#/auth",
-        "/accounts/profile/": "#/profile",
-        "/instruments/": "#/telemetry",
-        "/weeklytasks/": "#/tasks",
-        "/jartest/": "#/jartest",
-        "/PHadjustment/": "#/ph-adjust",
-        "/chlorinedemand/": "#/chlorine",
-        "/xmicalconcentration/": "#/concentration",
-        "/backwashing/": "#/backwashing",
-        "/inventory/": "#/inventory",
-        "/central_lab/": "#/central-lab",
-        "/duty_house/": "#/housing",
-        "/maintenance/": "#/maintenance",
-        "/microbial/": "#/microbial",
-        "/heavy_metal/": "#/heavy-metals",
-        "/filtered_water/": "#/filtered-water",
-        "/alerts/": "#/alerts"
-    };
-
-    var REVERSE_ROUTE_MAP = {};
-    for (var routePath in ROUTE_SLUG_MAP) {
-        REVERSE_ROUTE_MAP[ROUTE_SLUG_MAP[routePath]] = routePath;
-    }
-
-    function computeShortHash(str) {
-        var hash = 5381;
-        for (var i = 0; i < str.length; i++) {
-            hash = ((hash << 5) + hash) + str.charCodeAt(i);
-            hash = hash & hash;
+    function cleanupLegacyRouteMasking() {
+        if (window.location.hash && window.location.hash.startsWith("#/")) {
+            try {
+                var cleanUrl = window.location.pathname + window.location.search;
+                window.history.replaceState(null, document.title, cleanUrl);
+            } catch (e) {}
         }
-        return Math.abs(hash).toString(36).slice(0, 6);
-    }
-
-    function getShortenedUrl(pathname, search) {
-        var cleanPath = pathname.endsWith("/") ? pathname : pathname + "/";
-        if (ROUTE_SLUG_MAP[cleanPath]) {
-            return ROUTE_SLUG_MAP[cleanPath];
-        }
-        var parts = cleanPath.split("/").filter(Boolean);
-        var prefix = parts[0] || "portal";
-        var token = computeShortHash(cleanPath + (search || ""));
-        return "#/" + prefix + "~" + token;
-    }
-
-    function initUrlMasking() {
-        var currentHash = window.location.hash;
-        // On refresh or direct hash navigation at root (e.g. /#/scada):
-        if (window.location.pathname === "/" && currentHash && currentHash.startsWith("#/")) {
-            var cachedTarget = sessionStorage.getItem("qad_route_" + currentHash);
-            var targetPath = cachedTarget || REVERSE_ROUTE_MAP[currentHash];
-            if (targetPath && targetPath !== "/") {
-                window.location.replace(targetPath);
-                return;
-            }
-        }
-
         try {
-            var shortHash = getShortenedUrl(window.location.pathname, window.location.search);
-            sessionStorage.setItem("qad_route_" + shortHash, window.location.pathname + window.location.search);
-            if (window.history && window.history.replaceState) {
-                var targetDisplay = "/" + shortHash;
-                window.history.replaceState({ qad_real_path: window.location.pathname }, document.title, targetDisplay);
+            if (typeof sessionStorage !== "undefined") {
+                for (var i = sessionStorage.length - 1; i >= 0; i--) {
+                    var key = sessionStorage.key(i);
+                    if (key && key.startsWith("qad_route_")) {
+                        sessionStorage.removeItem(key);
+                    }
+                }
             }
         } catch (e) {}
     }
 
-    // 10. Global Window Exit & Omnipresent Top-Right Close Button (X)
-    function executeAppExit() {
-        broadcastLogout("window_closed");
-        if (navigator.sendBeacon) {
-            try {
-                navigator.sendBeacon("/accounts/logout/", new Blob(["action=window_close"], { type: "application/x-www-form-urlencoded" }));
-            } catch (e) {}
-        }
-        sessionStorage.removeItem("qad_active_session");
-        window.close();
-        setTimeout(function () {
-            window.location.href = "/accounts/logout/?reason=window_closed";
-        }, 200);
-    }
-
-    function ensureGlobalCloseControl() {
-        if (!document.body) return;
-        var existingClose = document.querySelector("[data-close-app-window], .app-window-close, .btn-launcher-close");
-        if (existingClose) return;
-
-        if (document.getElementById("pwa-global-close-control")) return;
-
-        var closeBtn = document.createElement("button");
-        closeBtn.id = "pwa-global-close-control";
-        closeBtn.type = "button";
-        closeBtn.title = "Close Application";
-        closeBtn.setAttribute("aria-label", "Close Application Window");
-        closeBtn.innerHTML = "&times;";
-        closeBtn.setAttribute("data-close-app-window", "true");
-
-        closeBtn.addEventListener("click", function (e) {
-            e.preventDefault();
-            e.stopPropagation();
-            executeAppExit();
-        });
-
-        document.body.appendChild(closeBtn);
-    }
-
-    document.addEventListener("click", function (event) {
-        var closeControl = event.target.closest("[data-close-app-window]");
-        if (closeControl) {
-            event.preventDefault();
-            event.stopPropagation();
-            executeAppExit();
-        }
-    }, true);
+    // Run route cleanup immediately
+    cleanupLegacyRouteMasking();
 
     function initializePwaShell() {
+        cleanupLegacyRouteMasking();
         renderInstallButton();
         updateNetworkNotice();
-        ensureGlobalCloseControl();
-        initUrlMasking();
     }
 
     if (document.readyState === "loading") {

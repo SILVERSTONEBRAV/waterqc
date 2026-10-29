@@ -6,7 +6,12 @@
     overflow: visible;
     isolation: isolate;
 
-    z-index: calc(var(--z-header) + 50);
+    z-index: calc(var(--z-header, 10000) + 50);
+}
+
+.dropdown-wrapper.notification-wrapper {
+    isolation: auto !important;
+    z-index: 10050 !important;
 }
 
 .dropdown-toggle {

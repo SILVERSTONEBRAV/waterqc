@@ -139,13 +139,17 @@ dmypy.json
 # ==============================================================================
 .idea/
 .vscode/
+.trae/
 *.swp
 *.swo
 *~
 *.bak
+*.orig
 *.tmp
 *.sublime-workspace
 *.sublime-project
+cookies.txt
+scratch/
 
 # ==============================================================================
 # Operating System Artifacts

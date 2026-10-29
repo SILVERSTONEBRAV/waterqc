@@ -1399,6 +1399,23 @@ class CompleteRetestTaskView(ChemicalWorkflowTaskView):
 class QAReviewTaskView(ChemicalWorkflowTaskView):
     form_class = QAReviewForm
 
+    def _redirect_analysis_performer(self, request):
+        process = self.get_process()
+        if not process.is_analysis_performer(request.user):
+            return None
+        messages.info(request, "QA review for this batch must be completed by an independent reviewer.")
+        return redirect(
+            f"{reverse('ca:batch-detail', kwargs={'pk': process.batch_id})}?stage=quality"
+        )
+
+    def get(self, request, *args, **kwargs):
+        response = self._redirect_analysis_performer(request)
+        return response or super().get(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        response = self._redirect_analysis_performer(request)
+        return response or super().post(request, *args, **kwargs)
+
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs.update(user=self.request.user, process=self.get_process(), batch=self.get_batch())
@@ -1411,7 +1428,7 @@ class QAReviewTaskView(ChemicalWorkflowTaskView):
             raise ValidationError("The analysis must be in QA before review.")
         if process.has_pending_tests or not process.is_analysis_complete:
             raise ValidationError("All required analytical results must be finalized before QA review.")
-        if not self.request.user.is_superuser and process.assigned_analysts.filter(pk=self.request.user.pk).exists():
+        if process.is_analysis_performer(self.request.user):
             raise PermissionDenied("The analyst who performed this analysis cannot independently review it.")
         decision = str(form.cleaned_data.get("decision", "")).upper()
         remarks = (form.cleaned_data.get("remarks") or "").strip()

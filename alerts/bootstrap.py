@@ -32,37 +32,71 @@ def bootstrap_alerts_system():
         return
 
     with transaction.atomic():
-        # 1. Ensure default VoiceOver profiles (Slot 1 and Slot 2 for fair 1:1 rotation)
+        # 1. Ensure default VoiceOver profiles (Slot 1: Martin Nangole, Slot 2: Michael Onyango for 1:1 rotation)
+        import os
+        from django.conf import settings
         from django.core.files.base import ContentFile
-        from .models import synthesize_alert_audio
 
-        if not VoiceOver.objects.filter(slot=1).exists():
-            sample1 = synthesize_alert_audio("Primary announcer initialized.", accent="co.uk") or b"audio"
-            v1 = VoiceOver(
-                slot=1,
-                name="Primary Quality Announcer (UK)",
-                user=admin_user,
-                gender="neutral",
-                accent_profile="co.uk",
-                speech_rate=1.0,
+        static_dir = os.path.join(settings.BASE_DIR, "static", "voice_over")
+        martin_mp3 = os.path.join(static_dir, "Martin Nangole.mp3")
+        michael_mp3 = os.path.join(static_dir, "Michael Onyango.mp3")
+
+        # Resolve or create accounts users for the two supplied voice actors
+        martin_user = (
+            User.objects.filter(username__icontains="nangole").first()
+            or User.objects.filter(first_name__icontains="martin", last_name__icontains="nangole").first()
+        )
+        if not martin_user:
+            martin_user = User.objects.create(
+                username="martin.nangole",
+                first_name="Martin",
+                last_name="Nangole",
+                email="mnangole@nairobiwater.co.ke",
                 is_active=True,
             )
-            v1.sample_clip.save("sample_slot1.mp3", ContentFile(sample1), save=False)
-            v1.save()
 
-        if not VoiceOver.objects.filter(slot=2).exists():
-            sample2 = synthesize_alert_audio("Secondary announcer initialized.", accent="com") or b"audio"
-            v2 = VoiceOver(
-                slot=2,
-                name="Secondary Quality Announcer (US)",
-                user=admin_user,
-                gender="female",
-                accent_profile="com",
-                speech_rate=1.0,
+        michael_user = (
+            User.objects.filter(username__icontains="onyango").first()
+            or User.objects.filter(first_name__icontains="michael", last_name__icontains="onyango").first()
+        )
+        if not michael_user:
+            michael_user = User.objects.create(
+                username="michael.onyango",
+                first_name="Michael",
+                last_name="Onyango",
+                email="monyango@nairobiwater.co.ke",
                 is_active=True,
             )
-            v2.sample_clip.save("sample_slot2.mp3", ContentFile(sample2), save=False)
-            v2.save()
+
+        # Slot 1: Martin Nangole
+        v1 = VoiceOver.objects.filter(slot=1).first()
+        if not v1:
+            v1 = VoiceOver(slot=1)
+        v1.name = "Martin Nangole"
+        v1.user = martin_user
+        v1.gender = "male"
+        v1.accent_profile = "co.za"
+        v1.speech_rate = 1.0
+        v1.is_active = True
+        if os.path.exists(martin_mp3):
+            with open(martin_mp3, "rb") as f:
+                v1.sample_clip.save("Martin_Nangole.mp3", ContentFile(f.read()), save=False)
+        v1.save()
+
+        # Slot 2: Michael Onyango
+        v2 = VoiceOver.objects.filter(slot=2).first()
+        if not v2:
+            v2 = VoiceOver(slot=2)
+        v2.name = "Michael Onyango"
+        v2.user = michael_user
+        v2.gender = "male"
+        v2.accent_profile = "co.za"
+        v2.speech_rate = 1.0
+        v2.is_active = True
+        if os.path.exists(michael_mp3):
+            with open(michael_mp3, "rb") as f:
+                v2.sample_clip.save("Michael_Onyango.mp3", ContentFile(f.read()), save=False)
+        v2.save()
 
         # 2. Ensure default Categories
         cat_qc, _ = AlertCategory.objects.get_or_create(
@@ -160,6 +194,20 @@ def bootstrap_alerts_system():
                 "priority": "high",
                 "template": template_map["Scheduled Analysis Generated"],
             },
+            {
+                "alert_type": "ca_assignment_pending",
+                "category": cat_qc,
+                "priority": "medium",
+                "template": template_map["Chemical Workflow Alert"],
+                "voice_persistence_mode": AlertConfig.VoicePersistenceMode.UNTIL_ANALYST_ASSIGNED,
+            },
+            {
+                "alert_type": "ca_assignment_escalation",
+                "category": cat_qc,
+                "priority": "high",
+                "template": template_map["Chemical Workflow Alert"],
+                "voice_persistence_mode": AlertConfig.VoicePersistenceMode.UNTIL_ANALYST_ASSIGNED,
+            },
         ]
 
         for cdef in configs_def:
@@ -174,6 +222,12 @@ def bootstrap_alerts_system():
                     "approve_timeout": timedelta(minutes=30),
                     "tat_for_escalation": timedelta(hours=1),
                     "escalation_timeout": timedelta(hours=2),
+                    "voice_persistence_mode": cdef.get(
+                        "voice_persistence_mode",
+                        AlertConfig.VoicePersistenceMode.UNTIL_ACKNOWLEDGED,
+                    ),
+                    "voice_repeat_interval_seconds": 60,
+                    "voice_repeat_max_count": 0,
                     "active": True,
                 },
             )

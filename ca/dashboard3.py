@@ -145,7 +145,7 @@ class Dashboard3View(CaWanjalaMixin, TemplateView):
             )
             .prefetch_related(
                 "batch__test_results",
-                "batch__test_results__specification",
+                "batch__test_results__parameter",
                 "task_set",
             )
         )

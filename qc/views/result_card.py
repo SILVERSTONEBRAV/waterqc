@@ -102,12 +102,6 @@ class ResultCardEntryView(
         )
 
     def check_idle_timeout(self):
-        """
-        Bypass idle timeout logout on the live analytical dashboard so cards
-        never disappear and operator sessions never expire due to inactivity.
-        """
-        if hasattr(self, "request") and self.request and hasattr(self.request, "session"):
-            self.request.session[self.last_activity_session_key] = timezone.now().timestamp()
         return None
 
 
@@ -200,33 +194,35 @@ class ResultCardEntryView(
             get_filter_sidebar_groups(plant, request.user) if needs_sidebar else []
         )
 
-        # Resolve current shift & supervisor for topbar display
-        current_shift = None
-        shift_supervisor = None
+        # Resolve current shift & supervisor for topbar display.
+        # The sc.context_processors.shift_context processor already
+        # supplies current_shift / current_shift_supervisor to every
+        # template.  We only override those values here when the view
+        # can resolve them successfully; otherwise we leave the
+        # context-processor values untouched.
+        shift_ctx: dict = {}
         if _HAS_SC:
             try:
-                today = timezone.localdate()
-                now_time = timezone.localtime().time()
-                sa = (
-                    ShiftAssignment.objects
-                    .select_related("shift", "supervisor")
-                    .filter(date=today)
-                    .first()
-                )
-                if sa:
-                    current_shift = sa.shift
-                    sup = sa.supervisor
-                    if sup:
-                        shift_supervisor = sup.get_full_name() or sup.username
-            except Exception:
-                pass
+                from sc.services.shift_service import get_current_shift_data
+                shift_data = get_current_shift_data(request.user, request=request)
+                cs = shift_data.get("current_shift")
+                sup = shift_data.get("supervisor")
+                if cs:
+                    shift_ctx["current_shift"] = cs
+                if sup:
+                    shift_ctx["current_shift_supervisor"] = sup
+                    shift_ctx["shift_supervisor"] = (
+                        sup.get_full_name()
+                        or getattr(sup, "username", str(sup))
+                    )
+            except Exception as e:
+                logger.debug("[ResultCard] Shift resolution notice: %s", e)
 
         context.update({
 
             "entry_mode": True,
 
             "auto_refresh": True,
-
 
             "current_time":
                 timezone.localtime(),
@@ -248,14 +244,11 @@ class ResultCardEntryView(
             "phase_concentrations": phase_concentrations,
 
             "filter_phase_groups": filter_phase_groups,
-
-            "current_shift":
-                current_shift,
-
-            "shift_supervisor":
-                shift_supervisor,
-
         })
+
+        # Merge shift data only if resolved — preserves context-processor values
+        if shift_ctx:
+            context.update(shift_ctx)
 
         if self.wants_json():
             return JsonResponse(
@@ -317,7 +310,7 @@ class ResultCardEntryView(
                     plant = None
 
             if plant is None:
-                plant = TreatmentPlant.objects.order_by("name").first()
+                plant = TreatmentPlant.objects.filter(code="NG001").first() or TreatmentPlant.objects.order_by("name").first()
 
             if (
                 plant

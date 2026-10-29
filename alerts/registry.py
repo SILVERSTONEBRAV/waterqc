@@ -32,9 +32,12 @@ AlertTemplate = get_model("AlertTemplate")
 AlertCategory = get_model("AlertCategory")
 AlertConfig = get_model("AlertConfig")
 AlertState = get_model("AlertState")
+AlertNotification = get_model("AlertNotification")
 AlarmAcknowledgment = get_model("AlarmAcknowledgment")
 AlertLog = get_model("AlertLog")
 UserAlertPreference = get_model("UserAlertPreference")
+VoiceOver = get_model("VoiceOver")
+VoiceAlert = get_model("VoiceAlert")
 
 
 # ==========================================================
@@ -45,9 +48,12 @@ ICONS = {
     "AlertCategory": "tags",
     "AlertConfig": "bell",
     "AlertState": "stream",
+    "AlertNotification": "envelope-open-text",
     "AlarmAcknowledgment": "check-circle",
     "AlertLog": "scroll",
     "UserAlertPreference": "sliders-h",
+    "VoiceOver": "microphone",
+    "VoiceAlert": "volume-high",
 }
 
 
@@ -59,9 +65,12 @@ GROUPS = {
     "AlertCategory": "taxonomy",
     "AlertConfig": "alerts",
     "AlertState": "alerts",
+    "AlertNotification": "alerts",
     "AlarmAcknowledgment": "audit",
     "AlertLog": "audit",
     "UserAlertPreference": "users",
+    "VoiceOver": "voice",
+    "VoiceAlert": "voice",
 }
 
 
@@ -126,6 +135,27 @@ def log_qs(model) -> QuerySet:
 
 def pref_qs(model) -> QuerySet:
     return model.objects.select_related("user")
+
+
+def notification_qs(model) -> QuerySet:
+    return model.objects.select_related(
+        "recipient",
+        "alert_state",
+        "alert_state__alert_config",
+    )
+
+
+def voice_over_qs(model) -> QuerySet:
+    return model.objects.select_related("user")
+
+
+def voice_alert_qs(model) -> QuerySet:
+    return model.objects.select_related(
+        "alert_config",
+        "alert_state",
+        "voice_over",
+        "speaker_user",
+    )
 
 
 # ==========================================================
@@ -209,7 +239,7 @@ safe_register(
 safe_register(
     AlertConfig,
     search_fields=["alert_type", "priority"],
-    filter_fields=["alert_type", "priority", "active"],
+    filter_fields=["alert_type", "priority", "voice_persistence_mode", "active"],
     ordering=["alert_type"],
     select_related=[
         "category",
@@ -226,6 +256,9 @@ safe_register(
     inline_edit_fields=[
         "alert_type",
         "priority",
+        "voice_persistence_mode",
+        "voice_repeat_interval_seconds",
+        "voice_repeat_max_count",
         "active",
         "last_triggered",
     ],
@@ -234,7 +267,7 @@ safe_register(
 safe_register(
     AlertState,
     search_fields=["state", "instance_ref"],
-    filter_fields=["state", "alert_config"],
+    filter_fields=["state", "alert_config", "repeat_due_at"],
     ordering=["-updated_at"],
     select_related=["alert_config"],
     queryset_factory=state_qs,
@@ -264,6 +297,33 @@ safe_register(
     ordering=["user"],
     select_related=["user"],
     queryset_factory=pref_qs,
+)
+
+safe_register(
+    AlertNotification,
+    search_fields=["title", "message", "recipient__username", "recipient__email"],
+    filter_fields=["delivery_status", "is_escalation", "priority"],
+    ordering=["-created_at"],
+    select_related=["recipient", "alert_state", "alert_state__alert_config"],
+    queryset_factory=notification_qs,
+)
+
+safe_register(
+    VoiceOver,
+    search_fields=["name", "user__username", "user__first_name", "user__last_name"],
+    filter_fields=["is_active", "gender", "accent_profile", "slot"],
+    ordering=["slot", "name"],
+    select_related=["user"],
+    queryset_factory=voice_over_qs,
+)
+
+safe_register(
+    VoiceAlert,
+    search_fields=["title", "message", "speaker_user__username"],
+    filter_fields=["is_played", "voice_cloned", "repeat_due_at"],
+    ordering=["-created_at"],
+    select_related=["alert_config", "alert_state", "voice_over", "speaker_user"],
+    queryset_factory=voice_alert_qs,
 )
 
 

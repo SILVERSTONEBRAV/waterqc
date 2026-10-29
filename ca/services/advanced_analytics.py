@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 from django.utils import timezone
 from django.db.models import Q
+from django.core.cache import cache
 
 try:
     import plotly.graph_objects as go
@@ -78,6 +79,12 @@ class ChemicalAnalyticsEngine:
         plant_ids = list(
             filtered_batches.values_list("treatment_plant_id", flat=True).distinct()
         )
+
+        plant_scope_str = "-".join(str(p) for p in sorted(plant_ids)) or "all"
+        cache_key = f"ca:analytics:{plant_scope_str}:{str(chemical_id)}:{str(parameter_name)}:{horizon_days}:{mode}"
+        cached_result = cache.get(cache_key)
+        if cached_result is not None:
+            return cached_result
 
         from ca.models import BatchTestResult, Chemical, ChemicalSpecification
 
@@ -165,6 +172,11 @@ class ChemicalAnalyticsEngine:
             "available_parameters": available_parameters,
             "total_points": len(df),
         })
+
+        try:
+            cache.set(cache_key, result, timeout=300)
+        except Exception:
+            pass
 
         return result
 

@@ -19,7 +19,7 @@ from core.mixins import WanjalaMixin
 from core.registry import registry
 from t.models import TreatmentPlant
 
-from .models import AlertConfig, AlertState
+from .models import AlertConfig, AlertNotification, AlertState
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,14 @@ class DashboardView(WanjalaMixin, View):
             "alert_config__template",
             "alert_config__category",
         )
+        recipient_state_ids = AlertNotification.objects.filter(
+            recipient=request.user,
+        ).values_list("alert_state_id", flat=True)
         if not is_superuser:
+            states_with_inbox_rows = AlertNotification.objects.values_list("alert_state_id", flat=True)
+            states = states.filter(
+                Q(pk__in=recipient_state_ids) | ~Q(pk__in=states_with_inbox_rows)
+            )
             from ca.services.alerts_service import ChemicalAlertsService
 
             allowed_alert_types = [
@@ -76,8 +83,18 @@ class DashboardView(WanjalaMixin, View):
         if plant is not None:
             plant_scope = (
                 Q(geo_context__plant_id=str(plant.pk))
-                | Q(alert_config__geo_context__plant_id=str(plant.pk))
-                | Q(alert_config__target_treatment_plants=plant)
+                | (
+                    Q(geo_context__plant_id__isnull=True)
+                    & Q(alert_config__target_treatment_plants=plant)
+                )
+                | (
+                    Q(geo_context__plant_id__isnull=True)
+                    & Q(alert_config__target_treatment_plants__isnull=True)
+                    & (
+                        Q(alert_config__geo_context__plant_id=str(plant.pk))
+                        | Q(alert_config__geo_context__plant_id__isnull=True)
+                    )
+                )
             )
             if not is_superuser:
                 audience = Q(alert_config__recipients=request.user) | Q(
@@ -89,7 +106,7 @@ class DashboardView(WanjalaMixin, View):
                 unscoped_but_addressed = (
                     Q(alert_config__target_treatment_plants__isnull=True) & audience
                 )
-                plant_scope &= targeted_to_plant | unscoped_but_addressed
+                plant_scope &= Q(pk__in=recipient_state_ids) | targeted_to_plant | unscoped_but_addressed
             states = states.filter(plant_scope)
         elif not is_superuser:
             states = states.none()
@@ -100,6 +117,7 @@ class DashboardView(WanjalaMixin, View):
         acknowledged_count = window_states.filter(
             state__in=(AlertState.StateChoices.ACKNOWLEDGED, AlertState.StateChoices.VERIFIED)
         ).count()
+        escalated_count = window_states.filter(escalation_count__gt=0).count()
         active_count = window_states.filter(
             state__in=(
                 AlertState.StateChoices.QUEUED,
@@ -110,9 +128,9 @@ class DashboardView(WanjalaMixin, View):
         ack_rate = round(acknowledged_count / total_count * 100, 1) if total_count else 0
 
         by_severity = list(
-            window_states.values("alert_config__priority")
+            window_states.values("priority")
             .annotate(count=Count("pk", distinct=True))
-            .order_by("alert_config__priority")
+            .order_by("priority")
         )
         by_state = list(
             window_states.values("state")
@@ -151,6 +169,7 @@ class DashboardView(WanjalaMixin, View):
             {"label": "Alert events", "value": total_count, "icon": "fa-bell", "color": "cyan"},
             {"label": "Active", "value": active_count, "icon": "fa-bell-on", "color": "rose"},
             {"label": "Acknowledged", "value": acknowledged_count, "icon": "fa-check-double", "color": "blue"},
+            {"label": "Escalated", "value": escalated_count, "icon": "fa-arrow-up", "color": "amber"},
             {"label": "Ack rate", "value": f"{ack_rate}%", "icon": "fa-chart-simple", "color": "emerald"},
             {"label": "Active rules", "value": configs.distinct().count(), "icon": "fa-gear", "color": "purple"},
         ]
@@ -160,7 +179,9 @@ class DashboardView(WanjalaMixin, View):
             config = item.alert_config
             recent.append({
                 "message": f"{(config.get_alert_type_display() if config else 'Alert')} · Ref {item.instance_ref}"[:120],
-                "severity": config.priority if config else "medium",
+                "severity": item.priority or (config.priority if config else "medium"),
+                "title": item.title or (config.get_alert_type_display() if config else "Alert"),
+                "escalations": item.escalation_count,
                 "state": item.get_state_display(),
                 "time": timezone.localtime(item.updated_at).strftime("%Y-%m-%d %H:%M"),
             })
@@ -171,7 +192,7 @@ class DashboardView(WanjalaMixin, View):
                 "data": [row["count"] for row in daily],
             },
             "by_severity": {
-                "labels": [row["alert_config__priority"] or "unknown" for row in by_severity],
+                "labels": [row["priority"] or "unknown" for row in by_severity],
                 "data": [row["count"] for row in by_severity],
             },
             "by_state": {

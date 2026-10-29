@@ -2,8 +2,12 @@ import io
 import os
 import uuid
 import logging
+import shutil
+import tempfile
+import threading
+from contextlib import contextmanager
 from typing import Optional
-from django.db import models
+from django.db import IntegrityError, models, transaction
 from django.utils import timezone
 from django.db.models import JSONField, F
 from django.contrib.postgres.indexes import GinIndex
@@ -29,6 +33,10 @@ from .utils import (
 
 User = CustomUser
 logger = logging.getLogger(__name__)
+
+_voice_clone_lock = threading.RLock()
+_voice_clone_model = None
+_voice_clone_device = None
 
 
 # ============================================================
@@ -72,11 +80,19 @@ class AlertCategory(models.Model):
 class AlertConfig(models.Model):
     class AlertType(models.TextChoices):
         NONCONFORMITY = 'nonconformity', 'Nonconformity'
+        AUTO_VERIFICATION = 'auto_verification', 'Automatic Verification'
         SAMPLING_DELAY = 'sampling_delay', 'Sampling Delay'
         ANALYSIS_MISSED = 'analysis_missed', 'Analysis Missed'
         MAINTENANCE_DUE = 'maintenance_due', 'Maintenance Due'
         VERIFICATION_PENDING = 'verification_pending', 'Verification Pending'
         PERFORMANCE_DEVIATION = 'performance_deviation', 'Performance Deviation'
+        CA_ASSIGNMENT_PENDING = 'ca_assignment_pending', 'CA analyst assignment pending'
+        CA_ASSIGNMENT_ESCALATION = 'ca_assignment_escalation', 'CA analyst assignment escalation'
+
+    class VoicePersistenceMode(models.TextChoices):
+        ONCE = 'once', 'Play once'
+        UNTIL_ACKNOWLEDGED = 'until_acknowledged', 'Repeat until acknowledged'
+        UNTIL_ANALYST_ASSIGNED = 'until_analyst_assigned', 'Repeat until an analyst is assigned'
 
     class PriorityLevel(models.TextChoices):
         LOW = 'low', 'Low'
@@ -104,6 +120,20 @@ class AlertConfig(models.Model):
     tat_for_escalation = models.DurationField(default=timezone.timedelta(hours=1))
     escalation_timeout = models.DurationField(default=timezone.timedelta(hours=2))
     escalate_to = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='escalated_alerts')
+    voice_persistence_mode = models.CharField(
+        max_length=32,
+        choices=VoicePersistenceMode.choices,
+        default=VoicePersistenceMode.UNTIL_ACKNOWLEDGED,
+        help_text="Controls how long voiced notifications repeat. The template must also allow auto voice.",
+    )
+    voice_repeat_interval_seconds = models.PositiveIntegerField(
+        default=60,
+        help_text="Seconds between voice reminders. Minimum effective interval is 5 seconds.",
+    )
+    voice_repeat_max_count = models.PositiveIntegerField(
+        default=0,
+        help_text="Maximum repeat count; 0 repeats until the selected completion condition is met.",
+    )
 
     filter_conditions = JSONField(default=dict)
     trigger_action = JSONField(default=dict)
@@ -141,213 +171,23 @@ class AlertConfig(models.Model):
     # ✅ FULL ALERT LIFECYCLE
     # ============================================================
     def send_alert(self, instance):
-        """
-        Full end-to-end alert dispatch for ANY alert type:
-        1. Serialize instance & predict AI priority
-        2. Evaluate filter conditions
-        3. Render template (subject/body)
-        4. Resolve dynamic recipients (sections, groups, plants, AI)
-        5. Deduplicate contacts & respect per-user preferences
-        6. Dispatch via all allowed channels
-        7. Voice notifications & WebSocket
-        8. Record AlertState
-        9. Auto-escalate unacknowledged alerts
-        """
-        from .tasks import dispatch_alerts, generate_voice_notification, send_websocket_notification
-        from accounts.utils import get_contacts_for_alert
-        from django.utils import timezone
-        from django.apps import apps
+        """Route legacy callers through the single durable alert lifecycle."""
+        from .engine import AlertEngine
 
-        AlertState = apps.get_model('alerts', 'AlertState')
-        UserAlertPreference = apps.get_model('alerts', 'UserAlertPreference')
-
-        try:
-            # -----------------------------
-            # Serialize instance & AI prediction
-            # -----------------------------
-            serialized = InstanceSerializer.serialize(instance)
-            predicted_priority = AIAlertPriorityPredictor.predict(serialized)
-            geo_context = GeoContextAnalyzer.detect(serialized)
-
-            if predicted_priority != self.priority:
-                self.priority = predicted_priority
-                self.save(update_fields=['priority'])
-
-            # -----------------------------
-            # Evaluate filter conditions
-            # -----------------------------
-            if not SafeConditionEvaluator.evaluate(self.filter_conditions, serialized):
-                logger.info(f"[alert] Filter conditions not met for {self.alert_type}")
-                return
-
-            # -----------------------------
-            # Render templates
-            # -----------------------------
-            subject = self.template.subject_template.format(**serialized)
-            body = self.template.body_template.format(**serialized)
-
-            # -----------------------------
-            # Collect recipients dynamically
-            # -----------------------------
-            explicit_user_ids = list(self.recipients.values_list('id', flat=True))
-            ai_user_ids = self.ai_recommended_recipients if self.allow_ai_recipients else []
-
-            section_ids = list(self.target_sections.values_list('id', flat=True)) if self.target_sections.exists() else None
-            group_ids = list(self.target_groups.values_list('id', flat=True)) if self.target_groups.exists() else None
-            plant_ids = list(self.target_treatment_plants.values_list('id', flat=True)) if self.target_treatment_plants.exists() else None
-
-            contacts = get_contacts_for_alert(
-                user_ids=explicit_user_ids + ai_user_ids,
-                sections=section_ids,
-                groups=group_ids,
-                treatment_plants=plant_ids
-            )
-
-            # -----------------------------
-            # Deduplicate & apply user preferences
-            # -----------------------------
-            seen_keys = set()
-            final_contacts = []
-            for c in contacts:
-                user_id = c.get('id')
-                prefs = UserAlertPreference.objects.filter(user_id=user_id).first()
-                if prefs:
-                    allowed_channels = []
-                    if prefs.receive_email and c.get('email'): allowed_channels.append('email')
-                    if prefs.receive_sms and c.get('mobile_number'): allowed_channels.append('sms')
-                    if prefs.receive_whatsapp and c.get('whatsapp_number'): allowed_channels.append('whatsapp')
-                    if prefs.receive_push: allowed_channels.append('push')
-                    if prefs.receive_slack and c.get('slack_channel'): allowed_channels.append('slack')
-                    if not allowed_channels:
-                        continue
-                    c['channels'] = allowed_channels
-
-                key = c.get('email') or c.get('mobile_number') or user_id
-                if key and key not in seen_keys:
-                    final_contacts.append(c)
-                    seen_keys.add(key)
-
-            if not final_contacts:
-                logger.warning(f"[alert] No recipients resolved for alert {self.alert_type}")
-                return
-
-            # -----------------------------
-            # Dispatch alerts
-            # -----------------------------
-            dispatch_alerts.delay(subject, body, final_contacts)
-
-            # -----------------------------
-            # Record AlertState
-            # -----------------------------
-            alert_state = AlertState.objects.create(
-                alert_config=self,
-                instance_ref=str(getattr(instance, "id", instance)),
-                state=AlertState.StateChoices.QUEUED,
-                geo_context=geo_context,
-            )
-
-            # -----------------------------
-            # Persistent Voice Alert (Fair 1:1 Alternation)
-            # -----------------------------
-            try:
-                VoiceAlert.generate_persistent_voice_alert(
-                    message=body,
-                    title=subject,
-                    alert_config=self,
-                    alert_state=alert_state,
-                )
-            except Exception as voice_err:
-                logger.warning(f"[alert] Voice alert generation exception: {voice_err}")
-
-            # Every notification and alert generates a corresponding voice message
-            generate_voice_notification.delay(body, alert_config_id=self.id, title=subject)
-
-            ws_group = f"plant_{getattr(instance, 'assigned_treatment_plant', 'general')}_alerts"
-            send_websocket_notification.delay(body, group=ws_group)
-
-            self.last_triggered = timezone.now()
-            self.save(update_fields=["last_triggered"])
-            logger.info(f"[alert] Alert '{self.alert_type}' sent to {len(final_contacts)} recipients")
-
-            # -----------------------------
-            # Auto-escalation
-            # -----------------------------
-            self.auto_escalate_if_unacknowledged()
-
-        except Exception as e:
-            logger.exception(f"[alert] Failed to send alert '{self.alert_type}': {e}")
+        return AlertEngine.trigger_alert(
+            instance,
+            alert_type=self.alert_type,
+            alert_config_id=self.pk,
+        )
 
     # ============================================================
     # ✅ GENERIC AUTO-ESCALATION
     # ============================================================
     def auto_escalate_if_unacknowledged(self):
-        """
-        Generic escalation for ANY alert type:
-        - Pending alerts: queued, sent, escalated
-        - Sends escalation to 'escalate_to' or AI-prioritized recipients
-        - Respects per-user alert preferences
-        """
-        from .tasks import escalate_alert
-        from accounts.utils import get_contacts_for_alert
-        from django.apps import apps
-        from django.utils import timezone
-        from django.contrib.contenttypes.models import ContentType
+        """Schedule eligible states; never send an escalation before its TAT."""
+        from .engine import AlertEngine
 
-        AlertState = apps.get_model('alerts', 'AlertState')
-        UserAlertPreference = apps.get_model('alerts', 'UserAlertPreference')
-
-        try:
-            if self.last_escalation and timezone.now() - self.last_escalation <= self.escalation_timeout:
-                return
-
-            pending_states = AlertState.objects.filter(
-                alert_config=self,
-                state__in=[
-                    AlertState.StateChoices.QUEUED,
-                    AlertState.StateChoices.SENT,
-                    AlertState.StateChoices.ESCALATED
-                ]
-            )
-
-            for state in pending_states:
-                # Determine escalation recipients
-                escalate_user_ids = []
-                if self.escalate_to:
-                    escalate_user_ids.append(self.escalate_to.id)
-                if self.ai_recommended_recipients and self.allow_ai_recipients:
-                    escalate_user_ids += self.ai_recommended_recipients
-
-                contacts = get_contacts_for_alert(user_ids=escalate_user_ids)
-                final_contacts = []
-                seen_keys = set()
-
-                for c in contacts:
-                    prefs = UserAlertPreference.objects.filter(user_id=c['id']).first()
-                    if prefs:
-                        allowed_channels = []
-                        if prefs.receive_email and c.get('email'): allowed_channels.append('email')
-                        if prefs.receive_sms and c.get('mobile_number'): allowed_channels.append('sms')
-                        if prefs.receive_whatsapp and c.get('whatsapp_number'): allowed_channels.append('whatsapp')
-                        if prefs.receive_push: allowed_channels.append('push')
-                        if prefs.receive_slack and c.get('slack_channel'): allowed_channels.append('slack')
-                        if not allowed_channels:
-                            continue
-                        c['channels'] = allowed_channels
-
-                    key = c.get('email') or c.get('mobile_number') or c.get('id')
-                    if key and key not in seen_keys:
-                        final_contacts.append(c)
-                        seen_keys.add(key)
-
-                if final_contacts:
-                    # Trigger generic escalation task
-                    escalate_alert.delay(self.id, getattr(state, 'instance_ref', None))
-
-            self.last_escalation = timezone.now()
-            self.save(update_fields=["last_escalation"])
-
-        except Exception as e:
-            logger.exception(f"[alert] Failed auto-escalation for '{self.alert_type}': {e}")
+        return AlertEngine.auto_escalate_unacknowledged(alert_type=self.alert_type)
 
 
 # ============================================================
@@ -364,12 +204,95 @@ class AlertState(models.Model):
 
     alert_config = models.ForeignKey(AlertConfig, on_delete=models.CASCADE)
     instance_ref = models.CharField(max_length=255)
+    title = models.CharField(max_length=255, blank=True)
+    message = models.TextField(blank=True)
+    priority = models.CharField(max_length=20, default="medium")
     state = models.CharField(max_length=20, choices=StateChoices.choices, default=StateChoices.QUEUED)
     geo_context = JSONField(default=dict)
+    escalation_due_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    last_escalated_at = models.DateTimeField(null=True, blank=True)
+    escalation_count = models.PositiveSmallIntegerField(default=0)
+    repeat_due_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    repeat_count = models.PositiveIntegerField(default=0)
+    # Explicit default keeps the field upgradeable for existing alert rows.
+    created_at = models.DateTimeField(default=timezone.now, editable=False)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("alert_config", "instance_ref"),
+                condition=models.Q(state__in=("queued", "sent", "escalated")),
+                name="alerts_open_state_uniq",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.alert_config.alert_type} → {self.state}"
+
+
+class AlertNotification(models.Model):
+    """Durable per-recipient inbox event and delivery outbox record."""
+
+    class DeliveryStatus(models.TextChoices):
+        PENDING = "pending", "Pending"
+        PARTIAL = "partial", "Partially delivered"
+        SENT = "sent", "Sent"
+        STORED = "stored", "Stored in inbox"
+        FAILED = "failed", "Failed"
+
+    alert_state = models.ForeignKey(
+        AlertState,
+        on_delete=models.CASCADE,
+        related_name="notifications",
+    )
+    recipient = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="alert_notifications",
+    )
+    sequence = models.PositiveSmallIntegerField(default=0)
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    priority = models.CharField(max_length=20, default="medium")
+    is_escalation = models.BooleanField(default=False)
+    channels = JSONField(default=list, blank=True)
+    delivery_status = models.CharField(
+        max_length=20,
+        choices=DeliveryStatus.choices,
+        default=DeliveryStatus.PENDING,
+    )
+    delivery_results = JSONField(default=dict, blank=True)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    last_attempt_at = models.DateTimeField(null=True, blank=True)
+    next_attempt_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+    acknowledged_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(
+                fields=("recipient", "acknowledged_at", "created_at"),
+                name="alerts_notif_user_ack_idx",
+            ),
+            models.Index(
+                fields=("delivery_status", "next_attempt_at"),
+                name="alerts_notif_delivery_idx",
+            ),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=("alert_state", "recipient", "sequence"),
+                name="alerts_state_recipient_sequence_uniq",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.title} → {self.recipient} ({self.delivery_status})"
 
 
 # ============================================================
@@ -408,21 +331,51 @@ class AlertLog(models.Model):
 # ============================================================
 @receiver(post_save, sender=AlertState)
 def alert_state_change_observer(sender, instance, created=False, **kwargs):
-    """Publish state changes only to the alert rule's explicit recipients."""
+    """Publish lifecycle changes only to users with a persisted inbox row."""
     if created:
         # The alert dispatch path sends the initial event to each recipient.
+        return
+    if instance.state not in {
+        AlertState.StateChoices.ACKNOWLEDGED,
+        AlertState.StateChoices.VERIFIED,
+        AlertState.StateChoices.CLOSED,
+    }:
+        # Sent/escalated transitions have their own per-recipient outbox rows.
         return
     channel_layer = get_channel_layer()
     if channel_layer is None:
         return
     try:
-        recipient_ids = instance.alert_config.recipients.values_list("pk", flat=True)
+        recipient_ids = set()
+        for notification in instance.notifications.select_related("recipient"):
+            if "push" not in (notification.channels or []):
+                continue
+            preference = getattr(notification.recipient, "alert_preferences", None)
+            if preference and not preference.receive_push:
+                continue
+            recipient_ids.add(notification.recipient_id)
+        if not recipient_ids:
+            return
+        auto_voice = bool(
+            instance.alert_config_id
+            and instance.alert_config.active
+            and instance.alert_config.template_id
+            and instance.alert_config.template.active
+            and instance.alert_config.template.auto_voice_enabled
+        )
         message = {
             "type": "alert_state",
-            "message": f"State changed to {instance.state}",
+            "id": f"state_{instance.pk}",
+            "title": instance.title or instance.alert_config.alert_type,
+            "message": instance.message or f"Alert state changed to {instance.state}",
+            "priority": instance.priority,
+            "alert_type": instance.alert_config.alert_type,
+            "instance_ref": instance.instance_ref,
+            "state": instance.state,
+            "auto_voice": auto_voice,
             "timestamp": timezone.now().isoformat(),
         }
-        for user_id in recipient_ids.iterator():
+        for user_id in recipient_ids:
             async_to_sync(channel_layer.group_send)(f"user_{user_id}_alerts", message)
     except Exception:
         logger.exception("Could not publish alert state update to its recipients")
@@ -445,40 +398,199 @@ class UserAlertPreference(models.Model):
 
 
 # ============================================================
-# 🎙️ VOICE SYNTHESIS HELPER
+# 🎙️ VOICE SYNTHESIS HELPER & VOICE CLONING ENGINE
 # ============================================================
-def synthesize_alert_audio(message: str, accent: str = "co.uk", speech_rate: float = 1.0) -> bytes:
+def _run_coroutine_safely(coro):
+    """Run an async coroutine from synchronous code without event loop conflicts."""
+    import asyncio
+    import concurrent.futures
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop and loop.is_running():
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(asyncio.run, coro).result()
+    else:
+        return asyncio.run(coro)
+
+
+def resolve_cloned_voice_profile(voice_over: Optional["VoiceOver"] = None, accent: str = "co.uk", speech_rate: float = 1.0):
     """
-    Synthesize audio speech bytes for custom alert message text.
-    Uses gTTS with voice accent profile, with offline pyttsx3 fallback.
+    Resolve a regional stock voice for the fallback TTS engines.
+
+    This is not voice cloning: the attached reference clip is handled by the
+    Chatterbox path below when that optional runtime is installed.
     """
+    rate_percent = f"{int((speech_rate - 1.0) * 100):+d}%" if speech_rate and speech_rate != 1.0 else "+0%"
+
+    if not voice_over:
+        return "en-KE-ChilembaNeural", "+0Hz", rate_percent
+
+    name_lower = (voice_over.name or "").lower()
+    slot = getattr(voice_over, "slot", None)
+    gender = getattr(voice_over, "gender", "male")
+
+    if gender == "female":
+        return "en-KE-AsiliaNeural", "+0Hz", rate_percent
+
+    if slot == 2 or "michael" in name_lower or "onyango" in name_lower:
+        return "en-TZ-ElimuNeural", "-3Hz", rate_percent
+    else:
+        return "en-KE-ChilembaNeural", "+0Hz", rate_percent
+
+
+@contextmanager
+def _local_voice_reference(voice_over):
+    """Expose a VoiceOver sample as a local path, including remote Django storage."""
+    clip = getattr(voice_over, "sample_clip", None) if voice_over else None
+    if not clip:
+        yield None
+        return
+
+    try:
+        local_path = clip.path
+        if os.path.isfile(local_path):
+            yield local_path
+            return
+    except (AttributeError, NotImplementedError, ValueError, OSError):
+        pass
+
+    suffix = os.path.splitext(getattr(clip, "name", ""))[1].lower()
+    if suffix not in {".mp3", ".wav", ".ogg", ".m4a", ".flac"}:
+        suffix = ".audio"
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as temp_file:
+            temp_path = temp_file.name
+            with clip.open("rb") as source:
+                shutil.copyfileobj(source, temp_file)
+        yield temp_path
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
+def _synthesize_reference_voice(message: str, voice_over: Optional["VoiceOver"]) -> bytes:
+    """Clone speech from the attached sample using the optional Chatterbox runtime."""
+    global _voice_clone_model, _voice_clone_device
+    if not voice_over or not getattr(voice_over, "sample_clip", None):
+        return b""
+
+    try:
+        import torch
+        import torchaudio
+        from chatterbox.tts_turbo import ChatterboxTurboTTS
+
+        with _voice_clone_lock:
+            if _voice_clone_model is None:
+                _voice_clone_device = "cuda" if torch.cuda.is_available() else "cpu"
+                # Nano is the CPU-capable model; use Turbo when a CUDA device
+                # is present. Both accept the VoiceOver sample as a reference.
+                _voice_clone_model = ChatterboxTurboTTS.from_pretrained(
+                    device=_voice_clone_device,
+                    nano=_voice_clone_device == "cpu",
+                )
+
+            with _local_voice_reference(voice_over) as reference_path:
+                if not reference_path:
+                    return b""
+                waveform = _voice_clone_model.generate(
+                    text=message,
+                    audio_prompt_path=reference_path,
+                )
+
+            audio_buffer = io.BytesIO()
+            torchaudio.save(
+                audio_buffer,
+                waveform.detach().cpu(),
+                _voice_clone_model.sr,
+                format="wav",
+            )
+            return audio_buffer.getvalue()
+    except ImportError:
+        logger.info("Voice cloning runtime is not installed; using regional TTS fallback.")
+    except Exception as exc:
+        logger.warning("[VoiceAlert] Reference voice cloning failed: %s", exc)
+    return b""
+
+
+def synthesize_alert_audio(
+    message: str,
+    voice_over: Optional["VoiceOver"] = None,
+    accent: str = "co.uk",
+    speech_rate: float = 1.0,
+) -> tuple[bytes, bool]:
+    """
+    Synthesize speech from the selected VoiceOver reference clip when possible.
+    Regional Edge-TTS, gTTS, and pyttsx3 remain compatibility fallbacks.
+    Returns (audio_bytes, used_reference_voice).
+    """
+    # 1. Reference-conditioned voice cloning from the attached VoiceOver clip.
+    cloned_audio = _synthesize_reference_voice(message, voice_over)
+    if cloned_audio:
+        return cloned_audio, True
+
+    # 2. Regional Edge-TTS voice (a stock voice, not a clone).
+    try:
+        import edge_tts
+        neural_voice, pitch_offset, rate_offset = resolve_cloned_voice_profile(
+            voice_over=voice_over,
+            accent=accent,
+            speech_rate=speech_rate,
+        )
+
+        async def _synthesize_edge():
+            communicate = edge_tts.Communicate(
+                text=message,
+                voice=neural_voice,
+                pitch=pitch_offset,
+                rate=rate_offset,
+            )
+            out_bytes = b""
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    out_bytes += chunk["data"]
+            return out_bytes
+
+        audio_bytes = _run_coroutine_safely(_synthesize_edge())
+        if audio_bytes and len(audio_bytes) > 200:
+            return audio_bytes, False
+    except Exception as edge_err:
+        logger.warning(f"[VoiceAlert] Edge-TTS cloned synthesis failed ({edge_err}); falling back to gTTS...")
+
+    # 3. Google TTS (gTTS) with regional accent profile.
     try:
         from gtts import gTTS
         fp = io.BytesIO()
-        tts = gTTS(text=message, lang="en", tld=accent or "co.uk")
+        tld_accent = getattr(voice_over, "accent_profile", None) or accent or "co.za"
+        tts = gTTS(text=message, lang="en", tld=tld_accent)
         tts.write_to_fp(fp)
         fp.seek(0)
-        return fp.read()
+        return fp.read(), False
     except Exception as exc:
         logger.warning(f"[VoiceAlert] gTTS synthesis failed ({exc}); falling back to offline TTS...")
-        try:
-            import tempfile
-            import pyttsx3
-            with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
-                tmp_path = tmp.name
-            engine = pyttsx3.init()
-            if speech_rate and speech_rate != 1.0:
-                engine.setProperty("rate", int(200 * speech_rate))
-            engine.save_to_file(message, tmp_path)
-            engine.runAndWait()
-            with open(tmp_path, "rb") as f:
-                data = f.read()
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
-            return data
-        except Exception as fallback_err:
-            logger.error(f"[VoiceAlert] Offline TTS fallback failed: {fallback_err}")
-            return b""
+
+    # 4. Offline pyttsx3 fallback.
+    try:
+        import tempfile
+        import pyttsx3
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
+            tmp_path = tmp.name
+        engine = pyttsx3.init()
+        if speech_rate and speech_rate != 1.0:
+            engine.setProperty("rate", int(200 * speech_rate))
+        engine.save_to_file(message, tmp_path)
+        engine.runAndWait()
+        with open(tmp_path, "rb") as f:
+            data = f.read()
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        return data, False
+    except Exception as fallback_err:
+        logger.error(f"[VoiceAlert] Offline TTS fallback failed: {fallback_err}")
+    return b"", False
 
 
 def optimize_m4a_faststart(file_path: str):
@@ -683,13 +795,23 @@ class VoiceOver(models.Model):
         Interchangeably alternates between the two active voices with exact 50/50 balance.
         Selects the active voice that has been used fewer times (lowest usage_count).
         """
-        active_voices = list(cls.objects.filter(is_active=True).order_by("usage_count", "id")[:2])
-        if not active_voices:
-            return None
-        if len(active_voices) == 1:
-            return active_voices[0]
-        # Return the one with lower usage_count (strict 1:1 ratio)
-        return active_voices[0]
+        with transaction.atomic():
+            active_voices = list(
+                cls.objects.select_for_update()
+                .filter(is_active=True)
+                .order_by("usage_count", "id")[:2]
+            )
+            if not active_voices:
+                return None
+            # Reserve the least-used profile while holding both rows so
+            # concurrent workers preserve the configured alternation.
+            voice = active_voices[0]
+            cls.objects.filter(pk=voice.pk).update(
+                usage_count=F("usage_count") + 1,
+                last_voiced_at=timezone.now(),
+            )
+            voice.refresh_from_db(fields=["usage_count", "last_voiced_at"])
+            return voice
 
     def record_usage(self):
         """Atomically increment usage counter for 1:1 fairness tracking."""
@@ -709,6 +831,7 @@ class VoiceAlert(models.Model):
     Generated using the configured VoiceOver profiles in a 1:1 interchangeable ratio.
     """
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    source_key = models.CharField(max_length=255, unique=True, null=True, blank=True)
     voice_over = models.ForeignKey(
         VoiceOver,
         on_delete=models.SET_NULL,
@@ -747,9 +870,15 @@ class VoiceAlert(models.Model):
         upload_to="voice_alerts/notifications/",
         help_text="Persistent audio file of the voiced alert."
     )
+    voice_cloned = models.BooleanField(
+        default=False,
+        help_text="True only when synthesis used this VoiceOver sample as a reference."
+    )
     duration_seconds = models.FloatField(default=0.0)
     is_played = models.BooleanField(default=False)
     play_count = models.PositiveIntegerField(default=0)
+    repeat_due_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    repeat_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -769,64 +898,67 @@ class VoiceAlert(models.Model):
         alert_config: Optional[AlertConfig] = None,
         alert_state: Optional[AlertState] = None,
         forced_voice: Optional["VoiceOver"] = None,
+        source_key: Optional[str] = None,
     ) -> Optional["VoiceAlert"]:
         """
         Generates and persistently saves a custom voice alert for a notification,
         fairly selecting from the two VoiceOver profiles in a 1:1 ratio.
         """
+        existing = cls.objects.filter(source_key=source_key).first() if source_key else None
+        if existing and existing.audio_file:
+            return existing
+
         voice = forced_voice or VoiceOver.get_next_voice()
         speaker = voice.user if voice else None
         accent = voice.accent_profile if voice else "co.uk"
         rate = voice.speech_rate if voice else 1.0
 
-        # Synthesize audio bytes
-        audio_bytes = synthesize_alert_audio(message, accent=accent, speech_rate=rate)
+        # Clone the selected VoiceOver profile and synthesize the notification text using TTS
+        audio_bytes, voice_cloned = synthesize_alert_audio(
+            message=message,
+            voice_over=voice,
+            accent=accent,
+            speech_rate=rate,
+        )
+
         if not audio_bytes:
             logger.warning("[VoiceAlert] No audio bytes generated for message.")
             return None
 
-        # Build unique filename
-        alert_uuid = uuid.uuid4()
-        filename = f"voice_alert_{alert_uuid.hex[:12]}.mp3"
+        # Choose the persistent file extension from the container signature.
+        alert_uuid = existing.uuid if existing else uuid.uuid4()
+        is_wav = audio_bytes.startswith(b"RIFF") and audio_bytes[8:12] == b"WAVE"
+        extension = "wav" if is_wav else "mp3"
+        filename = f"voice_alert_{alert_uuid.hex[:12]}.{extension}"
 
         # Create persistent VoiceAlert
-        voice_alert = cls(
-            uuid=alert_uuid,
-            voice_over=voice,
-            speaker_user=speaker,
-            alert_config=alert_config,
-            alert_state=alert_state,
-            title=title or (alert_config.alert_type if alert_config else "Alert Notification"),
-            message=message,
-            duration_seconds=round(max(1.0, len(message.split()) * 0.4), 1),
-        )
+        voice_alert = existing or cls(uuid=alert_uuid, source_key=source_key)
+        voice_alert.voice_over = voice
+        voice_alert.speaker_user = speaker
+        voice_alert.alert_config = alert_config
+        voice_alert.alert_state = alert_state
+        voice_alert.title = title or (alert_config.alert_type if alert_config else "Alert Notification")
+        voice_alert.message = message
+        voice_alert.voice_cloned = voice_cloned
+        voice_alert.duration_seconds = round(max(1.0, len(message.split()) * 0.4), 1)
         voice_alert.audio_file.save(filename, ContentFile(audio_bytes), save=False)
-        voice_alert.save()
-
-        # Update voice usage count for 1:1 fair ratio tracking
-        if voice:
-            voice.record_usage()
-
-        # Broadcast real-time voice alert event over WebSockets (Django Channels)
         try:
-            channel_layer = get_channel_layer()
-            if channel_layer:
-                payload = {
-                    "type": "voice.alert",
-                    "id": str(voice_alert.uuid),
-                    "audio_url": voice_alert.audio_file.url,
-                    "message": message,
-                    "title": voice_alert.title,
-                    "speaker": getattr(speaker, "full_name", None) or getattr(speaker, "username", "System Voice"),
-                    "timestamp": voice_alert.created_at.isoformat(),
-                }
-                async_to_sync(channel_layer.group_send)("alerts_group", payload)
-                async_to_sync(channel_layer.group_send)("alerts_stream", payload)
-                if alert_config:
-                    for recipient in alert_config.recipients.iterator():
-                        async_to_sync(channel_layer.group_send)(f"user_{recipient.pk}_alerts", payload)
-        except Exception as ws_err:
-            logger.debug(f"[VoiceAlert] WebSocket broadcast notice: {ws_err}")
+            with transaction.atomic():
+                voice_alert.save()
+        except IntegrityError:
+            # Concurrent retries may both synthesize before either insert
+            # wins the unique source_key constraint. Keep one file and row.
+            if source_key:
+                voice_alert.audio_file.delete(save=False)
+                existing = cls.objects.filter(source_key=source_key).first()
+                if existing and existing.audio_file:
+                    return existing
+            raise
+
+        # Forced profiles (such as the admin test action) do not pass through
+        # the round-robin reservation above.
+        if voice and forced_voice:
+            voice.record_usage()
 
         logger.info(f"[VoiceAlert] Created persistent voice alert {voice_alert.uuid} (voice={voice})")
         return voice_alert

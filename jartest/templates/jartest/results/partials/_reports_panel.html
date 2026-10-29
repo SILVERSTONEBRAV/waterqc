@@ -3,54 +3,68 @@
     <div class="jt-reports-shell">
         <header class="jt-reports-heading">
             <div><span class="jt-kicker">JAR-TEST BI · STATISTICAL REPORTING</span><h1>Jar-test reports</h1></div>
-            <span class="jt-report-scope"><i class="fa-solid fa-location-dot"></i>{{ plant.name }}</span>
         </header>
 
-        <form method="get" action="{% url 'jartest:dashboard' %}" class="jt-report-filter-form" id="jt-report-filter-form">
+        <form method="get" action="{% url 'jartest:dashboard' %}" class="dash-filters jt-report-filters-v2" id="jt-report-filter-form">
             <input type="hidden" name="plant" value="{{ plant.pk }}">
             <input type="hidden" name="tab" value="reports">
-            <label class="jt-report-search"><i class="fa-solid fa-magnifying-glass"></i>
-                <input type="search" name="report_q" value="{{ request.GET.report_q }}" placeholder="Search coagulant, analyst, source, remarks…" aria-label="Search jar-test reports">
-            </label>
-            <label><span>From</span><input type="date" name="report_from" value="{{ request.GET.report_from }}"></label>
-            <label><span>To</span><input type="date" name="report_to" value="{{ request.GET.report_to }}"></label>
-            <label><span>Coagulant</span><select name="report_coagulant"><option value="">All coagulants</option>
-                {% for chemical in available_coagulants %}<option value="{{ chemical.pk }}" {% if request.GET.report_coagulant == chemical.pk|stringformat:'s' %}selected{% endif %}>{{ chemical.name }}</option>{% endfor %}
-            </select></label>
-            <label><span>Stage</span><select name="report_status">
-                <option value="">All stages</option>
-                <option value="in_progress" {% if request.GET.report_status == 'in_progress' %}selected{% endif %}>In progress</option>
-                <option value="verified" {% if request.GET.report_status == 'verified' %}selected{% endif %}>Verified</option>
-                <option value="confirmed" {% if request.GET.report_status == 'confirmed' %}selected{% endif %}>Confirmed</option>
-                <option value="approved" {% if request.GET.report_status == 'approved' %}selected{% endif %}>Approved</option>
-                <option value="needs_review" {% if request.GET.report_status == 'needs_review' %}selected{% endif %}>Needs review</option>
-            </select></label>
-            <label><span>Raw-water parameter</span><select name="report_parameter"><option value="">Any parameter</option>
-                {% for item in report_parameters %}<option value="{{ item.pk }}" {% if request.GET.report_parameter == item.pk|stringformat:'s' %}selected{% endif %}>{{ item.parameter.name }} · {{ item.parameter.unit }}</option>{% endfor %}
-            </select></label>
-            <label><span>Min raw value</span><input type="number" min="0" step="any" name="report_min_parameter" value="{{ request.GET.report_min_parameter }}" placeholder="Parameter unit"></label>
-            <label><span>Max raw value</span><input type="number" min="0" step="any" name="report_max_parameter" value="{{ request.GET.report_max_parameter }}" placeholder="Parameter unit"></label>
-            <label><span>Min dose</span><input type="number" min="0" step="0.01" name="report_min_dose" value="{{ request.GET.report_min_dose }}" placeholder="mg/L"></label>
-            <label><span>Max dose</span><input type="number" min="0" step="0.01" name="report_max_dose" value="{{ request.GET.report_max_dose }}" placeholder="mg/L"></label>
-            <label><span>Sort by</span><select name="report_sort">
-                <option value="newest" {% if request.GET.report_sort != 'oldest' and request.GET.report_sort != 'dose_high' and request.GET.report_sort != 'dose_low' and request.GET.report_sort != 'coagulant' and request.GET.report_sort != 'analyst' and request.GET.report_sort != 'status' %}selected{% endif %}>Newest first</option>
-                <option value="oldest" {% if request.GET.report_sort == 'oldest' %}selected{% endif %}>Oldest first</option>
-                <option value="dose_high" {% if request.GET.report_sort == 'dose_high' %}selected{% endif %}>Dose: high to low</option>
-                <option value="dose_low" {% if request.GET.report_sort == 'dose_low' %}selected{% endif %}>Dose: low to high</option>
-                <option value="coagulant" {% if request.GET.report_sort == 'coagulant' %}selected{% endif %}>Coagulant</option>
-                <option value="analyst" {% if request.GET.report_sort == 'analyst' %}selected{% endif %}>Analyst</option>
-                <option value="status" {% if request.GET.report_sort == 'status' %}selected{% endif %}>Review stage</option>
-            </select></label>
-            <div class="jt-report-filter-actions">
-                <button type="submit" name="apply" value="1" class="jt-report-apply"><i class="fa-solid fa-filter"></i> Apply</button>
-                <a href="{% url 'jartest:dashboard' %}?plant={{ plant.pk }}&amp;tab=reports" class="jt-report-reset">Reset</a>
+            <div class="dash-filters__primary">
+                <label class="dash-search">
+                    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                    <input type="search" name="report_q" value="{{ request.GET.report_q }}" placeholder="Search coagulant, analyst, source, remarks…" aria-label="Search jar-test reports">
+                    {% if request.GET.report_q %}<a href="{% url 'jartest:dashboard' %}?plant={{ plant.pk }}&amp;tab=reports" class="dash-clear-search" title="Clear search"><i class="fa-solid fa-xmark"></i></a>{% endif %}
+                </label>
+                <div class="dash-compact-filter">
+                    <select name="report_status" aria-label="Review stage">
+                        <option value="">All review stages</option>
+                        <option value="in_progress" {% if request.GET.report_status == 'in_progress' %}selected{% endif %}>In progress</option>
+                        <option value="verified" {% if request.GET.report_status == 'verified' %}selected{% endif %}>Verified</option>
+                        <option value="confirmed" {% if request.GET.report_status == 'confirmed' %}selected{% endif %}>Confirmed</option>
+                        <option value="approved" {% if request.GET.report_status == 'approved' %}selected{% endif %}>Approved</option>
+                        <option value="needs_review" {% if request.GET.report_status == 'needs_review' %}selected{% endif %}>Needs review</option>
+                    </select>
+                </div>
+                <div class="dash-compact-filter">
+                    <select name="report_sort" aria-label="Sort records">
+                        <option value="newest" {% if request.GET.report_sort != 'oldest' and request.GET.report_sort != 'dose_high' and request.GET.report_sort != 'dose_low' and request.GET.report_sort != 'coagulant' and request.GET.report_sort != 'analyst' and request.GET.report_sort != 'status' %}selected{% endif %}>Newest first</option>
+                        <option value="oldest" {% if request.GET.report_sort == 'oldest' %}selected{% endif %}>Oldest first</option>
+                        <option value="dose_high" {% if request.GET.report_sort == 'dose_high' %}selected{% endif %}>Dose: high to low</option>
+                        <option value="dose_low" {% if request.GET.report_sort == 'dose_low' %}selected{% endif %}>Dose: low to high</option>
+                        <option value="coagulant" {% if request.GET.report_sort == 'coagulant' %}selected{% endif %}>Coagulant</option>
+                        <option value="analyst" {% if request.GET.report_sort == 'analyst' %}selected{% endif %}>Analyst</option>
+                        <option value="status" {% if request.GET.report_sort == 'status' %}selected{% endif %}>Review stage</option>
+                    </select>
+                </div>
+                <button type="submit" name="apply" value="1" class="dash-filter-submit"><i class="fa-solid fa-filter"></i> Apply</button>
+                <a href="{% url 'jartest:dashboard' %}?plant={{ plant.pk }}&amp;tab=reports" class="dash-filter-reset"><i class="fa-solid fa-rotate-left"></i> Reset</a>
             </div>
-            <div class="jt-report-exports" role="group" aria-label="Export filtered jar-test report">
-                <span>Export filtered results</span>
-                <button type="submit" name="export" value="csv" title="Export CSV"><i class="fa-solid fa-file-csv"></i> CSV</button>
-                <button type="submit" name="export" value="xlsx" title="Export Excel workbook"><i class="fa-solid fa-file-excel"></i> XLSX</button>
-                <button type="submit" name="export" value="pdf" title="Export PDF"><i class="fa-solid fa-file-pdf"></i> PDF</button>
-                <button type="submit" name="export" value="docx" title="Export Word document"><i class="fa-solid fa-file-word"></i> DOC</button>
+
+            <details class="dash-filters__advanced" {% if request.GET.report_from or request.GET.report_to or request.GET.report_coagulant or request.GET.report_parameter or request.GET.report_min_parameter or request.GET.report_max_parameter or request.GET.report_min_dose or request.GET.report_max_dose %}open{% endif %}>
+                <summary><i class="fa-solid fa-sliders"></i> Advanced parameters &amp; ranges <span>+</span></summary>
+                <div class="dash-filters__grid">
+                    <label><span>From date</span><input type="date" name="report_from" value="{{ request.GET.report_from }}"></label>
+                    <label><span>To date</span><input type="date" name="report_to" value="{{ request.GET.report_to }}"></label>
+                    <label><span>Coagulant</span><select name="report_coagulant"><option value="">All coagulants</option>
+                        {% for chemical in available_coagulants %}<option value="{{ chemical.pk }}" {% if request.GET.report_coagulant == chemical.pk|stringformat:'s' %}selected{% endif %}>{{ chemical.name }}</option>{% endfor %}
+                    </select></label>
+                    <label><span>Raw parameter</span><select name="report_parameter"><option value="">Any parameter</option>
+                        {% for item in report_parameters %}<option value="{{ item.pk }}" {% if request.GET.report_parameter == item.pk|stringformat:'s' %}selected{% endif %}>{{ item.parameter.name }} · {{ item.parameter.unit }}</option>{% endfor %}
+                    </select></label>
+                    <label><span>Min raw value</span><input type="number" min="0" step="any" name="report_min_parameter" value="{{ request.GET.report_min_parameter }}" placeholder="Parameter unit"></label>
+                    <label><span>Max raw value</span><input type="number" min="0" step="any" name="report_max_parameter" value="{{ request.GET.report_max_parameter }}" placeholder="Parameter unit"></label>
+                    <label><span>Min dose (mg/L)</span><input type="number" min="0" step="0.01" name="report_min_dose" value="{{ request.GET.report_min_dose }}" placeholder="0.00"></label>
+                    <label><span>Max dose (mg/L)</span><input type="number" min="0" step="0.01" name="report_max_dose" value="{{ request.GET.report_max_dose }}" placeholder="No limit"></label>
+                </div>
+            </details>
+
+            <div class="dash-filters-footer">
+                <div class="dash-export-group" role="group" aria-label="Export filtered jar-test report">
+                    <span><i class="fa-solid fa-download"></i> Export results:</span>
+                    <button type="submit" name="export" value="csv" class="dash-export-btn" title="Export CSV"><i class="fa-solid fa-file-csv"></i> CSV</button>
+                    <button type="submit" name="export" value="xlsx" class="dash-export-btn" title="Export Excel workbook"><i class="fa-solid fa-file-excel"></i> XLSX</button>
+                    <button type="submit" name="export" value="pdf" class="dash-export-btn" title="Export PDF"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+                    <button type="submit" name="export" value="docx" class="dash-export-btn" title="Export Word document"><i class="fa-solid fa-file-word"></i> DOC</button>
+                </div>
             </div>
         </form>
 

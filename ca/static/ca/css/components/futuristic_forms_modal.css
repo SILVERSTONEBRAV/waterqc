@@ -19,6 +19,38 @@
     --ca-label-cyan: #7dd3fc;
 }
 
+html[data-theme="light"],
+html[data-theme="day"],
+html[data-theme="default"],
+html[data-theme="enterprise"] {
+    --ca-modal-bg: linear-gradient(165deg, #ffffff 0%, #f8fafc 100%);
+    --ca-modal-border: rgba(14, 165, 233, 0.3);
+    --ca-modal-glow: 0 20px 50px -10px rgba(15, 23, 42, 0.15), 0 0 20px rgba(14, 165, 233, 0.1);
+    --ca-input-bg: #ffffff;
+    --ca-input-border: #cbd5e1;
+    --ca-input-focus: #0284c7;
+    --ca-input-glow: 0 0 0 3px rgba(2, 132, 199, 0.18);
+    --ca-text-light: #0f172a;
+    --ca-text-muted: #64748b;
+    --ca-label-cyan: #0284c7;
+}
+
+html[data-theme="light"] .ca-modal-header,
+html[data-theme="day"] .ca-modal-header,
+html[data-theme="default"] .ca-modal-header,
+html[data-theme="enterprise"] .ca-modal-header {
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+html[data-theme="light"] .ca-form-card,
+html[data-theme="day"] .ca-form-card,
+html[data-theme="default"] .ca-form-card,
+html[data-theme="enterprise"] .ca-form-card {
+    background: #ffffff;
+    border-color: #e2e8f0;
+}
+
 /* ── Modal Overlay Backdrop ──────────────────────────────────── */
 .ca-modal-overlay {
     position: fixed;
@@ -47,18 +79,21 @@
 }
 
 /* ── Modal Dialog Shell ──────────────────────────────────────── */
+/* ── Modal Dialog Shell ──────────────────────────────────────── */
 .ca-modal-dialog {
-    width: min(100%, 720px);
-    max-height: calc(100vh - 36px);
+    width: min(calc(100vw - 28px), 890px);
+    max-height: calc(100vh - 28px);
+    max-height: calc(100dvh - 28px);
+    height: auto;
     display: flex;
     flex-direction: column;
     background: var(--ca-modal-bg);
     border: 1px solid var(--ca-modal-border);
-    border-radius: 18px;
+    border-radius: 16px;
     box-shadow: var(--ca-modal-glow);
     overflow: hidden;
-    transform: scale(0.94) translateY(12px);
-    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    transform: scale(0.96) translateY(8px);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     position: relative;
     box-sizing: border-box;
 }
@@ -91,11 +126,12 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 22px;
-    background: rgba(10, 22, 44, 0.75);
+    padding: 10px 18px;
+    background: rgba(10, 22, 44, 0.85);
     border-bottom: 1px solid rgba(56, 189, 248, 0.18);
     position: relative;
     z-index: 5;
+    flex-shrink: 0;
 }
 
 .ca-modal-header__left {
@@ -105,16 +141,16 @@
 }
 
 .ca-modal-icon-badge {
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
     background: linear-gradient(135deg, rgba(2, 132, 199, 0.35) 0%, rgba(99, 102, 241, 0.35) 100%);
     border: 1px solid rgba(56, 189, 248, 0.4);
     display: flex;
     align-items: center;
     justify-content: center;
     color: var(--ca-neon-cyan);
-    font-size: 1.15rem;
+    font-size: 1.05rem;
     box-shadow: 0 0 14px rgba(0, 240, 255, 0.25);
     flex-shrink: 0;
 }
@@ -125,7 +161,7 @@
 }
 
 .ca-modal-tagline {
-    font-size: 0.64rem;
+    font-size: 0.62rem;
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -151,16 +187,16 @@
 
 .ca-modal-title {
     margin: 2px 0 0;
-    font-size: 1.15rem;
+    font-size: 1.1rem;
     font-weight: 800;
     color: #ffffff;
     letter-spacing: -0.01em;
 }
 
 .ca-modal-close-btn {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
+    width: 30px;
+    height: 30px;
+    border-radius: 7px;
     background: rgba(255, 255, 255, 0.06);
     border: 1px solid rgba(255, 255, 255, 0.12);
     color: #94a3b8;
@@ -168,7 +204,7 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     transition: all 0.2s ease;
 }
 
@@ -179,37 +215,7 @@
     transform: rotate(90deg);
 }
 
-/* ── Modal Body Content ──────────────────────────────────────── */
-.ca-modal-body {
-    padding: 18px 22px;
-    overflow-y: auto;
-    max-height: calc(85vh - 130px);
-    box-sizing: border-box;
-}
-
-/* Custom Futuristic Scrollbar */
-.ca-modal-body::-webkit-scrollbar {
-    width: 6px;
-}
-.ca-modal-body::-webkit-scrollbar-track {
-    background: rgba(10, 20, 38, 0.5);
-}
-.ca-modal-body::-webkit-scrollbar-thumb {
-    background: rgba(56, 189, 248, 0.3);
-    border-radius: 999px;
-}
-.ca-modal-body::-webkit-scrollbar-thumb:hover {
-    background: rgba(56, 189, 248, 0.6);
-}
-
-/* Keep every intake field visible in the dashboard dialog. */
-.ca-modal-dialog {
-    height: calc(100vh - 16px);
-    height: calc(100dvh - 16px);
-    max-height: calc(100vh - 16px);
-    max-height: calc(100dvh - 16px);
-}
-
+/* ── Modal Form Shell ────────────────────────────────────────── */
 .ca-modal-form {
     display: flex;
     flex: 1 1 auto;
@@ -218,28 +224,32 @@
     overflow: hidden;
 }
 
+/* ── Modal Body: Guaranteed Scrollable & Fully Visible ───────── */
 .ca-modal-body {
     flex: 1 1 auto;
     min-height: 0;
-    max-height: none;
-    overflow: hidden;
-    padding: 10px 18px;
+    max-height: calc(100vh - 135px);
+    max-height: calc(100dvh - 135px);
+    overflow-y: auto !important;
+    overflow-x: hidden;
+    padding: 10px 18px 12px;
+    box-sizing: border-box;
+    scroll-behavior: smooth;
 }
 
-.ca-compact-form-grid {
-    gap: 7px 14px;
+/* Custom Futuristic Scrollbar */
+.ca-modal-body::-webkit-scrollbar {
+    width: 6px;
 }
-
-.ca-field-label {
-    margin-bottom: 3px;
+.ca-modal-body::-webkit-scrollbar-track {
+    background: rgba(10, 20, 38, 0.6);
 }
-
-.ca-modal-header {
-    padding: 11px 18px;
+.ca-modal-body::-webkit-scrollbar-thumb {
+    background: rgba(56, 189, 248, 0.35);
+    border-radius: 999px;
 }
-
-.ca-modal-footer {
-    padding: 10px 18px;
+.ca-modal-body::-webkit-scrollbar-thumb:hover {
+    background: rgba(56, 189, 248, 0.7);
 }
 
 #toast-container.ca-toast-container {
@@ -331,20 +341,43 @@
 /* ── Compact Ergonomic Form Grid ─────────────────────────────── */
 .ca-compact-form-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px 16px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px 12px;
     width: 100%;
     box-sizing: border-box;
 }
 
-@media (max-width: 640px) {
+.ca-col-full {
+    grid-column: 1 / -1;
+}
+
+.ca-col-half {
+    grid-column: span 2;
+}
+
+.ca-col-quarter {
+    grid-column: span 1;
+}
+
+@media (max-width: 820px) {
+    .ca-compact-form-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px 10px;
+    }
+    .ca-col-full { grid-column: span 2; }
+    .ca-col-half { grid-column: span 1; }
+    .ca-col-quarter { grid-column: span 1; }
+}
+
+@media (max-width: 520px) {
     .ca-compact-form-grid {
         grid-template-columns: 1fr;
     }
-}
-
-.ca-col-full {
-    grid-column: 1 / -1;
+    .ca-col-full,
+    .ca-col-half,
+    .ca-col-quarter {
+        grid-column: span 1;
+    }
 }
 
 /* ── Field Wrappers & Labels ─────────────────────────────────── */
@@ -352,19 +385,19 @@
     display: flex;
     flex-direction: column;
     position: relative;
-    margin-bottom: 2px;
+    margin-bottom: 1px;
 }
 
 .ca-field-label {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    font-size: 0.68rem;
-    font-weight: 700;
+    font-size: 0.64rem;
+    font-weight: 750;
     color: var(--ca-label-cyan);
     letter-spacing: 0.05em;
     text-transform: uppercase;
-    margin-bottom: 5px;
+    margin-bottom: 3px;
 }
 
 .ca-field-label .required-star {
@@ -374,7 +407,7 @@
 }
 
 .ca-field-label__badge {
-    font-size: 0.62rem;
+    font-size: 0.6rem;
     font-weight: 600;
     color: #94a3b8;
     letter-spacing: normal;
@@ -386,14 +419,14 @@
 .ca-compact-select,
 .ca-compact-textarea {
     width: 100%;
-    height: 38px;
-    padding: 0 12px;
-    font-size: 0.82rem;
+    height: 35px;
+    padding: 0 10px;
+    font-size: 0.8rem;
     font-weight: 600;
     color: var(--ca-text-light);
     background: var(--ca-input-bg);
     border: 1px solid var(--ca-input-border);
-    border-radius: 8px;
+    border-radius: 7px;
     outline: none;
     box-sizing: border-box;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -411,8 +444,8 @@
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2338bdf8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
     background-position: right 10px center;
     background-repeat: no-repeat;
-    background-size: 14px;
-    padding-right: 32px;
+    background-size: 13px;
+    padding-right: 28px;
     appearance: none;
     -webkit-appearance: none;
 }
@@ -424,11 +457,74 @@
 }
 
 .ca-compact-textarea {
-    height: auto;
-    min-height: 58px;
-    padding: 8px 12px;
+    height: 36px;
+    min-height: 36px;
+    padding: 6px 10px;
     resize: vertical;
-    line-height: 1.4;
+    line-height: 1.35;
+}
+
+/* Discrepancy Fieldset & Chips */
+.ca-discrepancy-fieldset {
+    border: 1px solid rgba(251, 146, 60, 0.35);
+    border-radius: 9px;
+    padding: 6px 12px 8px;
+    background: rgba(251, 146, 60, 0.03);
+    transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ca-discrepancy-fieldset.has-discrepancy {
+    border-color: rgba(251, 146, 60, 0.7);
+    background: rgba(251, 146, 60, 0.07);
+    box-shadow: 0 0 14px rgba(251, 146, 60, 0.15);
+}
+
+.ca-discrepancy-chips {
+    display: flex;
+    gap: 6px 8px;
+    flex-wrap: wrap;
+    margin-bottom: 2px;
+}
+
+.ca-discrepancy-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    border-radius: 99px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #cbd5e1;
+    font-size: 0.68rem;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.15s ease;
+}
+
+.ca-discrepancy-chip:hover {
+    background: rgba(251, 146, 60, 0.15);
+    border-color: rgba(251, 146, 60, 0.45);
+    color: #fdba74;
+}
+
+.ca-discrepancy-chip input[type="checkbox"] {
+    accent-color: #f97316;
+    margin: 0;
+    cursor: pointer;
+    width: 13px;
+    height: 13px;
+}
+
+.ca-discrepancy-chip.is-checked {
+    background: rgba(251, 146, 60, 0.22);
+    border-color: #f97316;
+    color: #fff;
+    box-shadow: 0 0 8px rgba(249, 115, 22, 0.35);
+}
+
+.ca-hold-reason-wrap {
+    transition: all 0.25s ease;
 }
 
 /* Focus and Active Glow */

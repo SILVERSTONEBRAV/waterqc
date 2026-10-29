@@ -11,6 +11,7 @@ from typing import Any
 from django.http import HttpResponse
 from django.utils import timezone
 from django.db.models import Avg, Count, Sum, Min, Max, Q, F
+from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +108,11 @@ class ChemicalReportGenerator:
         now = timezone.now()
         year = year or now.year
         start_dt, end_dt, period_label = cls.get_period_dates(period_type, year, period_index)
+
+        cache_key = f"ca:rep_data:{plant_name}:{period_type}:{year}:{period_index}:{chemical_id}:{supplier_id}"
+        cached_report = cache.get(cache_key)
+        if cached_report is not None:
+            return cached_report
 
         qs = batches_qs.filter(created_at__gte=start_dt, created_at__lte=end_dt)
 
@@ -216,7 +222,7 @@ class ChemicalReportGenerator:
                 "coa_generated": "Yes" if b.coa_generated else "Pending",
             })
 
-        return {
+        report_data = {
             "period_type": period_type,
             "period_label": period_label,
             "year": year,
@@ -238,6 +244,13 @@ class ChemicalReportGenerator:
             "suppliers": supplier_summary,
             "batches_log": recent_batches_log,
         }
+
+        try:
+            cache.set(cache_key, report_data, timeout=300)
+        except Exception:
+            pass
+
+        return report_data
 
     # =========================================================
     # EXPORT HANDLERS (PDF, XLSX, DOCX, CSV, JSON)

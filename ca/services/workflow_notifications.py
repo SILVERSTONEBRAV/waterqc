@@ -62,18 +62,6 @@ def create_workflow_alert(
             created.append(alert)
     if created:
         try:
-            # Generate persistent voice alert for the workflow notification
-            from alerts.models import VoiceAlert
-            sample_item = created[0]
-            voice_msg = f"{sample_item.title}. {sample_item.message}"
-            transaction.on_commit(lambda: VoiceAlert.generate_persistent_voice_alert(
-                message=voice_msg,
-                title=sample_item.title,
-            ))
-        except Exception as v_err:
-            logger.warning(f"Could not generate voice alert for CA workflow notification: {v_err}")
-
-        try:
             from ca.signals import broadcast_dashboard_event
 
             transaction.on_commit(lambda: broadcast_dashboard_event(
@@ -90,46 +78,166 @@ def create_workflow_alert(
     return created
 
 
-def notify_analysis_assignment(analysis_request):
-    """Notify the plant's analyst pool when a request gets assigned.
-
-    Each analyst has a personal inbox row so plant scoping stays intact. The
-    acknowledgement endpoint decides whether that analyst is one of the
-    request's assignees; the batch list is the common landing page.
-    """
-    batch = getattr(analysis_request, "batch", None)
-    if batch is None or not batch.pk:
+@transaction.atomic
+def notify_unassigned_analysis_request(analysis_request):
+    """Create or reopen assignment prompts until this request gets an analyst."""
+    if (
+        not getattr(analysis_request, "pk", None)
+        or analysis_request.status != ChemicalAnalysisRequest.Status.PENDING
+        or analysis_request.assigned_analysts.exists()
+        or not analysis_request.batch_id
+    ):
+        return []
+    batch = analysis_request.batch
+    if batch is None:
         return []
 
-    assigned = list(analysis_request.assigned_analysts.all())
-    if not assigned:
-        return []
+    now = timezone.now()
+    dedupe_key = f"assignment-pending:{analysis_request.pk}"
+    message = (
+        f"Assign an analyst to {batch.chemical.name} batch {batch.batch_number}."
+        if batch.chemical_id else f"Assign an analyst to batch {batch.batch_number}."
+    )
+    changed = []
+    reopened = []
+    for recipient in _eligible_users(batch, ("ca.create_analysis_request",)):
+        alert, created = ChemicalWorkflowAlert.objects.get_or_create(
+            recipient=recipient,
+            dedupe_key=dedupe_key,
+            defaults={
+                "batch": batch,
+                "analysis_request": analysis_request,
+                "alert_type": "ca_assignment_pending",
+                "title": "Analysis request needs an analyst",
+                "message": message,
+                "url": f"/ca/requests/{analysis_request.pk}/assign-analyst/",
+                "severity": "medium",
+            },
+        )
+        if created:
+            changed.append(alert)
+        elif alert.acknowledged_at:
+            ChemicalWorkflowAlert.objects.filter(pk=alert.pk).update(
+                acknowledged_at=None,
+                acknowledged_by=None,
+                created_at=now,
+                message=message,
+            )
+            alert.refresh_from_db()
+            changed.append(alert)
+            reopened.append(alert)
+            try:
+                from alerts.models import VoiceAlert
 
-    stamp = timezone.now()
-    assignment_key = stamp.strftime("%Y%m%d%H%M%S%f")
-    assigned_names = ", ".join(
-        analyst.get_full_name() or analyst.get_username()
-        for analyst in assigned
-    )
-    return create_workflow_alert(
-        batch=batch,
-        request=analysis_request,
-        alert_type="ca_analysis_assignment",
-        title="Chemical analysis request assigned",
-        message=(
-            f"Batch {batch.batch_number} is ready for its receiving checklist. "
-            f"Assigned analyst(s): {assigned_names}."
-        ),
-        url=f"/ca/batches/?highlight={batch.pk}#batch-row-{batch.pk}",
-        severity="medium",
-        dedupe_key=f"analysis-assigned:{analysis_request.pk}:{assignment_key}",
-        permissions=("ca.start_chemical_analysis",),
-    )
+                VoiceAlert.objects.filter(source_key=f"ca-workflow:{alert.pk}").update(
+                    repeat_due_at=None,
+                    repeat_count=0,
+                )
+            except Exception:
+                logger.exception("Could not reset CA assignment voice reminders for alert %s", alert.pk)
+
+    if changed:
+        try:
+            from ca.signals import broadcast_dashboard_event
+
+            transaction.on_commit(lambda: broadcast_dashboard_event(
+                "chemical_workflow_alert",
+                {
+                    "alert_ids": [item.pk for item in changed],
+                    "batch_id": batch.pk,
+                    "alert_type": "ca_assignment_pending",
+                    "plant_id": batch.treatment_plant_id,
+                },
+            ))
+        except Exception:
+            logger.exception("Could not broadcast a CA analyst assignment prompt")
+    for alert in reopened:
+        def queue_reopened_voice(alert_id=alert.pk):
+            try:
+                from alerts.models import AlertConfig
+                from alerts.tasks import generate_voice_notification
+
+                config_id = AlertConfig.objects.filter(
+                    alert_type="ca_assignment_pending", active=True
+                ).values_list("pk", flat=True).first()
+                generate_voice_notification.delay(
+                    message=alert.message,
+                    title=alert.title,
+                    source_key=f"ca-workflow:{alert_id}",
+                    alert_config_id=config_id,
+                    recipient_ids=[alert.recipient_id],
+                )
+            except Exception:
+                logger.exception("Could not restart CA assignment voice alert %s", alert_id)
+
+        transaction.on_commit(queue_reopened_voice)
+    return changed
+
+
+def clear_assignment_notifications(analysis_request):
+    """Clear assignment prompts and escalations after an analyst is assigned."""
+    if not getattr(analysis_request, "pk", None):
+        return 0
+    if not analysis_request.assigned_analysts.exists():
+        return 0
+    alerts = list(ChemicalWorkflowAlert.objects.filter(
+        analysis_request=analysis_request,
+        alert_type__in=("ca_analysis_assignment", "ca_assignment_pending", "ca_assignment_escalation"),
+        acknowledged_at__isnull=True,
+    ).only("pk", "recipient_id"))
+    if not alerts:
+        return 0
+    now = timezone.now()
+    ids = [item.pk for item in alerts]
+    ChemicalWorkflowAlert.objects.filter(pk__in=ids).update(acknowledged_at=now)
+    try:
+        from alerts.models import VoiceAlert
+
+        VoiceAlert.objects.filter(source_key__in=[f"ca-workflow:{alert_id}" for alert_id in ids]).update(
+            repeat_due_at=None
+        )
+    except Exception:
+        logger.exception("Could not stop CA assignment voice reminders")
+
+    def broadcast_cleared():
+        try:
+            from asgiref.sync import async_to_sync
+            from channels.layers import get_channel_layer
+
+            layer = get_channel_layer()
+            if not layer:
+                return
+            for item in alerts:
+                async_to_sync(layer.group_send)(
+                    f"user_{item.recipient_id}_alerts",
+                    {
+                        "type": "alert_acknowledged",
+                        "id": f"ca_workflow_alert_{item.pk}",
+                        "timestamp": now.isoformat(),
+                    },
+                )
+        except Exception:
+            logger.exception("Could not broadcast cleared CA assignment alerts")
+
+    transaction.on_commit(broadcast_cleared)
+    return len(alerts)
 
 
 def escalate_due_chemical_workflows(*, now=None):
     now = now or timezone.now()
-    counts = {"assignment": 0, "analysis": 0, "holds": 0, "stalled": 0}
+    counts = {"assignment_pending": 0, "assignment": 0, "analysis": 0, "holds": 0, "stalled": 0}
+
+    # Backfill persistent reminders for pending requests created before this
+    # notification lifecycle was installed. The helper is idempotent.
+    pending_requests = ChemicalAnalysisRequest.objects.filter(
+        status=ChemicalAnalysisRequest.Status.PENDING,
+        assigned_analysts__isnull=True,
+    ).select_related("batch", "batch__chemical").distinct()
+    for request in pending_requests.iterator(chunk_size=100):
+        try:
+            counts["assignment_pending"] += len(notify_unassigned_analysis_request(request))
+        except Exception:
+            logger.exception("Could not create CA assignment prompt for request %s", request.pk)
 
     due_assignments = (
         ChemicalAnalysisRequest.objects.filter(

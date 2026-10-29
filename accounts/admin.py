@@ -61,15 +61,6 @@ class SystemConfigurationAdmin(admin.ModelAdmin):
                 "password_expire_days",
             ),
         }),
-        ("Session Policy", {
-            "classes": ("collapse",),
-            "fields": (
-                "session_timeout_minutes",
-                "session_idle_logout_minutes",
-                "daily_login_limit_minutes",
-                "max_concurrent_sessions",
-            ),
-        }),
         ("Cache Policy", {"classes": ("collapse",), "fields": ("cache_timeout_seconds",)}),
         ("Security / MFA", {
             "classes": ("collapse",),
@@ -351,9 +342,8 @@ class CustomUserAdmin(DjangoUserAdmin):
             <hr>
 
             <strong>Session Policy</strong><br>
-            Timeout: {config.session_timeout_minutes} mins |
-            Idle Logout: {config.session_idle_logout_minutes} mins |
-            Max Concurrent Sessions: {config.max_concurrent_sessions}
+            Automatic logouts: Disabled |
+            Concurrent sessions: Allowed
             <hr>
 
             <strong>Security</strong><br>
@@ -402,15 +392,6 @@ class CustomUserAdmin(DjangoUserAdmin):
     )
 
     def risk_status(self, obj):
-
-        config = SystemConfiguration.current()
-
-        session_count = self.active_session_count(obj)
-
-        max_sessions = (
-            config.max_concurrent_sessions or 5
-        )
-
         failed = (
             getattr(obj, "failed_login_attempts", 0)
             or 0
@@ -426,11 +407,6 @@ class CustomUserAdmin(DjangoUserAdmin):
         ):
             return mark_safe(
                 '<span style="color:red;font-weight:bold;">High Risk</span>'
-            )
-
-        if session_count >= max_sessions:
-            return mark_safe(
-                '<span style="color:orange;font-weight:bold;">Medium Risk</span>'
             )
 
         return mark_safe(

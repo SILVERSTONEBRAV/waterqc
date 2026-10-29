@@ -101,11 +101,25 @@ class SystemConfiguration(models.Model):
         """Enforce singleton strictly."""
         self.pk = 1
         super().save(*args, **kwargs)
+        try:
+            cache.delete("qad:system_configuration")
+        except Exception:
+            pass
 
     @classmethod
     def current(cls) -> "SystemConfiguration":
-        # Always fetch fresh instance to avoid caching stale settings
-        return cls.objects.get_or_create(pk=1)[0]
+        try:
+            cached = cache.get("qad:system_configuration")
+            if cached is not None:
+                return cached
+        except Exception:
+            pass
+        instance, _ = cls.objects.get_or_create(pk=1)
+        try:
+            cache.set("qad:system_configuration", instance, timeout=300)
+        except Exception:
+            pass
+        return instance
 
     def __str__(self):
         return "System Configuration"
@@ -302,19 +316,11 @@ def audit_delete(sender, instance, **kwargs):
 
 @receiver(user_logged_in)
 def track_login(sender, request, user, **kwargs):
-    now = timezone.now()
-    max_sessions = SettingsManager.max_sessions()
-    active_sessions = UserSession.objects.filter(user=user, terminated=False)
-
-    # Terminate oldest session if over limit
-    if active_sessions.count() >= max_sessions:
-        oldest = active_sessions.order_by("login_time").first()
-        if oldest:
-            oldest.terminated = True
-            oldest.save(update_fields=["terminated"])
-
-    # Create current session
-    UserSession.objects.create(user=user, session_key=request.session.session_key)
+    # Track each login for administration without imposing a device/session cap.
+    UserSession.objects.update_or_create(
+        session_key=request.session.session_key,
+        defaults={"user": user, "terminated": False},
+    )
 
 
 @receiver(user_logged_out)

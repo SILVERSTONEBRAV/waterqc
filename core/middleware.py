@@ -2,11 +2,21 @@ from django.conf import settings
 from django.contrib.auth.views import redirect_to_login
 from django.shortcuts import resolve_url
 from asgiref.sync import iscoroutinefunction, markcoroutinefunction
+from django.utils.deprecation import MiddlewareMixin
 
 from core.engine.superuser_authorization import (
     bind_request_user,
     reset_request_user,
 )
+
+
+class PersistentSessionMiddleware(MiddlewareMixin):
+    """Apply the configured long session lifetime to authenticated sessions."""
+
+    def process_request(self, request):
+        user = getattr(request, "user", None)
+        if user is not None and user.is_authenticated:
+            request.session.set_expiry(settings.SESSION_COOKIE_AGE)
 
 
 class SuperuserAuthorizationContextMiddleware:
@@ -97,73 +107,11 @@ class AnonymousForbiddenRedirectMiddleware:
 
 
 class SingleDeviceSessionMiddleware:
-    """
-    Enforce single PC/device session per user account.
-    If an account is opened on another computer, any prior session is terminated.
-    """
+    """Deprecated compatibility middleware; concurrent sessions are allowed."""
 
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
-        user = getattr(request, "user", None)
-        if user and user.is_authenticated:
-            path = request.path_info
-            exempt_paths = (
-                "/accounts/login/",
-                "/accounts/logout/",
-                "/login/",
-                "/logout/",
-                "/static/",
-                "/manifest.json",
-                "/sw.js",
-            )
-            if not any(path.startswith(p) for p in exempt_paths):
-                current_session_key = getattr(request.session, "session_key", None)
-                if current_session_key:
-                    from django.core.cache import cache
-                    import logging
-
-                    logger = logging.getLogger(__name__)
-                    cache_key = f"active_user_session:{user.pk}"
-                    active_session_key = cache.get(cache_key)
-
-                    if active_session_key is None:
-                        timeout = getattr(settings, "SESSION_COOKIE_AGE", 28800)
-                        cache.set(cache_key, current_session_key, timeout=timeout)
-                        active_session_key = current_session_key
-
-                    if active_session_key and active_session_key != current_session_key:
-                        logger.warning(
-                            "CONCURRENT_LOGIN_DETECTED: user=%s session=%s active=%s - logging out obsolete session",
-                            user.username,
-                            current_session_key,
-                            active_session_key,
-                        )
-                        from django.contrib.auth import logout as auth_logout
-                        from django.http import JsonResponse
-                        from django.shortcuts import redirect
-
-                        auth_logout(request)
-                        try:
-                            request.session.flush()
-                        except Exception:
-                            pass
-
-                        if (
-                            request.headers.get("X-Requested-With") == "XMLHttpRequest"
-                            or "application/json" in request.headers.get("Accept", "")
-                        ):
-                            return JsonResponse(
-                                {
-                                    "authenticated": False,
-                                    "error": "concurrent_login",
-                                    "message": "Your account was logged in from another computer. You have been logged out.",
-                                    "redirect": "/accounts/login/?reason=concurrent_login",
-                                },
-                                status=401,
-                            )
-
-                        return redirect("/accounts/login/?reason=concurrent_login")
-
         return self.get_response(request)
+

@@ -4,7 +4,7 @@ from django.shortcuts import resolve_url, render, redirect
 from django.urls import NoReverseMatch
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout, get_user_model
+from django.contrib.auth import authenticate, login as auth_login, get_user_model
 from django.core.exceptions import PermissionDenied, ImproperlyConfigured
 from django.utils import timezone
 from django.middleware.csrf import get_token
@@ -22,7 +22,6 @@ class LoginView(View):
     template_name = "accounts/login.html"
 
     max_failed_attempts = getattr(settings, "MAX_FAILED_LOGIN_ATTEMPTS", 5)
-    remember_me_age = 60 * 60 * 24 * 30
 
     def dispatch(self, request, *args, **kwargs):
         self.request = request
@@ -41,22 +40,17 @@ class LoginView(View):
 
         reason = request.GET.get("reason", "")
         error_msg = ""
-        if reason == "concurrent_login":
-            error_msg = "Your account was logged in from another computer. You were automatically logged out."
-        elif reason == "window_closed":
-            error_msg = "Previous session was closed when window exited. Please sign in again."
-        elif reason == "logged_out":
+        if reason == "logged_out":
             error_msg = "You have been logged out."
-        elif request.GET.get("expired") == "1":
-            error_msg = "Your session expired. Please sign in again."
 
-        return render(request, self.template_name, {
+        response = render(request, self.template_name, {
             "username": "",
             "error": error_msg,
             "next": request.GET.get("next", ""),
-            "session_expired": bool(error_msg),
+            "session_expired": False,
             "remember_me": False,
         })
+        return self._disable_login_caching(response)
 
     def post(self, request):
         is_ajax = self._is_ajax(request)
@@ -109,7 +103,6 @@ class LoginView(View):
         # LOGIN
         # -----------------------------
         auth_login(request, user)
-
         self._initialize_session(request, user, remember=False)
 
         request.session.save()
@@ -127,40 +120,17 @@ class LoginView(View):
         # ALWAYS JSON FOR AJAX
         # -----------------------------
         if is_ajax:
-            return JsonResponse({
+            response = JsonResponse({
                 "success": True,
                 "redirect": redirect_url
             })
+            return self._disable_login_caching(response)
 
-        return redirect(redirect_url)
+        return self._disable_login_caching(redirect(redirect_url))
     def _initialize_session(self, request, user, remember: bool = False):
-        from django.core.cache import cache
-
-        # Window/browser close must terminate the session: set expiry to 0
-        request.session.set_expiry(0)
-        request.session.cycle_key()
-        session_key = request.session.session_key
-
-        # Invalidate any previous session for this user on other computers
-        cache_key = f"active_user_session:{user.pk}"
-        old_session_key = cache.get(cache_key)
-        if old_session_key and old_session_key != session_key:
-            logger.info("TERMINATING_PREVIOUS_SESSION user=%s old_session=%s", user.username, old_session_key)
-            try:
-                from django.contrib.sessions.backends.cache import SessionStore
-                SessionStore(session_key=old_session_key).delete()
-            except Exception:
-                pass
-            try:
-                from django.contrib.sessions.models import Session
-                Session.objects.filter(session_key=old_session_key).delete()
-            except Exception:
-                pass
-
-        # Register current session as the single active session for this user
-        timeout = getattr(settings, "SESSION_COOKIE_AGE", 28800)
-        cache.set(cache_key, session_key, timeout=timeout)
-
+        # auth_login has already rotated the session key. Keep this session
+        # independent so signing in elsewhere does not invalidate it.
+        request.session.set_expiry(settings.SESSION_COOKIE_AGE)
         request.session.update({
             "user_id": user.pk,
             "username": user.username,
@@ -451,27 +421,36 @@ class LoginView(View):
         }
 
         if is_ajax:
-            return JsonResponse(
+            response = JsonResponse(
                 payload,
                 status=403,
             )
+            return self._disable_login_caching(response)
 
         messages.error(
             request,
             error_text,
         )
 
-        return render(
+        response = render(
             request,
             self.template_name,
             {
-                "username": username,
+                "username": "",
                 "error": error_text,
                 "next": request.POST.get("next", ""),
                 "remember_me": False,
             },
             status=403,
         )
+        return self._disable_login_caching(response)
+
+    @staticmethod
+    def _disable_login_caching(response):
+        response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response["Pragma"] = "no-cache"
+        response["Expires"] = "0"
+        return response
 
     def _is_ajax(self, request):
         return (

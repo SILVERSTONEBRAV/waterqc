@@ -29,19 +29,54 @@
     <form id="qcncFilters" class="qcr-filter-panel" method="get" action="{{ filter_action }}">
         <input type="hidden" name="water_type" value="{{ water_type }}"><input type="hidden" name="section" value="{{ section }}"><input type="hidden" name="page" value="1">
         {% if request.user.is_superuser and plant %}<input type="hidden" name="plant" value="{{ plant.pk }}">{% endif %}
-        <div class="qcr-filter-heading"><div><span class="qcr-section-kicker">CASE SCOPE &amp; SEARCH</span><h2>Filter recorded cases</h2></div><button type="button" class="qcr-filter-toggle" aria-expanded="true" aria-controls="qcncFilterGrid"><i class="fa-solid fa-sliders" aria-hidden="true"></i><span>Filters</span></button></div>
-        <div id="qcncFilterGrid" class="qcr-filter-grid">
-            <label class="qcr-field qcr-field-period"><span>Reporting window</span><select name="period" id="qcncPeriod">{% for key, label in period_choices %}<option value="{{ key }}"{% if period == key %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
-            <label class="qcr-field"><span>From</span><input type="date" name="start" value="{{ start_date|date:'Y-m-d' }}"></label>
-            <label class="qcr-field"><span>Through</span><input type="date" name="end" value="{{ end_date|date:'Y-m-d' }}"></label>
-            <label class="qcr-field"><span>Trend interval</span><select name="group_by">{% for key, label in group_choices %}<option value="{{ key }}"{% if group_by == key %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
-            <label class="qcr-field"><span>Case status</span><select name="status"><option value="">All statuses</option><option value="open"{% if status == 'open' %} selected{% endif %}>Open</option><option value="under_review"{% if status == 'under_review' %} selected{% endif %}>Under review</option><option value="closed"{% if status == 'closed' %} selected{% endif %}>Closed</option><option value="derived"{% if status == 'derived' %} selected{% endif %}>Derived filtered-water exceedance</option></select></label>
-            <label class="qcr-field"><span>Risk band</span><select name="severity"><option value="">All risk bands</option><option value="Critical"{% if severity == 'Critical' %} selected{% endif %}>Critical</option><option value="High"{% if severity == 'High' %} selected{% endif %}>High</option><option value="Moderate"{% if severity == 'Moderate' %} selected{% endif %}>Moderate</option><option value="Low"{% if severity == 'Low' %} selected{% endif %}>Low</option></select></label>
-            <label class="qcr-field qcr-field-search"><span>Search cases</span><span class="qcr-search-wrap"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input type="search" name="search" value="{{ search }}" placeholder="Reference, parameter, action…"></span></label>
-            <label class="qcr-field"><span>Sort by</span><select name="sort"><option value="date"{% if sort == 'date' %} selected{% endif %}>Recorded date</option><option value="risk"{% if sort == 'risk' %} selected{% endif %}>Risk score</option><option value="deviation"{% if sort == 'deviation' %} selected{% endif %}>Deviation</option><option value="status"{% if sort == 'status' %} selected{% endif %}>Status</option><option value="parameter"{% if sort == 'parameter' %} selected{% endif %}>Parameter</option><option value="reference"{% if sort == 'reference' %} selected{% endif %}>Sample reference</option></select></label>
-            <label class="qcr-field"><span>Direction</span><select name="direction"><option value="desc"{% if direction == 'desc' %} selected{% endif %}>Descending</option><option value="asc"{% if direction == 'asc' %} selected{% endif %}>Ascending</option></select></label>
-            <div class="qcr-filter-actions"><button class="qcr-button qcr-button-primary" type="submit"><i class="fa-solid fa-filter" aria-hidden="true"></i> Apply filters</button><a class="qcr-button qcr-button-quiet" href="{{ dashboard_url }}?water_type={{ water_type }}&amp;section={{ section }}{% if request.user.is_superuser and plant %}&amp;plant={{ plant.pk }}{% endif %}">Reset</a></div>
+        <div class="dash-filters__primary">
+            <label class="dash-search">
+                <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                <input type="search" name="search" value="{{ search }}" placeholder="Search reference, parameter, action, remarks…">
+                {% if search %}<a href="{{ dashboard_url }}?water_type={{ water_type }}&amp;section={{ section }}{% if request.user.is_superuser and plant %}&amp;plant={{ plant.pk }}{% endif %}" class="dash-clear-search" title="Clear search"><i class="fa-solid fa-xmark"></i></a>{% endif %}
+            </label>
+            <div class="dash-compact-filter">
+                <select name="status" aria-label="Case status">
+                    <option value="">All statuses</option>
+                    <option value="open"{% if status == 'open' %} selected{% endif %}>Open</option>
+                    <option value="under_review"{% if status == 'under_review' %} selected{% endif %}>Under review</option>
+                    <option value="closed"{% if status == 'closed' %} selected{% endif %}>Closed</option>
+                    <option value="derived"{% if status == 'derived' %} selected{% endif %}>Derived exceedance</option>
+                </select>
+            </div>
+            <div class="dash-compact-filter">
+                <select name="severity" aria-label="Risk band">
+                    <option value="">All risk bands</option>
+                    <option value="Critical"{% if severity == 'Critical' %} selected{% endif %}>Critical risk</option>
+                    <option value="High"{% if severity == 'High' %} selected{% endif %}>High risk</option>
+                    <option value="Moderate"{% if severity == 'Moderate' %} selected{% endif %}>Moderate risk</option>
+                    <option value="Low"{% if severity == 'Low' %} selected{% endif %}>Low risk</option>
+                </select>
+            </div>
+            <div class="dash-compact-filter">
+                <select name="sort" aria-label="Sort by">
+                    <option value="date"{% if sort == 'date' %} selected{% endif %}>Recorded date</option>
+                    <option value="risk"{% if sort == 'risk' %} selected{% endif %}>Risk score</option>
+                    <option value="deviation"{% if sort == 'deviation' %} selected{% endif %}>Deviation</option>
+                    <option value="status"{% if sort == 'status' %} selected{% endif %}>Status</option>
+                    <option value="parameter"{% if sort == 'parameter' %} selected{% endif %}>Parameter</option>
+                    <option value="reference"{% if sort == 'reference' %} selected{% endif %}>Sample reference</option>
+                </select>
+            </div>
+            <button class="dash-filter-submit" type="submit"><i class="fa-solid fa-filter" aria-hidden="true"></i> Apply</button>
+            <a class="dash-filter-reset" href="{{ dashboard_url }}?water_type={{ water_type }}&amp;section={{ section }}{% if request.user.is_superuser and plant %}&amp;plant={{ plant.pk }}{% endif %}"><i class="fa-solid fa-rotate-left"></i> Reset</a>
         </div>
+
+        <details class="dash-filters__advanced" {% if period or start_date or end_date or group_by or direction %}open{% endif %}>
+            <summary><i class="fa-solid fa-sliders"></i> Advanced window &amp; trend parameters <span>+</span></summary>
+            <div class="dash-filters__grid">
+                <label><span>Reporting window</span><select name="period" id="qcncPeriod">{% for key, label in period_choices %}<option value="{{ key }}"{% if period == key %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+                <label><span>From date</span><input type="date" name="start" value="{{ start_date|date:'Y-m-d' }}"></label>
+                <label><span>Through date</span><input type="date" name="end" value="{{ end_date|date:'Y-m-d' }}"></label>
+                <label><span>Trend interval</span><select name="group_by">{% for key, label in group_choices %}<option value="{{ key }}"{% if group_by == key %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+                <label><span>Direction</span><select name="direction"><option value="desc"{% if direction == 'desc' %} selected{% endif %}>Descending</option><option value="asc"{% if direction == 'asc' %} selected{% endif %}>Ascending</option></select></label>
+            </div>
+        </details>
     </form>
 
     {% if plant %}

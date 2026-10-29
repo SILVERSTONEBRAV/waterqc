@@ -158,9 +158,9 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "core.middleware.PersistentSessionMiddleware",
     "core.middleware.SuperuserAuthorizationContextMiddleware",
     "core.middleware.AnonymousForbiddenRedirectMiddleware",
-    "core.middleware.SingleDeviceSessionMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "axes.middleware.AxesMiddleware",
@@ -469,6 +469,18 @@ CELERY_BEAT_SCHEDULER = (
 )
 
 CELERY_BEAT_SCHEDULE = {
+    "alerts.deliver_due_notifications": {
+        "task": "alerts.tasks.deliver_due_alert_notifications",
+        "schedule": 30.0,
+    },
+    "alerts.process_due_escalations": {
+        "task": "alerts.tasks.process_due_alert_escalations",
+        "schedule": 30.0,
+    },
+    "alerts.process_due_critical_repeats": {
+        "task": "alerts.tasks.process_due_alert_repeats",
+        "schedule": 30.0,
+    },
     "qc.generate_due_analyses": {
         "task": "qc.generate_due_analyses",
         "schedule": 60.0,
@@ -559,10 +571,17 @@ LOGGING = {
     },
 }
 
-SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+# Use cached_db: fast reads from Redis, persistent writes to DB so
+# sessions survive Redis eviction / container restarts.
+SESSION_ENGINE = "django.contrib.sessions.backends.cached_db"
 SESSION_CACHE_ALIAS = "default"
-SESSION_EXPIRE_AT_BROWSER_CLOSE = True
-SESSION_COOKIE_AGE = env("SESSION_COOKIE_AGE", 28800, int)
+
+# Keep session alive across browser restarts (no more logout on tab close).
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+
+# Long-lived session. Active requests refresh the expiry; there is no idle or
+# daily-login logout policy. Users can still end the current session explicitly.
+SESSION_COOKIE_AGE = 10 * 365 * 24 * 60 * 60
 SESSION_SAVE_EVERY_REQUEST = True
 
 
@@ -609,3 +628,11 @@ PROMETHEUS_PORT = env(
 DATA_UPLOAD_MAX_NUMBER_FIELDS = env("DATA_UPLOAD_MAX_NUMBER_FIELDS",    20000,
     int,
 )
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "qad-locmem-cache",
+        "TIMEOUT": 300,
+    }
+}

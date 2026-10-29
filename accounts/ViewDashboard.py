@@ -26,8 +26,6 @@ class DashboardView(WanjalaMixin, View):
         if (r := self.process_request(request)):
             return r
 
-        self.check_idle_timeout()
-
         context = self.get_context(request)
 
         return HttpResponse(

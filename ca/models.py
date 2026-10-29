@@ -4,6 +4,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
+import logging
 import math
 import secrets
 import uuid
@@ -29,8 +30,11 @@ from .services.formulas import (
     safe_eval_formula,
     validate_formula_expression,
 )
+
 from .services.policies import require_ca_actor
 from .utils.coa_pdf import create_celestial_watermark
+
+logger = logging.getLogger(__name__)
 
 def today_date():
     return timezone.now().date()
@@ -3177,6 +3181,14 @@ class ChemicalAnalysisProcess(Process):
         if not ids and self.analysis_request_id:
             ids = set(self.assigned_analysts.values_list("pk", flat=True))
         return ids
+
+    def is_analysis_performer(self, user):
+        """Return whether this user performed, or is assigned to, this batch analysis."""
+        return bool(
+            user is not None
+            and getattr(user, "is_authenticated", False)
+            and user.pk in self.performing_analyst_ids
+        )
 
     def is_independent_approver(self, user):
         if not user or not getattr(user, "is_authenticated", False):
@@ -6623,7 +6635,6 @@ class ChemicalWorkflowAlert(models.Model):
         return self.acknowledged_at is not None
 
     @transaction.atomic
-    @transaction.atomic
     def acknowledge(self, *, actor):
         alert = type(self).objects.select_for_update().select_related(
             "batch", "analysis_request"
@@ -6637,12 +6648,41 @@ class ChemicalWorkflowAlert(models.Model):
         if alert.alert_type == "ca_analysis_assignment":
             if not alert.analysis_request_id or not alert.analysis_request.is_assigned_analyst(actor):
                 raise PermissionDenied("Only an analyst assigned to this request may acknowledge it.")
+        elif alert.alert_type in {"ca_assignment_pending", "ca_assignment_escalation"}:
+            if not alert.analysis_request_id or not alert.analysis_request.assigned_analysts.exists():
+                raise PermissionDenied("This assignment reminder remains active until an analyst is assigned.")
         elif actor.pk != alert.recipient_id and not actor.is_superuser:
             raise PermissionDenied("Only the notification recipient may acknowledge this alert.")
         if alert.acknowledged_at is None:
             alert.acknowledged_at = timezone.now()
             alert.acknowledged_by = actor
             alert.save(update_fields=["acknowledged_at", "acknowledged_by"])
+            try:
+                from alerts.models import VoiceAlert
+
+                VoiceAlert.objects.filter(source_key=f"ca-workflow:{alert.pk}").update(repeat_due_at=None)
+            except Exception:
+                logger.exception("Could not stop CA workflow voice reminders for alert %s", alert.pk)
+
+            def broadcast_acknowledgment():
+                try:
+                    from asgiref.sync import async_to_sync
+                    from channels.layers import get_channel_layer
+
+                    layer = get_channel_layer()
+                    if layer:
+                        async_to_sync(layer.group_send)(
+                            f"user_{alert.recipient_id}_alerts",
+                            {
+                                "type": "alert_acknowledged",
+                                "id": f"ca_workflow_alert_{alert.pk}",
+                                "timestamp": alert.acknowledged_at.isoformat(),
+                            },
+                        )
+                except Exception:
+                    logger.exception("Could not broadcast acknowledgment for CA alert %s", alert.pk)
+
+            transaction.on_commit(broadcast_acknowledgment)
         self.acknowledged_at = alert.acknowledged_at
         self.acknowledged_by_id = alert.acknowledged_by_id
         return self

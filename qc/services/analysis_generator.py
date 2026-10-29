@@ -675,46 +675,46 @@ class AnalysisGenerator:
                 )
             )
 
-            if current_analysis:
+            if current_analysis and current_analysis.shift:
+                current_shift = current_analysis.shift
+            else:
+                try:
+                    from sc.models import Shift
+                    current_shift = Shift.get_shift_for_time(now, treatment_plant=plant)
+                except Exception:
+                    pass
 
-                current_shift = (
-                    current_analysis.shift
+            if current_shift:
+                from sc.models import ShiftSupervisor
+
+                user_section = getattr(
+                    user,
+                    "section",
+                    None,
                 )
 
-                if current_shift:
-
-                    from sc.models import (
-                        ShiftSupervisor,
+                supervisor_query = (
+                    ShiftSupervisor.objects
+                    .filter(
+                        treatment_plant=plant,
+                        is_active=True,
                     )
-
-                    user_section = getattr(
-                        user,
-                        "section",
-                        None,
+                    .select_related(
+                        "user",
                     )
+                )
 
+                if user_section:
                     supervisor_query = (
-                        ShiftSupervisor.objects
-                        .filter(
-                            treatment_plant=plant,
-                            is_active=True,
-                        )
-                        .select_related(
-                            "user",
-                        )
-                    )
-
-                    if user_section:
-                        supervisor_query = (
-                            supervisor_query
-                            .filter(
-                                user__section=user_section
-                            )
-                        )
-
-                    shift_supervisors = list(
                         supervisor_query
+                        .filter(
+                            user__section=user_section
+                        )
                     )
+
+                shift_supervisors = list(
+                    supervisor_query
+                )
 
         return {
 

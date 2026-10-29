@@ -1,6 +1,7 @@
 # alerts/signals.py
 import logging
 from django.apps import apps
+from django.db import transaction
 from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
 from django.utils import timezone
@@ -143,20 +144,22 @@ AlertState = apps.get_model('alerts', 'AlertState')
 
 @receiver(post_save, sender=AlertState)
 def handle_alert_state_voice(sender, instance, created, **kwargs):
-    """Ensure every AlertState record has a corresponding persistent VoiceAlert."""
+    """Ensure every AlertState record has an asynchronously generated persistent VoiceAlert."""
     if created:
         try:
-            from alerts.models import VoiceAlert
-            if not VoiceAlert.objects.filter(alert_state=instance).exists():
-                cfg = instance.alert_config
-                body = (cfg.template.body_template if cfg and cfg.template else None) or f"Alert state {instance.state} for {instance.instance_ref}"
-                title = cfg.alert_type if cfg else "System Alert Notification"
-                VoiceAlert.generate_persistent_voice_alert(
-                    message=body,
-                    title=title,
-                    alert_config=cfg,
-                    alert_state=instance,
-                )
+            from alerts.tasks import generate_voice_notification
+            cfg = instance.alert_config
+            body = instance.message or f"Alert state {instance.state} for {instance.instance_ref}"
+            title = instance.title or (cfg.alert_type if cfg else "System Alert Notification")
+            state_id = instance.pk
+            cfg_id = cfg.pk if cfg else None
+            transaction.on_commit(lambda: generate_voice_notification.delay(
+                message=body,
+                alert_config_id=cfg_id,
+                title=title,
+                alert_state_id=state_id,
+                source_key=f"alert-state:{state_id}",
+            ))
         except Exception as e:
             logger.warning(f"[VoiceAlert] AlertState signal voice generation notice: {e}")
 
@@ -166,19 +169,32 @@ try:
 
     @receiver(post_save, sender=ChemicalWorkflowAlert)
     def handle_ca_workflow_alert_voice(sender, instance, created, **kwargs):
-        """Ensure every CA workflow alert generates a corresponding voice message."""
+        """Ensure every CA workflow alert generates a corresponding voice message asynchronously."""
         if created:
             try:
-                from alerts.models import VoiceAlert
-                from datetime import timedelta
-                # Deduplicate by title & recent window to avoid duplicate voice per recipient in batch notifications
-                recent_window = timezone.now() - timedelta(seconds=15)
-                if not VoiceAlert.objects.filter(title=instance.title, created_at__gte=recent_window).exists():
-                    voice_text = f"{instance.title}. {instance.message}"
-                    VoiceAlert.generate_persistent_voice_alert(
-                        message=voice_text,
-                        title=instance.title,
-                    )
+                from alerts.tasks import generate_voice_notification
+                from alerts.models import AlertConfig
+
+                voice_text = f"{instance.title}. {instance.message}"
+                v_title = instance.title
+                source_key = f"ca-workflow:{instance.pk}"
+                recipient_ids = [instance.recipient_id] if getattr(instance, "recipient_id", None) else []
+                config_id = AlertConfig.objects.filter(
+                    alert_type=instance.alert_type,
+                    active=True,
+                ).values_list("pk", flat=True).first()
+                batch = getattr(instance, "batch", None)
+                if batch is None and instance.analysis_request_id:
+                    batch = instance.analysis_request.batch
+                plant_id = getattr(batch, "treatment_plant_id", None)
+                transaction.on_commit(lambda: generate_voice_notification.delay(
+                    message=voice_text,
+                    title=v_title,
+                    source_key=source_key,
+                    alert_config_id=config_id,
+                    recipient_ids=recipient_ids,
+                    plant_id=plant_id,
+                ))
             except Exception as e:
                 logger.warning(f"[VoiceAlert] CA workflow alert signal voice generation notice: {e}")
 except Exception:

@@ -153,8 +153,6 @@ class NAMUBUYA(WanjalaMixin, View):
         if (r := self.process_request(request)):
             return r
 
-        self.check_idle_timeout()
-
         self.entry = self._resolve_entry()
         self.model = self.entry.model
 

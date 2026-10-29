@@ -128,23 +128,23 @@ def journal_chemical_process_status(sender, instance, created=False, raw=False, 
         ).update(acknowledged_at=timezone.now())
 
 
+@receiver(post_save, sender=ChemicalAnalysisRequest, dispatch_uid="ca.notify_unassigned_analysis_request")
+def notify_unassigned_analysis_request_on_save(sender, instance, raw=False, **kwargs):
+    if raw or not instance.batch_id:
+        return
+    if instance.status != ChemicalAnalysisRequest.Status.PENDING or instance.assigned_analysts.exists():
+        return
+    from ca.services.workflow_notifications import notify_unassigned_analysis_request
+
+    notify_unassigned_analysis_request(instance)
+
+
 @receiver(m2m_changed, sender=ChemicalAnalysisRequest._meta.get_field("assigned_analysts").remote_field.through, dispatch_uid="ca.journal_analyst_assignment")
 def journal_chemical_analyst_assignment(sender, instance, action, reverse, model, pk_set, **kwargs):
     if action not in {"post_add", "post_remove", "post_clear"} or reverse or not instance.batch_id:
         return
 
-    if action == "post_add" and pk_set:
-        ChemicalWorkflowAlert.objects.filter(
-            analysis_request=instance,
-            alert_type="ca_analysis_assignment",
-            acknowledged_at__isnull=True,
-        ).exclude(
-            recipient_id__in=instance.assigned_analysts.values("pk")
-        ).update(acknowledged_at=timezone.now())
-        from ca.services.workflow_notifications import notify_analysis_assignment
-
-        notify_analysis_assignment(instance)
-    elif action == "post_remove" and pk_set:
+    if action == "post_remove" and pk_set:
         ChemicalWorkflowAlert.objects.filter(
             analysis_request=instance,
             alert_type="ca_analysis_assignment",
@@ -157,6 +157,26 @@ def journal_chemical_analyst_assignment(sender, instance, action, reverse, model
             alert_type="ca_analysis_assignment",
             acknowledged_at__isnull=True,
         ).update(acknowledged_at=timezone.now())
+
+    if instance.assigned_analysts.exists():
+        from ca.services.workflow_notifications import clear_assignment_notifications
+
+        clear_assignment_notifications(instance)
+    elif action in {"post_remove", "post_clear"}:
+        from ca.services.workflow_notifications import notify_unassigned_analysis_request
+
+        notify_unassigned_analysis_request(instance)
+
+    broadcast_dashboard_event(
+        "analyst_assignment_changed",
+        {
+            "batch_id": instance.batch_id,
+            "plant_id": ChemicalBatch.objects.filter(pk=instance.batch_id)
+            .values_list("treatment_plant_id", flat=True)
+            .first(),
+            "analysis_request_id": instance.pk,
+        },
+    )
 
     try:
         process = instance.analysis_process
@@ -181,12 +201,6 @@ def journal_chemical_analyst_assignment(sender, instance, action, reverse, model
         to_status=str(process.status or ""),
         details={"analyst_ids": sorted(pk_set or [])},
     )
-    if instance.assigned_analysts.exists():
-        ChemicalWorkflowAlert.objects.filter(
-            analysis_request=instance,
-            alert_type="ca_assignment_escalation",
-            acknowledged_at__isnull=True,
-        ).update(acknowledged_at=timezone.now())
 
 
 from .events import batch_status_changed, checklist_completed, request_status_changed

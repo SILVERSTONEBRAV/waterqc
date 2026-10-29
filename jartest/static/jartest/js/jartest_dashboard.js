@@ -219,8 +219,9 @@
     };
 
     // 6. Historical dosage analytics and estimate workflow
-    const analyticsState = { payload: null, estimate: null, initialized: false };
+    const analyticsState = { payload: null, estimate: null, initialized: false, rendered: false };
     let reportPayload = null;
+    let reportAnalyticsRendered = false;
     const plotLayout = {
         paper_bgcolor: "rgba(0,0,0,0)",
         plot_bgcolor: "rgba(0,0,0,0)",
@@ -275,16 +276,24 @@
             panel.classList.toggle("is-active", active);
         });
         if (name === "intelligence") {
-            if (!analyticsState.payload) analyticsState.payload = readDosageAnalytics();
-            renderDosageAnalytics();
-            requestAnimationFrame(() => window.Plotly?.Plots?.resize?.(document.getElementById("jt-history-chart")));
-            requestAnimationFrame(() => window.Plotly?.Plots?.resize?.(document.getElementById("jt-correlation-chart")));
-            requestAnimationFrame(() => window.Plotly?.Plots?.resize?.(document.getElementById("jt-dose-distribution-chart")));
+            requestAnimationFrame(() => {
+                if (!analyticsState.payload) analyticsState.payload = readDosageAnalytics();
+                if (!analyticsState.rendered) {
+                    renderDosageAnalytics();
+                    analyticsState.rendered = true;
+                } else {
+                    ["jt-history-chart", "jt-correlation-chart", "jt-dose-distribution-chart"].forEach((id) => window.Plotly?.Plots?.resize?.(document.getElementById(id)));
+                }
+            });
         }
         if (name === "reports") {
-            renderReportAnalytics();
             requestAnimationFrame(() => {
-                ["jt-report-control-chart", "jt-report-association-chart", "jt-report-distribution-chart", "jt-report-groups-chart"].forEach((id) => window.Plotly?.Plots?.resize?.(document.getElementById(id)));
+                if (!reportAnalyticsRendered) {
+                    renderReportAnalytics();
+                    reportAnalyticsRendered = true;
+                } else {
+                    ["jt-report-control-chart", "jt-report-association-chart", "jt-report-distribution-chart", "jt-report-groups-chart"].forEach((id) => window.Plotly?.Plots?.resize?.(document.getElementById(id)));
+                }
             });
         }
     }

@@ -178,3 +178,106 @@
 @media (prefers-reduced-motion: reduce) {
     .batch-table tbody tr { transition: none; }
 }
+
+/* Dark Theme Overrides for Batch Command Center */
+html[data-theme="dark"] .ca-batch-command,
+html[data-theme="night"] .ca-batch-command,
+html[data-theme="oled"] .ca-batch-command,
+html[data-theme="amoled"] .ca-batch-command,
+html[data-theme="emerald-dark"] .ca-batch-command,
+html[data-theme="dusk"] .ca-batch-command,
+html[data-theme="inferno"] .ca-batch-command,
+html[data-theme="aurora"] .ca-batch-command,
+html[data-theme="celestial"] .ca-batch-command {
+    --bc-ink: var(--theme-text, #f1f5f9);
+    --bc-muted: var(--theme-muted, #94a3b8);
+    --bc-line: var(--theme-border, #334155);
+    --bc-cyan: var(--theme-accent, #38bdf8);
+}
+
+html[data-theme="dark"] .batch-filters,
+html[data-theme="night"] .batch-filters,
+html[data-theme="oled"] .batch-filters,
+html[data-theme="amoled"] .batch-filters,
+html[data-theme="emerald-dark"] .batch-filters,
+html[data-theme="dusk"] .batch-filters,
+html[data-theme="inferno"] .batch-filters,
+html[data-theme="aurora"] .batch-filters,
+html[data-theme="celestial"] .batch-filters {
+    background: var(--theme-surface, #0f172a);
+    border-color: var(--theme-border, #334155);
+}
+
+html[data-theme="dark"] .batch-search,
+html[data-theme="night"] .batch-search,
+html[data-theme="oled"] .batch-search,
+html[data-theme="amoled"] .batch-search,
+html[data-theme="dark"] .batch-compact-filter select,
+html[data-theme="night"] .batch-compact-filter select,
+html[data-theme="oled"] .batch-compact-filter select,
+html[data-theme="amoled"] .batch-compact-filter select,
+html[data-theme="dark"] .batch-filters__grid input,
+html[data-theme="night"] .batch-filters__grid input,
+html[data-theme="oled"] .batch-filters__grid input,
+html[data-theme="amoled"] .batch-filters__grid input,
+html[data-theme="dark"] .batch-filters__grid select,
+html[data-theme="night"] .batch-filters__grid select,
+html[data-theme="oled"] .batch-filters__grid select,
+html[data-theme="amoled"] .batch-filters__grid select,
+html[data-theme="dark"] .batch-columns > summary,
+html[data-theme="night"] .batch-columns > summary,
+html[data-theme="oled"] .batch-columns > summary,
+html[data-theme="amoled"] .batch-columns > summary,
+html[data-theme="dark"] .batch-export > summary,
+html[data-theme="night"] .batch-export > summary,
+html[data-theme="oled"] .batch-export > summary,
+html[data-theme="amoled"] .batch-export > summary,
+html[data-theme="dark"] .batch-columns__menu,
+html[data-theme="night"] .batch-columns__menu,
+html[data-theme="oled"] .batch-columns__menu,
+html[data-theme="amoled"] .batch-columns__menu,
+html[data-theme="dark"] .batch-export__menu,
+html[data-theme="night"] .batch-export__menu,
+html[data-theme="oled"] .batch-export__menu,
+html[data-theme="amoled"] .batch-export__menu {
+    background: var(--theme-surface-strong, #1e293b);
+    border-color: var(--theme-border, #334155);
+    color: var(--theme-text, #f1f5f9);
+}
+
+html[data-theme="dark"] .batch-table th,
+html[data-theme="night"] .batch-table th,
+html[data-theme="oled"] .batch-table th,
+html[data-theme="amoled"] .batch-table th {
+    background: var(--theme-surface-muted, #1e293b);
+    border-color: var(--theme-border, #334155);
+    color: var(--theme-muted, #94a3b8);
+}
+
+html[data-theme="dark"] .batch-table td,
+html[data-theme="night"] .batch-table td,
+html[data-theme="oled"] .batch-table td,
+html[data-theme="amoled"] .batch-table td {
+    background: var(--theme-surface, #0f172a);
+    border-color: var(--theme-border, #1e293b);
+    color: var(--theme-text, #cbd5e1);
+}
+
+html[data-theme="dark"] .batch-table tbody tr:hover td,
+html[data-theme="night"] .batch-table tbody tr:hover td,
+html[data-theme="oled"] .batch-table tbody tr:hover td,
+html[data-theme="amoled"] .batch-table tbody tr:hover td {
+    background: var(--theme-accent-soft, rgba(56, 189, 248, 0.12));
+}
+
+html[data-theme="dark"] .batch-register__toolbar,
+html[data-theme="night"] .batch-register__toolbar,
+html[data-theme="oled"] .batch-register__toolbar,
+html[data-theme="amoled"] .batch-register__toolbar,
+html[data-theme="dark"] .batch-pagination,
+html[data-theme="night"] .batch-pagination,
+html[data-theme="oled"] .batch-pagination,
+html[data-theme="amoled"] .batch-pagination {
+    border-color: var(--theme-border, #334155);
+    color: var(--theme-muted, #94a3b8);
+}

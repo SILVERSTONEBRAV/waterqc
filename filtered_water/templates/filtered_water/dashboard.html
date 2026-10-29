@@ -1,119 +1,94 @@
 {% extends "core/cockpit/base_cockpit.html" %}
 {% load static %}
 
+{% block dashboard_styles %}
+<link rel="stylesheet" href="{% static 'filtered_water/css/filter_dashboard.css' %}?v=20261029-1">
+{% endblock %}
+
+{% block topbar_actions %}
+<form method="get" class="fw-scope-controls" aria-label="Filter dashboard scope">
+    {% if plants|length > 1 or request.user.is_superuser %}
+    <label><span>Plant</span><select name="plant" aria-label="Treatment plant" onchange="this.form.submit()">
+        {% for option in plants %}<option value="{{ option.pk }}" {% if plant.pk == option.pk %}selected{% endif %}>{{ option.code }} · {{ option.name }}</option>{% endfor %}
+    </select></label>
+    {% else %}{% if plant %}<input type="hidden" name="plant" value="{{ plant.pk }}">{% endif %}{% endif %}
+    <label><span>Window</span><select name="days" aria-label="Analysis period" onchange="this.form.submit()">
+        {% for option in allowed_periods %}<option value="{{ option }}" {% if period_days == option %}selected{% endif %}>{{ option }} days</option>{% endfor %}
+    </select></label>
+    <button type="submit" title="Refresh the scoped filter analytics"><i class="fa-solid fa-arrows-rotate"></i></button>
+</form>
+{% endblock %}
+
 {% block kpi_strip %}
-<div class="kpi-strip">
-    {% for kpi in kpis %}
-    <div class="kpi-card">
-        <div class="kpi-card__icon kpi-card__icon--{{ kpi.color }}"><i class="fa-solid {{ kpi.icon }}"></i></div>
-        <div class="kpi-card__body">
-            <div class="kpi-card__value">{{ kpi.value }}</div>
-            <div class="kpi-card__label">{{ kpi.label }}</div>
-        </div>
+<div class="fw-dashboard-overview">
+    <div class="kpi-strip fw-kpi-strip">
+        {% for kpi in kpis %}
+        <article class="kpi-card fw-kpi-card">
+            <span class="kpi-card__icon kpi-card__icon--{{ kpi.color }}"><i class="fa-solid {{ kpi.icon }}"></i></span>
+            <span class="kpi-card__body"><strong class="kpi-card__value">{{ kpi.value }}</strong><span class="kpi-card__label">{{ kpi.label }}</span><small>{{ kpi.detail }}</small></span>
+        </article>
+        {% endfor %}
     </div>
-    {% endfor %}
+
+    <section class="fw-filter-fleet" aria-labelledby="filterFleetHeading">
+        <div class="fw-filter-fleet__heading">
+            <div><span class="fw-overline"><i class="fa-solid fa-wave-square"></i> Plant-scoped filter telemetry</span><h2 id="filterFleetHeading">Filter status field <small>{{ plant|default:"No treatment plant assigned" }}</small></h2></div>
+            <div class="fw-health-legend" aria-label="Filter signal legend"><span><i class="fw-led fw-led--green"></i>Healthy</span><span><i class="fw-led fw-led--orange"></i>Watch</span><span><i class="fw-led fw-led--red"></i>Critical</span></div>
+        </div>
+        <div class="fw-filter-rail" aria-label="All filters at the selected treatment plant">
+            {% for filter in filters %}
+            <a class="fw-filter-card fw-filter-card--{{ filter.tone }}" href="{% url 'filtered_water:filter_detail' filter.id %}?plant={{ plant.pk }}&amp;days={{ period_days }}" data-filter-card aria-describedby="filter-tooltip-{{ filter.id }}">
+                <span class="fw-filter-card__top"><span class="fw-filter-card__led fw-filter-card__led--{{ filter.tone }}" aria-label="{{ filter.health_label }}"></span><span class="fw-filter-card__state">{{ filter.health_label }}</span><i class="fa-solid fa-arrow-up-right-from-square"></i></span>
+                <strong class="fw-filter-card__name">{{ filter.name }}</strong>
+                <span class="fw-filter-card__meta">{{ filter.type }} · {{ filter.phase }}</span>
+                <span class="fw-filter-card__metrics"><span><small>Current flow</small><b>{% if filter.flow_rate != None %}{{ filter.flow_rate|floatformat:1 }} m³/h{% else %}—{% endif %}</b></span><span><small>Operation</small><b>{{ filter.status }}</b></span></span>
+                <span class="fw-filter-card__bar"><i style="width:{{ filter.utilization_bar|floatformat:0 }}%"></i></span>
+                <span class="fw-filter-card__capacity">{% if filter.utilization != None %}{{ filter.utilization|floatformat:1 }}% of {{ filter.design_capacity|floatformat:1 }} m³/h design{% else %}Design capacity unavailable{% endif %}</span>
+                <span class="fw-filter-card__hint">{{ filter.reading_count }} latest parameter{{ filter.reading_count|pluralize }} · Details <i class="fa-solid fa-chevron-right"></i></span>
+                <span class="fw-filter-tooltip" id="filter-tooltip-{{ filter.id }}" role="tooltip" hidden>
+                    <span class="fw-filter-tooltip__header"><b>{{ filter.name }} · latest parameter set</b><small>{{ filter.health_reason }}</small></span>
+                    <span class="fw-filter-tooltip__metrics"><span>Location <b>{{ filter.location|default:"Not set" }}</b></span><span>Phase <b>{{ filter.phase }}</b></span><span>Current operation <b>{{ filter.status }}</b></span><span>Latest analyst <b>{{ filter.analyst }}</b></span><span>Latest result time <b>{{ filter.last_recorded }}</b></span></span>
+                    <span class="fw-filter-tooltip__readings">
+                        {% for reading in filter.readings %}<span class="fw-hover-reading fw-hover-reading--{{ reading.condition }}"><b>{{ reading.name }}</b><span>{{ reading.value_text }} {{ reading.unit }} <small>limit {{ reading.limit_text }}</small></span><em>{% if reading.condition == 'within_limits' %}WITHIN LIMITS{% elif reading.condition == 'near_limit' %}NEAR LIMIT{% elif reading.condition == 'out_of_range' %}OUT OF RANGE{% else %}NO LIMIT CONFIGURED{% endif %} · {{ reading.recorded_at }} · {{ reading.analyst }} · {{ reading.analysis_state }}</em></span>{% empty %}<span class="fw-hover-empty">No non-empty parameter results have been recorded for this filter.</span>{% endfor %}
+                    </span>
+                    <span class="fw-filter-tooltip__footer">Hover to inspect · Click to open full performance workspace</span>
+                </span>
+            </a>
+            {% empty %}
+            <div class="fw-empty-fleet"><i class="fa-solid fa-filter-circle-xmark"></i><span><b>No filters in scope</b><small>Assign filters to a treatment plant phase to populate the live status field.</small></span></div>
+            {% endfor %}
+        </div>
+    </section>
 </div>
 {% endblock %}
 
 {% block cockpit_grid %}
-<div class="cockpit-grid cockpit-grid--3col">
-
-    <!-- ── PANEL 1: Daily Analysis Velocity (Line Chart) ── -->
-    <div class="cyber-card cockpit-panel">
-        <div class="cockpit-panel__header">
-            <div class="cockpit-panel__title">
-                <i class="fa-solid fa-chart-line text-cyan"></i> Analysis Frequency
-            </div>
-            <span class="cockpit-panel__badge">{{ period_days }}d Trend</span>
-        </div>
-        <div class="cockpit-panel__body">
-            <div class="cockpit-chart-container" style="height: 100%;">
-                <canvas id="chart-daily-analyses"></canvas>
-            </div>
-        </div>
-    </div>
-
-    <!-- ── PANEL 2: Filter Operational Status & Workflow State ── -->
-    <div class="cyber-card cockpit-panel">
-        <div class="cockpit-panel__header">
-            <div class="cockpit-panel__title">
-                <i class="fa-solid fa-chart-pie text-emerald"></i> Filter Fleet Status
-            </div>
-            <span class="cockpit-panel__badge">Live Fleet</span>
-        </div>
-        <div class="cockpit-panel__body">
-            <div class="cockpit-chart-container" style="height: 100%;">
-                <canvas id="chart-filter-status"></canvas>
-            </div>
-        </div>
-    </div>
-
-    <!-- ── PANEL 3: Recent Filtered Water Runs Feed ── -->
-    <div class="cyber-card cockpit-panel">
-        <div class="cockpit-panel__header">
-            <div class="cockpit-panel__title">
-                <i class="fa-solid fa-clock-rotate-left text-amber"></i> Telemetry Stream
-            </div>
-            <span class="cockpit-panel__badge">{{ recent_analyses|length }} Runs</span>
-        </div>
+<div class="cockpit-grid fw-dashboard-grid">
+    <section class="cyber-card cockpit-panel fw-dashboard-panel fw-panel--trend">
+        <header class="cockpit-panel__header"><div class="cockpit-panel__title"><i class="fa-solid fa-chart-area text-cyan"></i> Filter parameter results</div><span class="cockpit-panel__badge">{{ period_days }}D · LABELED BY RESULT TIME</span></header>
+        <div class="cockpit-panel__body"><div class="fw-chart-frame"><canvas id="fwResultTrend" aria-label="Daily filter parameter results within, near and outside configured limits"></canvas></div></div>
+    </section>
+    <section class="cyber-card cockpit-panel fw-dashboard-panel fw-panel--health">
+        <header class="cockpit-panel__header"><div class="cockpit-panel__title"><i class="fa-solid fa-signal text-emerald"></i> Fleet signal distribution</div><span class="cockpit-panel__badge">LATEST NON-EMPTY RESULT / FILTER</span></header>
+        <div class="cockpit-panel__body"><div class="fw-chart-frame fw-chart-frame--health"><canvas id="fwHealthChart" aria-label="Filter health signal distribution"></canvas></div><div class="fw-health-summary"><span><i class="fw-led fw-led--green"></i>{{ working_filters }} working</span><span><i class="fw-led fw-led--orange"></i>{{ backwashing_filters }} backwashing</span><span><i class="fw-led fw-led--red"></i>{{ offline_filters }} isolated / maintenance</span></div></div>
+    </section>
+    <section class="cyber-card cockpit-panel fw-dashboard-panel fw-panel--parameters">
+        <header class="cockpit-panel__header"><div class="cockpit-panel__title"><i class="fa-solid fa-ranking-star text-amber"></i> Parameter performance</div><span class="cockpit-panel__badge">{{ result_count }} RESULTS · {{ non_compliant_count }} EXCURSIONS · {{ unknown_count }} UNBOUNDED</span></header>
+        <div class="cockpit-panel__body"><div class="fw-chart-frame"><canvas id="fwParameterChart" aria-label="Compliance percentage by monitored parameter"></canvas></div></div>
+    </section>
+    <section class="cyber-card cockpit-panel fw-dashboard-panel fw-panel--feed">
+        <header class="cockpit-panel__header"><div class="cockpit-panel__title"><i class="fa-solid fa-clock-rotate-left text-amber"></i> Analysis activity</div><span class="cockpit-panel__badge">{{ recent_analyses|length }} RECENT RUNS</span></header>
         <div class="cockpit-panel__body cockpit-panel__body--scrollable">
-            <table class="cockpit-table">
-                <thead>
-                    <tr>
-                        <th>UUID</th>
-                        <th>Plant &amp; Phase</th>
-                        <th>State</th>
-                        <th>Analyst</th>
-                        <th>Timestamp</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for a in recent_analyses %}
-                    <tr>
-                        <td><code>#{{ a.uuid }}</code></td>
-                        <td><strong>{{ a.plant }}</strong> <span class="text-muted" style="font-size: 0.72rem;">({{ a.phase }})</span></td>
-                        <td>
-                            <span class="cockpit-pill {% if a.state == 'verified' %}cockpit-pill--emerald{% elif a.state == 'analysed' %}cockpit-pill--cyan{% else %}cockpit-pill--amber{% endif %}">
-                                {{ a.state|upper }}
-                            </span>
-                        </td>
-                        <td>{{ a.analyst }}</td>
-                        <td style="color: var(--theme-muted); font-size: 0.72rem;">{{ a.date }}</td>
-                    </tr>
-                    {% empty %}
-                    <tr><td colspan="5" class="text-center text-muted py-3">No filtration analyses recorded.</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            <div class="fw-analysis-feed">
+                {% for analysis in recent_analyses %}<article class="fw-analysis-entry"><span class="fw-analysis-entry__marker fw-analysis-entry__marker--{{ analysis.state }}"></span><span class="fw-analysis-entry__main"><b>{{ analysis.plant }} <small>{{ analysis.phase }}</small></b><span>Run #{{ analysis.uuid }} · {{ analysis.analyst }}</span></span><span class="fw-analysis-entry__state fw-analysis-entry__state--{{ analysis.state }}">{{ analysis.state|upper }}</span><time>{{ analysis.date }}</time></article>{% empty %}<div class="fw-empty-feed">No filtered-water analyses in this period.</div>{% endfor %}
+            </div>
         </div>
-    </div>
-
+    </section>
 </div>
 {% endblock %}
 
 {% block dashboard_scripts %}
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-    const chartsData = {{ charts_json|safe }};
-    if (!chartsData) return;
-
-    if (chartsData.daily_trend && document.getElementById("chart-daily-analyses")) {
-        QADCockpit.createLineChart(
-            document.getElementById("chart-daily-analyses"),
-            chartsData.daily_trend.labels,
-            chartsData.daily_trend.data,
-            { label: "Analyses", color: "#38bdf8", fill: true }
-        );
-    }
-
-    if (chartsData.filter_status && document.getElementById("chart-filter-status")) {
-        QADCockpit.createDoughnutChart(
-            document.getElementById("chart-filter-status"),
-            chartsData.filter_status.labels,
-            chartsData.filter_status.data,
-            { cutout: "65%" }
-        );
-    }
-});
-</script>
+{{ charts_payload|json_script:"filtered-water-dashboard-data" }}
+<script src="{% static 'js/chart.js' %}"></script>
+<script src="{% static 'filtered_water/js/filter_dashboard.js' %}?v=20261029-1"></script>
 {% endblock %}

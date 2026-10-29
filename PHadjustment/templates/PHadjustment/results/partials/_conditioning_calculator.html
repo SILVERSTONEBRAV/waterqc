@@ -39,17 +39,28 @@
                 <i class="fa-solid fa-calculator text-emerald"></i>
                 <h6 class="m-0 fw-bold">Alkaline Feed Scaler</h6>
             </div>
-            <span class="badge bg-emerald-subtle text-emerald small">Live Plant Feed</span>
+            <div class="d-flex align-items-center gap-2">
+                <a href="{% url 'ca:batch-list' %}?category=PH+Adjuster" class="badge bg-cyan-subtle text-cyan text-decoration-none border border-cyan-subtle" title="Browse pH Adjuster Chemical Batches in Chemical Analysis">
+                    <i class="fa-solid fa-arrow-up-right-from-square me-1"></i>pH Adjusters
+                </a>
+                <span class="badge bg-emerald-subtle text-emerald small">Live Plant Feed</span>
+            </div>
         </div>
 
         <div class="calc-body">
             <div class="calc-input-row">
-                <label class="calc-lbl">Reagent Type:</label>
+                <label class="calc-lbl">pH Adjuster / Reagent:</label>
                 <select id="reagentTypeSelect" class="ph-select-mini font-mono" onchange="calculatePhPlantFeed();">
-                    <option value="lime">Hydrated Lime Ca(OH)₂ (90%)</option>
-                    <option value="soda">Soda Ash Na₂CO₃ (99%)</option>
-                    <option value="caustic">Caustic Soda NaOH (50% Sol)</option>
-                    <option value="acid">Sulphuric Acid H₂SO₄ (98%)</option>
+                    {% for adj in available_ph_adjusters %}
+                    <option value="{{ adj.code|lower|default:adj.name|lower }}" data-purity="{% if 'lime' in adj.name|lower %}0.90{% elif 'soda' in adj.name|lower %}0.99{% elif 'caustic' in adj.name|lower or 'naoh' in adj.code|lower %}0.50{% elif 'acid' in adj.name|lower %}0.98{% else %}0.95{% endif %}">
+                        {{ adj.name }}{% if adj.code %} ({{ adj.code }}){% endif %}
+                    </option>
+                    {% empty %}
+                    <option value="lime" data-purity="0.90">Hydrated Lime Ca(OH)₂ (90%)</option>
+                    <option value="soda" data-purity="0.99">Soda Ash Na₂CO₃ (99%)</option>
+                    <option value="caustic" data-purity="0.50">Caustic Soda NaOH (50% Sol)</option>
+                    <option value="acid" data-purity="0.98">Sulphuric Acid H₂SO₄ (98%)</option>
+                    {% endfor %}
                 </select>
             </div>
 

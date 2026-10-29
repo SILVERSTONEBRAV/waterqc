@@ -142,8 +142,6 @@ class BDashboardView(WanjalaMixin, TemplateView):
             if result:
                 return result
 
-            self.check_idle_timeout()
-
             if not self.check_permission("view"):
                 raise PermissionDenied
 

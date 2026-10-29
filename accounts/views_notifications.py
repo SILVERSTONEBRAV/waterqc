@@ -30,36 +30,33 @@ class DashboardNotificationsView(LoginRequiredMixin, View):
             )
 
         now = timezone.now()
-        try:
-            from alerts.models import VoiceAlert
-            recent_voices = list(VoiceAlert.objects.filter(
-                created_at__gte=now - timedelta(days=7)
-            ).only("title", "message", "audio_file"))
-        except Exception:
-            recent_voices = []
-
         for alert in alerts:
             alert["urgency"] = self._urgency(alert, now)
             alert_type = str(alert.get("type", ""))
 
-            # Guarantee a corresponding voice message for every notification
-            title = alert.get("title", "")
-            msg = alert.get("message", "")
-            match = next((v for v in recent_voices if (v.title and v.title == title) or (v.message and v.message[:30] == msg[:30])), None)
-            if match and match.audio_file:
-                alert["voice_url"] = match.audio_file.url
-            else:
-                try:
-                    from alerts.models import VoiceAlert
-                    new_v = VoiceAlert.generate_persistent_voice_alert(
-                        message=f"{title}. {msg}" if title else msg,
-                        title=title or "Notification",
-                    )
-                    if new_v and new_v.audio_file:
-                        alert["voice_url"] = new_v.audio_file.url
-                        recent_voices.append(new_v)
-                except Exception:
-                    alert["voice_url"] = None
+            # Read already-persisted audio only. The feed endpoint must not
+            # create voice jobs on every poll; alert lifecycle hooks queue
+            # idempotent audio generation when the event is first created.
+            alert["voice_url"] = None
+            try:
+                from alerts.models import VoiceAlert
+
+                if alert_type == "alert_state" and alert.get("db_id"):
+                    voice = VoiceAlert.objects.filter(
+                        alert_state_id=alert["db_id"],
+                    ).exclude(audio_file="").order_by("-created_at").first()
+                elif alert_type == "ca_workflow_alert":
+                    alert_id = str(alert.get("id", ""))
+                    source_id = alert_id.removeprefix("ca_workflow_alert_")
+                    voice = VoiceAlert.objects.filter(
+                        source_key=f"ca-workflow:{source_id}",
+                    ).exclude(audio_file="").first()
+                else:
+                    voice = None
+                if voice and voice.audio_file:
+                    alert["voice_url"] = voice.audio_file.url
+            except Exception:
+                pass
 
             if alert_type == "ca_workflow_alert":
                 # Durable CA workflow alerts carry a per-recipient decision

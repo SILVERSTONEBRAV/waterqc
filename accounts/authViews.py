@@ -275,28 +275,12 @@ class ChangePasswordView(LoginRequiredMixin, View):
 
 class SessionCheckView(View):
     """
-    Heartbeat endpoint to verify the current session is still valid.
-    Detects if the account was logged into from another computer or terminated.
+    Report whether the current request still has an authenticated session.
     """
 
     def get(self, request):
         user = getattr(request, "user", None)
         if not user or not user.is_authenticated:
             return JsonResponse({"active": False, "reason": "unauthenticated"}, status=401)
-
-        from django.core.cache import cache
-
-        current_session_key = getattr(request.session, "session_key", None)
-        active_session_key = cache.get(f"active_user_session:{user.pk}")
-
-        if active_session_key and current_session_key and active_session_key != current_session_key:
-            return JsonResponse(
-                {
-                    "active": False,
-                    "reason": "concurrent_login",
-                    "message": "Your account was logged in from another computer.",
-                },
-                status=401,
-            )
 
         return JsonResponse({"active": True, "username": user.username})

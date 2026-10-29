@@ -54,7 +54,7 @@ def cached_result_rows(**scope):
     if cached is not None:
         return cached
     rows = load_result_rows(**scope)
-    cache.set(key, rows, timeout=45)
+    cache.set(key, rows, timeout=600)
     return rows
 
 
@@ -251,9 +251,19 @@ class QCReportsBase(WanjalaMixin, View):
             search=search,
         ) if plant and not search else None
         samples = sample_summary(rows, samples_collected=source_sample_count)
-        analytics = build_analytics(rows, previous_rows, focus_parameter, group_by) if include_analytics else None
-        if analytics is not None:
-            analytics["multivariate"] = multivariate_analysis(rows)
+        analytics = None
+        if include_analytics and plant:
+            analytics_key = f"qcr:analytics:v2:{plant.pk}:{water_type}:{start_date}:{end_date}:{parameter_name}:{focus_parameter}:{group_by}:{search}"
+            analytics = cache.get(analytics_key)
+            if analytics is None:
+                analytics = build_analytics(rows, previous_rows, focus_parameter, group_by)
+                if analytics is not None:
+                    analytics["multivariate"] = multivariate_analysis(rows)
+                    cache.set(analytics_key, analytics, timeout=600)
+        elif include_analytics:
+            analytics = build_analytics(rows, previous_rows, focus_parameter, group_by)
+            if analytics is not None:
+                analytics["multivariate"] = multivariate_analysis(rows)
         total_results = len(rows)
         evaluated = sum(row["compliant"] is not None for row in rows)
         within_limits = sum(row["compliant"] is True for row in rows)

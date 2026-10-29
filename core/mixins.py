@@ -22,12 +22,11 @@ from django.core.paginator import Paginator
 from core.models import UserPasswordHistory
 from django.utils.dateparse import parse_datetime
 from django.http import JsonResponse, HttpResponse
-from django.contrib.sessions.models import Session
 from django.template.loader import select_template
 from core.engine.super_user import SuperUserEngine
 from core.models import Section, SystemConfiguration
 from django.utils.deprecation import MiddlewareMixin
-from django.contrib.auth import get_user_model, logout
+from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import check_password
 from django.core.exceptions import ImproperlyConfigured
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -74,7 +73,6 @@ class WanjalaMixin(LoginRequiredMixin):
     permission_required_delete = None
     permission_required_view = None
 
-    last_activity_session_key = "_last_activity"
     filter_icontains = True
     filter_fields = []
     export_fields = None
@@ -86,7 +84,6 @@ class WanjalaMixin(LoginRequiredMixin):
 
     def process_request(self, request: HttpRequest):
         now = timezone.now().timestamp()
-        request.session[self.last_activity_session_key] = now
 
         user = getattr(request, "user", None)
         if not user or not user.is_authenticated:
@@ -128,39 +125,6 @@ class WanjalaMixin(LoginRequiredMixin):
                 return redirect(resolve_url("accounts:reset_password"))
 
         # =====================================================
-        # DAILY SESSION TIME LIMIT
-        # =====================================================
-        start = request.session.get("daily_login_start") or now
-        total = request.session.get("daily_login_seconds") or 0
-
-        total += max(0, now - start)
-        limit = config.daily_login_limit_minutes * 60
-
-        if total > limit:
-            logout(request)
-            messages.error(request, "You have exceeded your daily login limit.")
-            return redirect(resolve_url("accounts:login"))
-
-        request.session["daily_login_start"] = now
-        request.session["daily_login_seconds"] = total
-
-        # =====================================================
-        # SESSION CONCURRENCY LIMIT
-        # =====================================================
-        if config.max_concurrent_sessions > 0:
-            sessions = Session.objects.filter(expire_date__gte=timezone.now())
-            user_sessions = [
-                s for s in sessions
-                if self._session_belongs_to_user(s, user)
-            ]
-
-            if len(user_sessions) > config.max_concurrent_sessions:
-                excess = user_sessions[:-config.max_concurrent_sessions]
-                for s in excess:
-                    logger.info(f"[SessionLimit] Removing session {s.session_key}")
-                    s.delete()
-
-        # =====================================================
         # ADAPTIVE MFA
         # =====================================================
         if getattr(config, "adaptive_mfa_enabled", False):
@@ -168,14 +132,6 @@ class WanjalaMixin(LoginRequiredMixin):
                 if not getattr(user, "mfa_verified", False):
                     messages.warning(request, "MFA required for this session.")
                     return redirect(resolve_url("accounts:verify_mfa"))
-
-        # =====================================================
-        # FORCE LOGOUT FLAG
-        # =====================================================
-        if getattr(user, "force_logout", False):
-            logout(request)
-            messages.warning(request, "Session terminated by system policy.")
-            return redirect(resolve_url("accounts:login"))
 
         # =====================================================
         # AUDIT CONTEXT
@@ -192,9 +148,9 @@ class WanjalaMixin(LoginRequiredMixin):
 
         return None
 
-    def _ensure_runtime_defaults(self):
-        if not hasattr(self, "idle_timeout"):
-            self.idle_timeout = getattr(settings, "IDLE_TIMEOUT_SECONDS", 900)
+    def check_idle_timeout(self):
+        """Compatibility hook; idle sessions are no longer logged out."""
+        return None
 
     def build_user_runtime_context(self, request: HttpRequest):
         user = getattr(request, "user", None)
@@ -303,8 +259,6 @@ class WanjalaMixin(LoginRequiredMixin):
         if result:
             return result
 
-        self.check_idle_timeout()
-
         # 2. ✅ ONLY trigger export if requested
         export_type = (
                 request.GET.get("export")
@@ -371,45 +325,11 @@ class WanjalaMixin(LoginRequiredMixin):
                 raise ValidationError(f"Cannot reuse last {config.password_history_count} passwords")
 
     # ------------------- SESSION UTILITIES ------------------- #
-    def _session_belongs_to_user(self, session: Session, user: User) -> bool:
-        try:
-            return session.get_decoded().get("_auth_user_id") == str(user.id)
-        except Exception:
-            return False
-
     def _get_client_ip(self, request: HttpRequest) -> str:
         x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
         if x_forwarded_for:
             return x_forwarded_for.split(",")[0].strip()
         return request.META.get("REMOTE_ADDR", "")
-
-    # ------------------- IDLE TIMEOUT ------------------- #
-    def check_idle_timeout(self):
-        request = getattr(self, "request", None)
-        if not request or not request.user.is_authenticated:
-            return
-
-        now = timezone.now().timestamp()
-
-        last = request.session.get(self.last_activity_session_key)
-        if not last:
-            request.session[self.last_activity_session_key] = now
-            return
-
-        config = SystemConfiguration.current()
-        idle_timeout = getattr(config, "idle_timeout_minutes", 15) * 60
-
-        elapsed = now - last
-
-        if elapsed > idle_timeout:
-            from django.contrib.auth import logout
-            from django.shortcuts import redirect
-            from django.urls import reverse
-
-            logout(request)
-            return redirect(reverse("accounts:login"))
-
-        request.session[self.last_activity_session_key] = now
 
     # ------------------- PERMISSIONS ------------------- #
     def get_required_permission(self, action=None):

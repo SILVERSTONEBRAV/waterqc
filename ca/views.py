@@ -569,6 +569,14 @@ class ChemicalBatchListView(
                 status=status
             )
 
+        category = self.request.GET.get("category")
+        if category:
+            queryset = queryset.filter(
+                Q(chemical__categories__category__icontains=category)
+                | Q(chemical__name__icontains=category)
+                | Q(chemical__description__icontains=category)
+            )
+
         chemical = self.request.GET.get(
             "chemical"
         )
@@ -882,6 +890,9 @@ class ChemicalBatchTaskClaimView(CaWanjalaMixin, View):
             if node_name == "approval" and not process.is_independent_approver(user):
                 raise PermissionDenied("Batch approval must be performed by someone independent of analysis and QA review.")
 
+            if node_name == "qa_review" and process.is_analysis_performer(user):
+                raise PermissionDenied("The analyst who performed this batch cannot claim its QA review.")
+
             if node_name == "approve_coa":
                 if (
                     user.pk in process.performing_analyst_ids
@@ -1000,6 +1011,9 @@ class ChemicalBatchDetailView(
             if not self._task_permission_ok(user, task):
                 continue
 
+            if node_name == "qa_review" and process.is_analysis_performer(user):
+                continue
+
             if node_name == "approval" and not process.is_independent_approver(user):
                 continue
             if node_name == "approve_coa" and (
@@ -1036,7 +1050,7 @@ class ChemicalBatchDetailView(
         return "", ""
 
     def _waiting_message_for_stage(self, batch, process, analysis_request, stage_key):
-        """Build caution message naming the specific authorized analyst who is awaited."""
+        """Build a status message naming the authorized person awaited at this stage."""
         actor_name = None
 
         active_tasks = list(
@@ -1051,6 +1065,8 @@ class ChemicalBatchDetailView(
         # 1. Check if an active task for this stage has an assigned owner
         for t in stage_tasks:
             if t.owner:
+                if stage_key == "quality" and process and process.is_analysis_performer(t.owner):
+                    continue
                 actor_name = t.owner.get_full_name().strip() or t.owner.get_username()
                 break
 
@@ -1067,8 +1083,6 @@ class ChemicalBatchDetailView(
             elif stage_key == "quality":
                 if process and process.qa_officer:
                     actor_name = process.qa_officer.get_full_name().strip() or process.qa_officer.get_username()
-                elif process and process.assigned_analyst:
-                    actor_name = process.assigned_analyst.get_full_name().strip() or process.assigned_analyst.get_username()
             elif stage_key == "approval":
                 if process and process.approver:
                     actor_name = process.approver.get_full_name().strip() or process.approver.get_username()
@@ -1093,16 +1107,20 @@ class ChemicalBatchDetailView(
 
         # 3. Fallback to process assigned analyst or analysis request assigned analysts
         if not actor_name:
-            if process and process.assigned_analyst:
+            if stage_key != "quality" and process and process.assigned_analyst:
                 actor_name = process.assigned_analyst.get_full_name().strip() or process.assigned_analyst.get_username()
-            elif analysis_request and analysis_request.assigned_analysts.exists():
+            elif stage_key != "quality" and analysis_request and analysis_request.assigned_analysts.exists():
                 analysts = list(analysis_request.assigned_analysts.all())
                 actor_name = ", ".join(
                     a.get_full_name().strip() or a.get_username() for a in analysts
                 )
 
         if actor_name:
+            if stage_key == "quality":
+                return f"Waiting for the independent QA reviewer ({actor_name})"
             return f"Waiting for the authorized Analyst ({actor_name})"
+        if stage_key == "quality":
+            return "Waiting for an independent QA reviewer"
         return "Waiting for the authorized Analyst"
 
     def _workflow_stage_context(self, batch, process, analysis_request, checklist, coa):
@@ -1562,7 +1580,8 @@ class ChemicalBatchCreateView(
                     },
                 )
 
-                # ── Voice alert & WebSocket notification on batch receipt ────────
+                # Persist a recipient-scoped batch receipt alert. The workflow
+                # signal generates and links the appropriate voice clone once.
                 _batch = self.object
                 _hold_suffix = (
                     f" NOTE: {len(holds)} intake discrepanc{'y' if len(holds) == 1 else 'ies'} recorded. Batch placed on hold."
@@ -1576,60 +1595,18 @@ class ChemicalBatchCreateView(
                     f"{_hold_suffix}"
                 )
                 _voice_title = f"Chemical Batch Received – {_batch.batch_number}"
-
-                def _post_commit_voice(msg=_voice_msg, title=_voice_title, batch=_batch):
-                    try:
-                        from alerts.models import VoiceAlert
-                        from channels.layers import get_channel_layer
-                        from asgiref.sync import async_to_sync
-                        from accounts.models import CustomUser
-
-                        # 1. Persistent voice alert (alternating voices)
-                        va = VoiceAlert.generate_persistent_voice_alert(
-                            message=msg, title=title,
-                        )
-                        voice_url = va.audio_file.url if va and va.audio_file else None
-
-                        # 2. Push to every active user at this plant via their private WebSocket group
-                        channel_layer = get_channel_layer()
-                        if channel_layer:
-                            plant_id = batch.treatment_plant_id
-                            if plant_id:
-                                plant_users = CustomUser.objects.filter(
-                                    is_active=True,
-                                    assigned_treatment_plant_id=plant_id,
-                                ).values_list("pk", flat=True)
-                            else:
-                                # No plant? Send to all active users (fallback for superusers)
-                                plant_users = CustomUser.objects.filter(
-                                    is_active=True,
-                                ).values_list("pk", flat=True)
-
-                            payload = {
-                                "type": "voice.alert",
-                                "id": str(va.pk) if va else None,
-                                "audio_url": voice_url,
-                                "message": msg,
-                                "title": title,
-                                "timestamp": timezone.now().isoformat(),
-                            }
-                            for uid in plant_users:
-                                try:
-                                    async_to_sync(channel_layer.group_send)(
-                                        f"user_{uid}_alerts", payload
-                                    )
-                                except Exception as _ws_err:
-                                    logger.debug("WS push failed for user %s: %s", uid, _ws_err)
-
-                        logger.info(
-                            "Chemical batch receipt voice alert dispatched: %s (voice_url=%s)",
-                            batch.batch_number, voice_url,
-                        )
-                    except Exception as _ve:
-                        logger.warning("Could not dispatch batch receipt voice alert: %s", _ve)
-
-                transaction.on_commit(_post_commit_voice)
-                # ────────────────────────────────────────────────────────────────
+                from .services.workflow_notifications import create_workflow_alert
+                create_workflow_alert(
+                    batch=_batch,
+                    request=analysis_request,
+                    alert_type="ca_batch_received",
+                    title=_voice_title,
+                    message=_voice_msg,
+                    url=f"/ca/batches/{_batch.pk}/",
+                    severity="high" if holds else "medium",
+                    dedupe_key=f"batch-received:{_batch.pk}",
+                    permissions=("ca.receive_chemical_batch",),
+                )
 
                 response = redirect(self.get_success_url())
 
@@ -3739,6 +3716,8 @@ class MyChemicalTasksView(
                 ):
                     continue
                 node = task.flow_task
+                if node.name == "qa_review" and process.is_analysis_performer(user):
+                    continue
                 if not self._can_execute_task(node, task, user):
                     continue
 

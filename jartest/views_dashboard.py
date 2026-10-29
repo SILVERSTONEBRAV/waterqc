@@ -8,6 +8,7 @@ from math import isfinite
 from typing import Dict, Any, List, Optional
 
 from django.contrib import messages
+from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.http import HttpResponse, JsonResponse
@@ -187,8 +188,6 @@ class JarTestDashboardView(WanjalaMixin, View):
         return "" if value is None else str(value)
 
     def check_idle_timeout(self):
-        if hasattr(self, "request") and self.request and hasattr(self.request, "session"):
-            self.request.session[self.last_activity_session_key] = timezone.now().timestamp()
         return None
 
     def resolve_plant(self, request) -> Optional[TreatmentPlant]:
@@ -704,11 +703,19 @@ class JarTestDashboardView(WanjalaMixin, View):
         )
         sample_cutoff = jartest.raw_water.sampled_at if jartest and jartest.raw_water_id else None
         include_intelligence = not request.headers.get("HX-Request") and not request.GET.get("partial")
-        dosage_analytics = build_dashboard_analytics(plant, selected_coagulant, sample_at=sample_cutoff) if plant and include_intelligence else {
-            "catalog": [], "history": [], "correlations": [], "features": [],
-            "summary": {"count": 0, "median": None, "mean": None, "stdev": None, "q1": None, "q3": None, "min": None, "max": None},
-            "prior_sample": None, "has_model": False,
-        }
+        if plant and include_intelligence:
+            cache_key_intel = f"jt_intel_{plant.pk}_{selected_coagulant.pk if selected_coagulant else 0}_{sample_cutoff}"
+            dosage_analytics = cache.get(cache_key_intel)
+            if dosage_analytics is None:
+                dosage_analytics = build_dashboard_analytics(plant, selected_coagulant, sample_at=sample_cutoff)
+                cache.set(cache_key_intel, dosage_analytics, 180)
+        else:
+            dosage_analytics = {
+                "catalog": [], "history": [], "correlations": [], "features": [],
+                "summary": {"count": 0, "median": None, "mean": None, "stdev": None, "q1": None, "q3": None, "min": None, "max": None},
+                "prior_sample": None, "has_model": False,
+            }
+
         report_parameter_id = request.GET.get("report_parameter")
         report_parameter_id = int(report_parameter_id) if report_parameter_id and report_parameter_id.isdigit() else None
         if report_parameter_id and not any(item.pk == report_parameter_id for item in limits):
@@ -716,13 +723,25 @@ class JarTestDashboardView(WanjalaMixin, View):
         selected_report_parameter = next(
             (item for item in limits if item.pk == report_parameter_id), None
         )
-        reports = build_report_payload(self.get_queryset(), report_parameter_id) if plant and include_intelligence else {
-            "rows": [],
-            "summary": {"records": 0, "with_dose": 0, "approved": 0, "median": None, "mean": None, "stdev": None, "q1": None, "q3": None, "min": None, "max": None, "trend_per_day": None, "turbidity_rho": None, "turbidity_p": None},
-            "timeline": [], "histogram": {"centers": [], "counts": []},
-            "control": {"center": None, "lower": None, "upper": None},
-            "associations": [], "groups": [], "group_test": None,
-        }
+
+        if plant and include_intelligence:
+            has_report_filters = any(k.startswith("report_") for k in request.GET)
+            if not has_report_filters:
+                cache_key_reports = f"jt_reports_{plant.pk}_{report_parameter_id}"
+                reports = cache.get(cache_key_reports)
+                if reports is None:
+                    reports = build_report_payload(self.get_queryset(), report_parameter_id)
+                    cache.set(cache_key_reports, reports, 180)
+            else:
+                reports = build_report_payload(self.get_queryset(), report_parameter_id)
+        else:
+            reports = {
+                "rows": [],
+                "summary": {"records": 0, "with_dose": 0, "approved": 0, "median": None, "mean": None, "stdev": None, "q1": None, "q3": None, "min": None, "max": None, "trend_per_day": None, "turbidity_rho": None, "turbidity_p": None},
+                "timeline": [], "histogram": {"centers": [], "counts": []},
+                "control": {"center": None, "lower": None, "upper": None},
+                "associations": [], "groups": [], "group_test": None,
+            }
         report_page_obj = Paginator(reports["rows"], 50).get_page(request.GET.get("report_page", 1))
         reports["rows"] = list(report_page_obj.object_list)
         report_page_query = request.GET.copy()

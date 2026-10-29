@@ -11,22 +11,57 @@
     <input type="hidden" name="page" value="1">
     <input type="hidden" name="daily_page" value="1">
     {% if request.user.is_superuser and plant %}<input type="hidden" name="plant" value="{{ plant.pk }}">{% endif %}
+
+    <!-- Compact Collapsible Header Strip -->
     <div class="qcr-filter-heading">
-        <div><span class="qcr-section-kicker">{{ controls_kicker|default:"REPORT CONTROLS" }}</span><h2>{{ controls_title|default:"Refine the evidence" }}</h2></div>
-        <button type="button" class="qcr-filter-toggle" aria-expanded="true" aria-controls="qcrFilterGrid"><i class="fa-solid fa-sliders" aria-hidden="true"></i><span>Filters</span></button>
+        <div class="qcr-filter-head-left">
+            <div class="qcr-head-titles">
+                <span class="qcr-section-kicker"><i class="fa-solid fa-sliders-simple me-1"></i>{{ controls_kicker|default:"SCOPE" }}</span>
+                <span class="qcr-head-caption">{{ controls_title|default:"Filters & Evidence Scope" }}</span>
+            </div>
+            <!-- Active Filter Badges Strip (Visible When Collapsed) -->
+            <div class="qcr-active-chips" id="qcrActiveChips">
+                <span class="qcr-chip-pill"><i class="fa-solid fa-droplet text-cyan"></i>{{ water_type_label }}</span>
+                {% if parameter %}<span class="qcr-chip-pill"><i class="fa-solid fa-microscope text-violet"></i>{{ parameter }}</span>{% endif %}
+                <span class="qcr-chip-pill"><i class="fa-regular fa-calendar-range text-emerald"></i>{{ start_date|date:"d M" }} – {{ end_date|date:"d M Y" }}</span>
+                <span class="qcr-chip-pill"><i class="fa-solid fa-timeline text-amber"></i>{{ group_by|capfirst }}</span>
+                {% if phase %}<span class="qcr-chip-pill"><i class="fa-solid fa-diagram-project text-blue"></i>Phase Active</span>{% endif %}
+            </div>
+        </div>
+
+        <div class="qcr-filter-head-right">
+            <!-- Quick Preset Time Range Buttons -->
+            <div class="qcr-quick-ranges" aria-label="Quick preset windows">
+                <button type="button" class="qcr-quick-btn{% if period == '7' %} is-active{% endif %}" data-qcr-period="7" title="Last 7 Days">7D</button>
+                <button type="button" class="qcr-quick-btn{% if period == '14' %} is-active{% endif %}" data-qcr-period="14" title="Last 14 Days">14D</button>
+                <button type="button" class="qcr-quick-btn{% if period == '30' or not period %} is-active{% endif %}" data-qcr-period="30" title="Last 30 Days">30D</button>
+                <button type="button" class="qcr-quick-btn{% if period == '90' %} is-active{% endif %}" data-qcr-period="90" title="Last 90 Days">90D</button>
+                <button type="button" class="qcr-quick-btn{% if period == '365' %} is-active{% endif %}" data-qcr-period="365" title="Last 1 Year">1Y</button>
+                <button type="button" class="qcr-quick-btn{% if period == 'all' %} is-active{% endif %}" data-qcr-period="all" title="All Historical Records">All</button>
+            </div>
+
+            <!-- Collapsible Drawer Toggle Button -->
+            <button type="button" class="qcr-filter-toggle" id="qcrFilterToggle" aria-expanded="false" aria-controls="qcrFilterGrid" title="Toggle detailed filter drawer">
+                <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+                <span>Parameters &amp; Dates</span>
+                <i class="fa-solid fa-chevron-down qcr-toggle-chevron" aria-hidden="true"></i>
+            </button>
+        </div>
     </div>
-    <div id="qcrFilterGrid" class="qcr-filter-grid">
+
+    <!-- Collapsible Filter Drawer -->
+    <div id="qcrFilterGrid" class="qcr-filter-grid" hidden>
         <label class="qcr-field qcr-field-period"><span>Reporting window</span>
             <select name="period" id="qcrPeriod">
                 {% for key, label in period_choices %}<option value="{{ key }}"{% if period == key %} selected{% endif %}>{{ label }}</option>{% endfor %}
             </select>
         </label>
-        <label class="qcr-field"><span>From</span><input type="date" name="start" value="{{ start_date|date:'Y-m-d' }}"></label>
-        <label class="qcr-field"><span>Through</span><input type="date" name="end" value="{{ end_date|date:'Y-m-d' }}"></label>
+        <label class="qcr-field"><span>From date</span><input type="date" name="start" value="{{ start_date|date:'Y-m-d' }}"></label>
+        <label class="qcr-field"><span>Through date</span><input type="date" name="end" value="{{ end_date|date:'Y-m-d' }}"></label>
         <label class="qcr-field"><span>Trend interval</span>
             <select name="group_by">{% for key, label in group_choices %}<option value="{{ key }}"{% if group_by == key %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
         </label>
-        <label class="qcr-field"><span>Parameter</span>
+        <label class="qcr-field"><span>Water quality parameter</span>
             <select name="parameter"><option value="">All parameters</option>{% for item in parameters %}<option value="{{ item.name }}"{% if parameter == item.name %} selected{% endif %}>{{ item.name }} · {{ item.unit }}</option>{% endfor %}</select>
         </label>
         <label class="qcr-field"><span>Treatment phase</span>

@@ -1,0 +1,78 @@
+{% extends "core/cockpit/base_cockpit.html" %}
+{% load static %}
+
+{% block dashboard_styles %}
+<link rel="stylesheet" href="{% static 'filtered_water/css/filter_dashboard.css' %}?v=20261029-1">
+{% endblock %}
+
+{% block topbar_actions %}
+<form method="get" class="fw-scope-controls" aria-label="Filter analytics period">
+    <input type="hidden" name="plant" value="{{ plant.pk }}">
+    <label><span>Window</span><select name="days" aria-label="Analytics period" onchange="this.form.submit()">{% for option in allowed_periods %}<option value="{{ option }}" {% if period_days == option %}selected{% endif %}>{{ option }} days</option>{% endfor %}</select></label>
+    <button type="submit" title="Refresh filter analytics"><i class="fa-solid fa-arrows-rotate"></i></button>
+</form>
+<a class="fw-back-link" href="{% url 'filtered_water:dashboard' %}?plant={{ plant.pk }}&amp;days={{ period_days }}"><i class="fa-solid fa-arrow-left"></i> Filter fleet</a>
+{% endblock %}
+
+{% block kpi_strip %}
+<div class="fw-detail-overview">
+    <section class="fw-detail-identity fw-detail-identity--{{ health.tone }}">
+        <div class="fw-detail-identity__main">
+            <span class="fw-detail-identity__led fw-filter-card__led--{{ health.tone }}"></span>
+            <span><small>{{ plant.code }} · {{ water_filter.location|default:"Location not set" }}</small><h2>{{ water_filter.name }}</h2><p>{{ water_filter.filter_type }} · {{ water_filter.phase|default:"Phase not assigned" }} · {{ health.reason }}</p></span>
+        </div>
+        <div class="fw-detail-identity__status"><small>OPERATIONAL STATE</small><b>{{ water_filter.get_status_display }}</b><span>{{ health.label }}</span></div>
+    </section>
+    <div class="kpi-strip fw-kpi-strip fw-detail-kpis">
+        <article class="kpi-card fw-kpi-card"><span class="kpi-card__icon kpi-card__icon--cyan"><i class="fa-solid fa-gauge-high"></i></span><span class="kpi-card__body"><strong class="kpi-card__value">{% if water_filter.flow_rate != None %}{{ water_filter.flow_rate|floatformat:1 }}{% else %}—{% endif %}</strong><span class="kpi-card__label">Current flow · m³/h</span><small>Configured filter flow value</small></span></article>
+        <article class="kpi-card fw-kpi-card"><span class="kpi-card__icon kpi-card__icon--blue"><i class="fa-solid fa-chart-column"></i></span><span class="kpi-card__body"><strong class="kpi-card__value">{% if utilization != None %}{{ utilization|floatformat:1 }}%{% else %}—{% endif %}</strong><span class="kpi-card__label">Design capacity used</span><small>{{ water_filter.design_capacity|floatformat:1 }} m³/h design capacity</small></span></article>
+        <article class="kpi-card fw-kpi-card"><span class="kpi-card__icon kpi-card__icon--emerald"><i class="fa-solid fa-shield-halved"></i></span><span class="kpi-card__body"><strong class="kpi-card__value">{% if compliance_rate != None %}{{ compliance_rate|floatformat:1 }}%{% else %}—{% endif %}</strong><span class="kpi-card__label">Period compliance</span><small>{{ sample_count }} readings · {{ period_days }} days</small></span></article>
+        <article class="kpi-card fw-kpi-card"><span class="kpi-card__icon kpi-card__icon--amber"><i class="fa-solid fa-vials"></i></span><span class="kpi-card__body"><strong class="kpi-card__value">{{ health.reading_count }}</strong><span class="kpi-card__label">Parameters with latest data</span><small>Latest analyst: {{ health.analyst }}</small></span></article>
+        <article class="kpi-card fw-kpi-card"><span class="kpi-card__icon kpi-card__icon--{% if maintenance_due %}rose{% else %}purple{% endif %}"><i class="fa-solid fa-screwdriver-wrench"></i></span><span class="kpi-card__body"><strong class="kpi-card__value">{% if days_since_service != None %}{{ days_since_service }}d{% else %}—{% endif %}</strong><span class="kpi-card__label">Since last maintenance</span><small>{% if maintenance_due %}Maintenance interval reached{% else %}Last service {{ water_filter.last_maintenance_date|date:"d M Y" }}{% endif %}</small></span></article>
+    </div>
+</div>
+{% endblock %}
+
+{% block cockpit_grid %}
+<div class="cockpit-grid fw-detail-grid">
+    <section class="cyber-card cockpit-panel fw-dashboard-panel fw-panel--detail-trend">
+        <header class="cockpit-panel__header"><div class="cockpit-panel__title"><i class="fa-solid fa-wave-square text-cyan"></i> Recorded parameter trend</div><label class="fw-parameter-select"><span>Parameter</span><select id="fwParameterSelect" aria-label="Choose a filter parameter">{% for row in matrix %}<option value="{{ row.limit.pk }}">{{ row.name }} · {{ row.unit|default:"result" }}</option>{% endfor %}</select></label></header>
+        <div class="cockpit-panel__body"><div class="fw-chart-frame"><canvas id="fwParameterTrend" aria-label="Historical filter parameter results with configured limits"></canvas>{% if not matrix %}<div class="fw-chart-empty">No filter-specific parameter limits are configured.</div>{% endif %}</div></div>
+    </section>
+    <section class="cyber-card cockpit-panel fw-dashboard-panel fw-panel--detail-status">
+        <header class="cockpit-panel__header"><div class="cockpit-panel__title"><i class="fa-solid fa-sliders text-emerald"></i> Capacity & operational envelope</div><span class="cockpit-panel__badge">CONFIGURED / RECORDED</span></header>
+        <div class="cockpit-panel__body fw-status-panel">
+            <div class="fw-capacity-chart"><canvas id="fwCapacityChart" aria-label="Configured current flow compared with design capacity"></canvas><small class="fw-asset-note">Flow is the filter model’s current recorded field; historical trends use measured filter analysis results.</small></div>
+            <dl class="fw-asset-matrix">
+                <div><dt>Flow / design</dt><dd>{% if water_filter.flow_rate != None %}{{ water_filter.flow_rate|floatformat:2 }} / {{ water_filter.design_capacity|floatformat:2 }} m³/h{% else %}No flow value{% endif %}</dd></div>
+                <div><dt>Filter volume</dt><dd>{% if water_filter.volume != None %}{{ water_filter.volume|floatformat:2 }} m³{% else %}—{% endif %}</dd></div>
+                <div><dt>Geometry</dt><dd>{{ water_filter.length|floatformat:2 }} × {{ water_filter.width|floatformat:2 }} × {{ water_filter.depth|floatformat:2 }} m</dd></div>
+                <div><dt>Installed</dt><dd>{{ water_filter.installation_date|date:"d M Y" }} · {{ water_filter.age }} years</dd></div>
+                <div><dt>Maintenance</dt><dd>{{ water_filter.last_maintenance_date|date:"d M Y" }}{% if maintenance_due %} · DUE{% endif %}</dd></div>
+                <div><dt>Quality signal</dt><dd><span class="fw-inline-signal fw-inline-signal--{{ health.tone }}"><i class="fw-led fw-led--{{ health.tone }}"></i>{{ health.label }}</span></dd></div>
+            </dl>
+        </div>
+    </section>
+    <section class="cyber-card cockpit-panel fw-dashboard-panel fw-panel--detail-matrix">
+        <header class="cockpit-panel__header"><div class="cockpit-panel__title"><i class="fa-solid fa-table-cells-large text-amber"></i> Parameter performance matrix</div><span class="cockpit-panel__badge">{{ matrix|length }} CONFIGURED PARAMETERS</span></header>
+        <div class="cockpit-panel__body cockpit-panel__body--scrollable">
+            <div class="fw-chart-frame fw-chart-frame--performance"><canvas id="fwPerformanceChart" aria-label="Compliance percentage by filter parameter"></canvas>{% if not matrix %}<div class="fw-chart-empty">No parameter performance to chart.</div>{% endif %}</div>
+            <div class="fw-table-wrap"><table class="fw-data-table"><thead><tr><th>Parameter</th><th>Latest · limit</th><th>Period avg</th><th>Observed span</th><th>Compliance</th><th>Excursions</th></tr></thead><tbody>
+                {% for row in matrix %}<tr><td><b>{{ row.name }}</b><small>{{ row.samples }} readings · {{ row.unbounded }} without limits · {{ row.unit|default:"no unit" }}</small></td><td>{% if row.latest %}<strong>{{ row.latest.value_text }} {{ row.unit }}</strong><small>{{ row.limit_text }} · {{ row.latest.recorded_at }}</small>{% else %}<strong>—</strong><small>{{ row.limit_text }} · no current result</small>{% endif %}</td><td>{% if row.average != None %}{{ row.average|floatformat:2 }} {{ row.unit }}{% else %}—{% endif %}</td><td>{% if row.minimum_observed != None %}{{ row.minimum_observed|floatformat:2 }}–{{ row.maximum_observed|floatformat:2 }}{% else %}—{% endif %}</td><td>{% if row.compliance != None %}<span class="fw-compliance fw-compliance--{% if row.compliance >= 95 %}good{% elif row.compliance >= 80 %}watch{% else %}bad{% endif %}">{{ row.compliance|floatformat:1 }}%</span>{% else %}—{% endif %}</td><td>{{ row.excursions }}</td></tr>{% empty %}<tr><td colspan="6" class="fw-table-empty">No filter-specific parameters are configured for this plant.</td></tr>{% endfor %}
+            </tbody></table></div>
+        </div>
+    </section>
+    <section class="cyber-card cockpit-panel fw-dashboard-panel fw-panel--detail-history">
+        <header class="cockpit-panel__header"><div class="cockpit-panel__title"><i class="fa-solid fa-list-check text-cyan"></i> Recorded result history</div><span class="cockpit-panel__badge">LATEST {{ history|length }} · {{ period_days }}D</span></header>
+        <div class="cockpit-panel__body cockpit-panel__body--scrollable">
+            <div class="fw-history-list">{% for result in history %}<article class="fw-history-row"><span class="fw-history-row__signal fw-history-row__signal--{{ result.condition }}"></span><span class="fw-history-row__main"><b>{{ result.parameter }} <strong>{{ result.value|floatformat:2 }}</strong></b><small>{{ result.date }} · {{ result.analyst }} · {{ result.state }}</small></span><span class="fw-history-row__state fw-history-row__state--{{ result.condition }}">{% if result.condition == 'within_limits' %}WITHIN LIMITS{% elif result.condition == 'near_limit' %}NEAR LIMIT{% elif result.condition == 'out_of_range' %}OUT OF RANGE{% else %}NO LIMIT{% endif %}</span></article>{% empty %}<div class="fw-empty-feed">No results recorded for this filter during the selected period.</div>{% endfor %}</div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block dashboard_scripts %}
+{{ trend_payload|json_script:"filtered-water-filter-detail-data" }}
+<script src="{% static 'js/chart.js' %}"></script>
+<script src="{% static 'filtered_water/js/filter_detail.js' %}?v=20261029-1"></script>
+{% endblock %}

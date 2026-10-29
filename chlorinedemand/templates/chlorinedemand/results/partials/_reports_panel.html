@@ -1,18 +1,60 @@
 <section class="cd-report-panel" aria-labelledby="cd-report-title">
-    <div class="cd-report-heading"><div><span>CHLORINE DEMAND · ANALYTICAL REPORTING</span><h1 id="cd-report-title">Breakpoint demand reports</h1></div><span class="cd-report-scope"><i class="fa-solid fa-location-dot"></i>{{ plant.name }}</span></div>
-    <form method="get" action="{% url 'chlorinedemand:dashboard' %}" class="cd-report-filters">
+    <div class="cd-report-heading"><div><span>CHLORINE DEMAND · ANALYTICAL REPORTING</span><h1 id="cd-report-title">Breakpoint demand reports</h1></div></div>
+    <form method="get" action="{% url 'chlorinedemand:dashboard' %}" class="dash-filters cd-report-filters-v2" id="cdReportFilterForm">
         <input type="hidden" name="plant" value="{{ plant.pk }}"><input type="hidden" name="tab" value="reports">
-        <label class="cd-report-search"><span>Search</span><input type="search" name="report_q" value="{{ request.GET.report_q }}" placeholder="Analyst, remarks…"></label>
-        <label><span>From</span><input type="date" name="report_from" value="{{ request.GET.report_from }}"></label>
-        <label><span>To</span><input type="date" name="report_to" value="{{ request.GET.report_to }}"></label>
-        <label><span>Min dose · mg/L</span><input type="number" min="0" step="any" name="report_min_dose" value="{{ request.GET.report_min_dose }}"></label>
-        <label><span>Max dose · mg/L</span><input type="number" min="0" step="any" name="report_max_dose" value="{{ request.GET.report_max_dose }}"></label>
-        <label><span>Min residual · mg/L</span><input type="number" min="0" step="any" name="report_min_residual" value="{{ request.GET.report_min_residual }}"></label>
-        <label><span>Max residual · mg/L</span><input type="number" min="0" step="any" name="report_max_residual" value="{{ request.GET.report_max_residual }}"></label>
-        <label><span>Review stage</span><select name="report_status"><option value="">All stages</option><option value="in_progress" {% if request.GET.report_status == 'in_progress' %}selected{% endif %}>In progress</option><option value="verified" {% if request.GET.report_status == 'verified' %}selected{% endif %}>Verified</option><option value="confirmed" {% if request.GET.report_status == 'confirmed' %}selected{% endif %}>Confirmed</option><option value="approved" {% if request.GET.report_status == 'approved' %}selected{% endif %}>Approved</option><option value="needs_review" {% if request.GET.report_status == 'needs_review' %}selected{% endif %}>Needs review</option></select></label>
-        <label><span>Sort records</span><select name="report_sort"><option value="newest">Newest first</option><option value="oldest" {% if request.GET.report_sort == 'oldest' %}selected{% endif %}>Oldest first</option><option value="dose_high" {% if request.GET.report_sort == 'dose_high' %}selected{% endif %}>Dose: high to low</option><option value="dose_low" {% if request.GET.report_sort == 'dose_low' %}selected{% endif %}>Dose: low to high</option><option value="residual_high" {% if request.GET.report_sort == 'residual_high' %}selected{% endif %}>Residual: high to low</option><option value="residual_low" {% if request.GET.report_sort == 'residual_low' %}selected{% endif %}>Residual: low to high</option><option value="analyst" {% if request.GET.report_sort == 'analyst' %}selected{% endif %}>Analyst</option><option value="status" {% if request.GET.report_sort == 'status' %}selected{% endif %}>Review stage</option></select></label>
-        <div class="cd-report-actions"><button type="submit"><i class="fa-solid fa-filter"></i> Apply</button><a href="{% url 'chlorinedemand:dashboard' %}?plant={{ plant.pk }}&amp;tab=reports">Reset</a></div>
-        <div class="cd-report-exports"><span>Export filtered set</span><button name="export" value="csv"><i class="fa-solid fa-file-csv"></i> CSV</button><button name="export" value="xlsx"><i class="fa-solid fa-file-excel"></i> XLSX</button><button name="export" value="pdf"><i class="fa-solid fa-file-pdf"></i> PDF</button><button name="export" value="docx"><i class="fa-solid fa-file-word"></i> DOC</button></div>
+        <div class="dash-filters__primary">
+            <label class="dash-search">
+                <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                <input type="search" name="report_q" value="{{ request.GET.report_q }}" placeholder="Search analyst, observations, remarks…">
+                {% if request.GET.report_q %}<a href="{% url 'chlorinedemand:dashboard' %}?plant={{ plant.pk }}&amp;tab=reports" class="dash-clear-search" title="Clear search"><i class="fa-solid fa-xmark"></i></a>{% endif %}
+            </label>
+            <div class="dash-compact-filter">
+                <select name="report_status" aria-label="Review stage">
+                    <option value="">All review stages</option>
+                    <option value="in_progress" {% if request.GET.report_status == 'in_progress' %}selected{% endif %}>In progress</option>
+                    <option value="verified" {% if request.GET.report_status == 'verified' %}selected{% endif %}>Verified</option>
+                    <option value="confirmed" {% if request.GET.report_status == 'confirmed' %}selected{% endif %}>Confirmed</option>
+                    <option value="approved" {% if request.GET.report_status == 'approved' %}selected{% endif %}>Approved</option>
+                    <option value="needs_review" {% if request.GET.report_status == 'needs_review' %}selected{% endif %}>Needs review</option>
+                </select>
+            </div>
+            <div class="dash-compact-filter">
+                <select name="report_sort" aria-label="Sort records">
+                    <option value="newest">Newest first</option>
+                    <option value="oldest" {% if request.GET.report_sort == 'oldest' %}selected{% endif %}>Oldest first</option>
+                    <option value="dose_high" {% if request.GET.report_sort == 'dose_high' %}selected{% endif %}>Dose: high to low</option>
+                    <option value="dose_low" {% if request.GET.report_sort == 'dose_low' %}selected{% endif %}>Dose: low to high</option>
+                    <option value="residual_high" {% if request.GET.report_sort == 'residual_high' %}selected{% endif %}>Residual: high to low</option>
+                    <option value="residual_low" {% if request.GET.report_sort == 'residual_low' %}selected{% endif %}>Residual: low to high</option>
+                    <option value="analyst" {% if request.GET.report_sort == 'analyst' %}selected{% endif %}>Analyst</option>
+                    <option value="status" {% if request.GET.report_sort == 'status' %}selected{% endif %}>Review stage</option>
+                </select>
+            </div>
+            <button type="submit" class="dash-filter-submit"><i class="fa-solid fa-filter"></i> Apply</button>
+            <a href="{% url 'chlorinedemand:dashboard' %}?plant={{ plant.pk }}&amp;tab=reports" class="dash-filter-reset"><i class="fa-solid fa-rotate-left"></i> Reset</a>
+        </div>
+
+        <details class="dash-filters__advanced" {% if request.GET.report_from or request.GET.report_to or request.GET.report_min_dose or request.GET.report_max_dose or request.GET.report_min_residual or request.GET.report_max_residual %}open{% endif %}>
+            <summary><i class="fa-solid fa-sliders"></i> Advanced parameters &amp; ranges <span>+</span></summary>
+            <div class="dash-filters__grid">
+                <label><span>From date</span><input type="date" name="report_from" value="{{ request.GET.report_from }}"></label>
+                <label><span>To date</span><input type="date" name="report_to" value="{{ request.GET.report_to }}"></label>
+                <label><span>Min dose (mg/L)</span><input type="number" min="0" step="any" name="report_min_dose" value="{{ request.GET.report_min_dose }}" placeholder="0.00"></label>
+                <label><span>Max dose (mg/L)</span><input type="number" min="0" step="any" name="report_max_dose" value="{{ request.GET.report_max_dose }}" placeholder="No limit"></label>
+                <label><span>Min residual (mg/L)</span><input type="number" min="0" step="any" name="report_min_residual" value="{{ request.GET.report_min_residual }}" placeholder="0.00"></label>
+                <label><span>Max residual (mg/L)</span><input type="number" min="0" step="any" name="report_max_residual" value="{{ request.GET.report_max_residual }}" placeholder="No limit"></label>
+            </div>
+        </details>
+
+        <div class="dash-filters-footer">
+            <div class="dash-export-group">
+                <span><i class="fa-solid fa-download"></i> Export dataset:</span>
+                <button type="submit" name="export" value="csv" class="dash-export-btn"><i class="fa-solid fa-file-csv"></i> CSV</button>
+                <button type="submit" name="export" value="xlsx" class="dash-export-btn"><i class="fa-solid fa-file-excel"></i> XLSX</button>
+                <button type="submit" name="export" value="pdf" class="dash-export-btn"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+                <button type="submit" name="export" value="docx" class="dash-export-btn"><i class="fa-solid fa-file-word"></i> DOC</button>
+            </div>
+        </div>
     </form>
     <div class="cd-report-kpis"><article><span>Matching tests</span><b>{{ chlorine_reports.summary.records }}</b></article><article><span>With established dose</span><b>{{ chlorine_reports.summary.with_dose }}</b></article><article><span>Approved</span><b>{{ chlorine_reports.summary.approved }}</b></article><article><span>Median dose</span><b>{% if chlorine_reports.summary.median != None %}{{ chlorine_reports.summary.median }} <small>mg/L</small>{% else %}—{% endif %}</b></article><article><span>Median residual</span><b>{% if chlorine_reports.summary.median_residual != None %}{{ chlorine_reports.summary.median_residual }} <small>mg/L</small>{% else %}—{% endif %}</b></article><article><span>Robust dose trend</span><b>{% if chlorine_reports.summary.trend_per_day != None %}{{ chlorine_reports.summary.trend_per_day }} <small>mg/L/day</small>{% else %}—{% endif %}</b></article></div>
     <div class="cd-report-charts" aria-label="Chlorine demand statistical analytics">

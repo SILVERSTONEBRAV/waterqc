@@ -5,8 +5,8 @@
 //  • Mutating requests:    Network-first, queued to IndexedDB on failure
 //  • Background Sync:      Replays queued requests when connectivity restores
 
-const CACHE_NAME = "qad-enterprise-pwa-v6";
-const PAGE_CACHE = "qad-page-cache-v1";
+const CACHE_NAME = "qad-enterprise-pwa-v7";
+const PAGE_CACHE = "qad-page-cache-v2";
 
 const PRECACHE_ASSETS = [
     "/static/vendor/bootstrap/bootstrap.min.css",

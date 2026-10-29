@@ -6,17 +6,7 @@
     ===================================================== -->
     <div class="brand-section">
 
-        {% if request.user.is_authenticated %}
-        <a
-            href="{{ user_home_url }}"
-            class="header-home-btn"
-            title="Go to Dashboard"
-            aria-label="Home">
 
-            <i class="fas fa-home" aria-hidden="true"></i>
-            <span>Home</span>
-        </a>
-        {% endif %}
 
         <a href="{{ user_home_url|default:'/' }}" class="brand" aria-label="Company Home">
 
@@ -62,7 +52,7 @@
             <span class="shift-supervisor-tag">
                 <i class="fa-solid fa-user-shield"></i>
                 <span class="shift-sup-label">Supervisor:</span>
-                <strong id="headerShiftSupervisor">{{ current_shift_supervisor.get_full_name|default:current_shift_supervisor.username|default:"Unassigned" }}</strong>
+                <strong id="headerShiftSupervisor">{% if current_shift_supervisor %}{{ current_shift_supervisor.get_full_name|default:current_shift_supervisor.username }}{% else %}Unassigned{% endif %}</strong>
             </span>
         </div>
 
@@ -100,14 +90,7 @@
                 <i class="fas fa-moon" aria-hidden="true"></i>
             </button>
 
-            <button
-                class="header-window-close"
-                type="button"
-                data-close-app-window
-                title="Close window"
-                aria-label="Close window">
-                <i class="fas fa-xmark" aria-hidden="true"></i>
-            </button>
+
 
 
             <!-- =================================================

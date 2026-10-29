@@ -11,6 +11,7 @@
         alerts: [],
         refreshTimer: null,
         initialized: false,
+        autoVoicePlayed: new Set(),
         fetchUrl: container.dataset.feedUrl || "/accounts/notifications/",
         ackUrlTemplate: container.dataset.ackUrl || "/ca/notifications/__ID__/ack/",
 
@@ -93,9 +94,9 @@
                 const open = url
                     ? `<a class="notification-open" href="${this.escape(url)}">${alert.type === "ca_assignment_pending" ? "Assign analyst" : "Open"}</a>`
                     : "";
-                const voiceBtn = alert.voice_url
-                    ? `<button type="button" class="notification-voice-btn" data-notification-voice="${this.escape(alert.voice_url)}" title="Listen to spoken voice alert" style="display:inline-flex;align-items:center;gap:4px;padding:3px 7px;border-radius:4px;background:#eef2ff;color:#4f46e5;font-size:11px;font-weight:600;border:1px solid #c7d2fe;cursor:pointer;"><i class="fa-solid fa-volume-high" aria-hidden="true"></i> Voice</button>`
-                    : "";
+                const voiceUrl = alert.voice_url || "";
+                const voiceSpeech = `${alert.title || "Alert"}. ${alert.message || ""}`;
+                const voiceBtn = `<button type="button" class="notification-voice-btn" data-notification-voice="${this.escape(voiceUrl)}" data-voice-text="${this.escape(voiceSpeech)}" title="Listen to spoken voice alert" style="display:inline-flex;align-items:center;gap:4px;padding:3px 7px;border-radius:4px;background:#eef2ff;color:#4f46e5;font-size:11px;font-weight:600;border:1px solid #c7d2fe;cursor:pointer;"><i class="fa-solid fa-volume-high" aria-hidden="true"></i> Voice</button>`;
                 return `<li class="notification-item notification-item--${urgency}" role="none">
                     <div class="notification-item-top"><span class="notification-urgency">${urgency.replace("-", " ")}</span><time>${this.escape(alert.time_ago || "")}</time></div>
                     <strong class="notification-item-title">${this.escape(alert.title || "Notification")}</strong>
@@ -209,7 +210,9 @@
                     if (data.type === "alert" || data.type === "alert.message") {
                         const msg = data.message || "";
                         const title = data.title || "Notification";
-                        const alertId = data.instance_ref || ("ws_" + Date.now());
+                        const alertId = data.id || data.instance_ref || ("ws_" + Date.now());
+                        const acknowledged = data.state === "acknowledged";
+                        const alreadyVisible = self.alerts.some(item => item.id === alertId);
                         self.pushNotification({
                             id: alertId,
                             type: data.alert_type || "ws_alert",
@@ -217,11 +220,15 @@
                             message: msg,
                             urgency: data.priority === "critical" ? "expired" : (data.priority === "high" ? "almost-expiring" : "new"),
                             time_ago: "Just now",
-                            acknowledged: false,
+                            acknowledged: acknowledged,
                             voice_url: data.voice_url || null,
                         });
-                        self.playChime();
-                        if (data.voice_url) self._playVoice(data.voice_url);
+                        if (!alreadyVisible && !acknowledged) self.playChime();
+                        if (data.auto_voice !== false && data.voice_url &&
+                            !acknowledged && (data.repeat_voice || !self.autoVoicePlayed.has(alertId))) {
+                            if (!data.repeat_voice) self.autoVoicePlayed.add(alertId);
+                            self._playVoice(data.voice_url);
+                        }
                         // Also schedule a feed refresh to sync DB state
                         self.scheduleRefresh();
                         return;
@@ -230,8 +237,10 @@
                     if (data.type === "voice_alert") {
                         const audioUrl = data.audio_url || data.voice_url || null;
                         const title = data.title || data.message || "Voice Alert";
+                        const voiceId = data.id || ("voice_" + Date.now());
+                        const alreadyVisible = self.alerts.some(item => item.id === voiceId);
                         self.pushNotification({
-                            id: data.id || ("va_" + Date.now()),
+                            id: voiceId,
                             type: "voice_alert",
                             title: title,
                             message: data.message || "",
@@ -240,9 +249,28 @@
                             acknowledged: false,
                             voice_url: audioUrl,
                         });
-                        self.playChime();
-                        if (audioUrl) self._playVoice(audioUrl);
+                        if (!alreadyVisible) self.playChime();
+                        if (data.auto_voice !== false && audioUrl &&
+                            (data.repeat_voice || !self.autoVoicePlayed.has(voiceId))) {
+                            if (!data.repeat_voice) self.autoVoicePlayed.add(voiceId);
+                            self._playVoice(audioUrl);
+                        }
                         self.scheduleRefresh();
+                        return;
+                    }
+                    if (data.type === "alert_acknowledged" || data.type === "alert.acknowledged") {
+                        const targetId = String(data.id || (data.alert_state_id ? "state_" + data.alert_state_id : ""));
+                        if (targetId) {
+                            self.alerts = self.alerts.filter(item => String(item.id) !== targetId && String(item.db_id) !== String(data.alert_state_id));
+                            const unread = self.alerts.filter(item => !item.acknowledged).length;
+                            self.renderDropdown(self.alerts, unread);
+                            self.updateBadge(unread);
+                            const streamItem = document.getElementById("alarm-item-" + targetId.replace(/[^A-Za-z0-9_-]/g, ""));
+                            if (streamItem) streamItem.remove();
+                        }
+                        if (self._currentVoiceAudio) {
+                            try { self._currentVoiceAudio.pause(); } catch (_) {}
+                        }
                         return;
                     }
                 };
@@ -275,13 +303,39 @@
             connect();
         },
 
-        _playVoice(url) {
-            if (!url) return;
-            // Respect browser autoplay policy — errors are silently ignored
+        speakText(text) {
+            if (!text || !("speechSynthesis" in window)) return;
+            try {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.rate = 1.0;
+                utterance.pitch = 1.0;
+                utterance.lang = "en-US";
+                const voices = window.speechSynthesis.getVoices();
+                if (voices && voices.length) {
+                    const chosen = voices.find(v => v.lang.startsWith("en") && (v.name.includes("Natural") || v.name.includes("Google") || v.name.includes("Online") || v.name.includes("English")));
+                    if (chosen) utterance.voice = chosen;
+                }
+                window.speechSynthesis.speak(utterance);
+            } catch (err) {
+                console.warn("[VoiceAlert] Speech synthesis notice:", err);
+            }
+        },
+
+        _playVoice(url, fallbackText) {
+            if (!url) {
+                if (fallbackText) this.speakText(fallbackText);
+                return;
+            }
             try {
                 const audio = new Audio(url);
-                audio.play().catch(() => {/* autoplay blocked; user will see voice button */});
-            } catch (_) { /* ignore */ }
+                audio.play().catch(() => {
+                    // Autoplay was blocked or audio failed; speak fallback text
+                    if (fallbackText) this.speakText(fallbackText);
+                });
+            } catch (_) {
+                if (fallbackText) this.speakText(fallbackText);
+            }
         },
 
         scheduleRefresh() {
@@ -305,19 +359,26 @@
                 if (voiceBtn) {
                     event.stopPropagation();
                     const src = voiceBtn.dataset.notificationVoice;
+                    const fallbackSpeech = voiceBtn.dataset.voiceText || "Voice alert";
+                    const icon = voiceBtn.querySelector("i");
+                    if (icon) icon.className = "fa-solid fa-spinner fa-spin";
+                    const resetIcon = () => {
+                        if (icon) icon.className = "fa-solid fa-volume-high";
+                    };
+
                     if (src) {
-                        const icon = voiceBtn.querySelector("i");
-                        if (icon) icon.className = "fa-solid fa-spinner fa-spin";
                         const audio = new Audio(src);
+                        audio.addEventListener("ended", resetIcon);
+                        audio.addEventListener("pause", resetIcon);
                         audio.play()
-                            .then(() => {
-                                if (icon) icon.className = "fa-solid fa-volume-high";
-                            })
                             .catch(err => {
-                                console.warn("[VoiceAlert] Playback notice:", err);
-                                if (icon) icon.className = "fa-solid fa-volume-high";
-                                window.open(src, "_blank");
+                                console.warn("[VoiceAlert] Audio clip failed, falling back to speech synthesis:", err);
+                                api.speakText(fallbackSpeech);
+                                resetIcon();
                             });
+                    } else {
+                        api.speakText(fallbackSpeech);
+                        setTimeout(resetIcon, 1200);
                     }
                     return;
                 }

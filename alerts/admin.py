@@ -12,6 +12,7 @@ from .models import (
     AlertCategory,
     AlertConfig,
     AlertState,
+    AlertNotification,
     AlertLog,
     UserAlertPreference,
 )
@@ -130,15 +131,18 @@ class VoiceOverAdmin(admin.ModelAdmin):
         voice = get_object_or_404(VoiceOver, pk=object_id)
         alert = voice.generate_test_alert()
         if alert and alert.audio_file:
+            mime_type = get_audio_mime_types(alert.audio_file)[0]
             messages.success(
                 request,
                 format_html(
-                    '<strong>Voice Alert Generated Successfully!</strong> Voiced by <em>{}</em>. '
+                    '<strong>Voice Alert Generated Successfully!</strong> Voiced by <em>{}</em> (reference clone: {}). '
                     '<div style="margin-top:6px;"><audio controls autoplay preload="auto" style="height:32px;vertical-align:middle;">'
-                    '<source src="{}" type="audio/mpeg"><source src="{}">'
+                    '<source src="{}" type="{}"><source src="{}">'
                     '</audio> <a href="{}" style="margin-left:8px;font-weight:bold;">View in Voice Alerts &rarr;</a></div>',
                     voice.name,
+                    "yes" if alert.voice_cloned else "no",
                     alert.audio_file.url,
+                    mime_type,
                     alert.audio_file.url,
                     reverse("admin:alerts_voicealert_changelist"),
                 )
@@ -163,11 +167,14 @@ class VoiceAlertAdmin(admin.ModelAdmin):
         "title",
         "speaker_display",
         "voice_over",
+        "voice_cloned",
         "duration_seconds",
+        "repeat_count",
+        "repeat_due_at",
         "audio_player",
         "created_at",
     )
-    list_filter = ("voice_over", "created_at")
+    list_filter = ("voice_cloned", "voice_over", "created_at")
     search_fields = (
         "title",
         "message",
@@ -178,6 +185,9 @@ class VoiceAlertAdmin(admin.ModelAdmin):
     readonly_fields = (
         "uuid",
         "audio_player",
+        "voice_cloned",
+        "repeat_due_at",
+        "repeat_count",
         "created_at",
     )
     fieldsets = (
@@ -185,10 +195,10 @@ class VoiceAlertAdmin(admin.ModelAdmin):
             "fields": ("uuid", "title", "message", "alert_config", "alert_state"),
         }),
         ("Voice Identity & Playback", {
-            "fields": ("voice_over", "speaker_user", "audio_file", "audio_player", "duration_seconds"),
+            "fields": ("voice_over", "speaker_user", "voice_cloned", "audio_file", "audio_player", "duration_seconds"),
         }),
         ("Analytics", {
-            "fields": ("is_played", "play_count", "created_at"),
+            "fields": ("is_played", "play_count", "repeat_due_at", "repeat_count", "created_at"),
         }),
     )
 
@@ -237,17 +247,38 @@ class AlertCategoryAdmin(admin.ModelAdmin):
 
 @admin.register(AlertConfig)
 class AlertConfigAdmin(admin.ModelAdmin):
-    list_display = ("alert_type", "priority", "category", "active", "last_triggered")
-    list_filter = ("alert_type", "priority", "active")
+    list_display = (
+        "alert_type",
+        "priority",
+        "voice_persistence_mode",
+        "voice_repeat_interval_seconds",
+        "voice_repeat_max_count",
+        "active",
+        "last_triggered",
+    )
+    list_filter = ("alert_type", "priority", "voice_persistence_mode", "active")
     search_fields = ("alert_type",)
     filter_horizontal = ("recipients", "target_sections", "target_groups", "target_treatment_plants")
 
 
 @admin.register(AlertState)
 class AlertStateAdmin(admin.ModelAdmin):
-    list_display = ("alert_config", "instance_ref", "state", "updated_at")
+    list_display = (
+        "alert_config", "instance_ref", "priority", "state", "escalation_count",
+        "repeat_count", "repeat_due_at", "escalation_due_at", "updated_at",
+    )
     list_filter = ("state",)
     search_fields = ("instance_ref",)
+    readonly_fields = ("repeat_due_at", "repeat_count", "created_at", "updated_at")
+
+
+@admin.register(AlertNotification)
+class AlertNotificationAdmin(admin.ModelAdmin):
+    list_display = ("title", "recipient", "alert_state", "sequence", "delivery_status", "attempts", "delivered_at", "acknowledged_at")
+    list_filter = ("delivery_status", "is_escalation", "priority", "created_at")
+    search_fields = ("title", "message", "recipient__username", "recipient__email", "alert_state__instance_ref")
+    readonly_fields = ("created_at", "updated_at", "last_attempt_at", "delivered_at", "delivery_results")
+    raw_id_fields = ("alert_state", "recipient")
 
 
 @admin.register(AlertLog)

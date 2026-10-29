@@ -80,17 +80,7 @@
                 <span class="completion-val">{{ completion.entered|default:0 }}/{{ completion.total|default:0 }} ({{ completion.percent|default:0 }}%)</span>
             </div>
             {% endif %}
-            {% if current_shift %}
-            <div class="shift-info-pill">
-                <i class="fa-regular fa-clock"></i>
-                <span class="shift-name">{{ current_shift.name }}</span>
-                {% if shift_supervisor %}
-                <span class="shift-sep">·</span>
-                <i class="fa-solid fa-user-tie"></i>
-                <span class="shift-supervisor">{{ shift_supervisor }}</span>
-                {% endif %}
-            </div>
-            {% endif %}
+
         </div>
 
         <div class="meta-right">

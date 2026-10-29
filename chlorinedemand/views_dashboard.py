@@ -7,6 +7,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Dict, Any, List, Optional
 
 from django.contrib import messages
+from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Case, F, IntegerField, OuterRef, Q, Subquery, Value, When
@@ -355,7 +356,17 @@ class ChlorineDemandDashboardView(WanjalaMixin, View):
             return render(request, self.partial_curve_template, context)
 
         if context["plant"] and request.GET.get("tab") == "reports":
-            reports, page, page_query = self._reports_context(request)
+            has_report_filters = any(k.startswith("report_") for k in request.GET)
+            cache_key = f"cd_reports_{context['plant'].pk}"
+            if not has_report_filters:
+                cached = cache.get(cache_key)
+                if cached:
+                    reports, page, page_query = cached
+                else:
+                    reports, page, page_query = self._reports_context(request)
+                    cache.set(cache_key, (reports, page, page_query), 180)
+            else:
+                reports, page, page_query = self._reports_context(request)
             context.update({"chlorine_reports": reports, "report_page_obj": page, "report_page_query": page_query})
 
         return render(request, self.template_name, context)

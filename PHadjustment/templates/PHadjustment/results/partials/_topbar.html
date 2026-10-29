@@ -11,10 +11,6 @@
 
         <div class="ph-telemetry-ticker">
             <div class="ph-ticker-chip">
-                <span class="chip-label">Plant:</span>
-                <span class="chip-val">{{ plant.name|default:"Main Plant" }}</span>
-            </div>
-            <div class="ph-ticker-chip">
                 <span class="chip-label">Raw Water pH:</span>
                 <span class="chip-val" style="color:#38bdf8;">{{ telemetry.raw_ph }}</span>
             </div>
@@ -52,16 +48,6 @@
     <div class="ph-control-bar">
         <!-- Left: Plant, Date & Linked Source Jar -->
         <div class="ph-session-meta">
-            <div class="ph-meta-pill">
-                <i class="fa-solid fa-industry text-emerald"></i>
-                <select name="plant" id="plant-select" class="ph-select" onchange="const u = new URL(window.location); u.searchParams.set('plant', this.value); window.location = u;">
-                    {% for p in available_plants %}
-                    <option value="{{ p.pk }}" {% if plant.pk == p.pk %}selected{% endif %}>
-                        {{ p.name }}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
 
             <div class="ph-meta-pill">
                 <i class="fa-regular fa-calendar-days text-cyan"></i>

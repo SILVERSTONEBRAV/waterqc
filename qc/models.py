@@ -65,6 +65,21 @@ class SamplingSchedule(models.Model):
         db_index=True,
     )
 
+    adaptive = models.BooleanField(
+        default=False,
+        help_text="Whether this schedule dynamically adapts to operational alerts.",
+    )
+
+    last_auto_update = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    adaptive_confidence = models.FloatField(
+        default=0.0,
+        help_text="Confidence score for adaptive interval decisions.",
+    )
+
     last_generated_at = models.DateTimeField(
         null=True,
         blank=True,

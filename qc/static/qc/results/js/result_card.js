@@ -108,6 +108,8 @@
 
     function buildCardsRefreshUrl() {
         const url = new URL(window.location.href);
+        const path = url.pathname.includes("/cards/") ? url.pathname : "/qca/results/cards/";
+        url.pathname = path;
         url.searchParams.set("partial", "cards");
         return `${url.pathname}${url.search}`;
     }
@@ -211,6 +213,8 @@
         if (!topbars) return;
 
         const url = new URL(window.location.href);
+        const path = url.pathname.includes("/cards/") ? url.pathname : "/qca/results/cards/";
+        url.pathname = path;
         url.searchParams.set("partial", "topbar");
 
         htmx.ajax("GET", `${url.pathname}${url.search}`, {
@@ -322,29 +326,7 @@
 
     function startPersistenceWatchdog() {
         clearInterval(persistenceWatchdogTimer);
-        // Run frequently to prevent any flickering or external CSS from hiding cards
-        persistenceWatchdogTimer = setInterval(() => {
-            enforceCardsVisibility();
-        }, 800);
-
-        // MutationObserver: catch ANY attribute/style change that hides cards
-        const container = getCardsContainer();
-        if (container && typeof MutationObserver !== "undefined") {
-            const observer = new MutationObserver((mutations) => {
-                for (const m of mutations) {
-                    if (m.type === "attributes" && m.attributeName === "style") {
-                        const el = m.target;
-                        if (el.classList.contains("result-card") || el.classList.contains("excel-card") || el.classList.contains("card-cycle-body")) {
-                            const cs = el.style;
-                            if (cs.display === "none" || cs.opacity === "0" || cs.visibility === "hidden") {
-                                enforceCardsVisibility();
-                            }
-                        }
-                    }
-                }
-            });
-            observer.observe(container, { attributes: true, subtree: true, attributeFilter: ["style", "class"] });
-        }
+        enforceCardsVisibility();
     }
 
     // Cycle ribbon removed — single current analysis card only
@@ -436,6 +418,10 @@
                     scheduleRefresh(true, false);
                     break;
                 case "results.changed": {
+                    const currentPlantId = document.body.dataset.plantId || new URLSearchParams(window.location.search).get("plant") || "";
+                    if (data.plant_id && currentPlantId && String(data.plant_id) !== String(currentPlantId)) {
+                        break;
+                    }
                     const eventId = data.event_id;
                     if (eventId && receivedRealtimeEvents.has(eventId)) break;
                     if (eventId) {
@@ -452,10 +438,15 @@
                 case "results.updated":
                 case "qc_results_updated":
                 case "dashboard.refresh":
-                case "dashboard_refresh":
+                case "dashboard_refresh": {
+                    const currentPlantId = document.body.dataset.plantId || new URLSearchParams(window.location.search).get("plant") || "";
+                    if (data.plant_id && currentPlantId && String(data.plant_id) !== String(currentPlantId)) {
+                        break;
+                    }
                     playSound("click");
                     scheduleRefresh(true, !["analysis.created", "analysis_created", "results.updated", "qc_results_updated"].includes(data.type));
                     break;
+                }
             }
         };
 
@@ -471,7 +462,10 @@
 
     window.addEventListener("qad:data-changed", event => {
         // QC cards consume the durable qc.results.changed stream instead.
-        if (event.detail?.app_label === "qc") return;
+        if (event.detail?.app_label === "qc") {
+            event.preventDefault();
+            return;
+        }
         const newAnalysis = event.detail && event.detail.model === "wateranalysis" && event.detail.action === "created";
         scheduleRefresh(true, !newAnalysis);
         event.preventDefault();
@@ -750,7 +744,7 @@
     });
 
     document.body.addEventListener("htmx:afterSwap", e => {
-        if (e.target.id === "cards-container" || e.target.id === "dashboard-topbars") {
+        if (e.target.id === "cards-container") {
             isBusy = false;
             preserveInputForNextSwap = true;
             dedupeTopbars();
@@ -760,14 +754,15 @@
             startLiveClock();
             initCompletionLifecycle();
             updateCompletedChips();
-            setTimeout(enforceCardsVisibility, 100);
-            setTimeout(enforceCardsVisibility, 500);
             if (hasQueuedRefresh && !isEditing && !document.hidden) {
                 const preserveInputState = queuedRefreshPreserveInput;
                 hasQueuedRefresh = false;
                 queuedRefreshPreserveInput = true;
                 scheduleRefresh(true, preserveInputState);
             }
+        } else if (e.target.id === "dashboard-topbars") {
+            dedupeTopbars();
+            startLiveClock();
         }
     });
 

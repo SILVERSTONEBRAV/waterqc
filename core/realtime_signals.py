@@ -113,7 +113,16 @@ def _plant_paths(model):
     return tuple("__".join(path) for path in walk(model) if path)
 
 
+_last_channel_layer_error_time = 0.0
+
+
 def _publish(app_label, model_name, action, plant_id):
+    global _last_channel_layer_error_time
+    import time
+    now_ts = time.time()
+    if now_ts - _last_channel_layer_error_time < 30.0:
+        return
+
     channel_layer = get_channel_layer()
     if channel_layer is None:
         return
@@ -135,8 +144,9 @@ def _publish(app_label, model_name, action, plant_id):
     try:
         for group in groups:
             async_to_sync(channel_layer.group_send)(group, event)
-    except Exception:
-        logger.exception("Live update broadcast failed for %s.%s", app_label, model_name)
+    except Exception as exc:
+        _last_channel_layer_error_time = time.time()
+        logger.warning("Live update broadcast skipped (%s); backoff active for 30s: %s.%s", exc, app_label, model_name)
 
 
 def _saved(sender, instance, created=False, **kwargs):

@@ -935,61 +935,13 @@ class DashboardView(CaWanjalaMixin, TemplateView):
         else:
             context["custom_report"] = {"kpis": {}, "parameters": [], "suppliers": []}
 
-        # 4. DASHBOARD 2 & 3 EMBEDDED CONTEXT (Operational SPC & Predictive ML)
-        if permissions["can_view_overview"]:
-            try:
-                from .dashboard2 import Dashboard2View
-                d2_view = Dashboard2View()
-                d2_view.request = self.request
-                d2_view.now = timezone.now()
-                d2_view.user = self.request.user
-                d2_view.params = d2_view._read_filters()
-                d2_view.models = d2_view._resolve_models()
-                d2_view.scope = d2_view._build_scope()
-                d2_view.data = d2_view._load_data()
-                d2_analysis = d2_view._build_analysis()
-                context["d2"] = d2_analysis
-                context["d2_json"] = json.dumps(
-                    d2_analysis,
-                    cls=DjangoJSONEncoder,
-                    default=str,
-                )
-                context["d2_filters"] = d2_view.params
-            except Exception as e:
-                import logging
-                logging.getLogger(__name__).warning("Dashboard2 context skipped: %s", e)
-                context["d2"] = {}
-                context["d2_json"] = "{}"
-                context["d2_filters"] = {}
-
-            try:
-                from .dashboard3 import Dashboard3View
-                d3_view = Dashboard3View()
-                d3_view.request = self.request
-                d3_view._now = timezone.now()
-                d3_view._filters = d3_view._get_filters()
-                d3_qs = d3_view.get_queryset()
-                d3_payload = d3_view._build_dashboard(d3_qs)
-                context["d3"] = d3_payload
-                context["d3_json"] = json.dumps(
-                    d3_payload,
-                    cls=DjangoJSONEncoder,
-                    default=str,
-                )
-                context["d3_filters"] = d3_view._filters
-            except Exception as e:
-                import logging
-                logging.getLogger(__name__).warning("Dashboard3 context skipped: %s", e)
-                context["d3"] = {}
-                context["d3_json"] = "{}"
-                context["d3_filters"] = {}
-        else:
-            context["d3"] = {}
-            context["d3_json"] = "{}"
-            context["d3_filters"] = {}
-            context["d2"] = {}
-            context["d2_json"] = "{}"
-            context["d2_filters"] = {}
+        # 4. DASHBOARD 2 & 3 EMBEDDED CONTEXT (Operational SPC & Predictive ML are available on dedicated views)
+        context["d2"] = {}
+        context["d2_json"] = "{}"
+        context["d2_filters"] = {}
+        context["d3"] = {}
+        context["d3_json"] = "{}"
+        context["d3_filters"] = {}
 
         return context
 

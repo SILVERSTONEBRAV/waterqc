@@ -1,138 +1,117 @@
 {% extends "weeklytasks/base.html" %}
 {% load static %}
 
-{% block content %}
+{% block title %}Weekly Tasks | Planning and Coverage{% endblock %}
+{% block extra_styles %}<link rel="stylesheet" href="{% static 'core/css/operations_dashboard.css' %}?v=20261028-operations">{% endblock %}
 
-<div class="container-fluid mt-3">
-
-    <!-- ================= HEADER ================= -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h3 class="mb-0">
-                📊 {{ app.label }}
-            </h3>
-            <small class="text-muted">
-                Registry-driven overview for "{{ app.name }}"
-            </small>
-        </div>
-
-        <div class="text-muted small">
-            Total: {{ stats.total_models }} models
-        </div>
+{% block page_content %}
+<div class="ops-dashboard weekly-dashboard">
+  <section class="ops-hero" id="overview">
+    <div class="ops-hero__copy">
+      <span class="ops-eyebrow"><i class="fas fa-calendar-check"></i> WEEKLY TASKS · DUTY PLANNING</span>
+      <h1>Weekly task operations</h1>
+      <p>Review duty plans, task assignments and shift coverage from the live planning records.</p>
+      <div class="ops-hero__meta">
+        <span><i class="far fa-calendar"></i> {{ today|date:"l, d F Y" }}</span>
+        <span><i class="fas fa-calendar-week"></i> This week · {{ week_label }}</span>
+        <span><i class="fas fa-location-dot"></i> {% if selected_plant %}{{ selected_plant.name }}{% else %}All treatment plants{% endif %}</span>
+      </div>
     </div>
-
-
-    <!-- ================= STATS ================= -->
-    <div class="row g-3 mb-4">
-
-        {% for key, value in stats.items %}
-        <div class="col-md-3">
-            <div class="card shadow-sm border-0">
-                <div class="card-body">
-                    <small class="text-muted">{{ key|title }}</small>
-                    <h3 class="mb-0">{{ value }}</h3>
-                </div>
-            </div>
-        </div>
-        {% endfor %}
-
+    <div class="ops-hero__actions">
+      {% if show_plant_selector %}
+      <form method="get" class="ops-plant-filter">
+        <input type="hidden" name="section" value="overview">
+        <label for="weekly-plant">Treatment plant</label>
+        <select name="plant" id="weekly-plant" onchange="this.form.submit()">
+          <option value="">All plants</option>
+          {% for plant in plant_options %}<option value="{{ plant.pk }}" {% if selected_plant.pk == plant.pk %}selected{% endif %}>{{ plant.code }} · {{ plant.name }}</option>{% endfor %}
+        </select>
+      </form>
+      {% endif %}
+      <a class="ops-refresh" href="{% url 'weeklytasks:dashboard' %}{% if selected_plant %}?plant={{ selected_plant.pk }}{% endif %}"><i class="fas fa-rotate-right"></i> Refresh view</a>
     </div>
+    <div class="ops-hero__signal"><span class="ops-live-dot"></span><span>PLANNING DESK</span><strong>Current plan</strong></div>
+  </section>
 
+  <section class="ops-kpi-grid" aria-label="Weekly task key performance indicators">
+    {% for item in kpis %}
+      <a class="ops-kpi ops-kpi--{{ item.tone }}" href="{% url 'weeklytasks:dashboard' %}?{% if selected_plant %}plant={{ selected_plant.pk }}&amp;{% endif %}section={{ item.target }}#{{ item.target }}">
+        <div class="ops-kpi__top"><span>{{ item.label }}</span><i class="fas fa-{{ item.icon }}"></i></div>
+        <strong>{{ item.value }}</strong>
+        <small>{{ item.detail }}</small>
+      </a>
+    {% endfor %}
+  </section>
 
-    <!-- ================= MODELS ================= -->
-    <div class="card shadow-sm border-0">
+  <section class="ops-two-col">
+    <article class="ops-panel ops-chart-panel"><div class="ops-panel__heading"><div><span class="ops-eyebrow">WEEKLY RHYTHM</span><h3>Daily assignment load</h3><span class="ops-muted">Planned people assignments by date</span></div></div><div class="ops-chart-box"><canvas id="weeklyAssignmentTrend" aria-label="Daily task assignments for the current week"></canvas></div></article>
+    <article class="ops-panel ops-chart-panel" id="shift-load"><div class="ops-panel__heading"><div><span class="ops-eyebrow">SHIFT DISTRIBUTION</span><h3>Planned shifts</h3><span class="ops-muted">Upcoming two weeks</span></div></div><div class="ops-chart-box"><canvas id="weeklyShiftDistribution" aria-label="Assignment distribution by shift"></canvas></div></article>
+  </section>
 
-        <div class="card-header bg-light">
-            <strong>Registered Models</strong>
-        </div>
+  <section class="ops-section" id="schedules">
+    <div class="ops-section-heading"><div><span class="ops-eyebrow">MONTHLY DUTY SCHEDULES</span><h2>Schedules</h2><p>Monthly schedule records with plant, section and schedule owner.</p></div><span class="ops-count-pill">{{ kpis.1.value }} this month</span></div>
+    <article class="ops-panel"><div class="ops-table-wrap"><table class="ops-table"><thead><tr><th>Schedule</th><th>Treatment plant</th><th>Section</th><th>Weeks in plan</th><th>Created by</th><th>Updated</th></tr></thead><tbody>
+      {% for schedule in recent_schedules %}<tr><td class="ops-strong">{{ schedule.month }}/{{ schedule.year }}</td><td>{{ schedule.treatment_plant.name }}</td><td>{{ schedule.section.name }}</td><td>{{ schedule.weeks.count }}</td><td>{{ schedule.created_by.get_full_name|default:schedule.created_by.username|default:"—" }}</td><td>{{ schedule.updated_at|date:"d M Y" }}</td></tr>
+      {% empty %}<tr><td colspan="6"><div class="ops-empty"><i class="fas fa-calendar-xmark"></i><strong>No monthly schedule records</strong><span>Create a monthly schedule to start building the duty plan.</span></div></td></tr>{% endfor %}
+    </tbody></table></div></article>
+  </section>
 
-        <div class="card-body p-0">
+  <section class="ops-section" id="weeks">
+    <div class="ops-section-heading"><div><span class="ops-eyebrow">WEEK WINDOWS</span><h2>Duty weeks</h2><p>Current and upcoming week windows covered by monthly schedules.</p></div><span class="ops-count-pill">{{ weeks|length }} shown</span></div>
+    <article class="ops-panel"><div class="ops-table-wrap"><table class="ops-table"><thead><tr><th>Week window</th><th>Schedule</th><th>Plant</th><th>Section</th><th>Task plans</th><th>Daily assignments</th></tr></thead><tbody>
+      {% for week in weeks %}<tr><td class="ops-strong">{{ week.start_date|date:"d M" }} – {{ week.end_date|date:"d M Y" }}</td><td>{{ week.schedule.month }}/{{ week.schedule.year }}</td><td>{{ week.schedule.treatment_plant.name }}</td><td>{{ week.schedule.section.name }}</td><td>{{ week.task_count }}</td><td>{{ week.daily_assignment_count }}</td></tr>
+      {% empty %}<tr><td colspan="6"><div class="ops-empty"><i class="fas fa-calendar-week"></i><strong>No week windows in the planning horizon</strong><span>Week windows are generated as part of the monthly duty schedule.</span></div></td></tr>{% endfor %}
+    </tbody></table></div></article>
+  </section>
 
-            {% for m in models %}
+  <section class="ops-section" id="weekly-plans">
+    <div class="ops-section-heading"><div><span class="ops-eyebrow">TASK PLANNING</span><h2>Weekly duty tasks</h2><p>Task plans active during the current week, linked to their standard task templates.</p></div><span class="ops-count-pill">{{ current_tasks|length }} shown</span></div>
+    <article class="ops-panel"><div class="ops-table-wrap"><table class="ops-table"><thead><tr><th>Task</th><th>Code</th><th>Section</th><th>Week</th><th>Daily assignments</th><th>Assignment status</th></tr></thead><tbody>
+      {% for task in current_tasks %}<tr><td class="ops-strong">{{ task.task_template.name }}</td><td>{{ task.task_template.code }}</td><td>{{ task.section.name }}</td><td>{{ task.week.start_date|date:"d M" }} – {{ task.week.end_date|date:"d M" }}</td><td>{{ task.assignment_count }}</td><td>{% if task.assignment_count %}<span class="ops-chip ops-chip--green">Staff assigned</span>{% else %}<span class="ops-chip ops-chip--amber">Needs assignment</span>{% endif %}</td></tr>
+      {% empty %}<tr><td colspan="6"><div class="ops-empty"><i class="fas fa-list-check"></i><strong>No task plans for this week</strong><span>Weekly task plans will appear here once they are attached to a duty week.</span></div></td></tr>{% endfor %}
+    </tbody></table></div></article>
+    <div class="ops-section-heading ops-subheading"><div><h3>Tasks without assignees</h3><p>Task plans over the next 30 days that have no daily assignment in the plan window.</p></div><span class="ops-count-pill">{{ unstaffed_tasks|length }} flagged</span></div>
+    <article class="ops-panel"><div class="ops-table-wrap"><table class="ops-table"><thead><tr><th>Task</th><th>Section</th><th>Plant</th><th>Week</th><th>Planning window</th></tr></thead><tbody>
+      {% for task in unstaffed_tasks %}<tr><td class="ops-strong">{{ task.task_template.name }}</td><td>{{ task.section.name }}</td><td>{{ task.treatment_plant.name }}</td><td>{{ task.week.start_date|date:"d M" }} – {{ task.week.end_date|date:"d M" }}</td><td><span class="ops-chip ops-chip--amber">No assignments</span></td></tr>
+      {% empty %}<tr><td colspan="5"><div class="ops-empty"><i class="fas fa-circle-check"></i><strong>All tasks in the horizon have assignments</strong><span>No unstaffed plans were found for the next 30 days.</span></div></td></tr>{% endfor %}
+    </tbody></table></div></article>
+  </section>
 
-                <div class="d-flex justify-content-between align-items-center px-3 py-3 border-bottom">
+  <section class="ops-section" id="daily-assignments">
+    <div class="ops-section-heading"><div><span class="ops-eyebrow">PEOPLE & DAILY PLAN</span><h2>Daily assignments</h2><p>Scheduled team members and task details for the next 14 days.</p></div><span class="ops-count-pill">{{ daily_assignment_count }} planned in 30 days</span></div>
+    <article class="ops-panel"><div class="ops-table-wrap"><table class="ops-table"><thead><tr><th>Date</th><th>Person</th><th>Section</th><th>Task</th><th>Shift</th><th>Remarks</th></tr></thead><tbody>
+      {% for assignment in daily_assignment_rows %}<tr><td>{{ assignment.date|date:"D, d M" }}</td><td class="ops-strong">{{ assignment.user.get_full_name|default:assignment.user.username }}</td><td>{{ assignment.user.section.name|default:assignment.task.section.name }}</td><td>{{ assignment.task.task_template.name }}</td><td>{% if assignment.shift %}{{ assignment.shift.name }} <small>({{ assignment.shift.start_time|time:"H:i" }})</small>{% else %}<span class="ops-chip ops-chip--rose">Not set</span>{% endif %}</td><td>{{ assignment.remarks|default:"—"|truncatechars:80 }}</td></tr>
+      {% empty %}<tr><td colspan="6"><div class="ops-empty"><i class="fas fa-user-clock"></i><strong>No daily assignments in the next two weeks</strong><span>Assignments appear here when people are scheduled against weekly duty tasks.</span></div></td></tr>{% endfor %}
+    </tbody></table></div></article>
+  </section>
 
-                    <!-- LEFT -->
-                    <div class="d-flex align-items-center">
+  <section class="ops-section" id="section-load">
+    <div class="ops-section-heading"><div><span class="ops-eyebrow">WORKLOAD BALANCE</span><h2>Section workload</h2><p>Task plan count and people assignments by section over the next 30 days.</p></div></div>
+    <article class="ops-panel"><div class="ops-table-wrap"><table class="ops-table"><thead><tr><th>Section</th><th>Weekly task plans</th><th>Plans with assignees</th><th>People assignments</th><th>Staffing coverage</th></tr></thead><tbody>
+      {% for row in section_rows %}<tr><td class="ops-strong">{{ row.name }}</td><td>{{ row.tasks }}</td><td>{{ row.tasks_with_assignees }}</td><td>{{ row.assignments }}</td><td><div class="ops-progress"><span style="width:{{ row.coverage }}%"></span></div><small>{{ row.coverage }}% · {{ row.tasks_with_assignees }} / {{ row.tasks }} tasks assigned</small></td></tr>
+      {% empty %}<tr><td colspan="5"><div class="ops-empty"><i class="fas fa-layer-group"></i><strong>No planned work by section</strong><span>Section load is calculated from task plans and their daily assignments.</span></div></td></tr>{% endfor %}
+    </tbody></table></div></article>
+  </section>
 
-                        <div class="me-3">
-                            <i class="fas fa-{{ m.icon|default:'cube' }} fa-lg text-primary"></i>
-                        </div>
+  <section class="ops-section" id="shift-gaps">
+    <div class="ops-section-heading"><div><span class="ops-eyebrow">SHIFT COVERAGE</span><h2>Assignments without a shift</h2><p>Daily task assignments for the next 14 days where shift selection is missing.</p></div><span class="ops-count-pill">{{ missing_shift_assignments|length }} shown</span></div>
+    <article class="ops-panel"><div class="ops-table-wrap"><table class="ops-table"><thead><tr><th>Date</th><th>Person</th><th>Task</th><th>Section</th><th>Shift status</th></tr></thead><tbody>
+      {% for assignment in missing_shift_assignments %}<tr><td>{{ assignment.date|date:"D, d M" }}</td><td class="ops-strong">{{ assignment.user.get_full_name|default:assignment.user.username }}</td><td>{{ assignment.task.task_template.name }}</td><td>{{ assignment.task.section.name }}</td><td><span class="ops-chip ops-chip--rose">Shift not selected</span></td></tr>
+      {% empty %}<tr><td colspan="5"><div class="ops-empty"><i class="fas fa-circle-check"></i><strong>No upcoming shift gaps</strong><span>All assignments in the two-week window have a shift selected.</span></div></td></tr>{% endfor %}
+    </tbody></table></div></article>
+  </section>
 
-                        <div>
-                            <div class="fw-semibold">
-                                {{ m.label }}
-                            </div>
-
-                            <small class="text-muted">
-                                {{ m.key }}
-                            </small>
-
-                            <!-- TAGS (pure registry-driven) -->
-                            <div class="mt-1">
-                                {% for tag in m.tags %}
-                                    <span class="badge bg-secondary">{{ tag }}</span>
-                                {% empty %}
-                                    <span class="text-muted small">No tags</span>
-                                {% endfor %}
-                            </div>
-                        </div>
-                    </div>
-
-
-                    <!-- RIGHT ACTIONS (registry-driven ONLY) -->
-                    <div class="d-flex align-items-center gap-2">
-
-                        {% with r=m.routes c=m.capabilities %}
-
-                            <a href="{{ r.list }}"
-                               class="btn btn-sm btn-outline-primary">
-                                <i class="fas fa-list"></i>
-                                List
-                            </a>
-
-                            {% if c.create %}
-                                <a href="{{ r.create }}"
-                                   class="btn btn-sm btn-outline-success">
-                                    <i class="fas fa-plus"></i>
-                                    Create
-                                </a>
-                            {% endif %}
-
-                            {% if c.export %}
-                                <a href="{{ r.export }}"
-                                   class="btn btn-sm btn-outline-warning">
-                                    <i class="fas fa-file-export"></i>
-                                    Export
-                                </a>
-                            {% endif %}
-
-                            {% if c.inline %}
-                                <a href="{{ r.update }}"
-                                   class="btn btn-sm btn-outline-info">
-                                    <i class="fas fa-edit"></i>
-                                    Inline
-                                </a>
-                            {% endif %}
-
-                        {% endwith %}
-
-                    </div>
-
-                </div>
-
-            {% empty %}
-
-                <div class="text-center text-muted py-5">
-                    <i class="fas fa-database fa-2x mb-2"></i>
-                    <div>No models registered for this app</div>
-                </div>
-
-            {% endfor %}
-
-        </div>
-    </div>
-
+  <section class="ops-section" id="task-library">
+    <div class="ops-section-heading"><div><span class="ops-eyebrow">STANDARD TASK CATALOGUE</span><h2>Task library</h2><p>Active reusable tasks available to weekly plans.</p></div><span class="ops-count-pill">{{ template_rows|length }} shown</span></div>
+    <div class="ops-people-grid">{% for task in template_rows %}<article class="ops-person-card"><div class="ops-avatar"><i class="fas fa-list-check"></i></div><div><strong>{{ task.name }}</strong><span>{{ task.code }}</span><small>{{ task.description|default:"No description provided"|truncatechars:110 }}</small></div><span class="ops-chip ops-chip--green">ACTIVE</span></article>{% empty %}<div class="ops-empty"><i class="fas fa-book-open"></i><strong>No active task templates</strong><span>Active standard weekly tasks appear here.</span></div>{% endfor %}</div>
+  </section>
 </div>
+{{ trend|json_script:"weekly-trend-data" }}
+{{ shift_chart|json_script:"weekly-shift-data" }}
+{% endblock %}
 
+{% block extra_scripts %}
+{{ block.super }}
+<script src="{% static 'js/Chart.min.js' %}"></script>
+<script src="{% static 'weeklytasks/js/dashboard.js' %}?v=20261028-operations"></script>
 {% endblock %}
